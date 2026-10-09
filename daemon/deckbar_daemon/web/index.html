@@ -84,6 +84,29 @@
         <p class="hint small" hidden>Der Desktop-Hintergrund wird weichgezeichnet und folgt einem Wechsel automatisch. Die Vorschau zeigt den Hintergrund nach dem Speichern.</p>
         <p class="hint small" id="layout-path"></p>
       </div>
+
+      <div class="card" id="dps-card">
+        <div class="card-head">
+          <h2>AION 2 DPS-Meter</h2>
+          <span class="chip" id="dps-chip"><span class="dot"></span><span id="dps-status">…</span></span>
+        </div>
+        <label class="check" style="margin-bottom:10px"><input type="checkbox" id="dps-enabled"> Daten vom A2Tools DPS Meter holen</label>
+        <label>Verbindung
+          <select id="dps-source">
+            <option value="auto">Automatisch (Einstellungen des A2Tools-Meters)</option>
+            <option value="manual">Port und Schlüssel von Hand</option>
+          </select>
+        </label>
+        <div class="grid2" id="dps-manual" style="margin-top:10px" hidden>
+          <label>Port<input id="dps-port" type="number" min="1024" max="65535"></label>
+          <label>Schlüssel<input id="dps-key" type="password" autocomplete="off" spellcheck="false" placeholder="key=… aus der Overlay-URL"></label>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <label>Bei Kampfbeginn zeigen<select id="dps-page"></select></label>
+          <label>Zurück nach (s, 0 = nie)<input id="dps-return" type="number" min="0" max="600"></label>
+        </div>
+        <p class="hint small" id="dps-hint"></p>
+      </div>
     </div>
 
     <div class="col props-col">

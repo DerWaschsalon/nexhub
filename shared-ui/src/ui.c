@@ -26,7 +26,31 @@
 #define HELLO_TIMEOUT_MS 5000
 #define CACHE_KEY "layout"
 
-typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA } it_type_t;
+typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS } it_type_t;
+
+#define DPS_MAX_ROWS 8
+
+typedef struct {
+    lv_obj_t *row;   /* Zeile (Hintergrundspur) */
+    lv_obj_t *bar;   /* Balken in Klassenfarbe, Breite = DPS relativ zum Besten */
+    lv_obj_t *name;
+    lv_obj_t *val;   /* DPS */
+    lv_obj_t *extra; /* Anteil oder Gesamtschaden */
+} dps_row_t;
+
+/* DPS-Kachel: Kopfzeile (Ziel, HP, Zeit) und bis zu 8 vorab angelegte Zeilen */
+typedef struct {
+    int n;          /* angelegte Zeilen */
+    int extra;      /* 0 = Anteil, 1 = Schaden, 2 = nichts */
+    int32_t bar_w;  /* volle Balkenbreite */
+    lv_obj_t *target;
+    lv_obj_t *time;
+    lv_obj_t *hp_track; /* dünne Spur unter der Kopfzeile … */
+    lv_obj_t *hp;       /* … mit den Rest-HP des Bosses */
+    int32_t hp_w;
+    lv_obj_t *msg;  /* „nicht verbunden“ / „Warte auf Kampf“ */
+    dps_row_t rows[DPS_MAX_ROWS];
+} dps_view_t;
 
 typedef struct {
     char id[ID_LEN];
@@ -50,6 +74,7 @@ typedef struct {
     lv_obj_t *cover;   /* Media: Cover-Bild (über dem Platzhalter-Icon in t->icon) */
     int32_t cover_px;  /* Media: Kantenlänge des Covers, 0 = keins */
     bool flat;         /* Media: einzeiliges Layout, Text wird vertikal zentriert */
+    dps_view_t *dps;   /* DPS-Kachel */
 
     bool checked;
     bool muted;
@@ -496,6 +521,8 @@ static void media_update(tile_t *t)
     if (t->icon) lv_obj_set_style_text_opa(t->icon, playing ? LV_OPA_COVER : 140, 0);
 }
 
+static void dps_update(tile_t *t);
+
 static void apply_state_key(const char *key, const cJSON *val)
 {
     bool media = !strcmp(key, "track") || !strcmp(key, "playing");
@@ -504,6 +531,10 @@ static void apply_state_key(const char *key, const cJSON *val)
         tile_t *t = &ui.tiles[i];
         if (t->type == IT_MEDIA) {
             if (media) media_update(t);
+            continue;
+        }
+        if (t->type == IT_DPS) {
+            if (!strcmp(key, "dps")) dps_update(t);
             continue;
         }
         if (t->bind[0] && !strcmp(t->bind, key)) {
@@ -527,8 +558,10 @@ static void apply_full_state(void)
 {
     const cJSON *it;
     cJSON_ArrayForEach(it, ui.state) apply_state_key(it->string, it);
-    for (int i = 0; i < ui.tile_count; i++)
+    for (int i = 0; i < ui.tile_count; i++) {
         if (ui.tiles[i].type == IT_MEDIA) media_update(&ui.tiles[i]);
+        if (ui.tiles[i].type == IT_DPS) dps_update(&ui.tiles[i]);
+    }
 }
 
 /* ======================================================================= Kacheln: Events */
@@ -851,6 +884,206 @@ static void build_media(tile_t *t, int32_t w, int32_t h)
     media_show_cover(t);
 }
 
+/* ======================================================================= DPS (AION 2) */
+
+static lv_color_t class_color(const char *cls)
+{
+    static const struct {
+        const char *name;
+        uint32_t rgb;
+    } map[] = {
+        {"gladiator", 0xE8A33D}, {"templar", 0x5B8DEF},      {"ranger", 0x6CCB5F},
+        {"assassin", 0xB46AE6},  {"sorcerer", 0x4FC3F7},     {"cleric", 0xF4E07A},
+        {"spiritmaster", 0xEC7FB8}, {"chanter", 0x4DD4B0}, {"brawler", 0xF0624D},
+    };
+    for (size_t i = 0; cls && i < sizeof map / sizeof map[0]; i++)
+        if (!strcmp(map[i].name, cls)) return lv_color_hex(map[i].rgb);
+    return lv_color_hex(0x8E8E93);
+}
+
+/* 8432 · 18,4k · 1,23M (deutsche Schreibweise) */
+static void fmt_amount(char *buf, size_t n, double v)
+{
+    if (v < 0) v = 0;
+    if (v >= 1e9) snprintf(buf, n, "%.2fG", v / 1e9);
+    else if (v >= 1e6) snprintf(buf, n, "%.2fM", v / 1e6);
+    else if (v >= 1e4) snprintf(buf, n, "%.1fk", v / 1e3);
+    else snprintf(buf, n, "%.0f", v);
+    for (char *c = buf; *c; c++)
+        if (*c == '.') *c = ',';
+}
+
+/* nur bei Änderung neu setzen, spart Neuzeichnen bei ~3 Updates pro Sekunde */
+static void set_text(lv_obj_t *l, const char *txt)
+{
+    if (strcmp(lv_label_get_text(l), txt)) lv_label_set_text(l, txt);
+}
+
+static void set_hidden(lv_obj_t *o, bool hidden)
+{
+    if (hidden) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void dps_update(tile_t *t)
+{
+    dps_view_t *v = t->dps;
+    if (!v) return;
+    const cJSON *d = cJSON_GetObjectItemCaseSensitive(ui.state, "dps");
+    const cJSON *rows = cJSON_IsObject(d) ? cJSON_GetObjectItemCaseSensitive(d, "rows") : NULL;
+    int count = cJSON_IsArray(rows) ? cJSON_GetArraySize(rows) : 0;
+    char buf[48];
+
+    if (v->target) {
+        const char *target = cJSON_IsObject(d) ? jstr(d, "target") : NULL;
+        set_text(v->target, target && *target ? target : "AION 2");
+        int secs = cJSON_IsObject(d) ? jint(d, "time", 0) : 0;
+        const cJSON *hp = cJSON_IsObject(d) ? cJSON_GetObjectItemCaseSensitive(d, "hp") : NULL;
+        if (!count) buf[0] = 0;
+        else if (cJSON_IsNumber(hp))
+            snprintf(buf, sizeof buf, "%.0f %% · %d:%02d", hp->valuedouble, secs / 60, secs % 60);
+        else snprintf(buf, sizeof buf, "%d:%02d", secs / 60, secs % 60);
+        set_text(v->time, buf);
+        if (count && cJSON_IsNumber(hp)) {
+            int32_t w = (int32_t)(v->hp_w * LV_CLAMP(0.0, hp->valuedouble, 100.0) / 100.0);
+            lv_obj_set_width(v->hp, LV_MAX(w, 1));
+            set_hidden(v->hp_track, false);
+        } else set_hidden(v->hp_track, true);
+    }
+
+    set_text(v->msg, !cJSON_IsObject(d) ? "DPS-Meter nicht verbunden" : "Warte auf Kampf …");
+    set_hidden(v->msg, count > 0);
+
+    double best = 1;
+    for (int i = 0; i < count && i < v->n; i++) {
+        const cJSON *x = cJSON_GetObjectItemCaseSensitive(cJSON_GetArrayItem(rows, i), "dps");
+        if (cJSON_IsNumber(x) && x->valuedouble > best) best = x->valuedouble;
+    }
+    for (int i = 0; i < v->n; i++) {
+        dps_row_t *r = &v->rows[i];
+        const cJSON *jr = i < count ? cJSON_GetArrayItem(rows, i) : NULL;
+        set_hidden(r->row, !cJSON_IsObject(jr));
+        if (!cJSON_IsObject(jr)) continue;
+        const cJSON *dps = cJSON_GetObjectItemCaseSensitive(jr, "dps");
+        double x = cJSON_IsNumber(dps) ? dps->valuedouble : 0;
+        const char *name = jstr(jr, "name");
+        snprintf(buf, sizeof buf, "%d  %s", i + 1, name ? name : "?");
+        set_text(r->name, buf);
+        fmt_amount(buf, sizeof buf, x);
+        set_text(r->val, buf);
+        if (r->extra) {
+            if (v->extra == 0) {
+                const cJSON *pct = cJSON_GetObjectItemCaseSensitive(jr, "pct");
+                snprintf(buf, sizeof buf, "%.0f %%", cJSON_IsNumber(pct) ? pct->valuedouble : 0.0);
+            } else {
+                const cJSON *dmg = cJSON_GetObjectItemCaseSensitive(jr, "dmg");
+                fmt_amount(buf, sizeof buf, cJSON_IsNumber(dmg) ? dmg->valuedouble : 0);
+            }
+            set_text(r->extra, buf);
+        }
+        lv_obj_set_width(r->bar, LV_MAX((int32_t)(v->bar_w * x / best), 6));
+        lv_obj_set_style_bg_color(r->bar, class_color(jstr(jr, "cls")), 0);
+        bool you = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(jr, "you"));
+        lv_obj_set_style_border_opa(r->row, you ? 230 : LV_OPA_TRANSP, 0);
+    }
+}
+
+/*
+ * DPS-Kachel
+ *   ab h >= 90: Kopfzeile mit Ziel, HP und Kampfzeit, darunter dünner HP-Balken
+ *   dann `players` Zeilen: [Rang Name ......... DPS  Anteil], Balken in Klassenfarbe
+ */
+static void build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *extra)
+{
+    lv_obj_t *o = t->obj;
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_clip_corner(o, true, 0);
+    dps_view_t *v = lv_malloc_zeroed(sizeof *v);
+    if (!v) return;
+    t->dps = v;
+    v->extra = extra && !strcmp(extra, "dmg") ? 1 : extra && !strcmp(extra, "none") ? 2 : 0;
+
+    const int32_t px = 10, gap = 3;
+    int32_t y = 7;
+    if (h >= 90) {
+        int32_t ls = lv_font_get_line_height(&db_font_small);
+        v->time = text_label(o, &db_font_small, "");
+        lv_obj_add_style(v->time, &db_theme.text_dim, 0);
+        lv_obj_align(v->time, LV_ALIGN_TOP_RIGHT, -px - 2, y);
+        v->target = text_label(o, &db_font_small, "AION 2");
+        lv_obj_add_style(v->target, &db_theme.text_dim, 0);
+        lv_label_set_long_mode(v->target, LV_LABEL_LONG_DOT);
+        lv_obj_set_size(v->target, w - 2 * px - 120, ls);
+        lv_obj_set_pos(v->target, px + 2, y);
+        y += ls + 3;
+        v->hp_w = w - 2 * px;
+        v->hp_track = plain_obj(o);
+        lv_obj_set_size(v->hp_track, v->hp_w, 2);
+        lv_obj_set_pos(v->hp_track, px, y);
+        lv_obj_set_style_bg_color(v->hp_track, lv_color_white(), 0);
+        lv_obj_set_style_bg_opa(v->hp_track, 28, 0);
+        lv_obj_add_flag(v->hp_track, LV_OBJ_FLAG_HIDDEN);
+        v->hp = plain_obj(v->hp_track);
+        lv_obj_set_size(v->hp, v->hp_w, 2);
+        lv_obj_set_style_bg_color(v->hp, lv_color_hex(0xFF453A), 0);
+        lv_obj_set_style_bg_opa(v->hp, 210, 0);
+        y += 2 + 4;
+    }
+
+    int32_t avail = h - y - 7;
+    int n = LV_CLAMP(1, players, DPS_MAX_ROWS);
+    while (n > 1 && (avail - (n - 1) * gap) / n < 16) n--;
+    /* wenige Spieler: höhere Zeilen und größere Schrift */
+    int32_t row_h = LV_MIN((avail - (n - 1) * gap) / n, 40);
+    const lv_font_t *font = row_h >= 34 ? &db_font_title : row_h >= 20 ? &db_font_label : &db_font_small;
+    int32_t extra_w = v->extra == 2 ? 0 : (v->extra == 1 ? 58 : 44);
+    v->n = n;
+    v->bar_w = w - 2 * px;
+
+    for (int i = 0; i < n; i++) {
+        dps_row_t *r = &v->rows[i];
+        r->row = plain_obj(o);
+        lv_obj_set_size(r->row, v->bar_w, row_h);
+        lv_obj_set_pos(r->row, px, y + i * (row_h + gap));
+        lv_obj_set_style_radius(r->row, 7, 0);
+        lv_obj_set_style_clip_corner(r->row, true, 0);
+        lv_obj_set_style_bg_color(r->row, lv_color_white(), 0);
+        lv_obj_set_style_bg_opa(r->row, 14, 0);
+        /* Rahmen in Akzentfarbe markiert die eigene Zeile */
+        lv_obj_set_style_border_width(r->row, 1, 0);
+        lv_obj_set_style_border_color(r->row, db_theme_color(DB_STYLE_ACCENT), 0);
+        lv_obj_set_style_border_opa(r->row, LV_OPA_TRANSP, 0);
+
+        r->bar = plain_obj(r->row);
+        lv_obj_set_size(r->bar, 6, LV_PCT(100));
+        lv_obj_set_style_radius(r->bar, 7, 0);
+        lv_obj_set_style_bg_opa(r->bar, 120, 0);
+
+        r->name = text_label(r->row, font, "");
+        lv_label_set_long_mode(r->name, LV_LABEL_LONG_DOT);
+        lv_obj_set_size(r->name, v->bar_w - 16 - extra_w - 64, lv_font_get_line_height(font));
+        lv_obj_align(r->name, LV_ALIGN_LEFT_MID, 8, 0);
+
+        if (extra_w) {
+            r->extra = text_label(r->row, &db_font_small, "");
+            lv_obj_add_style(r->extra, &db_theme.text_dim, 0);
+            lv_obj_set_width(r->extra, extra_w);
+            lv_obj_set_style_text_align(r->extra, LV_TEXT_ALIGN_RIGHT, 0);
+            lv_obj_align(r->extra, LV_ALIGN_RIGHT_MID, -8, 0);
+        }
+        r->val = text_label(r->row, font, "");
+        lv_obj_set_width(r->val, 64);
+        lv_obj_set_style_text_align(r->val, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_align(r->val, LV_ALIGN_RIGHT_MID, -8 - extra_w - (extra_w ? 6 : 0), 0);
+        lv_obj_add_flag(r->row, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    v->msg = text_label(o, &db_font_label, "");
+    lv_obj_add_style(v->msg, &db_theme.text_dim, 0);
+    lv_obj_align(v->msg, LV_ALIGN_CENTER, 0, v->target ? 8 : 0);
+    dps_update(t);
+}
+
 /* ======================================================================= Seiten */
 
 static void update_dots(void)
@@ -895,6 +1128,7 @@ static void free_tiles(void)
         tile_t *t = &ui.tiles[i];
         lv_anim_delete(t, fill_anim_cb);
         if (t->timer) lv_timer_delete(t->timer);
+        lv_free(t->dps);
     }
     lv_free(ui.tiles);
     ui.tiles = NULL;
@@ -906,6 +1140,7 @@ static it_type_t parse_type(const char *s)
     if (s && !strcmp(s, "toggle")) return IT_TOGGLE;
     if (s && !strcmp(s, "slider")) return IT_SLIDER;
     if (s && !strcmp(s, "media")) return IT_MEDIA;
+    if (s && !strcmp(s, "dps")) return IT_DPS;
     return IT_BUTTON;
 }
 
@@ -975,6 +1210,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         switch (t->type) {
         case IT_SLIDER: build_slider(t, pw, ph, jstr(ji, "label")); break;
         case IT_MEDIA: build_media(t, pw, ph); break;
+        case IT_DPS: build_dps(t, pw, ph, jint(ji, "players", 5), jstr(ji, "extra")); break;
         default: build_button(t, pw, ph, jstr(ji, "label")); break;
         }
     }
@@ -1077,6 +1313,7 @@ static void send_hello(void)
     cJSON_AddStringToObject(o, "type", "hello");
     cJSON_AddStringToObject(o, "token", ui.cfg.token ? ui.cfg.token : "");
     if (ui.layout_hash[0]) cJSON_AddStringToObject(o, "layout_hash", ui.layout_hash);
+    if (ui.page_count) cJSON_AddStringToObject(o, "page", ui.page_ids[ui.page_active]);
     if (ui.bgi.front >= 0) cJSON_AddStringToObject(o, "bg_id", ui.bgi.id[ui.bgi.front]);
     cJSON *d = cJSON_AddObjectToObject(o, "device");
     cJSON_AddStringToObject(d, "id", ui.cfg.device_id ? ui.cfg.device_id : "deckbar");
@@ -1139,6 +1376,10 @@ void deckbar_ui_net_message(const char *text, size_t len)
         handle_art(msg);
     } else if (!strcmp(type, "bg")) {
         handle_bg(msg);
+    } else if (!strcmp(type, "goto")) {
+        const char *page = jstr(msg, "page");
+        for (int i = 0; page && i < ui.page_count; i++)
+            if (!strcmp(ui.page_ids[i], page)) go_to_page(i, true);
     } else if (!strcmp(type, "layout")) {
         if (apply_layout(msg)) deckbar_hal_store(CACHE_KEY, text, len);
     } else if (!strcmp(type, "welcome")) {

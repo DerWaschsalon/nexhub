@@ -84,6 +84,31 @@ journalctl --user -u deckbar -f
 Grafik-Umgebung im systemd-User-Kontext:
 `systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP`.
 
+## AION 2: DPS-Meter
+
+Die Kachel „AION 2 DPS-Meter“ zeigt die DPS der Gruppe in Echtzeit: Rang, Name, DPS und
+wahlweise Anteil oder Gesamtschaden, Balken in Klassenfarbe, die eigene Zeile umrandet.
+Darüber stehen Bossname, Rest-HP und Kampfdauer.
+
+Die Daten kommen vom [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter). Das
+Meter liest die Spielpakete mit, die DeckBar liest nur seinen Stream-Overlay-Server
+(`/overlay/events`, Server-Sent Events, etwa 3 × pro Sekunde, siehe `daemon/deckbar_daemon/dps.py`).
+
+1. Im A2Tools-Meter unter Einstellungen das **Stream-Overlay** einschalten.
+2. In der Web-UI (Karte „AION 2 DPS-Meter“) die Verbindung auf „Automatisch“ lassen: Port
+   und Schlüssel liest der Daemon aus `~/.local/share/com.a2tools.dps-meter/settings.json`,
+   auch nach „Neuer Schlüssel“ im Meter. Sonst Port und `key=…` aus der Overlay-URL von Hand.
+3. Eine Seite mit der Kachel „AION 2 DPS-Meter“ anlegen (füllt die Seite). Spielerzahl
+   (1–8) und Zusatzwert stehen in den Kachel-Eigenschaften.
+4. Optional „Bei Kampfbeginn zeigen“: Sobald neuer Schaden kommt, springt die Leiste auf
+   diese Seite und nach „Zurück nach“ Sekunden ohne Schaden wieder auf die vorige Seite
+   (nicht, wenn man inzwischen selbst weggewischt hat).
+
+Die Einstellungen liegen in `~/.config/deckbar/dps.yaml` (Modus 600, enthält ggf. den
+Schlüssel). Das Meter listet nicht streng die Gruppe, sondern die Top N nach DPS am Ziel
+plus einen selbst; im Dungeon ist das die Gruppe. Wie viele es höchstens sind, stellt man
+im Meter ein (Spielerlimit, Standard 6).
+
 ## Simulator starten
 
 ```sh

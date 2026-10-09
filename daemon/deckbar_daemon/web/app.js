@@ -5,8 +5,19 @@
 const W = 640, H = 172, PAD = 8, GAP = 8;
 const STYLES = { default: "#ffffff", accent: null, danger: "#ff453a", success: "#30d158", warning: "#ff9f0a" };
 const STYLE_NAMES = { default: "Standard", accent: "Akzent", danger: "Rot", success: "Grün", warning: "Orange" };
-const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media" };
-const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url"];
+const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter" };
+const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active"];
+const CLASS_COLORS = { gladiator: "#E8A33D", templar: "#5B8DEF", ranger: "#6CCB5F", assassin: "#B46AE6", sorcerer: "#4FC3F7", cleric: "#F4E07A", spiritmaster: "#EC7FB8", chanter: "#4DD4B0", brawler: "#F0624D" };
+const EXTRA_NAMES = { pct: "Anteil in %", dmg: "Gesamtschaden", none: "nichts" };
+// Vorschau im Bearbeiten-Modus, solange das Meter nichts liefert
+const DPS_DEMO = { target: "Beispiel-Boss", time: 92, hp: 37.4, rows: [
+  { name: "Du", cls: "spiritmaster", dps: 22950, dmg: 2111400, pct: 28.4, you: true },
+  { name: "Gladiator", cls: "gladiator", dps: 20080, dmg: 1847360, pct: 24.9 },
+  { name: "Zauberer", cls: "sorcerer", dps: 18110, dmg: 1666120, pct: 22.4 },
+  { name: "Templer", cls: "templar", dps: 10600, dmg: 975200, pct: 13.1 },
+  { name: "Kleriker", cls: "cleric", dps: 4337, dmg: 399004, pct: 5.4 },
+  { name: "Kantor", cls: "chanter", dps: 3900, dmg: 358800, pct: 4.8 },
+] };
 const ID_RE = /^[A-Za-z0-9_-]{1,32}$/;
 
 const TEMPLATES = [
@@ -22,6 +33,7 @@ const TEMPLATES = [
   { name: "Hotkey", icon: "keyboard", item: { label: "Hotkey", icon: "keyboard", action: { do: "hotkey", keys: "ctrl+shift+m" } } },
   { name: "Befehl", icon: "console", item: { label: "Befehl", icon: "console", action: { do: "shell", cmd: "notify-send DeckBar Hallo" } } },
   { name: "Seite wechseln", icon: "chevron-right", item: { label: "Mehr", icon: "chevron-right", nav: "" } },
+  { name: "AION 2 DPS-Meter", icon: "flash", item: { type: "dps" } },
 ];
 
 const ACTION_FIELDS = {
@@ -44,6 +56,7 @@ const S = {
   state: {},
   devices: [],
   status: {},
+  dps: null,         // Verbindung zum A2Tools-Meter (GET /api/dps)
   icons: {},
   page: 0,
   sel: null,         // Index des ausgewählten Items auf der aktuellen Seite
@@ -178,8 +191,52 @@ function renderTile(it, b, idx) {
     }
     t.append(m);
     t.addEventListener("click", () => onTileClick(it, idx));
+  } else if (type === "dps") {
+    t.append(renderDps(it, b));
+    t.addEventListener("click", () => S.mode === "edit" && select(idx));
   }
   return t;
+}
+
+/* 8432 · 18,4k · 1,23M wie fmt_amount in ui.c */
+function fmtAmount(v) {
+  v = Math.max(0, v || 0);
+  const s = v >= 1e9 ? (v / 1e9).toFixed(2) + "G" : v >= 1e6 ? (v / 1e6).toFixed(2) + "M" : v >= 1e4 ? (v / 1e3).toFixed(1) + "k" : String(Math.round(v));
+  return s.replace(".", ",");
+}
+
+function renderDps(it, b) {
+  const box = el("div", { class: "dps" });
+  let d = S.state.dps;
+  const demo = (!d || !d.rows?.length) && S.mode === "edit";
+  if (demo) d = DPS_DEMO;
+  const extra = it.extra || "pct";
+  let y = 7;
+  if (b.h >= 90) {
+    const rows = d?.rows?.length;
+    const time = rows ? `${Math.floor(d.time / 60)}:${String(d.time % 60).padStart(2, "0")}` : "";
+    box.append(el("div", { class: "hd" }, el("span", { text: d?.target || "AION 2" }), el("span", { text: rows && d.hp != null ? `${Math.round(d.hp)} % · ${time}` : time })));
+    y += 15 + 3;
+    if (rows && d.hp != null) box.append(el("div", { class: "hp", style: `top:${y}px` }, el("i", { style: `width:${Math.max(0, Math.min(100, d.hp))}%` })));
+    y += 6;
+  }
+  const avail = b.h - y - 7, gap = 3;
+  let n = Math.max(1, Math.min(8, it.players || 5));
+  while (n > 1 && (avail - (n - 1) * gap) / n < 16) n--;
+  const rowH = Math.min(Math.floor((avail - (n - 1) * gap) / n), 40);
+  const font = rowH >= 34 ? "font-size:17px;font-weight:600" : `font-size:${rowH >= 20 ? 14 : 12}px`;
+  const rows = (d?.rows || []).slice(0, n);
+  const best = Math.max(1, ...rows.map((r) => r.dps));
+  rows.forEach((r, i) => {
+    const row = el("div", { class: "r" + (r.you ? " you" : ""), style: `top:${y + i * (rowH + gap)}px;height:${rowH}px;${font}` });
+    row.append(el("span", { class: "b", style: `width:${Math.max(6, (100 * r.dps) / best)}%;background:${CLASS_COLORS[r.cls] || "#8E8E93"}` }));
+    row.append(el("span", { class: "n", text: `${i + 1}  ${r.name}` }), el("span", { class: "v", text: fmtAmount(r.dps) }));
+    if (extra !== "none") row.append(el("span", { class: "x", style: `width:${extra === "dmg" ? 58 : 44}px`, text: extra === "dmg" ? fmtAmount(r.dmg) : `${Math.round(r.pct || 0)} %` }));
+    box.append(row);
+  });
+  if (!rows.length) box.append(el("div", { class: "msg", style: b.h >= 90 ? "top:16px" : "", text: d ? "Warte auf Kampf …" : "DPS-Meter nicht verbunden" }));
+  if (demo) box.append(el("span", { class: "demo", text: "Beispieldaten" }));
+  return box;
 }
 
 function onTileClick(it, idx) {
@@ -342,8 +399,8 @@ function renderItemList() {
       const li = el(
         "li",
         { class: i === S.sel ? "sel" : null, draggable: "true", onclick: () => select(i) },
-        el("span", { class: "ic", text: glyph(it.icon) || (it.type === "media" ? glyph("music") : "") }),
-        el("span", { class: "nm", text: it.label || (it.type === "media" ? "Media" : it.id) }),
+        el("span", { class: "ic", text: glyph(it.icon) || (it.type === "media" ? glyph("music") : it.type === "dps" ? glyph("flash") : "") }),
+        el("span", { class: "nm", text: it.label || (it.type === "media" ? "Media" : it.type === "dps" ? "DPS-Meter" : it.id) }),
         boxes[i] ? el("span", { class: "meta", text: `${TYPE_NAMES[it.type || "button"]} · ${it.w || 1}×${it.h || 1}` }) : el("span", { class: "warn", text: "passt nicht" }),
       );
       li.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", String(i)); li.classList.add("dragging"); });
@@ -385,6 +442,12 @@ function renderAddMenu() {
 function addItem(template) {
   const item = structuredClone(template);
   item.id = uniqueId((item.label || item.type || "item").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item", allItemIds());
+  if (item.type === "dps") {
+    // ganze Seite; w/h werden ohnehin auf das Raster begrenzt
+    const p = curPage();
+    if ((p.cols || 6) > 1) item.w = p.cols || 6;
+    if ((p.rows || 2) > 1) item.h = p.rows || 2;
+  }
   if ("nav" in item) {
     const other = S.layout.pages.find((p) => p !== curPage());
     if (other) item.nav = other.id;
@@ -455,7 +518,7 @@ function renderProps() {
       it.id = v;
       changed({ list: false });
     }, { maxlength: 32 })),
-    type !== "media" ? field("Beschriftung", input(it.label, (v) => set("label", v, { list: true }), { maxlength: 24 }), "span2") : null,
+    type !== "media" && type !== "dps" ? field("Beschriftung", input(it.label, (v) => set("label", v, { list: true }), { maxlength: 24 }), "span2") : null,
     field("Breite (Zellen)", input(it.w || 1, (v) => set("w", clampInt(v, 1, 8, 1) === 1 ? undefined : clampInt(v, 1, 8, 1)), { type: "number", min: 1, max: 8 })),
     field("Höhe (Zellen)", input(it.h || 1, (v) => set("h", clampInt(v, 1, 3, 1) === 1 ? undefined : clampInt(v, 1, 3, 1)), { type: "number", min: 1, max: 3 })),
   );
@@ -480,7 +543,19 @@ function renderProps() {
     ),
   );
 
-  const parts = [head, basics, look];
+  const parts = [head, basics];
+  if (type === "dps") {
+    const sec = el("div", { class: "section" }, el("h3", { text: "Anzeige" }));
+    sec.append(el("div", { class: "grid2" },
+      field("Spieler (Zeilen)", input(it.players || 5, (v) => set("players", clampInt(v, 1, 8, 5) === 5 ? undefined : clampInt(v, 1, 8, 5)), { type: "number", min: 1, max: 8 })),
+      field("Neben der DPS-Zahl", select_(EXTRA_NAMES, it.extra || "pct", (v) => set("extra", v === "pct" ? undefined : v))),
+    ));
+    sec.append(el("p", { class: "hint small", text: "Passen nicht alle Spieler in die Kachel, zeigt sie so viele wie möglich. Die Daten kommen vom A2Tools DPS Meter, siehe Karte „AION 2 DPS-Meter“ links." }));
+    parts.push(sec);
+    box.replaceChildren(...parts);
+    return;
+  }
+  parts.push(look);
 
   if (type === "toggle" || type === "slider") {
     const keys = type === "toggle" ? ["mic_muted", "out_muted", "playing"] : ["out_volume", "mic_volume"];
@@ -528,6 +603,8 @@ function changeType(it, v) {
   if (v !== "slider") { delete it.mute_bind; delete it.min; delete it.max; }
   if (v !== "button") delete it.nav;
   if (v === "media") { delete it.icon; delete it.label; if (!it.h) it.h = 2; if (!it.w) it.w = 2; }
+  if (v === "dps") { delete it.icon; delete it.label; delete it.style; delete it.action; delete it.long_action; }
+  else { delete it.players; delete it.extra; }
 }
 
 function keyInput(value, suggestions, onChange) {
@@ -605,7 +682,7 @@ function changed(opts = {}) {
   renderPreview();
   renderItemList();
   renderPageCard();
-  if (opts.tabs) renderTabs();
+  if (opts.tabs) { renderTabs(); renderDpsCard(); }
   if (opts.props !== false && opts.list !== false) renderPropsSoft();
   setSave("Änderungen …");
   clearTimeout(S.saveTimer);
@@ -681,6 +758,7 @@ function connectLive() {
       S.state = msg.state;
       S.devices = msg.devices;
       S.status = msg.status;
+      S.dps = msg.dps;
       setBgPreview(msg.status?.background?.id);
       if (!S.dirty) setLayout(msg.layout);
       showError(msg.error);
@@ -699,6 +777,9 @@ function connectLive() {
         renderAll();
       }
       showError(null);
+    } else if (msg.type === "dps") {
+      S.dps = msg.dps;
+      renderDpsCard();
     } else if (msg.type === "background") {
       setBgPreview(msg.id);
     } else if (msg.type === "layout_error") {
@@ -740,10 +821,74 @@ function renderChips(offline) {
   $("layout-path").textContent = S.status.layout_path ? `Datei: ${S.status.layout_path} (auch von Hand editierbar, wird live übernommen)` : "";
 }
 
+/* ================================================================= AION 2 DPS-Meter */
+const DPS_DOT = { connected: "ok", bad_key: "bad", off: "" };
+
+function renderDpsCard() {
+  const d = S.dps;
+  if (!d || !S.layout) return;
+  const st = d.settings;
+  const focused = document.activeElement;
+  const setVal = (id, v) => { if (focused !== $(id)) $(id).value = v; };
+  $("dps-enabled").checked = st.enabled;
+  setVal("dps-source", st.source);
+  setVal("dps-port", st.port);
+  setVal("dps-key", st.key);
+  setVal("dps-return", st.return_after);
+  $("dps-manual").hidden = st.source !== "manual";
+  const opts = { "": "— nicht wechseln —", ...Object.fromEntries(S.layout.pages.map((p) => [p.id, p.name || p.id])) };
+  if (focused !== $("dps-page")) {
+    $("dps-page").replaceChildren(...Object.entries(opts).map(([k, v]) => el("option", { value: k, selected: k === (st.auto_page || ""), text: v })));
+  }
+  $("dps-return").disabled = !st.auto_page;
+  $("dps-chip").className = "chip " + (DPS_DOT[d.status] ?? "warn");
+  $("dps-status").textContent = d.status_text + (d.status === "connected" && d.port ? ` (Port ${d.port})` : "");
+  const hasTile = S.layout.pages.some((p) => p.items.some((i) => i.type === "dps"));
+  const hint = {
+    off: "",
+    overlay_off: "Im A2Tools-Meter unter Einstellungen das Stream-Overlay einschalten. Port und Schlüssel liest die DeckBar dann selbst.",
+    no_meter: st.source === "auto" && !d.a2tools.installed ? "Das A2Tools DPS Meter ist nicht installiert (oder hat noch keine Einstellungen gespeichert)." : "Das A2Tools DPS Meter starten. Die DeckBar verbindet sich dann von selbst.",
+    connecting: "",
+    bad_key: st.source === "manual" ? "Der Schlüssel passt nicht. Er steht in der Overlay-URL des Meters hinter key=." : "Der Schlüssel wurde abgelehnt. Wurde er im Meter gerade neu erzeugt? Die DeckBar versucht es gleich erneut.",
+    connected: hasTile ? "" : "Für die Anzeige auf einer Seite eine Kachel „AION 2 DPS-Meter“ hinzufügen.",
+  }[d.status] || "";
+  $("dps-hint").textContent = (d.detail ? `(${d.detail}) ` : "") + hint;
+  $("dps-hint").hidden = !$("dps-hint").textContent;
+}
+
+let dpsTimer = null;
+function saveDps(patch) {
+  Object.assign(S.dps.settings, patch);
+  renderDpsCard();
+  clearTimeout(dpsTimer);
+  dpsTimer = setTimeout(async () => {
+    try {
+      const r = await fetch("/api/dps", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(S.dps.settings) });
+      const data = await r.json();
+      if (!r.ok) return toast(data.error || `Fehler ${r.status}`, true);
+      S.dps = data;
+      renderDpsCard();
+      toast("DPS-Einstellungen gespeichert ✓");
+    } catch {
+      toast("Daemon nicht erreichbar", true);
+    }
+  }, 400);
+}
+
+function bindDpsCard() {
+  $("dps-enabled").addEventListener("change", (e) => saveDps({ enabled: e.target.checked }));
+  $("dps-source").addEventListener("change", (e) => saveDps({ source: e.target.value }));
+  $("dps-port").addEventListener("change", (e) => saveDps({ port: clampInt(e.target.value, 1024, 65535, 18731) }));
+  $("dps-key").addEventListener("change", (e) => saveDps({ key: e.target.value.trim() }));
+  $("dps-page").addEventListener("change", (e) => saveDps({ auto_page: e.target.value || null }));
+  $("dps-return").addEventListener("change", (e) => saveDps({ return_after: clampInt(e.target.value, 0, 600, 20) }));
+}
+
 function renderAll() {
   if (!S.layout) return;
   renderTabs();
   renderPageCard();
+  renderDpsCard();
   renderPreview();
   renderItemList();
   renderProps();
@@ -766,6 +911,7 @@ async function init() {
   S.icons = await (await fetch("/static/icons.json")).json();
   await document.fonts.load('20px "mdi"').catch(() => {});
   bindPageCard();
+  bindDpsCard();
   renderAddMenu();
   $("item-add").addEventListener("click", (e) => { e.stopPropagation(); $("add-menu").hidden = !$("add-menu").hidden; });
   document.addEventListener("click", (e) => { if (!$("add-menu").contains(e.target)) $("add-menu").hidden = true; });
@@ -783,7 +929,8 @@ async function init() {
   window.addEventListener("resize", fitPreview);
   // Erststand per REST (sofort sichtbar), danach live über den WebSocket
   try {
-    const [lay, st] = await Promise.all([fetch("/api/layout").then((r) => r.json()), fetch("/api/status").then((r) => r.json())]);
+    const [lay, st, dps] = await Promise.all([fetch("/api/layout").then((r) => r.json()), fetch("/api/status").then((r) => r.json()), fetch("/api/dps").then((r) => r.json())]);
+    S.dps = dps;
     S.state = st.state;
     S.devices = st.devices;
     S.status = st;

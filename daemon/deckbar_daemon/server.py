@@ -22,6 +22,7 @@ from .art import Art, chunks
 from .background import Background
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout
+from .dps import DpsFeed, DpsSettings
 from .media import Media
 from .proc import have
 from .state import State
@@ -29,7 +30,7 @@ from .state import State
 log = logging.getLogger(__name__)
 
 PROTO_V = 1
-BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url")
+BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url", "dps", "dps_active")
 # nur für Daemon/Web-UI; das Gerät bekommt das Cover als Bild per `art`
 DEVICE_HIDDEN_KEYS = {"art_url"}
 MAX_MSG = 16 * 1024
@@ -50,6 +51,7 @@ class Device:
     last_seen: float = field(default_factory=time.monotonic)
     art_size: int = 0  # Kantenlänge des Covers laut art_request, 0 = keins gewünscht
     bg_id: str = ""    # Hintergrund, den das Gerät gerade zeigt ("" = eingebauter)
+    return_page: str | None = None  # Seite vor dem automatischen Wechsel zur DPS-Seite
     # Bildübertragungen pro Gerät nacheinander, damit sich Teile zweier Bilder nicht mischen
     send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -92,6 +94,8 @@ class DeckBar:
         self.executor = Executor(self.audio, self.media)
         self.art = Art()
         self.bg = Background()
+        self.dps = DpsFeed(self.state, config_dir, self._on_combat)
+        self.dps.status_listeners.append(self._dps_changed)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -161,6 +165,29 @@ class DeckBar:
         while True:
             await asyncio.sleep(5)
             await self.update_background()
+
+    # ---------------------------------------------------------------- DPS-Meter
+    async def _dps_changed(self) -> None:
+        await self._broadcast_ui({"type": "dps", "dps": self.dps.info()})
+
+    async def _on_combat(self, active: bool) -> None:
+        """Kampfbeginn: auf die DPS-Seite wechseln; Kampfende: zurück, wenn dort noch."""
+        page = self.dps.settings.auto_page
+        page_ids = [p.id for p in self.layout.pages]
+        if not page or page not in page_ids:
+            return
+        for dev in list(self.devices):
+            if active:
+                if dev.page != page:
+                    dev.return_page = dev.page or page_ids[0]
+                    log.info("Kampfbeginn: %s wechselt zu Seite '%s'", dev.id, page)
+                    await self._send(dev.ws, _msg("goto", page=page))
+            else:
+                back, dev.return_page = dev.return_page, None
+                # nur zurück, wenn niemand inzwischen selbst weggewischt hat
+                if back and back in page_ids and dev.page == page and self.dps.settings.return_after:
+                    log.info("Kampfende: %s zurück zu Seite '%s'", dev.id, back)
+                    await self._send(dev.ws, _msg("goto", page=back))
 
     async def _devices_changed(self) -> None:
         await self._broadcast_ui({"type": "devices", "devices": [d.info() for d in self.devices]})
@@ -258,6 +285,8 @@ class DeckBar:
         dev.fw = str(info.get("fw", ""))[:32]
         dev.sim = bool(info.get("sim", False))
         dev.bg_id = str(hello.get("bg_id", ""))[:16]
+        page = hello.get("page")
+        dev.page = page if isinstance(page, str) and page else None
         self.devices.add(dev)
         log.info("Gerät verbunden: %s (%s) von %s", dev.id, dev.model or "?", dev.remote)
         await self._devices_changed()
@@ -327,6 +356,7 @@ class DeckBar:
             "state": self.state.values,
             "devices": [d.info() for d in self.devices],
             "status": self.status(),
+            "dps": self.dps.info(),
         }, ensure_ascii=False))
         try:
             async for m in ws:
@@ -401,6 +431,27 @@ class DeckBar:
         self.state.update(**data)
         return web.json_response({"ok": True})
 
+    async def api_get_dps(self, request: web.Request) -> web.Response:
+        return web.json_response(self.dps.info())
+
+    async def api_put_dps(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "kein JSON-Objekt"}, status=400)
+        # Platzhalter aus info() = Schlüssel unverändert lassen
+        if "key" not in data or set(str(data["key"])) == {"•"}:
+            data["key"] = self.dps.settings.key
+        try:
+            settings = DpsSettings.model_validate(data)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        self.dps.save(settings)
+        await self._dps_changed()
+        return web.json_response({"ok": True, **self.dps.info()})
+
     async def api_background(self, request: web.Request) -> web.StreamResponse:
         """Aktueller Hintergrund als PNG (Vorschau in der Web-UI)."""
         if self.bg.png is None:
@@ -441,6 +492,8 @@ def build_app(deck: DeckBar) -> web.Application:
     app.router.add_post("/api/trigger", deck.api_trigger)
     app.router.add_post("/api/state", deck.api_post_state)
     app.router.add_get("/api/background.png", deck.api_background)
+    app.router.add_get("/api/dps", deck.api_get_dps)
+    app.router.add_put("/api/dps", deck.api_put_dps)
     app.router.add_static("/static/", WEB_DIR)
     app["deck"] = deck
 

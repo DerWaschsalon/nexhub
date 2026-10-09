@@ -1,7 +1,7 @@
 #pragma once
 /* Einstellungen der DeckBar-Firmware. Zugangsdaten stehen in secrets.h (gitignored). */
 
-#define DECKBAR_FW_VERSION "0.1.0"
+#define DECKBAR_FW_VERSION "0.2.0"
 
 /*
  * Ausrichtung im Querformat. 270 entspricht der Drehung aus dem Waveshare-Beispiel

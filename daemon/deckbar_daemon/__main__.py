@@ -36,6 +36,7 @@ async def serve(args: argparse.Namespace) -> None:
         asyncio.ensure_future(deck.media.watch()),
         asyncio.ensure_future(deck.watch_layout_file()),
         asyncio.ensure_future(deck.watch_background()),
+        asyncio.ensure_future(deck.dps.watch()),
     ]
     announcer = Announcer(settings.name, settings.port) if settings.mdns and not args.no_mdns else None
     if announcer:

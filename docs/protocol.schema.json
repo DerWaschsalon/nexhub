@@ -6,7 +6,7 @@
   "required": ["v", "type"],
   "properties": {
     "v": { "const": 1 },
-    "type": { "enum": ["hello", "welcome", "error", "layout", "state", "event", "ping", "pong", "art_request", "art"] }
+    "type": { "enum": ["hello", "welcome", "error", "layout", "state", "event", "ping", "pong", "art_request", "art", "goto"] }
   },
   "allOf": [
     { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "$ref": "#/$defs/hello" } },
@@ -17,9 +17,15 @@
     { "if": { "properties": { "type": { "const": "event" } } }, "then": { "$ref": "#/$defs/event" } },
     { "if": { "properties": { "type": { "enum": ["ping", "pong"] } } }, "then": { "$ref": "#/$defs/heartbeat" } },
     { "if": { "properties": { "type": { "const": "art_request" } } }, "then": { "$ref": "#/$defs/art_request" } },
-    { "if": { "properties": { "type": { "const": "art" } } }, "then": { "$ref": "#/$defs/art" } }
+    { "if": { "properties": { "type": { "const": "art" } } }, "then": { "$ref": "#/$defs/art" } },
+    { "if": { "properties": { "type": { "const": "goto" } } }, "then": { "$ref": "#/$defs/goto" } }
   ],
   "$defs": {
+    "goto": {
+      "type": "object",
+      "required": ["page"],
+      "properties": { "page": { "$ref": "#/$defs/id" } }
+    },
     "art_request": {
       "type": "object",
       "required": ["size"],
@@ -46,6 +52,7 @@
       "properties": {
         "token": { "type": "string", "maxLength": 128 },
         "layout_hash": { "type": "string", "maxLength": 64 },
+        "page": { "$ref": "#/$defs/id" },
         "device": {
           "type": "object",
           "required": ["id", "width", "height"],
@@ -90,7 +97,7 @@
       "required": ["id", "type"],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["button", "toggle", "slider", "media"] },
+        "type": { "enum": ["button", "toggle", "slider", "media", "dps"] },
         "label": { "type": "string", "maxLength": 24 },
         "icon": { "type": "string", "maxLength": 48 },
         "icon_on": { "type": "string", "maxLength": 48 },
@@ -100,6 +107,8 @@
         "min": { "type": "integer" },
         "max": { "type": "integer" },
         "nav": { "$ref": "#/$defs/id" },
+        "players": { "type": "integer", "minimum": 1, "maximum": 8, "default": 5 },
+        "extra": { "enum": ["pct", "dmg", "none"], "default": "pct" },
         "w": { "type": "integer", "minimum": 1, "maximum": 8, "default": 1 },
         "h": { "type": "integer", "minimum": 1, "maximum": 3, "default": 1 }
       }
@@ -138,6 +147,31 @@
         "player": { "type": "string" }
       }
     },
+    "dps": {
+      "type": ["object", "null"],
+      "required": ["target", "time", "rows"],
+      "properties": {
+        "target": { "type": "string" },
+        "time": { "type": "integer", "minimum": 0 },
+        "hp": { "type": ["number", "null"] },
+        "rows": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["name", "dps"],
+            "properties": {
+              "name": { "type": "string", "maxLength": 24 },
+              "cls": { "enum": ["gladiator", "templar", "ranger", "assassin", "sorcerer", "cleric", "spiritmaster", "chanter", "brawler", null] },
+              "dps": { "type": "integer", "minimum": 0 },
+              "dmg": { "type": "integer", "minimum": 0 },
+              "pct": { "type": "number" },
+              "you": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
     "state": {
       "type": "object",
       "required": ["values"],
@@ -151,7 +185,9 @@
             "mic_volume": { "type": "integer" },
             "mic_muted": { "type": "boolean" },
             "playing": { "type": "boolean" },
-            "track": { "$ref": "#/$defs/track" }
+            "track": { "$ref": "#/$defs/track" },
+            "dps": { "$ref": "#/$defs/dps" },
+            "dps_active": { "type": "boolean" }
           }
         }
       }

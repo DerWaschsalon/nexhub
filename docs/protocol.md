@@ -48,13 +48,13 @@ Gerät                                Daemon
 ### `hello`
 
 ```json
-{"v":1,"type":"hello","token":"…","layout_hash":"3f2a…",
+{"v":1,"type":"hello","token":"…","layout_hash":"3f2a…","page":"main",
  "device":{"id":"deckbar-a1b2c3","model":"waveshare-s3-lcd-3.49","fw":"0.1.0",
            "width":640,"height":172,"sim":false}}
 ```
 
 `layout_hash` ist optional und gibt den Hash des gecachten Layouts an. Stimmt er,
-lässt der Daemon das `layout` weg.
+lässt der Daemon das `layout` weg. `page` (optional) ist die gerade angezeigte Seite.
 
 ### `event`
 
@@ -129,6 +129,7 @@ Items, die nicht mehr passen, werden nicht angezeigt.
 | `toggle` | wie button; aktiv, wenn `state[bind]` truthy ist  | `button_press`, `long_press`    |
 | `slider` | Kachel füllt sich mit Wert; relatives Ziehen      | `slider_change`, `long_press`   |
 | `media`  | Titel/Interpret aus `state.track`, ab h ≥ 2 mit ⏮ ⏯ ⏭ | `button_press` (+ `part`)    |
+| `dps`    | DPS-Rangliste aus `state.dps` (AION 2), Balken in Klassenfarbe | –                |
 
 **Felder**
 
@@ -142,6 +143,8 @@ Items, die nicht mehr passen, werden nicht angezeigt.
 | `mute_bind` | slider           | State-Schlüssel, der den Slider als „stumm“ darstellt     |
 | `min`,`max` | slider           | Wertebereich (Standard 0–100)                             |
 | `nav`       | button           | Seiten-ID; das Gerät wechselt **lokal** und sendet `page_change` |
+| `players`   | dps              | Anzahl Zeilen (1–8, Standard 5)                           |
+| `extra`     | dps              | Zusatzwert neben der DPS-Zahl: `pct` (Anteil, Standard), `dmg` (Gesamtschaden), `none` |
 
 Beim Toggle bestimmt `style`, wie der **aktive** Zustand aussieht. Ein gemutetes
 Mikro ist also `style: danger` + `bind: mic_muted`.
@@ -169,6 +172,19 @@ Eigene Schlüssel sind erlaubt (z. B. aus Shell-Statusbefehlen) und lassen sich 
 | `mic_muted`   | bool         | dito                                    |
 | `playing`     | bool         | `playerctl` (Status == Playing)         |
 | `track`       | object\|null | `playerctl` Metadaten                   |
+| `dps`         | object\|null | A2Tools DPS Meter (Stream-Overlay), siehe unten |
+| `dps_active`  | bool         | gerade Schaden im Kampf                 |
+
+`dps` ist `null`, solange keine Verbindung zum Meter besteht, sonst:
+
+```json
+{"target":"Bossname","time":83,"hp":42.5,
+ "rows":[{"name":"Aria","cls":"spiritmaster","dps":18432,"dmg":1529856,"pct":31.2,"you":true}]}
+```
+
+`time` = Kampfdauer in s, `hp` = Rest-HP des Bosses in % (oder `null`), `rows` absteigend
+nach DPS (höchstens 8). `cls` ist einer von `gladiator`, `templar`, `ranger`, `assassin`,
+`sorcerer`, `cleric`, `spiritmaster`, `chanter`, `brawler` oder `null` (noch unbekannt).
 
 ### `art`
 
@@ -187,6 +203,13 @@ Die URL selbst (`art_url`) bleibt im Daemon und wird nicht ans Gerät geschickt.
 ### `ping`
 
 `{"v":1,"type":"ping","t":1727712000123}`
+
+### `goto`
+
+`{"v":1,"type":"goto","page":"aion"}`
+
+Das Gerät wechselt auf die Seite (wie ein `nav`-Button) und meldet das per `page_change`.
+Der Daemon nutzt das für den automatischen Wechsel zur DPS-Seite bei Kampfbeginn.
 
 ## Sicherheit
 

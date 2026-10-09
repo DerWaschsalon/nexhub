@@ -63,7 +63,7 @@ Action = Annotated[
 # ------------------------------------------------------------------ Layout
 class Item(_Strict):
     id: ID
-    type: Literal["button", "toggle", "slider", "media"] = "button"
+    type: Literal["button", "toggle", "slider", "media", "dps"] = "button"
     label: str | None = Field(None, max_length=24)
     icon: str | None = Field(None, max_length=48)
     icon_on: str | None = Field(None, max_length=48)
@@ -73,6 +73,9 @@ class Item(_Strict):
     min: int | None = None
     max: int | None = None
     nav: ID | None = None
+    # dps: Anzahl Spieler und Zusatzwert neben der DPS-Zahl
+    players: int | None = Field(None, ge=1, le=8)
+    extra: Literal["pct", "dmg", "none"] | None = None
     w: int = Field(1, ge=1, le=8)
     h: int = Field(1, ge=1, le=3)
     action: Action | None = None
@@ -84,6 +87,8 @@ class Item(_Strict):
             raise ValueError(f"Item '{self.id}': {self.type} braucht 'bind'")
         if self.nav and self.type != "button":
             raise ValueError(f"Item '{self.id}': 'nav' gibt es nur bei type=button")
+        if self.type != "dps" and (self.players is not None or self.extra is not None):
+            raise ValueError(f"Item '{self.id}': 'players' und 'extra' gibt es nur bei type=dps")
         if self.min is not None and self.max is not None and self.min >= self.max:
             raise ValueError(f"Item '{self.id}': min muss kleiner als max sein")
         return self
