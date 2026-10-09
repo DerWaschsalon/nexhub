@@ -1,0 +1,14 @@
+{
+  "name": "deckbar-shared-ui",
+  "version": "0.1.0",
+  "description": "Gemeinsamer LVGL-UI-Code für DeckBar (Firmware + Simulator)",
+  "frameworks": "*",
+  "platforms": "*",
+  "dependencies": { "lvgl/lvgl": "9.3.0" },
+  "build": {
+    "srcDir": ".",
+    "includeDir": "include",
+    "srcFilter": ["-<*>", "+<src/*.c>", "+<fonts/*.c>", "+<assets/*.c>", "+<third_party/*.c>"],
+    "flags": ["-Ithird_party", "-Iinclude"]
+  }
+}

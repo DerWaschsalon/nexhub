@@ -1,0 +1,26 @@
+/* LVGL-Konfiguration für den SDL-Simulator */
+#ifndef LV_CONF_H
+#define LV_CONF_H
+
+#include "lv_conf_deckbar.h"
+
+#define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
+#define LV_MEM_SIZE (2 * 1024 * 1024)
+#define LV_USE_OS LV_OS_NONE
+
+#define LV_USE_SDL 1
+#define LV_SDL_INCLUDE_PATH <SDL2/SDL.h>
+#define LV_SDL_RENDER_MODE LV_DISPLAY_RENDER_MODE_DIRECT
+#define LV_SDL_BUF_COUNT 1
+#define LV_SDL_FULLSCREEN 0
+#define LV_SDL_DIRECT_EXIT 1
+#define LV_SDL_MOUSEWHEEL_MODE LV_SDL_MOUSEWHEEL_MODE_ENCODER
+
+#define LV_USE_SYSMON 1
+#define LV_USE_PERF_MONITOR 1
+#define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_LEFT
+
+#define LV_USE_ASSERT_NULL 1
+#define LV_USE_ASSERT_MALLOC 1
+
+#endif

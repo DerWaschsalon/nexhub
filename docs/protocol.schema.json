@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deckbar.local/protocol/v1.json",
+  "title": "DeckBar protocol v1 message",
+  "type": "object",
+  "required": ["v", "type"],
+  "properties": {
+    "v": { "const": 1 },
+    "type": { "enum": ["hello", "welcome", "error", "layout", "state", "event", "ping", "pong", "art_request", "art"] }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "$ref": "#/$defs/hello" } },
+    { "if": { "properties": { "type": { "const": "welcome" } } }, "then": { "$ref": "#/$defs/welcome" } },
+    { "if": { "properties": { "type": { "const": "error" } } }, "then": { "$ref": "#/$defs/error" } },
+    { "if": { "properties": { "type": { "const": "layout" } } }, "then": { "$ref": "#/$defs/layout" } },
+    { "if": { "properties": { "type": { "const": "state" } } }, "then": { "$ref": "#/$defs/state" } },
+    { "if": { "properties": { "type": { "const": "event" } } }, "then": { "$ref": "#/$defs/event" } },
+    { "if": { "properties": { "type": { "enum": ["ping", "pong"] } } }, "then": { "$ref": "#/$defs/heartbeat" } },
+    { "if": { "properties": { "type": { "const": "art_request" } } }, "then": { "$ref": "#/$defs/art_request" } },
+    { "if": { "properties": { "type": { "const": "art" } } }, "then": { "$ref": "#/$defs/art" } }
+  ],
+  "$defs": {
+    "art_request": {
+      "type": "object",
+      "required": ["size"],
+      "properties": { "size": { "type": "integer", "minimum": 8, "maximum": 160 } }
+    },
+    "art": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "maxLength": 15 },
+        "w": { "type": "integer", "minimum": 8, "maximum": 160 },
+        "h": { "type": "integer", "minimum": 8, "maximum": 160 },
+        "y": { "type": "integer", "minimum": 0 },
+        "rows": { "type": "integer", "minimum": 1 },
+        "data": { "type": "string" }
+      },
+      "if": { "properties": { "id": { "minLength": 1 } } },
+      "then": { "required": ["w", "h", "y", "rows", "data"] }
+    },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,32}$" },
+    "hello": {
+      "type": "object",
+      "required": ["token", "device"],
+      "properties": {
+        "token": { "type": "string", "maxLength": 128 },
+        "layout_hash": { "type": "string", "maxLength": 64 },
+        "device": {
+          "type": "object",
+          "required": ["id", "width", "height"],
+          "properties": {
+            "id": { "type": "string", "maxLength": 64 },
+            "model": { "type": "string", "maxLength": 64 },
+            "fw": { "type": "string", "maxLength": 32 },
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 },
+            "sim": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "welcome": {
+      "type": "object",
+      "required": ["heartbeat"],
+      "properties": {
+        "server": {
+          "type": "object",
+          "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+        },
+        "heartbeat": { "type": "integer", "minimum": 1, "maximum": 60 }
+      }
+    },
+    "error": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": { "enum": ["auth", "version", "bad_request"] },
+        "message": { "type": "string" }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "required": ["t"],
+      "properties": { "t": { "type": "integer" } }
+    },
+    "style": { "enum": ["default", "accent", "danger", "success", "warning"] },
+    "item": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["button", "toggle", "slider", "media"] },
+        "label": { "type": "string", "maxLength": 24 },
+        "icon": { "type": "string", "maxLength": 48 },
+        "icon_on": { "type": "string", "maxLength": 48 },
+        "style": { "$ref": "#/$defs/style" },
+        "bind": { "type": "string", "maxLength": 32 },
+        "mute_bind": { "type": "string", "maxLength": 32 },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" },
+        "nav": { "$ref": "#/$defs/id" },
+        "w": { "type": "integer", "minimum": 1, "maximum": 8, "default": 1 },
+        "h": { "type": "integer", "minimum": 1, "maximum": 3, "default": 1 }
+      }
+    },
+    "page": {
+      "type": "object",
+      "required": ["id", "items"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "maxLength": 24 },
+        "cols": { "type": "integer", "minimum": 1, "maximum": 8, "default": 6 },
+        "rows": { "type": "integer", "minimum": 1, "maximum": 3, "default": 2 },
+        "items": { "type": "array", "maxItems": 24, "items": { "$ref": "#/$defs/item" } }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "required": ["hash", "pages"],
+      "properties": {
+        "hash": { "type": "string", "maxLength": 64 },
+        "theme": {
+          "type": "object",
+          "properties": {
+            "accent": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+            "background": { "type": "string" }
+          }
+        },
+        "pages": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/page" } }
+      }
+    },
+    "track": {
+      "type": ["object", "null"],
+      "properties": {
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "player": { "type": "string" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["values"],
+      "properties": {
+        "full": { "type": "boolean" },
+        "values": {
+          "type": "object",
+          "properties": {
+            "out_volume": { "type": "integer" },
+            "out_muted": { "type": "boolean" },
+            "mic_volume": { "type": "integer" },
+            "mic_muted": { "type": "boolean" },
+            "playing": { "type": "boolean" },
+            "track": { "$ref": "#/$defs/track" }
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["event"],
+      "properties": {
+        "event": { "enum": ["button_press", "long_press", "slider_change", "page_change"] },
+        "item": { "$ref": "#/$defs/id" },
+        "part": { "enum": ["prev", "toggle", "next"] },
+        "page": { "$ref": "#/$defs/id" },
+        "value": { "type": "integer" },
+        "final": { "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "event": { "enum": ["button_press", "long_press"] } } }, "then": { "required": ["item"] } },
+        { "if": { "properties": { "event": { "const": "slider_change" } } }, "then": { "required": ["item", "value"] } },
+        { "if": { "properties": { "event": { "const": "page_change" } } }, "then": { "required": ["page"] } }
+      ]
+    }
+  }
+}

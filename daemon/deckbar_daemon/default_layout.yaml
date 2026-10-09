@@ -1,0 +1,125 @@
+# DeckBar-Layout
+#
+# Jede Seite ist ein Raster aus cols x rows Zellen (Standard 6 x 2). Items belegen
+# w x h Zellen und werden der Reihe nach zeilenweise in die erste freie Lücke gesetzt.
+#
+# type:   button | toggle | slider | media
+# style:  default | accent | danger | success | warning  (bei toggle: Look im aktiven Zustand)
+# bind:   State-Schlüssel (out_volume, out_muted, mic_volume, mic_muted, playing)
+# action / long_action:
+#   {do: media,  op: play_pause|play|pause|stop|next|previous}
+#   {do: volume, target: sink|source, op: toggle_mute|mute|unmute|set|step, step: 5}
+#   {do: open,   url: https://…}
+#   {do: hotkey, keys: ctrl+shift+m}
+#   {do: shell,  cmd: "notify-send hallo"}
+# Icons: siehe docs/icons.md
+
+theme:
+  accent: "#5AC8FA"
+
+pages:
+  - id: main
+    name: Audio
+    cols: 6
+    rows: 2
+    items:
+      - id: mic
+        type: toggle
+        label: Mikro
+        icon: microphone
+        icon_on: microphone-off
+        bind: mic_muted
+        style: danger
+        action: {do: volume, target: source, op: toggle_mute}
+
+      - id: vol
+        type: slider
+        label: Lautstärke
+        icon: volume-high
+        icon_on: volume-off
+        bind: out_volume
+        mute_bind: out_muted
+        w: 2
+        action: {do: volume, target: sink, op: set}
+        long_action: {do: volume, target: sink, op: toggle_mute}
+
+      - id: np
+        type: media
+        w: 3
+        h: 2
+
+      - id: out
+        type: toggle
+        label: Ausgang
+        icon: volume-high
+        icon_on: volume-off
+        bind: out_muted
+        style: warning
+        action: {do: volume, target: sink, op: toggle_mute}
+
+      - id: yt
+        label: YouTube
+        icon: youtube
+        action: {do: open, url: "https://www.youtube.com"}
+
+      - id: more
+        label: Mehr
+        icon: chevron-right
+        nav: tools
+
+  - id: tools
+    name: Tools
+    cols: 6
+    rows: 2
+    items:
+      - id: back
+        label: Zurück
+        icon: chevron-left
+        nav: main
+      - id: shot
+        label: Screenshot
+        icon: monitor-screenshot
+        action: {do: shell, cmd: "spectacle -r -b -n"}
+      - id: term
+        label: Terminal
+        icon: console
+        action: {do: shell, cmd: "konsole"}
+      - id: ha
+        label: Home Assistant
+        icon: home-assistant
+        action: {do: open, url: "http://homeassistant.local:8123"}
+      - id: gh
+        label: GitHub
+        icon: github
+        action: {do: open, url: "https://github.com"}
+      - id: lock
+        label: Sperren
+        icon: lock
+        style: accent
+        action: {do: shell, cmd: "loginctl lock-session"}
+      - id: prev
+        label: Zurück
+        icon: skip-previous
+        action: {do: media, op: previous}
+      - id: pp
+        type: toggle
+        label: Play
+        icon: play
+        icon_on: pause
+        bind: playing
+        style: accent
+        action: {do: media, op: play_pause}
+      - id: next
+        label: Weiter
+        icon: skip-next
+        action: {do: media, op: next}
+      - id: micvol
+        type: slider
+        label: Mikro-Pegel
+        icon: microphone
+        icon_on: microphone-off
+        bind: mic_volume
+        mute_bind: mic_muted
+        w: 3
+        action: {do: volume, target: source, op: set}
+        long_action: {do: volume, target: source, op: toggle_mute}

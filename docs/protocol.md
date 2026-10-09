@@ -1,0 +1,197 @@
+# DeckBar-Protokoll v1
+
+Transport: WebSocket, Textframes, je Frame genau ein JSON-Objekt (UTF-8).
+Endpunkt: `ws://<daemon>:8765/ws` (Port per Config änderbar).
+Maschinenlesbares Schema: [`protocol.schema.json`](protocol.schema.json).
+
+Jede Nachricht hat die Felder
+
+| Feld   | Typ     | Bedeutung                                   |
+|--------|---------|---------------------------------------------|
+| `v`    | integer | Protokollversion, aktuell `1`               |
+| `type` | string  | Nachrichtentyp (siehe unten)                |
+
+Unbekannte Felder werden ignoriert (Vorwärtskompatibilität). Eine Gegenstelle mit
+anderem `v` wird mit `error`/`version` abgelehnt.
+
+## Grundidee
+
+Das Gerät ist „dumm“. Es kennt **keine Aktionen**, sondern nur Layout und State.
+Tippt man einen Button an, meldet das Gerät die `item`-ID. Welche Aktion dahinter
+steckt, weiß nur der Daemon. Deshalb enthält das Layout, das zum Gerät geht, keine
+Befehle, Links oder Hotkeys.
+
+## Ablauf
+
+```
+Gerät                                Daemon
+  |  ---- hello (token, device) ---->  |
+  |  <--- welcome ------------------   |   (oder error + close)
+  |  <--- layout -------------------   |   (entfällt, wenn hash == layout_hash)
+  |  <--- state (full: true) -------   |
+  |           ...                       |
+  |  ---- event -------------------->  |
+  |  <--- state (Diff) -------------   |
+  |  <--- ping ---------------------   |   alle `heartbeat` s
+  |  ---- pong --------------------->  |
+```
+
+- Das Gerät muss `hello` innerhalb von 5 s nach dem Verbindungsaufbau schicken,
+  sonst trennt der Daemon.
+- Der Daemon schickt alle `heartbeat` Sekunden (Standard 5) ein `ping`.
+  Erhält das Gerät 3 × `heartbeat` lang **gar keine** Nachricht, baut es die
+  Verbindung neu auf. Erhält der Daemon 3 × `heartbeat` lang kein `pong`, trennt er.
+- Ändert sich die Konfiguration, schickt der Daemon jederzeit ein neues `layout`.
+
+## Gerät → Daemon
+
+### `hello`
+
+```json
+{"v":1,"type":"hello","token":"…","layout_hash":"3f2a…",
+ "device":{"id":"deckbar-a1b2c3","model":"waveshare-s3-lcd-3.49","fw":"0.1.0",
+           "width":640,"height":172,"sim":false}}
+```
+
+`layout_hash` ist optional und gibt den Hash des gecachten Layouts an. Stimmt er,
+lässt der Daemon das `layout` weg.
+
+### `event`
+
+| `event`         | Pflichtfelder     | Bedeutung                                              |
+|-----------------|-------------------|--------------------------------------------------------|
+| `button_press`  | `item`            | kurzer Tap auf button/toggle/media                     |
+| `long_press`    | `item`            | ≥ 600 ms gehalten (danach kommt kein `button_press`)   |
+| `slider_change` | `item`, `value`   | Slider bewegt; `final: true` beim Loslassen            |
+| `page_change`   | `page`            | Gerät hat die Seite gewechselt (Wischen / Nav-Button)  |
+
+Optional ist `part`, damit Kacheln mit mehreren Schaltflächen unterscheiden können,
+welche gemeint war (für `media`: `prev` | `toggle` | `next`).
+
+```json
+{"v":1,"type":"event","event":"slider_change","item":"vol","value":42,"final":false}
+{"v":1,"type":"event","event":"button_press","item":"np","part":"next"}
+```
+
+Slider-Events drosselt das Gerät auf höchstens 20 pro Sekunde. Das letzte Event
+(`final: true`) wird immer gesendet.
+
+### `art_request`
+
+`{"v":1,"type":"art_request","size":88}`
+
+Kantenlänge (8–160 px) des Covers, das das Gerät für seine größte `media`-Kachel braucht.
+Das Gerät schickt die Nachricht nach `welcome` und nach jedem neuen Layout. Der Daemon
+antwortet sofort mit dem aktuellen Cover und schickt danach jedes neue Cover unaufgefordert.
+
+### `pong`
+
+`{"v":1,"type":"pong","t":<t aus dem ping>}`
+
+## Daemon → Gerät
+
+### `welcome`
+
+`{"v":1,"type":"welcome","server":{"name":"DeckBar","version":"0.1.0"},"heartbeat":5}`
+
+### `error`
+
+`{"v":1,"type":"error","code":"auth"|"version"|"bad_request","message":"…"}`.
+Bei `auth` und `version` schließt der Daemon danach die Verbindung.
+
+### `layout`
+
+```json
+{"v":1,"type":"layout","hash":"3f2a…",
+ "theme":{"accent":"#5AC8FA","background":"default"},
+ "pages":[
+   {"id":"main","name":"Audio","cols":6,"rows":2,"items":[
+     {"id":"mic","type":"toggle","label":"Mikro","icon":"microphone",
+      "icon_on":"microphone-off","bind":"mic_muted","style":"danger","w":1,"h":1},
+     {"id":"vol","type":"slider","label":"Lautstärke","icon":"volume-high",
+      "bind":"out_volume","mute_bind":"out_muted","min":0,"max":100,"w":2,"h":1},
+     {"id":"np","type":"media","w":2,"h":2},
+     {"id":"yt","type":"button","label":"YouTube","icon":"youtube","style":"default"},
+     {"id":"p2","type":"button","label":"Mehr","icon":"chevron-right","nav":"page2"}
+   ]}]}
+```
+
+**Raster:** Jede Seite ist ein Raster aus `cols` × `rows` Zellen (1–8 × 1–3).
+Items belegen `w` × `h` Zellen (Standard 1 × 1) und werden in Listenreihenfolge
+zeilenweise in die erste freie Lücke gesetzt (wie CSS-Grid mit `auto-flow: row dense`).
+Items, die nicht mehr passen, werden nicht angezeigt.
+
+**Item-Typen**
+
+| `type`   | Anzeige                                           | Events                          |
+|----------|---------------------------------------------------|---------------------------------|
+| `button` | Icon + Label                                      | `button_press`, `long_press`    |
+| `toggle` | wie button; aktiv, wenn `state[bind]` truthy ist  | `button_press`, `long_press`    |
+| `slider` | Kachel füllt sich mit Wert; relatives Ziehen      | `slider_change`, `long_press`   |
+| `media`  | Titel/Interpret aus `state.track`, ab h ≥ 2 mit ⏮ ⏯ ⏭ | `button_press` (+ `part`)    |
+
+**Felder**
+
+| Feld        | Typen            | Bedeutung                                                 |
+|-------------|------------------|-----------------------------------------------------------|
+| `label`     | alle             | max. 24 Zeichen                                           |
+| `icon`      | alle             | Name aus [`icons.md`](icons.md) (Material Design Icons)   |
+| `icon_on`   | toggle, slider   | Icon im aktiven Zustand bzw. bei `mute_bind` = true       |
+| `style`     | alle             | `default`, `accent`, `danger`, `success`, `warning`       |
+| `bind`      | toggle, slider   | State-Schlüssel                                           |
+| `mute_bind` | slider           | State-Schlüssel, der den Slider als „stumm“ darstellt     |
+| `min`,`max` | slider           | Wertebereich (Standard 0–100)                             |
+| `nav`       | button           | Seiten-ID; das Gerät wechselt **lokal** und sendet `page_change` |
+
+Beim Toggle bestimmt `style`, wie der **aktive** Zustand aussieht. Ein gemutetes
+Mikro ist also `style: danger` + `bind: mic_muted`.
+
+Limits: max. 8 Seiten, max. 24 Items pro Seite, Nachricht max. 16 KiB.
+
+### `state`
+
+```json
+{"v":1,"type":"state","full":true,"values":{
+  "out_volume":42,"out_muted":false,"mic_volume":80,"mic_muted":true,
+  "playing":true,"track":{"title":"Song","artist":"Band","player":"spotify"}}}
+```
+
+Ist `full` = `false`, enthält `values` nur geänderte Schlüssel. Sie werden in den
+bestehenden State übernommen. `track: null` bedeutet, dass kein Player aktiv ist.
+Eigene Schlüssel sind erlaubt (z. B. aus Shell-Statusbefehlen) und lassen sich über
+`bind` nutzen.
+
+| Schlüssel     | Typ          | Quelle                                  |
+|---------------|--------------|-----------------------------------------|
+| `out_volume`  | int 0–150    | `wpctl get-volume @DEFAULT_AUDIO_SINK@` |
+| `out_muted`   | bool         | dito                                    |
+| `mic_volume`  | int 0–150    | `@DEFAULT_AUDIO_SOURCE@`                |
+| `mic_muted`   | bool         | dito                                    |
+| `playing`     | bool         | `playerctl` (Status == Playing)         |
+| `track`       | object\|null | `playerctl` Metadaten                   |
+
+### `art`
+
+```json
+{"v":1,"type":"art","id":"3f2a9c01b2d4","w":88,"h":88,"y":0,"rows":34,"data":"<base64>"}
+{"v":1,"type":"art","id":""}
+```
+
+Cover des aktuellen Titels (`mpris:artUrl`), mittig quadratisch zugeschnitten und genau auf
+`size` aus `art_request` skaliert. `data` ist RGB565 little-endian (LVGL-Format), Zeilen
+`y` bis `y + rows - 1`. Ein Bild kommt in mehreren Nachrichten zu je ≤ 6000 Byte Rohdaten,
+der Reihe nach von `y = 0` an, weil die Firmware höchstens 15 KB pro Nachricht annimmt.
+Das Gerät zeigt das Bild erst, wenn alle Zeilen da sind. `id: ""` heißt: kein Cover.
+Die URL selbst (`art_url`) bleibt im Daemon und wird nicht ans Gerät geschickt.
+
+### `ping`
+
+`{"v":1,"type":"ping","t":1727712000123}`
+
+## Sicherheit
+
+- Das Token steht nur in der gitignorierten Konfiguration (Daemon:
+  `~/.config/deckbar/config.yaml`, Firmware: `firmware/include/secrets.h`).
+- Das Token schützt nur vor versehentlichen Clients im LAN. Der Transport ist
+  unverschlüsselt (kein TLS).
+- Die Konfigurations-UI und `/api/*` antworten nur Anfragen von Loopback-Adressen.

@@ -1,0 +1,19 @@
+# Geheimnisse / lokale Konfiguration
+config.yaml
+layout.yaml
+firmware/include/secrets.h
+firmware/secrets.ini
+
+# Build
+build/
+simulator/build*/
+firmware/.pio/
+__pycache__/
+*.pyc
+.venv/
+daemon/.venv/
+tools/.cache/
+node_modules/
+
+# Werks-Flash von Waveshare (16 MB, proprietär) – liegt nur lokal
+firmware/backup/

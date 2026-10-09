@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeckBar</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='10' width='28' height='12' rx='4' fill='%235AC8FA'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <h1>DeckBar</h1>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="save" id="save-state" aria-live="polite"></div>
+</header>
+
+<div id="error" class="banner error" hidden></div>
+<div id="warnings" class="banner warn" hidden></div>
+
+<main>
+  <section class="stage">
+    <div class="stage-bar">
+      <div class="tabs" id="page-tabs" role="tablist"></div>
+      <div class="mode" role="group" aria-label="Modus">
+        <button id="mode-edit" class="seg on" type="button">Bearbeiten</button>
+        <button id="mode-test" class="seg" type="button">Testen</button>
+      </div>
+    </div>
+    <div class="preview-wrap" id="preview-wrap">
+      <div class="preview" id="preview"></div>
+    </div>
+    <p class="hint" id="mode-hint">Klicke eine Kachel an, um sie zu bearbeiten. Im Modus „Testen“ lösen Klicks die echten Aktionen aus.</p>
+  </section>
+
+  <section class="editor">
+    <div class="col pages-col">
+      <div class="card">
+        <div class="card-head">
+          <h2>Seite</h2>
+          <div class="btns">
+            <button type="button" class="icon-btn" id="page-left" title="Nach links">‹</button>
+            <button type="button" class="icon-btn" id="page-right" title="Nach rechts">›</button>
+            <button type="button" class="icon-btn danger" id="page-del" title="Seite löschen">✕</button>
+          </div>
+        </div>
+        <div class="grid2">
+          <label>Name<input id="page-name" maxlength="24"></label>
+          <label>ID<input id="page-id" maxlength="32" pattern="[A-Za-z0-9_-]{1,32}"></label>
+          <label>Spalten<input id="page-cols" type="number" min="1" max="8"></label>
+          <label>Zeilen<input id="page-rows" type="number" min="1" max="3"></label>
+        </div>
+        <button type="button" class="wide" id="page-add">+ Neue Seite</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Kacheln</h2>
+          <div class="add-wrap">
+            <button type="button" id="item-add" class="primary">+ Hinzufügen</button>
+            <div class="menu" id="add-menu" hidden></div>
+          </div>
+        </div>
+        <ol class="items" id="item-list"></ol>
+        <p class="hint small">Reihenfolge per Ziehen ändern. Kacheln werden zeilenweise in die erste freie Lücke gesetzt.</p>
+      </div>
+
+      <div class="card">
+        <h2>Design</h2>
+        <label class="row">Akzentfarbe <input id="accent" type="color"></label>
+        <!-- Hintergrund vom Daemon: vorerst ausgeblendet, bricht auf dem Gerät die Verbindung ab (siehe background.py) -->
+        <label class="row" hidden>Hintergrund
+          <select id="background">
+            <option value="default">Standard</option>
+            <option value="wallpaper">Desktop-Hintergrund</option>
+            <option value="file">Eigene Bilddatei</option>
+          </select>
+        </label>
+        <label id="bg-file-row" hidden>Bilddatei (Pfad)
+          <input id="bg-file" type="text" placeholder="/home/…/bild.jpg" spellcheck="false">
+        </label>
+        <p class="hint small" hidden>Der Desktop-Hintergrund wird weichgezeichnet und folgt einem Wechsel automatisch. Die Vorschau zeigt den Hintergrund nach dem Speichern.</p>
+        <p class="hint small" id="layout-path"></p>
+      </div>
+    </div>
+
+    <div class="col props-col">
+      <div class="card" id="props">
+        <p class="empty">Keine Kachel ausgewählt.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="icon-dialog">
+  <form method="dialog" class="icon-dlg">
+    <div class="dlg-head">
+      <input id="icon-search" placeholder="Icon suchen …" autocomplete="off">
+      <button value="none" type="submit" class="ghost">Kein Icon</button>
+      <button value="cancel" type="submit" class="ghost">Abbrechen</button>
+    </div>
+    <div class="icon-grid" id="icon-grid"></div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

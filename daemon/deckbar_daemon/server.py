@@ -1,0 +1,451 @@
+"""WebSocket-Server für Geräte, REST/Live-API und Auslieferung der Web-UI."""
+from __future__ import annotations
+
+import asyncio
+import hmac
+import json
+import logging
+import time
+from dataclasses import dataclass, field
+from importlib import resources
+from pathlib import Path
+from typing import Any
+
+import yaml
+from aiohttp import WSMsgType, web
+from pydantic import ValidationError
+
+from . import __version__
+from .actions import Executor
+from .art import MAX_SIZE as ART_MAX_SIZE
+from .art import Art, chunks
+from .background import Background
+from .audio import Audio
+from .config import Layout, Page, Settings, load_layout, save_layout
+from .media import Media
+from .proc import have
+from .state import State
+
+log = logging.getLogger(__name__)
+
+PROTO_V = 1
+BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url")
+# nur für Daemon/Web-UI; das Gerät bekommt das Cover als Bild per `art`
+DEVICE_HIDDEN_KEYS = {"art_url"}
+MAX_MSG = 16 * 1024
+LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+WEB_DIR = Path(str(resources.files("deckbar_daemon").joinpath("web")))
+
+
+@dataclass(eq=False)
+class Device:
+    ws: web.WebSocketResponse
+    remote: str
+    id: str = "?"
+    model: str = ""
+    fw: str = ""
+    sim: bool = False
+    page: str | None = None
+    connected_at: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.monotonic)
+    art_size: int = 0  # Kantenlänge des Covers laut art_request, 0 = keins gewünscht
+    bg_id: str = ""    # Hintergrund, den das Gerät gerade zeigt ("" = eingebauter)
+    # Bildübertragungen pro Gerät nacheinander, damit sich Teile zweier Bilder nicht mischen
+    send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+    def info(self) -> dict:
+        return {
+            "id": self.id, "model": self.model, "fw": self.fw, "sim": self.sim,
+            "remote": self.remote, "page": self.page, "connected_at": self.connected_at,
+        }
+
+
+def _msg(type_: str, **fields: Any) -> str:
+    return json.dumps({"v": PROTO_V, "type": type_, **fields}, ensure_ascii=False, separators=(",", ":"))
+
+
+def _validation_text(e: ValidationError) -> str:
+    parts = []
+    for err in e.errors():
+        loc = ".".join(str(x) for x in err["loc"])
+        parts.append(f"{loc}: {err['msg']}" if loc else err["msg"])
+    return "\n".join(parts)
+
+
+class DeckBar:
+    def __init__(self, settings: Settings, config_dir: Path) -> None:
+        self.settings = settings
+        self.layout_path = config_dir / "layout.yaml"
+        self.layout_error: str | None = None
+        try:
+            self.layout: Layout = load_layout(self.layout_path)
+        except (yaml.YAMLError, ValidationError) as e:
+            # nicht abstürzen (systemd-Neustartschleife), sondern Fehler in der Web-UI zeigen
+            self.layout_error = _validation_text(e) if isinstance(e, ValidationError) else str(e)
+            log.error("layout.yaml ungültig, starte mit leerem Layout:\n%s", self.layout_error)
+            self.layout = Layout(pages=[Page(id="main", name="Fehler", items=[])])
+        self.layout_payload = self.layout.device_payload()
+        self._layout_mtime = self.layout_path.stat().st_mtime
+        self.state = State()
+        self.audio = Audio(self.state)
+        self.media = Media(self.state, settings.player)
+        self.executor = Executor(self.audio, self.media)
+        self.art = Art()
+        self.bg = Background()
+        self.devices: set[Device] = set()
+        self.ui_clients: set[web.WebSocketResponse] = set()
+        self.state.subscribe(self._on_state)
+
+    # ---------------------------------------------------------------- Verteilung
+    async def _send(self, ws: web.WebSocketResponse, text: str) -> None:
+        if ws.closed:
+            return
+        try:
+            await ws.send_str(text)
+        except (ConnectionError, RuntimeError) as e:  # ConnectionError umfasst Reset + Broken Pipe
+            log.debug("Senden fehlgeschlagen: %s", e)
+
+    async def _broadcast_devices(self, text: str) -> None:
+        await asyncio.gather(*(self._send(d.ws, text) for d in list(self.devices)))
+
+    async def _broadcast_ui(self, obj: dict) -> None:
+        text = json.dumps(obj, ensure_ascii=False)
+        await asyncio.gather(*(self._send(ws, text) for ws in list(self.ui_clients)))
+
+    async def _on_state(self, diff: dict) -> None:
+        if "art_url" in diff:
+            asyncio.ensure_future(self._update_art(diff["art_url"]))
+        dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS}
+        if dev_diff:
+            await self._broadcast_devices(_msg("state", full=False, values=dev_diff))
+        await self._broadcast_ui({"type": "state", "values": diff})
+
+    # ---------------------------------------------------------------- Cover
+    async def _update_art(self, url: str | None) -> None:
+        if await self.art.set_url(url):
+            await asyncio.gather(*(self._send_art(d) for d in list(self.devices) if d.art_size))
+
+    async def _send_art(self, dev: Device) -> None:
+        async with dev.send_lock:
+            r = await self.art.render(dev.art_size)
+            if r is None:
+                await self._send(dev.ws, _msg("art", id=""))
+                return
+            aid, data = r
+            for part in chunks(aid, dev.art_size, dev.art_size, data):
+                await self._send(dev.ws, _msg("art", **part))
+
+    # ---------------------------------------------------------------- Hintergrund
+    async def _send_bg(self, dev: Device) -> None:
+        async with dev.send_lock:
+            bid, data = self.bg.id, self.bg.data
+            if bid == dev.bg_id:
+                return
+            if not bid or data is None:
+                await self._send(dev.ws, _msg("bg", id=""))
+            else:
+                for part in chunks(bid, 640, 172, data):
+                    if dev.ws.closed:
+                        return
+                    await self._send(dev.ws, _msg("bg", **part))
+            dev.bg_id = bid
+
+    async def update_background(self, mode: str | None = None) -> None:
+        if await self.bg.update(mode):
+            await asyncio.gather(*(self._send_bg(d) for d in list(self.devices)))
+            await self._broadcast_ui({"type": "background", "id": self.bg.id})
+
+    async def watch_background(self) -> None:
+        """Folgt einem neuen Desktop-Hintergrund (bzw. geänderter Bilddatei)."""
+        await self.update_background(self.layout.theme.background)
+        while True:
+            await asyncio.sleep(5)
+            await self.update_background()
+
+    async def _devices_changed(self) -> None:
+        await self._broadcast_ui({"type": "devices", "devices": [d.info() for d in self.devices]})
+
+    async def apply_layout(self, layout: Layout, save: bool) -> None:
+        if save:
+            save_layout(self.layout_path, layout)
+            self._layout_mtime = self.layout_path.stat().st_mtime
+        self.layout = layout
+        self.layout_payload = layout.device_payload()
+        self.layout_error = None
+        log.info("Layout aktualisiert (hash %s), an %d Gerät(e)", self.layout_payload["hash"], len(self.devices))
+        await self._broadcast_devices(_msg("layout", **self.layout_payload))
+        await self._broadcast_ui({"type": "layout", "layout": self.layout_json(), "error": None})
+        await self.update_background(layout.theme.background)
+
+    def layout_json(self) -> dict:
+        return self.layout.model_dump(mode="json", exclude_none=True)
+
+    async def watch_layout_file(self) -> None:
+        """Übernimmt Handänderungen an layout.yaml ohne Neustart."""
+        while True:
+            await asyncio.sleep(1)
+            try:
+                mtime = self.layout_path.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            if mtime == self._layout_mtime:
+                continue
+            self._layout_mtime = mtime
+            try:
+                data = yaml.safe_load(self.layout_path.read_text()) or {}
+                await self.apply_layout(Layout.model_validate(data), save=False)
+            except (yaml.YAMLError, ValidationError) as e:
+                text = _validation_text(e) if isinstance(e, ValidationError) else str(e)
+                self.layout_error = text
+                log.error("layout.yaml ungültig, altes Layout bleibt aktiv:\n%s", text)
+                await self._broadcast_ui({"type": "layout_error", "error": text})
+
+    # ---------------------------------------------------------------- Ereignisse
+    async def handle_event(self, msg: dict, source: str) -> str | None:
+        event = msg.get("event")
+        if event == "page_change":
+            return None
+        item_id = msg.get("item")
+        item = self.layout.find_item(item_id) if isinstance(item_id, str) else None
+        if item is None:
+            return f"unbekanntes Item '{item_id}'"
+        value = msg.get("value")
+        if value is not None and not isinstance(value, int):
+            return "value muss eine Ganzzahl sein"
+        part = msg.get("part")
+        log.debug("%s: %s %s value=%s part=%s", source, event, item_id, value, part)
+        await self.executor.on_event(item, event, value, part)
+        return None
+
+    # ---------------------------------------------------------------- Geräte-WebSocket
+    async def ws_device(self, request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse(max_msg_size=MAX_MSG, heartbeat=None)
+        await ws.prepare(request)
+        dev = Device(ws=ws, remote=request.remote or "?")
+        hb = self.settings.heartbeat
+
+        # 1. hello innerhalb von 5 s
+        try:
+            first = await ws.receive(timeout=5)
+        except TimeoutError:
+            await ws.close(code=4000, message=b"hello timeout")
+            return ws
+        if first.type != WSMsgType.TEXT:
+            await ws.close()
+            return ws
+        try:
+            hello = json.loads(first.data)
+        except json.JSONDecodeError:
+            hello = {}
+        if hello.get("type") != "hello":
+            await self._send(ws, _msg("error", code="bad_request", message="erste Nachricht muss hello sein"))
+            await ws.close()
+            return ws
+        if hello.get("v") != PROTO_V:
+            await self._send(ws, _msg("error", code="version", message=f"Daemon spricht v{PROTO_V}"))
+            await ws.close()
+            return ws
+        token = str(hello.get("token", ""))
+        if not hmac.compare_digest(token.encode(), self.settings.token.encode()):
+            log.warning("Gerät %s: falsches Token", dev.remote)
+            await self._send(ws, _msg("error", code="auth", message="falsches Token"))
+            await ws.close(code=4001, message=b"auth")
+            return ws
+
+        info = hello.get("device") or {}
+        dev.id = str(info.get("id", "?"))[:64]
+        dev.model = str(info.get("model", ""))[:64]
+        dev.fw = str(info.get("fw", ""))[:32]
+        dev.sim = bool(info.get("sim", False))
+        dev.bg_id = str(hello.get("bg_id", ""))[:16]
+        self.devices.add(dev)
+        log.info("Gerät verbunden: %s (%s) von %s", dev.id, dev.model or "?", dev.remote)
+        await self._devices_changed()
+
+        await self._send(ws, _msg("welcome", server={"name": self.settings.name, "version": __version__}, heartbeat=hb))
+        if hello.get("layout_hash") != self.layout_payload["hash"]:
+            await self._send(ws, _msg("layout", **self.layout_payload))
+        values = {k: v for k, v in self.state.values.items() if k not in DEVICE_HIDDEN_KEYS}
+        await self._send(ws, _msg("state", full=True, values=values))
+        asyncio.ensure_future(self._send_bg(dev))
+
+        async def heartbeat():
+            while not ws.closed:
+                await asyncio.sleep(hb)
+                if time.monotonic() - dev.last_seen > 3 * hb:
+                    log.warning("Gerät %s antwortet nicht mehr, trenne", dev.id)
+                    await ws.close(code=4002, message=b"heartbeat")
+                    return
+                await self._send(ws, _msg("ping", t=int(time.time() * 1000)))
+
+        hb_task = asyncio.ensure_future(heartbeat())
+        try:
+            async for m in ws:
+                if m.type != WSMsgType.TEXT:
+                    continue
+                dev.last_seen = time.monotonic()
+                try:
+                    msg = json.loads(m.data)
+                except json.JSONDecodeError:
+                    await self._send(ws, _msg("error", code="bad_request", message="kein JSON"))
+                    continue
+                t = msg.get("type")
+                if t == "pong":
+                    continue
+                if t == "ping":
+                    await self._send(ws, _msg("pong", t=msg.get("t", 0)))
+                elif t == "art_request":
+                    size = msg.get("size")
+                    dev.art_size = size if isinstance(size, int) and 0 < size <= ART_MAX_SIZE else 0
+                    if dev.art_size:
+                        asyncio.ensure_future(self._send_art(dev))
+                elif t == "event":
+                    if msg.get("event") == "page_change":
+                        dev.page = msg.get("page")
+                        await self._devices_changed()
+                    err = await self.handle_event(msg, dev.id)
+                    if err:
+                        await self._send(ws, _msg("error", code="bad_request", message=err))
+                else:
+                    log.debug("Gerät %s: unbekannter Typ %r", dev.id, t)
+        finally:
+            hb_task.cancel()
+            self.devices.discard(dev)
+            log.info("Gerät getrennt: %s", dev.id)
+            await self._devices_changed()
+        return ws
+
+    # ---------------------------------------------------------------- Web-UI / API
+    async def ws_ui(self, request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse(heartbeat=20)
+        await ws.prepare(request)
+        self.ui_clients.add(ws)
+        await self._send(ws, json.dumps({
+            "type": "hello",
+            "layout": self.layout_json(),
+            "error": self.layout_error,
+            "state": self.state.values,
+            "devices": [d.info() for d in self.devices],
+            "status": self.status(),
+        }, ensure_ascii=False))
+        try:
+            async for m in ws:
+                if m.type != WSMsgType.TEXT:
+                    continue
+                try:
+                    msg = json.loads(m.data)
+                except json.JSONDecodeError:
+                    continue
+                # Die Vorschau in der Web-UI verhält sich wie ein Gerät
+                if msg.get("type") == "event":
+                    err = await self.handle_event(msg, "web-ui")
+                    if err:
+                        await self._send(ws, json.dumps({"type": "error", "error": err}))
+        finally:
+            self.ui_clients.discard(ws)
+        return ws
+
+    def status(self) -> dict:
+        return {
+            "version": __version__,
+            "port": self.settings.port,
+            "name": self.settings.name,
+            "layout_path": str(self.layout_path),
+            "tools": {t: have(t) for t in ("wpctl", "pactl", "playerctl", "ydotool", "xdg-open")},
+            "last_error": self.executor.last_error,
+            "background": {"mode": self.bg.mode, "source": str(self.bg.source) if self.bg.source else None,
+                           "id": self.bg.id},
+        }
+
+    async def api_get_layout(self, request: web.Request) -> web.Response:
+        return web.json_response({"layout": self.layout_json(), "error": self.layout_error,
+                                  "device_payload": self.layout_payload})
+
+    async def api_put_layout(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            layout = Layout.model_validate(data)
+        except json.JSONDecodeError:
+            return web.json_response({"error": "kein JSON"}, status=400)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        await self.apply_layout(layout, save=True)
+        return web.json_response({"ok": True, "hash": self.layout_payload["hash"]})
+
+    async def api_status(self, request: web.Request) -> web.Response:
+        return web.json_response({**self.status(), "devices": [d.info() for d in self.devices],
+                                  "state": self.state.values})
+
+    async def api_trigger(self, request: web.Request) -> web.Response:
+        msg = await request.json()
+        err = await self.handle_event(msg, "api")
+        if err:
+            return web.json_response({"error": err}, status=400)
+        return web.json_response({"ok": True, "error": self.executor.last_error})
+
+    async def api_post_state(self, request: web.Request) -> web.Response:
+        """Eigene State-Schlüssel setzen, z. B. aus Skripten:
+        curl -X POST localhost:8765/api/state -d '{"obs_rec": true}'"""
+        try:
+            data = await request.json()
+        except json.JSONDecodeError:
+            return web.json_response({"error": "kein JSON"}, status=400)
+        if not isinstance(data, dict):
+            return web.json_response({"error": "Objekt erwartet"}, status=400)
+        builtin = set(BUILTIN_KEYS) & data.keys()
+        if builtin:
+            return web.json_response({"error": f"eingebaute Schlüssel sind schreibgeschützt: {', '.join(sorted(builtin))}"}, status=400)
+        bad = [k for k in data if not isinstance(k, str) or not k or len(k) > 32]
+        if bad:
+            return web.json_response({"error": "Schlüssel: 1–32 Zeichen"}, status=400)
+        self.state.update(**data)
+        return web.json_response({"ok": True})
+
+    async def api_background(self, request: web.Request) -> web.StreamResponse:
+        """Aktueller Hintergrund als PNG (Vorschau in der Web-UI)."""
+        if self.bg.png is None:
+            return web.FileResponse(WEB_DIR / "bg.png", headers={"Cache-Control": "no-cache"})
+        return web.Response(body=self.bg.png, content_type="image/png", headers={"Cache-Control": "no-cache"})
+
+    async def index(self, request: web.Request) -> web.FileResponse:
+        return web.FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+@web.middleware
+async def local_only(request: web.Request, handler):
+    """Alles außer /ws nur von localhost, plus Host-/Origin-Prüfung gegen DNS-Rebinding."""
+    if request.path == "/ws":
+        return await handler(request)
+    remote = request.remote or ""
+    if remote.startswith("::ffff:"):
+        remote = remote[7:]
+    host = (request.host or "").rsplit(":", 1)[0].strip("[]")
+    if remote not in LOCAL_HOSTS or host not in LOCAL_HOSTS:
+        raise web.HTTPForbidden(text="Die DeckBar-Konfiguration ist nur über localhost erreichbar.")
+    origin = request.headers.get("Origin")
+    if origin and request.method not in ("GET", "HEAD"):
+        o_host = origin.split("://", 1)[-1].rsplit(":", 1)[0].strip("[]")
+        if o_host not in LOCAL_HOSTS:
+            raise web.HTTPForbidden(text="fremder Origin")
+    return await handler(request)
+
+
+def build_app(deck: DeckBar) -> web.Application:
+    app = web.Application(middlewares=[local_only], client_max_size=256 * 1024)
+    app.router.add_get("/ws", deck.ws_device)
+    app.router.add_get("/", deck.index)
+    app.router.add_get("/api/live", deck.ws_ui)
+    app.router.add_get("/api/layout", deck.api_get_layout)
+    app.router.add_put("/api/layout", deck.api_put_layout)
+    app.router.add_get("/api/status", deck.api_status)
+    app.router.add_post("/api/trigger", deck.api_trigger)
+    app.router.add_post("/api/state", deck.api_post_state)
+    app.router.add_get("/api/background.png", deck.api_background)
+    app.router.add_static("/static/", WEB_DIR)
+    app["deck"] = deck
+
+    async def cleanup(_app: web.Application) -> None:
+        await deck.art.close()
+
+    app.on_cleanup.append(cleanup)
+    return app
