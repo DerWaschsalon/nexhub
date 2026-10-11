@@ -17,7 +17,11 @@
 
 #include <string.h>
 
+#if DECKBAR_BOARD_V1
+#include "board_v1.h"
+#else
 #include "board_v2.h"
+#endif
 #include "deckbar/ui.h"
 #include "deckbar_config.h"
 #include "driver/gpio.h"
@@ -97,6 +101,14 @@ static void i2c_init(void)
 
 static void exio_init(void)
 {
+#if DECKBAR_BOARD_V1
+    /* V1: Reset und Backlight hängen direkt am ESP32, Expander wird nicht gebraucht */
+    gpio_config_t rst = {.pin_bit_mask = 1ULL << BOARD_LCD_RST, .mode = GPIO_MODE_OUTPUT,
+                         .pull_up_en = GPIO_PULLUP_ENABLE};
+    ESP_ERROR_CHECK(gpio_config(&rst));
+    gpio_set_level(BOARD_LCD_RST, 1);
+    return;
+#endif
     ESP_ERROR_CHECK(esp_io_expander_new_i2c_tca9554(bus0, ESP_IO_EXPANDER_I2C_TCA9554_ADDRESS_000, &expander));
     ESP_ERROR_CHECK(esp_io_expander_set_dir(expander, BOARD_EXIO_TOUCH_INT, IO_EXPANDER_INPUT));
     ESP_ERROR_CHECK(esp_io_expander_set_dir(expander, BOARD_EXIO_BL_EN | BOARD_EXIO_LCD_RST, IO_EXPANDER_OUTPUT));
@@ -106,6 +118,15 @@ static void exio_init(void)
 
 static void lcd_reset(void)
 {
+#if DECKBAR_BOARD_V1
+    gpio_set_level(BOARD_LCD_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(30));
+    gpio_set_level(BOARD_LCD_RST, 0);
+    vTaskDelay(pdMS_TO_TICKS(250));
+    gpio_set_level(BOARD_LCD_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(30));
+    return;
+#endif
     ESP_ERROR_CHECK(esp_io_expander_set_level(expander, BOARD_EXIO_LCD_RST, 1));
     vTaskDelay(pdMS_TO_TICKS(30));
     ESP_ERROR_CHECK(esp_io_expander_set_level(expander, BOARD_EXIO_LCD_RST, 0));
@@ -125,7 +146,11 @@ static void backlight_off_early(void)
         .intr_type = GPIO_INTR_DISABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&c));
+#if DECKBAR_BOARD_V1
+    gpio_set_level(BOARD_LCD_BL, 1); /* V1: invertiert, High = dunkel */
+#else
     gpio_set_level(BOARD_LCD_BL, 0);
+#endif
 }
 
 void display_set_brightness(uint8_t level)
@@ -138,8 +163,10 @@ void display_set_brightness(uint8_t level)
 static void backlight_on(uint8_t level)
 {
     /* Reihenfolge wie im V2-Beispiel: GPIO + BL_EN an, danach PWM (lcd_bl_pwm_bsp_init) */
+#if !DECKBAR_BOARD_V1
     gpio_set_level(BOARD_LCD_BL, 1);
     ESP_ERROR_CHECK(esp_io_expander_set_level(expander, BOARD_EXIO_BL_EN, 1));
+#endif
     ledc_timer_config_t t = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_8_BIT,
