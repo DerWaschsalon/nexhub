@@ -57,6 +57,7 @@ const S = {
   devices: [],
   status: {},
   dps: null,         // Verbindung zum A2Tools-Meter (GET /api/dps)
+  runs: null,        // Dungeon-Runs → Discord (GET /api/runs)
   icons: {},
   page: 0,
   sel: null,         // Index des ausgewählten Items auf der aktuellen Seite
@@ -759,6 +760,7 @@ function connectLive() {
       S.devices = msg.devices;
       S.status = msg.status;
       S.dps = msg.dps;
+      S.runs = msg.runs;
       setBgPreview(msg.status?.background?.id);
       if (!S.dirty) setLayout(msg.layout);
       showError(msg.error);
@@ -780,6 +782,9 @@ function connectLive() {
     } else if (msg.type === "dps") {
       S.dps = msg.dps;
       renderDpsCard();
+    } else if (msg.type === "runs") {
+      S.runs = msg.runs;
+      renderRunsCard();
     } else if (msg.type === "background") {
       setBgPreview(msg.id);
     } else if (msg.type === "layout_error") {
@@ -884,11 +889,99 @@ function bindDpsCard() {
   $("dps-return").addEventListener("change", (e) => saveDps({ return_after: clampInt(e.target.value, 0, 600, 20) }));
 }
 
+/* ================================================================= Dungeon-Runs → Discord */
+const CLASS_LABELS = { gladiator: "Gladiator", templar: "Templer", assassin: "Assassine", ranger: "Waldläufer", sorcerer: "Magier", spiritmaster: "Beschwörer", cleric: "Kleriker", chanter: "Kantor" };
+
+// So maskiert das A2Tools-Meter (wie mask() in runs.py)
+function maskName(n) {
+  if (n.includes("*") || n.length < 2) return n;
+  if (n.length === 2) return n[0] + "*";
+  const head = n.length === 3 ? 1 : 2;
+  return n.slice(0, head) + "*".repeat(Math.min(4, n.length - head - 1)) + n.slice(-1);
+}
+
+function renderRunsCard() {
+  const r = S.runs;
+  if (!r) return;
+  const st = r.settings;
+  const focused = document.activeElement;
+  $("runs-enabled").checked = st.enabled;
+  if (focused !== $("runs-webhook")) $("runs-webhook").value = st.webhook;
+  if (focused !== $("runs-idle")) $("runs-idle").value = st.idle_minutes;
+  const on = st.enabled && st.webhook;
+  $("runs-chip").className = "chip " + (!r.history ? "warn" : on ? "ok" : "");
+  $("runs-status").textContent = !r.history ? "keine History" : on ? (r.open_run ? "Run läuft" : "bereit") : "aus";
+  const hint = [];
+  if (!r.history) hint.push("Keine Kampf-History vom A2Tools-Meter gefunden.");
+  else if (st.enabled && !st.webhook) hint.push("Webhook-URL fehlt: in Discord unter Kanal bearbeiten → Integrationen → Webhooks.");
+  if (r.result) hint.push(r.result);
+  $("runs-hint").textContent = hint.join(" ");
+  $("runs-hint").hidden = !hint.length;
+  // Namensliste nicht neu bauen, während jemand darin tippt
+  if ($("runs-names").contains(focused)) return;
+  $("runs-names").replaceChildren(...r.characters.flatMap((c) => {
+    const inp = el("input", { type: "text", value: c.name, placeholder: c.seen || (c.you ? "dein Charakter" : "echter Name"), maxlength: 24, spellcheck: "false" });
+    const check = () => inp.classList.toggle("bad", !!inp.value.trim() && maskName(inp.value.trim()) !== c.mask);
+    inp.title = "Muss zur Maske passen: gleicher Anfang und gleiches Ende";
+    check();
+    inp.addEventListener("input", check);
+    inp.addEventListener("change", () => {
+      const names = { ...S.runs.settings.names };
+      const v = inp.value.trim();
+      if (v) names[c.key] = v; else delete names[c.key];
+      saveRuns({ names });
+    });
+    return [el("span", { class: "m", text: c.mask }), el("span", { class: "c", text: `${CLASS_LABELS[c.cls] || "?"} · ${c.count}×` }), inp];
+  }));
+  if (!r.characters.length) $("runs-names").append(el("span", { class: "c", text: "Noch keine Dungeon-Kämpfe in der History." }));
+}
+
+let runsTimer = null;
+function saveRuns(patch) {
+  Object.assign(S.runs.settings, patch);
+  clearTimeout(runsTimer);
+  runsTimer = setTimeout(async () => {
+    try {
+      const r = await fetch("/api/runs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(S.runs.settings) });
+      const data = await r.json();
+      if (!r.ok) return toast(data.error || `Fehler ${r.status}`, true);
+      S.runs = data;
+      renderRunsCard();
+      toast("Discord-Einstellungen gespeichert ✓");
+    } catch {
+      toast("Daemon nicht erreichbar", true);
+    }
+  }, 300);
+}
+
+function bindRunsCard() {
+  $("runs-enabled").addEventListener("change", (e) => saveRuns({ enabled: e.target.checked }));
+  $("runs-webhook").addEventListener("change", (e) => saveRuns({ webhook: e.target.value.trim() }));
+  $("runs-idle").addEventListener("change", (e) => saveRuns({ idle_minutes: clampInt(e.target.value, 2, 120, 15) }));
+  $("runs-preview").addEventListener("click", () => window.open(`/api/runs/preview.png?t=${Date.now()}`, "_blank"));
+  $("runs-test").addEventListener("click", async () => {
+    $("runs-test").disabled = true;
+    try {
+      const r = await fetch("/api/runs/test", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) return toast(data.error || `Fehler ${r.status}`, true);
+      S.runs = data;
+      renderRunsCard();
+      toast("An Discord geschickt ✓");
+    } catch {
+      toast("Daemon nicht erreichbar", true);
+    } finally {
+      $("runs-test").disabled = false;
+    }
+  });
+}
+
 function renderAll() {
   if (!S.layout) return;
   renderTabs();
   renderPageCard();
   renderDpsCard();
+  renderRunsCard();
   renderPreview();
   renderItemList();
   renderProps();
@@ -912,6 +1005,7 @@ async function init() {
   await document.fonts.load('20px "mdi"').catch(() => {});
   bindPageCard();
   bindDpsCard();
+  bindRunsCard();
   renderAddMenu();
   $("item-add").addEventListener("click", (e) => { e.stopPropagation(); $("add-menu").hidden = !$("add-menu").hidden; });
   document.addEventListener("click", (e) => { if (!$("add-menu").contains(e.target)) $("add-menu").hidden = true; });

@@ -233,6 +233,12 @@ main { padding: 18px 24px 40px; max-width: 1400px; margin: 0 auto; }
 .card > h2 { margin-bottom: 12px; }
 .btns { display: flex; gap: 6px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+details.sub { margin-top: 14px; }
+details.sub summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.names { display: grid; grid-template-columns: auto auto 1fr; gap: 6px 10px; align-items: center; margin-top: 8px; font-size: 13px; }
+.names .m { font-variant-numeric: tabular-nums; }
+.names .c { color: var(--dim); font-size: 12px; }
+.names input.bad { border-color: var(--warning); }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .span2 { grid-column: span 2; }
 .span3 { grid-column: 1 / -1; }

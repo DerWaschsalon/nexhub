@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from aiohttp import WSMsgType, web
+from aiohttp import ClientSession, ClientTimeout, WSMsgType, web
 from pydantic import ValidationError
 
 from . import __version__
@@ -23,6 +23,7 @@ from .background import Background
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout
 from .dps import DpsFeed, DpsSettings
+from .runs import DungeonRuns, RunSettings, render_run
 from .media import Media
 from .proc import have
 from .state import State
@@ -96,6 +97,8 @@ class DeckBar:
         self.bg = Background()
         self.dps = DpsFeed(self.state, config_dir, self._on_combat)
         self.dps.status_listeners.append(self._dps_changed)
+        self.runs = DungeonRuns(config_dir)
+        self.runs.listeners.append(self._runs_changed)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -117,6 +120,8 @@ class DeckBar:
         await asyncio.gather(*(self._send(ws, text) for ws in list(self.ui_clients)))
 
     async def _on_state(self, diff: dict) -> None:
+        if diff.get("dps"):
+            self.runs.observe(diff["dps"])
         if "art_url" in diff:
             asyncio.ensure_future(self._update_art(diff["art_url"]))
         dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS}
@@ -169,6 +174,9 @@ class DeckBar:
     # ---------------------------------------------------------------- DPS-Meter
     async def _dps_changed(self) -> None:
         await self._broadcast_ui({"type": "dps", "dps": self.dps.info()})
+
+    async def _runs_changed(self) -> None:
+        await self._broadcast_ui({"type": "runs", "runs": self.runs.info()})
 
     async def _on_combat(self, active: bool) -> None:
         """Kampfbeginn: auf die DPS-Seite wechseln; Kampfende: zurück, wenn dort noch."""
@@ -357,6 +365,7 @@ class DeckBar:
             "devices": [d.info() for d in self.devices],
             "status": self.status(),
             "dps": self.dps.info(),
+            "runs": self.runs.info(),
         }, ensure_ascii=False))
         try:
             async for m in ws:
@@ -452,6 +461,49 @@ class DeckBar:
         await self._dps_changed()
         return web.json_response({"ok": True, **self.dps.info()})
 
+    async def api_get_runs(self, request: web.Request) -> web.Response:
+        return web.json_response(self.runs.info())
+
+    async def api_put_runs(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "kein JSON-Objekt"}, status=400)
+        # Platzhalter aus info() = Webhook unverändert lassen
+        if "webhook" not in data or set(str(data["webhook"])) == {"•"}:
+            data["webhook"] = self.runs.settings.webhook
+        try:
+            settings = RunSettings.model_validate(data)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        self.runs.save(settings)
+        await self._runs_changed()
+        return web.json_response({"ok": True, **self.runs.info()})
+
+    async def api_runs_preview(self, request: web.Request) -> web.Response:
+        """Letzter Run als PNG, so wie er nach Discord ginge."""
+        run = await asyncio.to_thread(self.runs.latest_run)
+        if not run:
+            return web.json_response({"error": "noch kein Dungeon-Run in der History"}, status=404)
+        png = await asyncio.to_thread(render_run, run)
+        return web.Response(body=png, content_type="image/png", headers={"Cache-Control": "no-store"})
+
+    async def api_runs_test(self, request: web.Request) -> web.Response:
+        """Letzten Run jetzt nach Discord schicken (Knopf in der Web-UI)."""
+        if not self.runs.settings.webhook:
+            return web.json_response({"error": "keine Webhook-URL eingetragen"}, status=400)
+        run = await asyncio.to_thread(self.runs.latest_run)
+        if not run:
+            return web.json_response({"error": "noch kein Dungeon-Run in der History"}, status=404)
+        async with ClientSession(timeout=ClientTimeout(total=30)) as session:
+            ok = await self.runs.post(session, run)
+        await self._runs_changed()
+        if not ok:
+            return web.json_response({"error": self.runs.result}, status=502)
+        return web.json_response({"ok": True, **self.runs.info()})
+
     async def api_background(self, request: web.Request) -> web.StreamResponse:
         """Aktueller Hintergrund als PNG (Vorschau in der Web-UI)."""
         if self.bg.png is None:
@@ -494,6 +546,10 @@ def build_app(deck: DeckBar) -> web.Application:
     app.router.add_get("/api/background.png", deck.api_background)
     app.router.add_get("/api/dps", deck.api_get_dps)
     app.router.add_put("/api/dps", deck.api_put_dps)
+    app.router.add_get("/api/runs", deck.api_get_runs)
+    app.router.add_put("/api/runs", deck.api_put_runs)
+    app.router.add_get("/api/runs/preview.png", deck.api_runs_preview)
+    app.router.add_post("/api/runs/test", deck.api_runs_test)
     app.router.add_static("/static/", WEB_DIR)
     app["deck"] = deck
 

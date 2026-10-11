@@ -107,6 +107,28 @@
         </div>
         <p class="hint small" id="dps-hint"></p>
       </div>
+
+      <div class="card" id="runs-card">
+        <div class="card-head">
+          <h2>Dungeon-Runs → Discord</h2>
+          <span class="chip" id="runs-chip"><span class="dot"></span><span id="runs-status">…</span></span>
+        </div>
+        <label class="check" style="margin-bottom:10px"><input type="checkbox" id="runs-enabled"> Nach jedem Run ein Bild mit dem Schaden pro Boss posten</label>
+        <div class="grid2">
+          <label>Discord-Webhook<input id="runs-webhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…"></label>
+          <label>Run vorbei nach (min ohne Boss)<input id="runs-idle" type="number" min="2" max="120"></label>
+        </div>
+        <div class="btns" style="margin-top:10px">
+          <button type="button" id="runs-preview">Vorschau letzter Run</button>
+          <button type="button" id="runs-test">Letzten Run jetzt posten</button>
+        </div>
+        <p class="hint small" id="runs-hint"></p>
+        <details class="sub">
+          <summary>Namen der Mitspieler</summary>
+          <p class="hint small">Das A2Tools-Meter speichert Namen maskiert. Die DeckBar merkt sich die echten Namen während des Kampfs aus der Live-Anzeige (grau vorausgefüllt). Eintragen musst du nur, was falsch oder leer ist.</p>
+          <div id="runs-names" class="names"></div>
+        </details>
+      </div>
     </div>
 
     <div class="col props-col">
