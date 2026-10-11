@@ -6,8 +6,9 @@ dem Schaden jeder Fähigkeit pro Spieler. Die Datei entsteht schon während des 
 wird laufend neu geschrieben – sie wird deshalb bei jeder Änderung neu gelesen, und ein
 beendeter Run geht erst raus, wenn seine Dateien `SETTLE_RUN_S` lang ruhen. Aufeinanderfolgende Kämpfe im selben Dungeon
 ergeben einen Run. Er endet,
-  - sobald der Endboss liegt (der Boss mit den meisten HP, den es in diesem Dungeon in
-    früheren Runs schon gab – im ersten Run eines Dungeons ist er also noch unbekannt),
+  - sobald der Endboss liegt: laut `END_BOSSES` (recherchiert, englische Namen aus den
+    Meter-Daten), sonst der Boss mit den meisten HP, den es in diesem Dungeon in früheren
+    Runs schon gab – im ersten Run eines nicht gelisteten Dungeons ist er also unbekannt,
   - wenn der nächste Kampf in einem anderen Dungeon stattfindet oder ein in diesem Run
     schon besiegter Boss wieder auftaucht,
   - oder nach `idle_minutes` ohne neuen Bosskampf.
@@ -54,6 +55,27 @@ LATE_POST_S = 3600
 KILL_RATIO = 0.97
 # gelernte Namen (runs-state.json); Weltbosse bringen schnell Dutzende Fremde mit
 MAX_LEARNED = 1000
+# Endbosse je Dungeon (englischer Name wie in i18n/npcs/en.json, gilt für alle Schwierigkeiten
+# und Stufen). Recherche 11.10.2026: metabot.gg, games.gg, gamesfuze.com, thegameswiki.com, u4n.com.
+# Nicht gelistet, weil unklar: Mirror of Scarlet Desire, Consumed Deus Research Base – dort
+# greift weiter das Lernen über die HP.
+END_BOSSES = {
+    "Ultimate Berk",  # Krao Cave
+    "Divine Auldor",  # Urugugu Canyon
+    "Kromede's Desire",  # Fire Temple
+    "Transcendent Bakarma",  # Draupnir
+    "Decaying Durvati",  # Dying Dramata's Nest (nicht „… (Specimen)“)
+    "Atiel",  # Deus Research Base (erscheint nach Gelcos + Nazmun)
+    "Talisra of the Void",  # Shattered Arkanis (keine Quelle; im Spiel zuletzt, doppelte HP)
+    "Vakron",  # Vakron Sky Island
+    "Ferocious Horn Nuakum",  # Ferocious Horn Den
+    "Afflicted Bakarma",  # Cradle of Nihility
+    "Nathara",  # Hall of Illusion
+    "Awakened Alturadon",  # Azure Breath Island
+    "Basilus the False",  # Citadel of the Fallen Daeva
+    "Submerged Emon",  # Submerged Life Temple
+    "Gargaum",  # Abyssal Horn Den
+}
 WEBHOOK_RE = re.compile(r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/\d+/[\w-]+$")
 
 # jobId der History → Klassen-Schlüssel wie im Live-Stream (dps.CLASSES)
@@ -128,6 +150,10 @@ def _i18n(name: str) -> dict:
 
 def boss_name(mob: int, fallback: str) -> str:
     return (_i18n("npcs/de.json").get(str(mob)) or {}).get("name") or fallback or f"Boss {mob}"
+
+
+def is_end_boss(mob: int) -> bool:
+    return (_i18n("npcs/en.json").get(str(mob)) or {}).get("name") in END_BOSSES
 
 
 def dungeon_name(dungeon: int) -> str:
@@ -285,20 +311,31 @@ class Run:
 
 
 class RunTracker:
-    """Setzt Kämpfe zu Runs zusammen. `known` = maximale HP je Boss aus abgeschlossenen Runs."""
+    """Setzt Kämpfe zu Runs zusammen. `known` = maximale HP je Boss aus abgeschlossenen Runs,
+    `listed` = Dungeons, deren Endboss in `END_BOSSES` steht (dort zählt nur die Liste)."""
 
     def __init__(self, idle_ms: int) -> None:
         self.idle_ms = idle_ms
         self.known: dict[int, dict[int, int]] = {}
+        self.listed: set[int] = set()
         self.run: Run | None = None
 
     def learn(self, f: Fight) -> None:
         mobs = self.known.setdefault(f.dungeon, {})
         mobs[f.mob] = max(mobs.get(f.mob, 0), f.max_hp)
+        if is_end_boss(f.mob):
+            self.listed.add(f.dungeon)
 
     def end_boss(self, dungeon: int) -> int | None:
         mobs = self.known.get(dungeon)
         return max(mobs, key=mobs.__getitem__) if mobs else None
+
+    def _is_end(self, f: Fight) -> bool:
+        if not f.killed:
+            return False
+        if is_end_boss(f.mob):
+            return True
+        return f.dungeon not in self.listed and f.mob == self.end_boss(f.dungeon)
 
     def _close(self, complete: bool) -> Run:
         run, self.run = self.run, None
@@ -314,7 +351,7 @@ class RunTracker:
             for i, old in enumerate(self.run.fights):
                 if old.id == f.id:
                     self.run.fights[i] = f
-                    if f.killed and f.mob == self.end_boss(f.dungeon):
+                    if self._is_end(f):
                         return [self._close(True)]
                     return []
         closed = []
@@ -324,7 +361,7 @@ class RunTracker:
         if self.run is None:
             self.run = Run(f.dungeon)
         self.run.fights.append(f)
-        if f.killed and f.mob == self.end_boss(f.dungeon):
+        if self._is_end(f):
             closed.append(self._close(True))
         return closed
 

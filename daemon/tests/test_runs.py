@@ -246,3 +246,16 @@ def test_learned_keys_follow_mask_rule(tmp_path):
         {"last_ms": 1, "learned": {"Po*******l|gladiator": "Ironwhisper", "Mo***y|templar": "Monkey"}}))
     runs = DungeonRuns(tmp_path)
     assert runs.learned == {"Ir****r|gladiator": "Ironwhisper", "Mo***y|templar": "Monkey"}
+
+
+def test_listed_end_boss_closes_first_run(monkeypatch):
+    """Endboss aus END_BOSSES beendet schon den ersten Run; dort zählen gelernte HP nicht."""
+    monkeypatch.setattr(runs_mod, "is_end_boss", lambda mob: mob == 3)
+    tr = RunTracker(idle_ms=15 * 60_000)
+    assert tr.add(F(1, 0, max_hp=5000, dmg=(4000, 1000))) == []
+    assert tr.add(F(2, 60)) == []
+    [run] = tr.add(F(3, 120))
+    assert run.complete and [f.mob for f in run.fights] == [1, 2, 3]
+    # Boss 1 hat zwar die meisten HP, ist aber nicht der gelistete Endboss
+    assert tr.add(F(1, 3600, max_hp=5000, dmg=(4000, 1000))) == []
+    assert tr.run and len(tr.run.fights) == 1
