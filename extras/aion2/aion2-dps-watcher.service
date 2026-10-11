@@ -1,0 +1,14 @@
+[Unit]
+Description=A2Tools DPS-Meter automatisch mit AION 2 starten
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/aion2-dps-watcher.sh
+KillMode=process
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
