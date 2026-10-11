@@ -388,6 +388,23 @@ function bindPageCard() {
     } else setBg(v);
   });
   $("bg-file").addEventListener("input", (e) => { if (e.target.value.trim()) setBg(e.target.value.trim()); });
+  $("bg-upload").addEventListener("click", () => $("bg-upload-input").click());
+  $("bg-upload-input").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.size > 20 * 1024 * 1024) return toast("Bild zu groß (max. 20 MB)", true);
+    toast("Lade Bild hoch …");
+    try {
+      const r = await fetch("/api/background", { method: "POST", headers: { "Content-Type": f.type || "application/octet-stream" }, body: f });
+      const j = await r.json();
+      if (!r.ok) return toast(j.error || "Upload fehlgeschlagen", true);
+      $("bg-file").value = j.path;
+      setBg(j.path);
+    } catch {
+      toast("Upload fehlgeschlagen", true);
+    }
+  });
 }
 
 /* ================================================================= Kachel-Liste */

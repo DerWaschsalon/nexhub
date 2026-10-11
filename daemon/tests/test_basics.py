@@ -94,3 +94,20 @@ def test_kde_wallpaper(tmp_path):
     )
     assert kde_wallpaper(rc) == b  # Hauptbildschirm gewinnt
     assert kde_wallpaper(tmp_path / "fehlt") is None
+
+
+def test_save_upload(tmp_path):
+    import io
+
+    from PIL import Image
+
+    from deckbar_daemon.background import save_upload
+
+    buf = io.BytesIO()
+    Image.new("RGB", (4000, 1000), (10, 20, 30)).save(buf, "JPEG")
+    p = save_upload(buf.getvalue(), tmp_path / "bg")
+    assert p.parent == tmp_path / "bg" and p.suffix == ".png"
+    assert Image.open(p).size == (1920, 480)
+    assert save_upload(buf.getvalue(), tmp_path / "bg") == p  # gleiches Bild, gleiche Datei
+    with pytest.raises(ValueError):
+        save_upload(b"kein bild", tmp_path / "bg")
