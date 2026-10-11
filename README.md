@@ -15,6 +15,14 @@ Track). Die Optik ist im „Liquid Glass“-Stil gehalten.
                                         └──────────────────────────────┘
 ```
 
+**USB oder WLAN:** Hängt das Gerät per USB am PC, läuft alles über das Kabel (zuverlässiger,
+unabhängig vom Empfang). Ohne USB-Verbindung nimmt es WLAN. Der Wechsel passiert von selbst: das
+Gerät sendet über USB alle 2 s eine Kennung, der Daemon (`daemon/deckbar_daemon/usb.py`) prüft die
+Espressif-Ports nur passiv und schreibt erst nach dieser Kennung. Fremde ESP32 am selben PC
+(z. B. WLED) bekommen also nichts geschickt. Abschalten mit `usb: off` in `config.yaml`, oder
+fester Port mit `usb: /dev/serial/by-id/…`. Fehlen 15 s lang Lebenszeichen über USB, fällt das
+Gerät auf WLAN zurück.
+
 Die Firmware hält keine eigene Logik. Das Gerät rendert, was der Daemon schickt, und
 meldet nur zurück, welche Kachel angetippt wurde. Welche Aktion dahinter steckt, weiß
 allein der Daemon.
@@ -43,7 +51,7 @@ der Leiste), und bei aktivem `ufw` die Freigabe von Port 8765 im Heimnetz. Es l�
 mehrfach ausführen, z. B. für Updates. Optionen: `--no-a2tools`, `--show-meter`.
 A2Tools steht unter GPLv3 und wird nicht mitgeliefert, sondern beim Installieren geladen.
 
-Danach nur noch die Firmware flashen, siehe unten (V1-Boards: `pio run -e deckbar-v1`).
+Danach nur noch die Firmware flashen, siehe unten (`firmware/flash.sh`, V1-Boards: `./flash.sh deckbar-v1`).
 
 ## Voraussetzungen (CachyOS / Arch)
 
@@ -158,7 +166,8 @@ blendet „Suche Daemon …“ ein, bis die Verbindung steht.
 ```sh
 cd firmware
 cp include/secrets.example.h include/secrets.h     # WLAN + Token eintragen (gitignored)
-pio run -t upload                                  # USB-C, ggf. BOOT halten + RESET
+./flash.sh                                         # V2; ./flash.sh deckbar-v1 für V1
+                                                   # hält den Daemon (USB-Brücke) kurz an
 pio device monitor
 ```
 

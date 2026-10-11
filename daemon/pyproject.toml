@@ -7,6 +7,7 @@ dependencies = [
     "aiohttp>=3.10",
     "pillow>=11",
     "pydantic>=2.9",
+    "pyserial>=3.5",
     "pyyaml>=6",
     "zeroconf>=0.136",
 ]

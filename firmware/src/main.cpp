@@ -1,5 +1,10 @@
 /*
- * DeckBar-Firmware: WLAN + mDNS + WebSocket, rendert den gemeinsamen shared-ui-Code.
+ * DeckBar-Firmware: WLAN + mDNS + WebSocket oder USB, rendert den gemeinsamen shared-ui-Code.
+ *
+ * USB: Dasselbe JSON-Protokoll zeilenweise mit Präfix "@@" über die USB-Schnittstelle (Gegenstück:
+ * daemon/deckbar_daemon/usb.py). Ohne USB-Verbindung sendet das Gerät alle 2 s "@@DECKBAR". Schickt
+ * der PC "@@OPEN", läuft alles über USB und der WebSocket ruht; ohne Lebenszeichen ("@@KEEP")
+ * für 15 s oder nach "@@CLOSE" geht es wieder über WLAN.
  *
  * Threads:
  *   - LVGL-Task (Kern 1): lv_timer_handler() unter lvgl_mux, arbeitet die Eingangs-Queue ab.
@@ -12,6 +17,7 @@
 #include <Preferences.h>
 #include <WebSocketsClient.h>
 #include <WiFi.h>
+#include <esp_mac.h>
 
 #include "deckbar/hal.h"
 #include "deckbar/ui.h"
@@ -43,6 +49,7 @@ static QueueHandle_t q_out; /* LVGL -> Netz (char*, ps_malloc) */
 static SemaphoreHandle_t lvgl_mux;
 static volatile bool want_reconnect;
 static volatile bool ws_connected;
+static volatile bool usb_link; /* Daemon über USB verbunden, WebSocket ruht */
 
 static void push_in(uint8_t type, const char *data = nullptr, size_t len = 0)
 {
@@ -67,7 +74,7 @@ extern "C" bool deckbar_hal_send(const char *text, size_t len)
 #if DECKBAR_TOUCH_DEBUG
     log_printf("TXM %.*s\n", (int)(len > 120 ? 120 : len), text);
 #endif
-    if (!ws_connected) return false;
+    if (!ws_connected && !usb_link) return false;
     char *copy = (char *)ps_malloc(len + 1);
     if (!copy) return false;
     memcpy(copy, text, len);
@@ -214,6 +221,16 @@ static bool resolve_daemon(void)
     }
     daemon_ip = MDNS.address(0);
     daemon_port = MDNS.port(0);
+    if (daemon_ip == IPAddress(0, 0, 0, 0)) {
+        /* Antwort ohne A-Eintrag: Hostnamen einzeln auflösen */
+        String host = MDNS.hostname(0);
+        if (host.endsWith(".local")) host.remove(host.length() - 6);
+        daemon_ip = MDNS.queryHost(host, 2000);
+        if (daemon_ip == IPAddress(0, 0, 0, 0)) {
+            set_detail("Daemon %s ohne Adresse", host.c_str());
+            return false;
+        }
+    }
     return true;
 #endif
 }
@@ -234,6 +251,7 @@ static void net_loop(void)
         last_rssi_log = millis();
         log_printf("RSSI %d dBm, Kanal %d, BSSID %s\n", (int)WiFi.RSSI(), (int)WiFi.channel(), WiFi.BSSIDstr().c_str());
     }
+    if (usb_link) return; /* WLAN bleibt verbunden, der WebSocket wird nicht gebraucht */
     if (!wifi_up) {
         if (wifi_was_up || ws_started) {
             stop_ws();
@@ -273,10 +291,86 @@ static void net_loop(void)
     }
 
     ws.loop();
+}
 
+/* ------------------------------------------------------------------ USB */
+#define USB_LINE_MAX (20 * 1024)
+#define USB_TIMEOUT_MS 15000
+#define USB_BEACON_MS 2000
+static char *usb_buf;
+static size_t usb_len;
+static bool usb_overflow;
+static uint32_t usb_last_rx, usb_last_beacon;
+
+static void usb_write(const char *payload, size_t len)
+{
+    char *line = (char *)ps_malloc(len + 3);
+    if (!line) return;
+    line[0] = line[1] = '@';
+    memcpy(line + 2, payload, len);
+    line[len + 2] = '\n';
+    Serial.write((const uint8_t *)line, len + 3); /* ein Aufruf, damit Logs nicht dazwischenfunken */
+    free(line);
+}
+
+static void usb_line(char *line, size_t len)
+{
+    char *p = strstr(line, "@@");
+    if (!p) return; /* Echo oder Müll */
+    p += 2;
+    len -= (size_t)(p - line);
+    usb_last_rx = millis();
+    if (!strcmp(p, "OPEN")) {
+        stop_ws();
+        usb_link = true;
+        set_detail("USB verbunden");
+        push_in(EV_OPEN);
+    } else if (!strcmp(p, "CLOSE")) {
+        if (usb_link) push_in(EV_CLOSE);
+        usb_link = false;
+    } else if (p[0] == '{' && usb_link) {
+        push_in(EV_MSG, p, len);
+    }
+}
+
+static void usb_loop(void)
+{
+    if (!usb_buf) usb_buf = (char *)ps_malloc(USB_LINE_MAX + 1);
+    if (!usb_buf) return;
+    while (Serial.available()) {
+        int c = Serial.read();
+        if (c < 0) break;
+        if (c == '\n') {
+            while (usb_len && usb_buf[usb_len - 1] == '\r') usb_len--;
+            usb_buf[usb_len] = 0;
+            if (!usb_overflow) usb_line(usb_buf, usb_len);
+            usb_len = 0;
+            usb_overflow = false;
+        } else if (usb_len < USB_LINE_MAX) {
+            usb_buf[usb_len++] = (char)c;
+        } else {
+            usb_overflow = true;
+        }
+    }
+    if (usb_link && millis() - usb_last_rx > USB_TIMEOUT_MS) {
+        log_printf("USB: kein Lebenszeichen, zurück auf WLAN\n");
+        usb_link = false;
+        push_in(EV_CLOSE);
+    }
+    if (!usb_link && millis() - usb_last_beacon > USB_BEACON_MS) {
+        usb_last_beacon = millis();
+        usb_write("DECKBAR", 7);
+    }
+}
+
+static void send_out(void)
+{
     char *out;
-    while (ws_connected && xQueueReceive(q_out, &out, 0) == pdTRUE) {
-        ws.sendTXT(out, strlen(out));
+    while ((usb_link || ws_connected) && xQueueReceive(q_out, &out, 0) == pdTRUE) {
+        if (usb_link)
+            usb_write(out, strlen(out));
+        else
+            ws.sendTXT(out, strlen(out));
         free(out);
     }
 }
@@ -284,7 +378,9 @@ static void net_loop(void)
 /* ------------------------------------------------------------------ Arduino */
 void setup()
 {
+    Serial.setRxBufferSize(32 * 1024); /* Bildteile vom Daemon über USB (bis 16 KB pro Zeile) */
     Serial.begin(115200);
+    Serial.setTxTimeoutMs(0); /* liest niemand mit, nicht blockieren */
     log_printf("DeckBar %s, Reset-Grund %d\n", DECKBAR_FW_VERSION, (int)esp_reset_reason());
     q_in = xQueueCreate(32, sizeof(net_ev_t));
     q_out = xQueueCreate(32, sizeof(char *));
@@ -292,7 +388,7 @@ void setup()
     prefs.begin("deckbar", false);
 
     uint8_t mac[6];
-    WiFi.macAddress(mac);
+    esp_read_mac(mac, ESP_MAC_WIFI_STA); /* WiFi.macAddress() liefert vor WiFi.mode() nur Nullen */
     snprintf(device_id, sizeof device_id, "deckbar-%02x%02x%02x", mac[3], mac[4], mac[5]);
 
     lv_init();
@@ -326,6 +422,8 @@ void setup()
 
 void loop()
 {
+    usb_loop();
     net_loop();
+    send_out();
     delay(1);
 }
