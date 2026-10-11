@@ -119,7 +119,13 @@ Die Daten kommen vom [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-M
 Meter liest die Spielpakete mit, die DeckBar liest nur seinen Stream-Overlay-Server
 (`/overlay/events`, Server-Sent Events, etwa 3 × pro Sekunde, siehe `daemon/deckbar_daemon/dps.py`).
 
-1. Im A2Tools-Meter unter Einstellungen das **Stream-Overlay** einschalten.
+**Meter im Hintergrund:** `./install.sh` installiert A2Tools, startet es mit AION 2
+(`extras/aion2/aion2-dps-watcher.sh`, systemd-User-Dienst) und blendet sein Fenster per KWin-Regel
+aus (minimiert, nicht in Taskleiste und Fensterwechsler). Die DPS stehen dann nur auf der Leiste.
+Mit `./install.sh --show-meter` bleibt das Fenster sichtbar; von Hand rückgängig unter
+Systemeinstellungen > Fensterverwaltung > Fensterregeln.
+
+1. Im A2Tools-Meter unter Einstellungen das **Stream-Overlay** einschalten (macht `install.sh`).
 2. In der Web-UI (Karte „AION 2 DPS-Meter“) die Verbindung auf „Automatisch“ lassen: Port
    und Schlüssel liest der Daemon aus `~/.local/share/com.a2tools.dps-meter/settings.json`,
    auch nach „Neuer Schlüssel“ im Meter. Sonst Port und `key=…` aus der Overlay-URL von Hand.
