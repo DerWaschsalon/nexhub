@@ -28,6 +28,23 @@ allein der Daemon.
 | `firmware/`  | PlatformIO / Arduino-ESP32 3.3.12, Treiber aus dem Waveshare-**V2**-Repo |
 | `tools/`     | `gen_assets.py`: Schriften, Icons, Hintergrundbild erzeugen |
 
+## Schnellinstallation (CachyOS / Arch, KDE Plasma)
+
+```sh
+git clone https://github.com/Navonex/deckbar && cd deckbar
+./install.sh
+```
+
+Das Skript richtet alles ein: Pakete, den Daemon als User-Dienst, den
+[A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter) (offizielles Paket vom neuesten
+Release, SHA-256 gegen GitHub geprüft) mit Autostart zum Spiel und eingeschaltetem
+Stream-Overlay, eine KWin-Regel, die das Meter-Fenster ausblendet (die DPS stehen nur noch auf
+der Leiste), und bei aktivem `ufw` die Freigabe von Port 8765 im Heimnetz. Es lässt sich
+mehrfach ausführen, z. B. für Updates. Optionen: `--no-a2tools`, `--show-meter`.
+A2Tools steht unter GPLv3 und wird nicht mitgeliefert, sondern beim Installieren geladen.
+
+Danach nur noch die Firmware flashen, siehe unten (V1-Boards: `pio run -e deckbar-v1`).
+
 ## Voraussetzungen (CachyOS / Arch)
 
 ```sh
@@ -130,7 +147,10 @@ blendet „Suche Daemon …“ ein, bis die Verbindung steht.
 
 ## Firmware flashen
 
-> **Nur für V2** (PCB-Aufdruck „Rev1.1“, QC-Label „V2“). Pins und Treiber stammen aus
+> **V1 und V2:** Standard ist V2 (PCB-Aufdruck „Rev1.1“, QC-Label „V2“, `pio run -e deckbar`).
+> Für die ältere V1 (LCD-Reset GPIO21, Backlight GPIO8) gibt es `pio run -e deckbar-v1`, läuft
+> auf einem V1-Board. Im seriellen Log stehen Netzstatus, RSSI und beim Start die gefundenen WLANs.
+> Pins und Treiber stammen aus
 > <https://github.com/waveshareteam/ESP32-S3-Touch-LCD-3.49-V2>. Das ältere Repo ohne
 > „-V2“ gilt für V1: Dort ist GPIO21 der LCD-Reset, bei V2 ist GPIO21 der TE-*Ausgang*
 > des Displays.
