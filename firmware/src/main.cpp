@@ -168,7 +168,7 @@ static void set_detail(const char *fmt, ...)
     va_end(ap);
     if (strcmp(buf, detail) == 0) return;
     strcpy(detail, buf);
-    ESP_LOGI(TAG, "%s", buf);
+    log_printf("NET %s (WiFi-Status %d)\n", buf, (int)WiFi.status());
     push_in(EV_DETAIL, buf, strlen(buf));
 }
 
