@@ -1,14 +1,9 @@
-"""Hinweis (2026-10-02): In der Web-UI ausgeblendet. Die Abbrüche beim Übertragen lagen
-vermutlich nicht an diesem Bild, sondern am aktiven Warten von LVGL (siehe flush_wait_cb in
-firmware/src/display.c). Seit dem Fix nicht erneut getestet. Genutzt wird das eingebaute Bild mit
-Farben aus dem eigenen Desktop-Hintergrund (tools/gen_assets.py).
-
-Hintergrundbild fürs Gerät: Standard (in der Firmware), KDE-Hintergrundbild oder eigene Datei.
+"""Hintergrundbild fürs Gerät: Standard (in der Firmware), KDE-Hintergrundbild oder eigene Datei.
 
 `theme.background` im Layout:
   "default"    eingebautes Bild der Firmware, es wird nichts übertragen
   "wallpaper"  aktuelles Plasma-Hintergrundbild des Hauptbildschirms, folgt Änderungen
-  "/pfad.jpg"  beliebige Bilddatei
+  "/pfad.jpg"  beliebige Bilddatei (auch per Upload aus der Web-UI, siehe save_upload)
 
 Das Bild wird auf 640x172 zugeschnitten, weichgezeichnet und leicht abgedunkelt (wie
 tools/gen_assets.py --bg), mit Dithering nach RGB565 gewandelt und in `bg`-Nachrichten
@@ -168,3 +163,25 @@ class Background:
         buf = io.BytesIO()
         img.save(buf, "PNG")
         return to_rgb565_dithered(img), buf.getvalue()
+
+
+UPLOAD_MAX = 20 * 1024 * 1024
+
+
+def save_upload(data: bytes, folder: Path) -> Path:
+    """Hochgeladenes Bild prüfen, auf höchstens 1920 px verkleinern und als PNG ablegen.
+
+    Der Dateiname ist der Hash des Inhalts, gleiches Bild = gleiche Datei. Wirft ValueError,
+    wenn die Daten kein lesbares Bild sind."""
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception as e:  # Pillow wirft je nach Format verschiedene Fehler
+        raise ValueError("keine lesbare Bilddatei") from e
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    img.thumbnail((1920, 1920))
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"upload-{hashlib.sha256(data).hexdigest()[:16]}.png"
+    if not path.exists():
+        img.save(path, "PNG")
+    return path

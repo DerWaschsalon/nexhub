@@ -70,18 +70,21 @@
       <div class="card">
         <h2>Design</h2>
         <label class="row">Akzentfarbe <input id="accent" type="color"></label>
-        <!-- Hintergrund vom Daemon: vorerst ausgeblendet, bricht auf dem Gerät die Verbindung ab (siehe background.py) -->
-        <label class="row" hidden>Hintergrund
+        <label class="row">Hintergrund
           <select id="background">
             <option value="default">Standard</option>
             <option value="wallpaper">Desktop-Hintergrund</option>
-            <option value="file">Eigene Bilddatei</option>
+            <option value="file">Eigenes Bild</option>
           </select>
         </label>
-        <label id="bg-file-row" hidden>Bilddatei (Pfad)
-          <input id="bg-file" type="text" placeholder="/home/…/bild.jpg" spellcheck="false">
-        </label>
-        <p class="hint small" hidden>Der Desktop-Hintergrund wird weichgezeichnet und folgt einem Wechsel automatisch. Die Vorschau zeigt den Hintergrund nach dem Speichern.</p>
+        <div id="bg-file-row" hidden>
+          <button type="button" class="wide" id="bg-upload">Bild hochladen …</button>
+          <input id="bg-upload-input" type="file" accept="image/*" hidden>
+          <label>oder Pfad
+            <input id="bg-file" type="text" placeholder="/home/…/bild.jpg" spellcheck="false">
+          </label>
+        </div>
+        <p class="hint small">Das Bild wird auf 640 × 172 zugeschnitten, weichgezeichnet und leicht abgedunkelt. Der Desktop-Hintergrund folgt einem Wechsel automatisch.</p>
         <p class="hint small" id="layout-path"></p>
       </div>
 

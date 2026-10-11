@@ -19,7 +19,7 @@ from . import __version__
 from .actions import Executor
 from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, chunks
-from .background import Background
+from .background import UPLOAD_MAX, Background, save_upload
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout
 from .dps import DpsFeed, DpsSettings
@@ -79,6 +79,7 @@ class DeckBar:
     def __init__(self, settings: Settings, config_dir: Path) -> None:
         self.settings = settings
         self.layout_path = config_dir / "layout.yaml"
+        self.upload_dir = config_dir / "backgrounds"
         self.layout_error: str | None = None
         try:
             self.layout: Layout = load_layout(self.layout_path)
@@ -510,6 +511,20 @@ class DeckBar:
             return web.FileResponse(WEB_DIR / "bg.png", headers={"Cache-Control": "no-cache"})
         return web.Response(body=self.bg.png, content_type="image/png", headers={"Cache-Control": "no-cache"})
 
+    async def api_upload_background(self, request: web.Request) -> web.Response:
+        """Bild aus der Web-UI annehmen (roher Body). Antwortet mit dem Pfad für theme.background."""
+        data = bytearray()
+        async for chunk in request.content.iter_chunked(64 * 1024):
+            data += chunk
+            if len(data) > UPLOAD_MAX:
+                return web.json_response({"error": "Bild zu groß (max. 20 MB)"}, status=413)
+        try:
+            path = await asyncio.to_thread(save_upload, bytes(data), self.upload_dir)
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=422)
+        log.info("Hintergrund hochgeladen: %s", path)
+        return web.json_response({"ok": True, "path": str(path)})
+
     async def index(self, request: web.Request) -> web.FileResponse:
         return web.FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -544,6 +559,7 @@ def build_app(deck: DeckBar) -> web.Application:
     app.router.add_post("/api/trigger", deck.api_trigger)
     app.router.add_post("/api/state", deck.api_post_state)
     app.router.add_get("/api/background.png", deck.api_background)
+    app.router.add_post("/api/background", deck.api_upload_background)
     app.router.add_get("/api/dps", deck.api_get_dps)
     app.router.add_put("/api/dps", deck.api_put_dps)
     app.router.add_get("/api/runs", deck.api_get_runs)

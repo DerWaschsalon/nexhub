@@ -229,6 +229,11 @@ static void stop_ws(void)
 static void net_loop(void)
 {
     bool wifi_up = WiFi.status() == WL_CONNECTED;
+    static uint32_t last_rssi_log;
+    if (wifi_up && millis() - last_rssi_log > 5000) {
+        last_rssi_log = millis();
+        log_printf("RSSI %d dBm, Kanal %d, BSSID %s\n", (int)WiFi.RSSI(), (int)WiFi.channel(), WiFi.BSSIDstr().c_str());
+    }
     if (!wifi_up) {
         if (wifi_was_up || ws_started) {
             stop_ws();
@@ -310,6 +315,11 @@ void setup()
     WiFi.setHostname(device_id);
     WiFi.setSleep(false); /* geringere Latenz beim Tippen */
     WiFi.setAutoReconnect(true);
+    int nets = WiFi.scanNetworks();
+    for (int i = 0; i < nets; i++)
+        log_printf("SCAN %-24s %4d dBm Kanal %2d %s\n", WiFi.SSID(i).c_str(), (int)WiFi.RSSI(i), (int)WiFi.channel(i),
+                   WiFi.BSSIDstr(i).c_str());
+    WiFi.scanDelete();
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     ESP_LOGI(TAG, "%s gestartet, PSRAM frei: %u KB", device_id, (unsigned)(ESP.getFreePsram() / 1024));
 }
