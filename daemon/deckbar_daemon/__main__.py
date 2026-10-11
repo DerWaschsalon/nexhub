@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from .config import config_dir, load_settings
 from .mdns import Announcer
 from .server import DeckBar, build_app
+from .usb import UsbBridge
 
 log = logging.getLogger("deckbar")
 
@@ -38,6 +39,7 @@ async def serve(args: argparse.Namespace) -> None:
         asyncio.ensure_future(deck.watch_background()),
         asyncio.ensure_future(deck.dps.watch()),
         asyncio.ensure_future(deck.runs.watch()),
+        asyncio.ensure_future(UsbBridge(settings.usb, f"ws://127.0.0.1:{settings.port}/ws").watch()),
     ]
     announcer = Announcer(settings.name, settings.port) if settings.mdns and not args.no_mdns else None
     if announcer:

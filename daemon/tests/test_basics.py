@@ -111,3 +111,12 @@ def test_save_upload(tmp_path):
     assert save_upload(buf.getvalue(), tmp_path / "bg") == p  # gleiches Bild, gleiche Datei
     with pytest.raises(ValueError):
         save_upload(b"kein bild", tmp_path / "bg")
+
+
+def test_usb_parse_line():
+    from deckbar_daemon.usb import parse_line
+
+    assert parse_line(b"@@DECKBAR\r") == b"DECKBAR"
+    assert parse_line(b'@@{"type":"hello"}') == b'{"type":"hello"}'
+    assert parse_line(b'[W] log ohne Zeilenende@@{"a":1}') == b'{"a":1}'
+    assert parse_line(b"NET WLAN ok") is None

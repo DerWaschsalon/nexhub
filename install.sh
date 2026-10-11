@@ -130,6 +130,8 @@ Firmware flashen (einmalig):
   cd $REPO/firmware
   cp include/secrets.example.h include/secrets.h   # WLAN + Token eintragen
   uv tool install platformio
-  pio run -e deckbar -t upload       # Board V2
-  pio run -e deckbar-v1 -t upload    # Board V1 (ohne „V2“-Aufkleber)
+  ./flash.sh              # Board V2
+  ./flash.sh deckbar-v1   # Board V1 (ohne „V2“-Aufkleber)
+
+Das Gerät verbindet sich per USB-Kabel (bevorzugt) oder WLAN.
 EOF
