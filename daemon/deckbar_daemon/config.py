@@ -165,7 +165,7 @@ class Settings(_Strict):
     mdns: bool = True
     player: str | None = Field(None, description="playerctl -p … (leer = aktivster Player)")
     open_browser: bool = False
-    # Gerät per USB-Kabel: "auto" (Espressif-Ports passiv prüfen), "off" oder fester Pfad
+    # Rückfall per USB-Kabel, wenn WLAN nicht klappt: "auto" (Espressif-Ports passiv prüfen), "off" oder fester Pfad
     usb: str = "auto"
 
 
@@ -196,7 +196,7 @@ def load_settings(directory: Path) -> Settings:
             "heartbeat: 5\n"
             "mdns: true\n"
             "player: null          # z. B. spotify; null = playerctl wählt\n"
-            "usb: auto             # Gerät auch per USB-Kabel; off oder fester Pfad /dev/serial/by-id/…\n"
+            "usb: auto             # Rückfall per USB-Kabel ohne WLAN; off oder fester Pfad /dev/serial/by-id/…\n"
         )
         _atomic_write(path, text, 0o600)
         log.info("neue Konfiguration mit frischem Token angelegt: %s", path)

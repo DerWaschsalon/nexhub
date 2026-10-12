@@ -2,6 +2,8 @@
 
 Transport: WebSocket, Textframes, je Frame genau ein JSON-Objekt (UTF-8).
 Endpunkt: `ws://<daemon>:8765/ws` (Port per Config änderbar).
+Rückfall ohne WLAN: dieselben Nachrichten zeilenweise über USB mit Präfix `@@`, die USB-Brücke
+des Daemons reicht sie an `/ws` weiter (Ablauf und Steuerzeilen im README, „Verbindung“).
 Maschinenlesbares Schema: [`protocol.schema.json`](protocol.schema.json).
 
 Jede Nachricht hat die Felder

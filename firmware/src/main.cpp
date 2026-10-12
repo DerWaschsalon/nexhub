@@ -1,16 +1,20 @@
 /*
  * DeckBar-Firmware: WLAN + mDNS + WebSocket oder USB, rendert den gemeinsamen shared-ui-Code.
  *
- * USB: Dasselbe JSON-Protokoll zeilenweise mit Präfix "@@" über die USB-Schnittstelle (Gegenstück:
- * daemon/deckbar_daemon/usb.py). Ohne USB-Verbindung sendet das Gerät alle 2 s "@@DECKBAR". Schickt
- * der PC "@@OPEN", läuft alles über USB und der WebSocket ruht; ohne Lebenszeichen ("@@KEEP")
- * für 15 s oder nach "@@CLOSE" geht es wieder über WLAN.
+ * WLAN hat Vorrang, USB ist der Rückfall: Dasselbe JSON-Protokoll läuft zeilenweise mit Präfix "@@"
+ * über die USB-Schnittstelle (Gegenstück: daemon/deckbar_daemon/usb.py). Ohne USB-Verbindung meldet
+ * sich das Gerät alle 2 s mit "@@DECKBAR WLAN" (läuft über WLAN) oder "@@DECKBAR" (WebSocket seit
+ * USB_FALLBACK_MS weg, USB erwünscht). Nur dann nimmt es "@@OPEN" an. Der WLAN-Teil sucht weiter;
+ * steht der WebSocket wieder, wird USB verlassen. Ohne Lebenszeichen ("@@KEEP") für 15 s oder
+ * nach "@@CLOSE" endet die USB-Verbindung ebenfalls.
  *
  * Threads:
  *   - LVGL-Task (Kern 1): lv_timer_handler() unter lvgl_mux, arbeitet die Eingangs-Queue ab.
- *   - loop() (Arduino, Kern 1): WLAN, mDNS-Suche, WebSocketsClient; einzige Stelle, die das
- *     Netzwerk anfasst. Ausgehende Nachrichten kommen über die Ausgangs-Queue.
+ *   - loop() (Arduino, Kern 1): WLAN, mDNS-Suche, WebSocketsClient. Die mDNS-Suche blockiert
+ *     bis zu 3 s, deshalb läuft USB getrennt davon.
+ *   - usb (Kern 0): USB-Zeilen lesen und schreiben.
  *   - lcd_tx (Kern 0): Frame-Übertragung, siehe display.c.
+ *   Ausgehende Nachrichten kommen über die Ausgangs-Queue, abgeholt von der aktiven Verbindung.
  */
 #include <Arduino.h>
 #include <ESPmDNS.h>
@@ -49,7 +53,9 @@ static QueueHandle_t q_out; /* LVGL -> Netz (char*, ps_malloc) */
 static SemaphoreHandle_t lvgl_mux;
 static volatile bool want_reconnect;
 static volatile bool ws_connected;
-static volatile bool usb_link; /* Daemon über USB verbunden, WebSocket ruht */
+static volatile bool usb_link;          /* Daemon über USB verbunden (nur solange kein WebSocket) */
+static volatile uint32_t ws_down_since; /* seit wann kein WebSocket steht */
+static volatile bool detail_stale;      /* Statuszeile nach USB neu setzen */
 
 static void push_in(uint8_t type, const char *data = nullptr, size_t len = 0)
 {
@@ -173,9 +179,11 @@ static void set_detail(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
-    if (strcmp(buf, detail) == 0) return;
+    if (strcmp(buf, detail) == 0 && !(detail_stale && !usb_link)) return;
     strcpy(detail, buf);
     log_printf("NET %s (WiFi-Status %d)\n", buf, (int)WiFi.status());
+    if (usb_link) return; /* Anzeige gehört gerade der USB-Verbindung */
+    detail_stale = false;
     push_in(EV_DETAIL, buf, strlen(buf));
 }
 
@@ -183,14 +191,22 @@ static void ws_event(WStype_t type, uint8_t *payload, size_t len)
 {
     switch (type) {
     case WStype_CONNECTED:
-        ws_connected = true;
+        ws_connected = true; /* zuerst, damit die USB-Task kein OPEN mehr annimmt */
+        if (usb_link) {
+            usb_link = false;
+            log_printf("WLAN wieder da, verlasse USB\n");
+            push_in(EV_CLOSE);
+        }
         set_detail("Daemon %s:%u", daemon_ip.toString().c_str(), daemon_port);
         push_in(EV_OPEN);
         break;
     case WStype_DISCONNECTED:
         if (ws_connected) log_printf("WS getrennt (frei: intern %u, PSRAM %u)\n", (unsigned)ESP.getFreeHeap(),
                                      (unsigned)ESP.getFreePsram());
-        if (ws_connected) push_in(EV_CLOSE);
+        if (ws_connected) {
+            push_in(EV_CLOSE);
+            ws_down_since = millis();
+        }
         ws_connected = false;
         break;
     case WStype_TEXT:
@@ -239,7 +255,10 @@ static void stop_ws(void)
 {
     if (ws_started) ws.disconnect();
     ws_started = false;
-    if (ws_connected) push_in(EV_CLOSE);
+    if (ws_connected) {
+        push_in(EV_CLOSE);
+        ws_down_since = millis();
+    }
     ws_connected = false;
 }
 
@@ -251,11 +270,10 @@ static void net_loop(void)
         last_rssi_log = millis();
         log_printf("RSSI %d dBm, Kanal %d, BSSID %s\n", (int)WiFi.RSSI(), (int)WiFi.channel(), WiFi.BSSIDstr().c_str());
     }
-    if (usb_link) return; /* WLAN bleibt verbunden, der WebSocket wird nicht gebraucht */
     if (!wifi_up) {
         if (wifi_was_up || ws_started) {
             stop_ws();
-            push_in(EV_CLOSE_NOWIFI);
+            if (!usb_link) push_in(EV_CLOSE_NOWIFI);
         }
         wifi_was_up = false;
         set_detail("WLAN „%s“ …", WIFI_SSID);
@@ -265,7 +283,7 @@ static void net_loop(void)
         wifi_was_up = true;
         MDNS.end();
         MDNS.begin(device_id);
-        push_in(EV_CLOSE); /* Anzeige: "Suche Daemon" */
+        if (!usb_link) push_in(EV_CLOSE); /* Anzeige: "Suche Daemon" */
         set_detail("WLAN ok, IP %s", WiFi.localIP().toString().c_str());
     }
 
@@ -291,12 +309,19 @@ static void net_loop(void)
     }
 
     ws.loop();
+
+    char *out;
+    while (ws_connected && xQueueReceive(q_out, &out, 0) == pdTRUE) {
+        ws.sendTXT(out, strlen(out));
+        free(out);
+    }
 }
 
 /* ------------------------------------------------------------------ USB */
 #define USB_LINE_MAX (20 * 1024)
 #define USB_TIMEOUT_MS 15000
 #define USB_BEACON_MS 2000
+#define USB_FALLBACK_MS 10000 /* so lange ohne WebSocket, bevor USB angeboten wird (auch nach dem Start) */
 static char *usb_buf;
 static size_t usb_len;
 static bool usb_overflow;
@@ -313,6 +338,19 @@ static void usb_write(const char *payload, size_t len)
     free(line);
 }
 
+static bool usb_wanted(void)
+{
+    return !ws_connected && millis() - ws_down_since > USB_FALLBACK_MS;
+}
+
+static void usb_leave(const char *why)
+{
+    log_printf("USB: %s, zurück auf WLAN\n", why);
+    usb_link = false;
+    detail_stale = true;
+    push_in(WiFi.status() == WL_CONNECTED ? EV_CLOSE : EV_CLOSE_NOWIFI);
+}
+
 static void usb_line(char *line, size_t len)
 {
     char *p = strstr(line, "@@");
@@ -321,13 +359,12 @@ static void usb_line(char *line, size_t len)
     len -= (size_t)(p - line);
     usb_last_rx = millis();
     if (!strcmp(p, "OPEN")) {
-        stop_ws();
+        if (!usb_wanted()) return; /* WLAN steht, die nächste Kennung sagt es dem PC */
         usb_link = true;
-        set_detail("USB verbunden");
+        push_in(EV_DETAIL, "USB verbunden", 13);
         push_in(EV_OPEN);
     } else if (!strcmp(p, "CLOSE")) {
-        if (usb_link) push_in(EV_CLOSE);
-        usb_link = false;
+        if (usb_link) usb_leave("PC hat getrennt");
     } else if (p[0] == '{' && usb_link) {
         push_in(EV_MSG, p, len);
     }
@@ -352,26 +389,27 @@ static void usb_loop(void)
             usb_overflow = true;
         }
     }
-    if (usb_link && millis() - usb_last_rx > USB_TIMEOUT_MS) {
-        log_printf("USB: kein Lebenszeichen, zurück auf WLAN\n");
-        usb_link = false;
-        push_in(EV_CLOSE);
-    }
+    if (usb_link && millis() - usb_last_rx > USB_TIMEOUT_MS) usb_leave("kein Lebenszeichen");
     if (!usb_link && millis() - usb_last_beacon > USB_BEACON_MS) {
         usb_last_beacon = millis();
-        usb_write("DECKBAR", 7);
+        if (usb_wanted())
+            usb_write("DECKBAR", 7);
+        else
+            usb_write("DECKBAR WLAN", 12);
+    }
+
+    char *out;
+    while (usb_link && xQueueReceive(q_out, &out, 0) == pdTRUE) {
+        usb_write(out, strlen(out));
+        free(out);
     }
 }
 
-static void send_out(void)
+static void usb_task(void *)
 {
-    char *out;
-    while ((usb_link || ws_connected) && xQueueReceive(q_out, &out, 0) == pdTRUE) {
-        if (usb_link)
-            usb_write(out, strlen(out));
-        else
-            ws.sendTXT(out, strlen(out));
-        free(out);
+    for (;;) {
+        usb_loop();
+        vTaskDelay(1);
     }
 }
 
@@ -399,13 +437,18 @@ void setup()
     static deckbar_config_t cfg = {
         .token = DECKBAR_TOKEN,
         .device_id = device_id,
+#if DECKBAR_BOARD_V1
+        .model = "waveshare-s3-lcd-3.49-v1",
+#else
         .model = "waveshare-s3-lcd-3.49-v2",
+#endif
         .fw = DECKBAR_FW_VERSION,
         .sim = false,
     };
     deckbar_ui_init(&cfg);
 
     xTaskCreatePinnedToCore(lvgl_task, "lvgl", 12 * 1024, NULL, 3, NULL, 1);
+    xTaskCreatePinnedToCore(usb_task, "usb", 6 * 1024, NULL, 1, NULL, 0);
 
     WiFi.mode(WIFI_STA);
     WiFi.setHostname(device_id);
@@ -422,8 +465,6 @@ void setup()
 
 void loop()
 {
-    usb_loop();
     net_loop();
-    send_out();
     delay(1);
 }

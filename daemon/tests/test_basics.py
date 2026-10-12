@@ -117,6 +117,7 @@ def test_usb_parse_line():
     from deckbar_daemon.usb import parse_line
 
     assert parse_line(b"@@DECKBAR\r") == b"DECKBAR"
+    assert parse_line(b"@@DECKBAR WLAN\r") == b"DECKBAR WLAN"
     assert parse_line(b'@@{"type":"hello"}') == b'{"type":"hello"}'
     assert parse_line(b'[W] log ohne Zeilenende@@{"a":1}') == b'{"a":1}'
     assert parse_line(b"NET WLAN ok") is None
