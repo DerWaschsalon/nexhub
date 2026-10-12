@@ -14,7 +14,8 @@ from pydantic import ValidationError
 
 from .config import config_dir, load_settings
 from .mdns import Announcer
-from .server import DeckBar, build_app
+from .a2ui import A2Ui
+from .server import DeckBar, build_app, local_only
 from .usb import UsbBridge
 
 log = logging.getLogger("deckbar")
@@ -30,6 +31,14 @@ async def serve(args: argparse.Namespace) -> None:
     await runner.setup()
     await web.TCPSite(runner, settings.host, settings.port).start()
     url = f"http://localhost:{settings.port}/"
+    # Oberfläche des A2Tools-Meters fürs Overlay, eigener Port wegen ihrer absoluten Pfade
+    a2 = A2Ui(deck.dps.capture, cdir / "a2-settings.json")
+    a2_runner = web.AppRunner(a2.app(local_only), access_log=None)
+    await a2_runner.setup()
+    try:
+        await web.TCPSite(a2_runner, "127.0.0.1", settings.port + 1).start()
+    except OSError as e:
+        log.warning("Overlay-Oberfläche nicht verfügbar (Port %d): %s", settings.port + 1, e)
     log.info("DeckBar-Daemon läuft auf %s:%d – Konfiguration: %s", settings.host, settings.port, url)
 
     tasks = [
@@ -62,6 +71,7 @@ async def serve(args: argparse.Namespace) -> None:
         t.cancel()
     if announcer:
         await announcer.stop()
+    await a2_runner.cleanup()
     await runner.cleanup()
 
 

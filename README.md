@@ -34,6 +34,7 @@ zurück, welche Kachel angetippt wurde. Welche Aktion dahinter steckt, weiß all
 | `simulator/` | SDL2-Fenster 640 × 172, RGB565, Maus = Touch, echter WebSocket zum Daemon |
 | `daemon/`    | Python-Daemon inkl. Web-Konfiguration, USB-Brücke, systemd-User-Service |
 | `capture/`   | `deckbar-capture` (Rust): AION-2-Mitschnitt mit dem Kern des A2Tools DPS Meter (Submodul `capture/a2tools`) |
+| `overlay/`   | `deckbar-overlay` (PySide6): das DPS-Meter am PC, mit der Oberfläche des A2Tools-Meters, Tray und Tastenkürzel |
 | `firmware/`  | PlatformIO / Arduino-ESP32 3.3.12, Umgebungen für Board V2 und V1 |
 | `tools/`     | `gen_assets.py`: Schriften, Icons, Hintergrundbild erzeugen |
 
@@ -176,6 +177,35 @@ Ein Spiel-Patch ändert meist Opcodes oder Datentabellen. Upstream zieht das sch
 das Submodul aktualisieren (`git -C capture/a2tools fetch --tags && git -C capture/a2tools checkout vX.Y.Z`)
 und neu bauen.
 
+### Overlay am PC
+
+`deckbar-overlay` zeigt das Meter zusätzlich am PC, über dem Spiel, mit der unveränderten
+Oberfläche des A2Tools-Meters: Meter-Fenster, Details mit Skill-Aufschlüsselung, Buffs und
+Zeitleiste, Kampf-History und Einstellungen. Es läuft im Hintergrund mit Tray-Symbol, das Fenster
+ist zunächst verborgen.
+
+```sh
+sudo pacman -S --needed pyside6 qt6-webengine
+overlay/install.sh        # ~/.local/bin/deckbar-overlay, User-Dienst, Starter fürs Tastenkürzel
+```
+
+- **Einblenden:** Klick aufs Tray-Symbol, `deckbar-overlay --toggle` (Tastenkürzel in den
+  Systemeinstellungen auf „DeckBar DPS-Meter zeigen/verbergen“ legen) oder eine DeckBar-Kachel mit
+  dieser Shell-Aktion. Weitere Befehle: `--show`, `--hide`, `--details`, `--history`, `--settings`, `--quit`.
+- **Über dem Vollbild-Spiel:** Beim ersten Start legt das Overlay die KWin-Regel `deckbar-overlay`
+  an (Ebene „Overlay“, nur das Meter-Fenster). Änderungen daran bleiben erhalten.
+- **Durchklicken:** Schloss-Knopf im Meter oder im Tray. Dann nimmt nur noch der Schloss-Knopf die
+  Maus an (X11-Input-Shape, das Overlay läuft deshalb wie das A2Tools-Meter unter XWayland).
+- „Quit“ in den Einstellungen verbirgt nur die Fenster, beendet wird über das Tray-Menü.
+
+So funktioniert es: Der Daemon liefert die Oberfläche aus `capture/a2tools` auf Port 8766 (nur
+localhost) aus und setzt einen kleinen Ersatz für Tauris JavaScript-API davor
+(`daemon/deckbar_daemon/web/a2shim.js`). Daten-Befehle gehen an `deckbar-capture`
+(`daemon/deckbar_daemon/a2ui.py`), Fenster-Befehle an das Overlay. Die Einstellungen der
+Oberfläche liegen in `~/.config/deckbar/a2-settings.json`, beim ersten Start übernommen aus dem
+A2Tools-Meter (ohne Schlüssel und Fensterlagen). Nicht dabei sind die Online-Funktionen, Plugins
+und die eigenen globalen Tastenkürzel des Meters.
+
 **Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die DeckBar stattdessen dessen
 Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent Events). Dafür im
 Meter das Stream-Overlay einschalten. Port und Schlüssel liest der Daemon aus
@@ -279,7 +309,8 @@ cd daemon && uv run python -m pytest -q
 DeckBar steht unter der **GNU General Public License v3.0 oder später** (`LICENSE`).
 
 Teile stammen aus dem [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter) (GPL-3.0):
-der Mitschnitt-Kern als unverändertes Submodul `capture/a2tools`, die Zeilenaufbereitung in
+der Mitschnitt-Kern und die Oberfläche des Overlays als unverändertes Submodul `capture/a2tools`,
+die Zeilenaufbereitung in
 `capture/src/view.rs` (nach `stream_overlay/snapshot.rs`), die Klassen-Icons in
 `daemon/deckbar_daemon/assets/classes/` und das Design der Dungeon-Run-Bilder (nach `src/styles.css`). Übernommene Dateien sind an Ort und Stelle gekennzeichnet, inklusive der
 Änderungen.

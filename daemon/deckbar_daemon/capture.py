@@ -108,6 +108,9 @@ class Capture:
         self.status: dict[str, Any] = {}
         self.error = ""
         self.game_running = aion2_running  # austauschbar für Tests
+        # Volle DpsData (Skills je Spieler) nur, solange jemand sie braucht (Overlay, a2ui.py)
+        self.full = False
+        self.data_listeners: list[Callable[[str, Any], Awaitable[None]]] = []  # (Ereignis, Inhalt)
         self._proc: asyncio.subprocess.Process | None = None
         self._pending: dict[int, asyncio.Future] = {}
         self._ids = itertools.count(1)
@@ -233,17 +236,27 @@ class Capture:
             if t == "dps" and isinstance(msg.get("view"), dict):
                 await self.on_view(msg["view"], first)
                 first = False
+                if "data" in msg:
+                    await self._notify("dps", msg["data"])
             elif t == "status":
+                ping = msg.get("ping")
+                if ping != self.status.get("ping"):
+                    await self._notify("ping", ping)
                 self.status = msg
                 await self.on_change()
             elif t == "hello":
                 self.hello = msg
+                if self.full:
+                    asyncio.ensure_future(self._send_view())
                 if msg.get("cap_net_raw"):
                     await self._set("running")
                 else:
                     await self._set("no_caps", "ohne cap_net_raw kein Mitschnitt")
-            elif t == "fights_saved" and self.on_fights:
-                await self.on_fights([str(i) for i in msg.get("ids") or []])
+            elif t == "fights_saved":
+                ids = [str(i) for i in msg.get("ids") or []]
+                if self.on_fights:
+                    await self.on_fights(ids)
+                await self._notify("fights_saved", ids)
             elif t == "reply":
                 fut = self._pending.pop(msg.get("id"), None)
                 if fut and not fut.done():
@@ -258,6 +271,25 @@ class Capture:
             line = raw.decode(errors="replace").rstrip()
             level = logging.WARNING if " WARN " in line or " ERROR " in line else logging.DEBUG
             log.log(level, "%s: %s", BINARY, line)
+
+    async def _notify(self, event: str, payload: Any) -> None:
+        for fn in self.data_listeners:
+            try:
+                await fn(event, payload)
+            except Exception:  # ein kaputter Zuhörer darf den Mitschnitt nicht anhalten
+                log.exception("Zuhörer für %s", event)
+
+    async def set_full(self, on: bool) -> None:
+        if on != self.full:
+            self.full = on
+            if self.running:
+                await self._send_view()
+
+    async def _send_view(self) -> None:
+        try:
+            await self.request("view", full=self.full)
+        except (RuntimeError, TimeoutError, OSError) as e:
+            log.debug("view: %s", e)
 
     # ------------------------------------------------------------ Befehle
     @property

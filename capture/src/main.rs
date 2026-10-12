@@ -7,7 +7,11 @@
 //!
 //!   stdout  {"type":"hello"|"dps"|"status"|"fights_saved"|"reply"|"bye", …}
 //!   stdin   {"id":1,"cmd":"reset"|"target_mode"|"details"|"buffs"|"context"|"history"|"fight"|
-//!            "suspend"|"language"|"save"|"snapshot"|"view", …}
+//!            "delete_fight"|"suspend"|"language"|"save"|"snapshot"|"view"|"capture_status"|
+//!            "set_character_name"|"bind_local_actor_id"|"bind_local_nickname"|"devices"|
+//!            "set_device"|"reset_detection"|"window_title", …}
+//!           Die Befehle der Meter-Oberfläche verhalten sich wie die gleichnamigen Tauri-Commands
+//!           in a2tools/src-tauri/src/app.rs (Logik von dort übernommen).
 //!   stderr  Log (RUST_LOG, Standard: warn, für dieses Programm info)
 //!
 //! `dps` kommt höchstens alle `--interval-ms` und nur bei Änderung, `status` bei Änderung. `dps`
@@ -121,11 +125,12 @@ struct Core {
     data_dir: PathBuf,
     dot_ids: HashSet<i32>,
     suspended: Arc<AtomicBool>,
+    ports: Option<Arc<CombatPortDetector>>, // nur im Live-Betrieb
     view: Mutex<(view::Options, bool)>, // Zeilen-Optionen, volle DpsData mitschicken
 }
 
 impl Core {
-    fn new(args: &Args, ping: Arc<PingTracker>) -> Arc<Self> {
+    fn new(args: &Args, ping: Arc<PingTracker>, ports: Option<Arc<CombatPortDetector>>) -> Arc<Self> {
         let skills = SkillLookup::new();
         let npcs = NpcLookup::new();
         lookup::load_language(&skills, &npcs, &args.data_dir, &args.lang);
@@ -152,6 +157,7 @@ impl Core {
             data_dir: args.data_dir.clone(),
             dot_ids,
             suspended: Arc::new(AtomicBool::new(false)),
+            ports,
             view: Mutex::new((view::Options::default(), false)),
         });
         // Vor jedem Zurücksetzen der Kampfdaten (Zonenwechsel, Gruppenende) speichern, sonst
@@ -237,6 +243,58 @@ impl Core {
             "context" => to_value(serde_json::to_value(self.reader().get_details_context())),
             "history" => to_value(serde_json::to_value(self.history.list_fights())),
             "fight" => to_value(serde_json::to_value(self.history.load_fight(str_arg("fight_id")?)?)),
+            "delete_fight" => {
+                let id = str_arg("fight_id")?;
+                if !a2tools_dps_meter_lib::history::fight_history::is_plain_name(id) {
+                    return Err(format!("ungültige Kampf-ID {id:?}"));
+                }
+                let _saving = self.save_lock.lock();
+                self.history.delete_fight(id)?;
+                Ok(Value::Null)
+            }
+            "capture_status" => {
+                let port = self.ports.as_ref().and_then(|p| p.current_port());
+                let device = self.ports.as_ref().and_then(|p| p.current_device());
+                Ok(json!({
+                    "locked": port.is_some(),
+                    "port": port,
+                    "device": device.clone().unwrap_or_default(),
+                    "ip": device.unwrap_or_else(|| "127.0.0.1".to_string()),
+                    "localPlayerId": self.storage.local_player_id(),
+                    "characterName": self.storage.local_character_name(),
+                    "characterNameFromGame": self.storage.local_identity_from_self_record(),
+                }))
+            }
+            "window_title" => Ok(json!(platform::window_detector::find_aion2_window_title())),
+            "devices" => Ok(json!(capture::pcap_capturer::list_device_labels().unwrap_or_default())),
+            "set_device" => {
+                let dev = str_arg("device")?.trim().to_string();
+                if let Some(p) = &self.ports {
+                    p.set_preferred_device((!dev.is_empty()).then_some(dev));
+                }
+                Ok(Value::Null)
+            }
+            "reset_detection" => {
+                if let Some(p) = &self.ports {
+                    p.reset();
+                }
+                self.ping.reset();
+                Ok(Value::Null)
+            }
+            "set_character_name" => {
+                self.set_character_name(str_arg("name")?, bool_arg(cmd, "manual"));
+                Ok(Value::Null)
+            }
+            "bind_local_actor_id" => {
+                let id = cmd.get("actor_id").and_then(Value::as_i64).ok_or("actor_id fehlt")?;
+                self.bind_local_actor_id(id, bool_arg(cmd, "manual"));
+                Ok(Value::Null)
+            }
+            "bind_local_nickname" => {
+                let id = cmd.get("actor_id").and_then(Value::as_i64).ok_or("actor_id fehlt")?;
+                self.bind_local_nickname(id, str_arg("nickname")?);
+                Ok(Value::Null)
+            }
             "suspend" => {
                 let on = cmd.get("on").and_then(Value::as_bool).unwrap_or(true);
                 self.suspended.store(on, Ordering::SeqCst);
@@ -261,6 +319,67 @@ impl Core {
             }
             other => Err(format!("unbekannter Befehl {other:?}")),
         }
+    }
+}
+
+fn bool_arg(cmd: &Value, key: &str) -> bool {
+    cmd.get(key).and_then(Value::as_bool).unwrap_or(false)
+}
+
+/// Identität des eigenen Charakters, wie die gleichnamigen Commands in app.rs des Meters.
+impl Core {
+    fn set_character_name(&self, name: &str, manual: bool) {
+        // Hat das Spiel den Namen schon genannt, gilt nur noch ein von Hand eingetragener.
+        if self.storage.local_identity_from_self_record() && !manual {
+            return;
+        }
+        let trimmed = name.trim().to_string();
+        self.storage.set_local_character_name(Some(name.to_string()));
+        if !trimmed.is_empty() && (manual || !self.storage.local_id_from_scope()) {
+            if let Some(id) = self.storage.local_player_id() {
+                self.storage.set_permanent_nickname(id as i32, &trimmed);
+            }
+        }
+    }
+
+    fn bind_local_actor_id(&self, actor_id: i64, manual: bool) {
+        if !self.storage.ui_may_bind_local_id(actor_id, manual) {
+            return;
+        }
+        if actor_id <= 0 {
+            self.storage.set_local_player_id(None);
+            return;
+        }
+        if self.storage.local_player_id() != Some(actor_id) {
+            self.storage.set_local_player_id(Some(actor_id));
+        }
+        if self.storage.local_id_from_scope() {
+            return;
+        }
+        if let Some(name) = self.storage.local_character_name() {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() && self.storage.get_nickname(actor_id as i32).as_deref() != Some(trimmed) {
+                self.storage.set_permanent_nickname(actor_id as i32, trimmed);
+            }
+        }
+    }
+
+    fn bind_local_nickname(&self, actor_id: i64, nickname: &str) {
+        let current = self.storage.get_nickname(actor_id as i32);
+        if self.storage.local_player_id() == Some(actor_id) && current.as_deref() == Some(nickname) {
+            return;
+        }
+        if actor_id >= 90_000_000 {
+            return; // Platzhalterzeile der Gruppe
+        }
+        if self.storage.local_id_from_scope() && self.storage.local_player_id() == Some(actor_id) {
+            return;
+        }
+        if self.storage.local_identity_from_self_record() {
+            return;
+        }
+        self.storage.set_local_player_id(Some(actor_id));
+        self.storage.set_permanent_nickname(actor_id as i32, nickname);
     }
 }
 
@@ -329,8 +448,8 @@ async fn shutdown_signal() {
 
 async fn run_live(args: Args) {
     let ping = Arc::new(PingTracker::with_perf_clock(platform::clock::perf_clock()));
-    let core = Core::new(&args, ping.clone());
     let ports = Arc::new(CombatPortDetector::new());
+    let core = Core::new(&args, ping.clone(), Some(ports.clone()));
     if let Some(dev) = &args.device {
         ports.set_preferred_device(Some(dev.clone()));
     }
@@ -437,7 +556,7 @@ async fn run_replay(args: Args, file: &Path) {
             std::process::exit(1);
         }
     };
-    let core = Core::new(&args, Arc::new(PingTracker::new()));
+    let core = Core::new(&args, Arc::new(PingTracker::new()), None);
     emit(&json!({"type": "hello", "version": env!("CARGO_PKG_VERSION"), "parser": rederive::parser_version(),
                  "replay": file, "packets": packets.len(), "history_dir": args.history_dir}));
     let mut proc = StreamProcessor::new(core.storage.clone(), core.skills.clone(), core.npcs.clone());
