@@ -1,8 +1,11 @@
-"""AION-2-DPS über den Stream-Overlay-Server des A2Tools DPS Meter.
+"""AION-2-DPS: eigener Mitschnitt oder der Stream-Overlay-Server des A2Tools DPS Meter.
 
-Das Meter (github.com/taengu/A2Tools-DPS-Meter) liest selbst die Spielpakete mit und
-bietet für OBS einen kleinen HTTP-Server an (Einstellungen → Stream-Overlay, Port 18731).
-`/overlay/events?key=…` liefert etwa dreimal pro Sekunde den aktuellen Stand als
+Quelle `capture` (Standard): Der Daemon startet mit dem Spiel `deckbar-capture` (capture/ im
+Repo, Kern des A2Tools-Meters ohne Oberfläche, siehe capture.py) und bekommt von dort die Zeilen.
+
+Quellen `auto`/`manual`: Das Meter (github.com/taengu/A2Tools-DPS-Meter) liest selbst die
+Spielpakete mit und bietet für OBS einen kleinen HTTP-Server an (Einstellungen → Stream-Overlay,
+Port 18731). `/overlay/events?key=…` liefert etwa dreimal pro Sekunde den aktuellen Stand als
 Server-Sent Events:
 
     {"v":1,"target":"Boss","mode":"bossTargets","timeMs":83000,"hp":42.5,
@@ -10,7 +13,8 @@ Server-Sent Events:
 
 Daraus wird der State-Schlüssel `dps` (gekürzt, siehe `compact`) und `dps_active`
 (gerade Schaden im Kampf). Port und Schlüssel stehen in den Einstellungen des Meters
-(settings.json) und werden im Modus „auto“ von dort gelesen.
+(settings.json) und werden im Modus „auto“ von dort gelesen. Beide Quellen liefern dasselbe
+Zeilenformat, deckbar-capture baut es wie das Stream-Overlay (capture/src/view.rs).
 """
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ import aiohttp
 import yaml
 from pydantic import Field, ValidationError
 
+from .capture import Capture
 from .config import ID, _atomic_write, _Strict
 from .state import State
 
@@ -40,9 +45,15 @@ READ_TIMEOUT_S = 40
 DEFAULT_IDLE_S = 30
 CLASSES = ("gladiator", "templar", "ranger", "assassin", "sorcerer", "cleric", "spiritmaster", "chanter", "brawler")
 
-Status = Literal["off", "no_meter", "overlay_off", "connecting", "bad_key", "connected"]
+Status = Literal["off", "no_meter", "overlay_off", "connecting", "bad_key", "connected",
+                 "no_capture", "no_game", "no_caps", "capturing"]
+LIVE = ("connected", "capturing")
 STATUS_TEXT = {
     "off": "ausgeschaltet",
+    "no_capture": "deckbar-capture nicht gefunden",
+    "no_game": "wartet auf AION 2",
+    "no_caps": "deckbar-capture ohne Mitschnitt-Rechte",
+    "capturing": "Mitschnitt läuft",
     "no_meter": "A2Tools DPS Meter läuft nicht",
     "overlay_off": "Stream-Overlay im A2Tools-Meter ist aus",
     "connecting": "verbinde …",
@@ -53,8 +64,13 @@ STATUS_TEXT = {
 
 class DpsSettings(_Strict):
     enabled: bool = True
-    # auto = Port + Schlüssel aus den Einstellungen des A2Tools-Meters
-    source: Literal["auto", "manual"] = "auto"
+    # capture = eigener Mitschnitt (deckbar-capture); auto = Stream-Overlay des A2Tools-Meters mit
+    # Port + Schlüssel aus dessen Einstellungen; manual = dasselbe mit Port + Schlüssel von Hand
+    source: Literal["capture", "auto", "manual"] = "capture"
+    # deckbar-capture: fester Pfad (leer = PATH, sonst capture/target/release im Repo)
+    capture_bin: str = Field("", max_length=300)
+    # Sprache für Boss- und Skillnamen (Daten des Meters)
+    lang: Literal["de", "en", "es", "fr", "ja", "ko", "pt", "ru", "zh-Hans", "zh-Hant"] = "en"
     port: int = Field(DEFAULT_PORT, ge=1024, le=65535)
     key: str = Field("", max_length=128)
     # Bei Kampfbeginn auf diese Seite wechseln (None = nie)
@@ -143,6 +159,7 @@ class DpsFeed:
         self._wake = asyncio.Event()
         self._last_total = 0
         self._last_change = 0.0
+        self.capture = Capture(self._on_view, self._on_capture_change)
 
     # ------------------------------------------------------------ Einstellungen
     def _load(self) -> DpsSettings:
@@ -156,7 +173,7 @@ class DpsFeed:
             return DpsSettings()
 
     def save(self, settings: DpsSettings) -> None:
-        header = "# AION-2-DPS (A2Tools-Meter) – wird von der Web-UI überschrieben.\n"
+        header = "# AION-2-DPS – wird von der Web-UI überschrieben.\n"
         text = yaml.safe_dump(settings.model_dump(exclude_none=True), sort_keys=False, allow_unicode=True)
         _atomic_write(self.path, header + text, 0o600)  # enthält ggf. den Overlay-Schlüssel
         self.settings = settings
@@ -178,6 +195,7 @@ class DpsFeed:
             "detail": self.detail,
             "port": self.port,
             "a2tools": a2t,
+            "capture": self.capture.info(),
         }
 
     # ------------------------------------------------------------ Status
@@ -187,7 +205,7 @@ class DpsFeed:
         if status != self.status:
             log.info("DPS-Meter: %s%s", STATUS_TEXT[status], f" ({detail})" if detail else "")
         self.status, self.detail = status, detail
-        if status != "connected":
+        if status not in LIVE:
             await self._apply(None)
         for fn in self.status_listeners:
             await fn()
@@ -232,6 +250,31 @@ class DpsFeed:
             return -1, ""
         return a2t["port"], a2t["key"]
 
+    # ------------------------------------------------------------ eigener Mitschnitt
+    async def _on_view(self, view: dict | None, first: bool) -> None:
+        if self.status == "capturing":
+            await self._apply(compact(view) if view else None, baseline=first)
+
+    async def _on_capture_change(self) -> None:
+        c = self.capture
+        if self.settings.source != "capture" or not self.settings.enabled:
+            return
+        if c.phase == "no_binary":
+            await self._set_status("no_capture")
+        elif c.phase == "no_game":
+            await self._set_status("no_game")
+        elif c.phase == "no_caps":
+            await self._set_status("no_caps")
+        elif c.phase == "crashed":
+            await self._set_status("no_game", c.error)
+        elif c.phase == "starting":
+            await self._set_status("connecting")
+        else:
+            port = c.status.get("port")
+            await self._set_status("capturing", f"Spielserver-Port {port}" if port else "wartet auf Kampfdaten")
+        for fn in self.status_listeners:  # Ping/Port ändern sich ohne Statuswechsel
+            await fn()
+
     async def watch(self) -> None:
         async def idle_loop() -> None:
             while True:
@@ -248,6 +291,17 @@ class DpsFeed:
                         self.port = None
                         await self._set_status("off")
                         await self._wake.wait()
+                        continue
+                    if self.settings.source == "capture":
+                        self.port = None
+                        job = asyncio.ensure_future(self.capture.run(self.settings.capture_bin, self.settings.lang))
+                        wake = asyncio.ensure_future(self._wake.wait())
+                        await asyncio.wait({job, wake}, return_when=asyncio.FIRST_COMPLETED)
+                        for t in (job, wake):
+                            t.cancel()
+                        await asyncio.gather(job, return_exceptions=True)  # Programm sauber beenden
+                        if not self._wake.is_set():
+                            await self._sleep(RETRY_S)
                         continue
                     target = self._target()
                     if target is None:

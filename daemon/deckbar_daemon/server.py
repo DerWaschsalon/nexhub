@@ -20,10 +20,11 @@ from .actions import Executor
 from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, chunks
 from .background import UPLOAD_MAX, Background, save_upload
+from .capture import history_root
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout
 from .dps import DpsFeed, DpsSettings
-from .runs import DungeonRuns, RunSettings, render_run
+from .runs import DungeonRuns, RunSettings, a2tools_dir, render_run
 from .media import Media
 from .proc import have
 from .state import State
@@ -99,10 +100,16 @@ class DeckBar:
         self.dps = DpsFeed(self.state, config_dir, self._on_combat)
         self.dps.status_listeners.append(self._dps_changed)
         self.runs = DungeonRuns(config_dir)
+        self.runs.history_dir = self._history_dir
         self.runs.listeners.append(self._runs_changed)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
+
+    def _history_dir(self) -> Path:
+        if self.dps.settings.source == "capture":
+            return history_root() / "history"
+        return a2tools_dir() / "history"
 
     # ---------------------------------------------------------------- Verteilung
     async def _send(self, ws: web.WebSocketResponse, text: str) -> None:

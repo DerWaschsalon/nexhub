@@ -1,0 +1,21 @@
+[package]
+name = "deckbar-capture"
+version = "0.1.0"
+description = "AION-2-Mitschnitt für die DeckBar: A2Tools-Kern ohne Oberfläche, JSON über stdin/stdout"
+license = "GPL-3.0-or-later"
+edition = "2024"
+publish = false
+
+[dependencies]
+# Kern des A2Tools DPS Meter (GPL-3.0), Git-Submodul a2tools/. Nur "desktop" für den
+# Mitschnitt, ohne "online": kein Konto, keine Uploads, keine Update-Abfrage.
+a2tools-dps-meter = { path = "a2tools/src-tauri", default-features = false, features = ["desktop"] }
+parking_lot = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+strip = true

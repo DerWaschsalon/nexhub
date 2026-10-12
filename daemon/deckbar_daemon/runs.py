@@ -1,7 +1,8 @@
 """AION-2-Dungeon-Runs: nach jedem Run ein PNG mit der Schadensaufteilung pro Boss nach Discord.
 
-Quelle ist nicht der Live-Stream (dps.py), sondern die Kampf-History des A2Tools-Meters:
-Für jeden Bosskampf legt es `history/<id>.json` an, mit Dungeon, Boss, maximalen HP und
+Quelle ist nicht der Live-Stream (dps.py), sondern die Kampf-History im Format des A2Tools-Meters,
+geschrieben von deckbar-capture (Quelle `capture`) oder vom Meter selbst:
+Für jeden Bosskampf entsteht `history/<id>.json`, mit Dungeon, Boss, maximalen HP und
 dem Schaden jeder Fähigkeit pro Spieler. Die Datei entsteht schon während des Kampfs und
 wird laufend neu geschrieben – sie wird deshalb bei jeder Änderung neu gelesen, und ein
 beendeter Run geht erst raus, wenn seine Dateien `SETTLE_RUN_S` lang ruhen. Aufeinanderfolgende Kämpfe im selben Dungeon
@@ -135,8 +136,15 @@ def a2tools_dir() -> Path:
     return a2tools_settings_path().parent
 
 
+REPO_DATA = Path(__file__).resolve().parents[2] / "capture" / "a2tools" / "src" / "data"
+
+
 def a2tools_data_dir() -> Path:
-    return Path(os.environ.get("DECKBAR_A2TOOLS_DATA", "/usr/lib/A2Tools DPS Meter/data"))
+    """Übersetzungen (Boss-, Dungeonnamen): installiertes Meter, sonst das Submodul im Repo."""
+    if env := os.environ.get("DECKBAR_A2TOOLS_DATA"):
+        return Path(env)
+    installed = Path("/usr/lib/A2Tools DPS Meter/data")
+    return installed if installed.is_dir() or not REPO_DATA.is_dir() else REPO_DATA
 
 
 @cache
@@ -730,6 +738,8 @@ class DungeonRuns:
         self.result = ""  # letzter Post: Erfolg oder Fehler, für die Web-UI
         self.listeners: list[Callable[[], Awaitable[None]]] = []
         self._ready = False
+        # Wo die History liegt, hängt an der DPS-Quelle (server.py setzt das)
+        self.history_dir: Callable[[], Path] = lambda: a2tools_dir() / "history"
 
     # ------------------------------------------------------------ Einstellungen
     def _load(self) -> RunSettings:
@@ -754,7 +764,7 @@ class DungeonRuns:
         last = None
         if self.last:
             last = {"name": self.last.name, "end": self.last.end_ms, "kills": self.last.kills}
-        return {"settings": s, "history": a2tools_dir().joinpath("history").is_dir(),
+        return {"settings": s, "history": self.history_dir().is_dir(),
                 "last_run": last, "result": self.result, "open_run": bool(self.tracker.run),
                 "characters": self.characters()}
 
@@ -827,7 +837,7 @@ class DungeonRuns:
 
     def _scan(self, settle: bool = True) -> list[Fight]:
         """Neue und seit dem letzten Lesen geänderte Kämpfe."""
-        hist = a2tools_dir() / "history"
+        hist = self.history_dir()
         now = time.time()
         fights = []
         try:
@@ -942,7 +952,7 @@ class DungeonRuns:
 
     def _last_from_history(self) -> Run | None:
         fights = list(self.fights.values()) or [
-            f for f in (load_fight(p) for p in (a2tools_dir() / "history").glob("*.json")) if f]
+            f for f in (load_fight(p) for p in self.history_dir().glob("*.json")) if f]
         tracker = RunTracker(self.settings.idle_minutes * 60_000)
         runs: list[Run] = []
         for f in sorted(fights, key=lambda f: f.start_ms):

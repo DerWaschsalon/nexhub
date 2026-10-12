@@ -13,6 +13,7 @@ __pycache__/
 .venv/
 daemon/.venv/
 tools/.cache/
+capture/target/
 node_modules/
 
 # Werks-Flash von Waveshare (16 MB, proprietär) – liegt nur lokal

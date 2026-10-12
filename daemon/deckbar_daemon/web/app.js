@@ -844,7 +844,7 @@ function renderChips(offline) {
 }
 
 /* ================================================================= AION 2 DPS-Meter */
-const DPS_DOT = { connected: "ok", bad_key: "bad", off: "" };
+const DPS_DOT = { connected: "ok", capturing: "ok", bad_key: "bad", no_caps: "bad", no_capture: "bad", off: "" };
 
 function renderDpsCard() {
   const d = S.dps;
@@ -854,6 +854,8 @@ function renderDpsCard() {
   const setVal = (id, v) => { if (focused !== $(id)) $(id).value = v; };
   $("dps-enabled").checked = st.enabled;
   setVal("dps-source", st.source);
+  setVal("dps-lang", st.lang);
+  $("dps-lang-row").hidden = st.source !== "capture";
   setVal("dps-port", st.port);
   setVal("dps-key", st.key);
   setVal("dps-return", st.return_after);
@@ -864,7 +866,9 @@ function renderDpsCard() {
   }
   $("dps-return").disabled = !st.auto_page;
   $("dps-chip").className = "chip " + (DPS_DOT[d.status] ?? "warn");
-  $("dps-status").textContent = d.status_text + (d.status === "connected" && d.port ? ` (Port ${d.port})` : "");
+  const cap = d.capture || {};
+  $("dps-status").textContent = d.status_text + (d.status === "connected" && d.port ? ` (Port ${d.port})` : "")
+    + (d.status === "capturing" && cap.ping ? ` · Ping ${cap.ping} ms` : "");
   const hasTile = S.layout.pages.some((p) => p.items.some((i) => i.type === "dps"));
   const hint = {
     off: "",
@@ -873,6 +877,10 @@ function renderDpsCard() {
     connecting: "",
     bad_key: st.source === "manual" ? "Der Schlüssel passt nicht. Er steht in der Overlay-URL des Meters hinter key=." : "Der Schlüssel wurde abgelehnt. Wurde er im Meter gerade neu erzeugt? Die DeckBar versucht es gleich erneut.",
     connected: hasTile ? "" : "Für die Anzeige auf einer Seite eine Kachel „AION 2 DPS-Meter“ hinzufügen.",
+    capturing: hasTile ? "" : "Für die Anzeige auf einer Seite eine Kachel „AION 2 DPS-Meter“ hinzufügen.",
+    no_game: "Startet von selbst, sobald AION 2 läuft, und endet mit dem Spiel.",
+    no_capture: "Einmal bauen und installieren: capture/build.sh --install im Repo (braucht cargo, fragt nach sudo für die Mitschnitt-Rechte).",
+    no_caps: `Mitschneiden braucht cap_net_raw: capture/build.sh --install (legt es nach ~/.local/bin) oder sudo setcap cap_net_raw=ep ${cap.binary || "deckbar-capture"}. Ein Neubau verliert die Rechte.`,
   }[d.status] || "";
   $("dps-hint").textContent = (d.detail ? `(${d.detail}) ` : "") + hint;
   $("dps-hint").hidden = !$("dps-hint").textContent;
@@ -900,6 +908,7 @@ function saveDps(patch) {
 function bindDpsCard() {
   $("dps-enabled").addEventListener("change", (e) => saveDps({ enabled: e.target.checked }));
   $("dps-source").addEventListener("change", (e) => saveDps({ source: e.target.value }));
+  $("dps-lang").addEventListener("change", (e) => saveDps({ lang: e.target.value }));
   $("dps-port").addEventListener("change", (e) => saveDps({ port: clampInt(e.target.value, 1024, 65535, 18731) }));
   $("dps-key").addEventListener("change", (e) => saveDps({ key: e.target.value.trim() }));
   $("dps-page").addEventListener("change", (e) => saveDps({ auto_page: e.target.value || null }));

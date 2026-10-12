@@ -33,6 +33,7 @@ zurück, welche Kachel angetippt wurde. Welche Aktion dahinter steckt, weiß all
 | `shared-ui/` | LVGL-UI-Code (C). Läuft unverändert in Firmware **und** Simulator, Hardware nur über `include/deckbar/hal.h` |
 | `simulator/` | SDL2-Fenster 640 × 172, RGB565, Maus = Touch, echter WebSocket zum Daemon |
 | `daemon/`    | Python-Daemon inkl. Web-Konfiguration, USB-Brücke, systemd-User-Service |
+| `capture/`   | `deckbar-capture` (Rust): AION-2-Mitschnitt mit dem Kern des A2Tools DPS Meter (Submodul `capture/a2tools`) |
 | `firmware/`  | PlatformIO / Arduino-ESP32 3.3.12, Umgebungen für Board V2 und V1 |
 | `tools/`     | `gen_assets.py`: Schriften, Icons, Hintergrundbild erzeugen |
 
@@ -44,6 +45,7 @@ zurück, welche Kachel angetippt wurde. Welche Aktion dahinter steckt, weiß all
 sudo pacman -S --needed sdl2 playerctl ydotool wireplumber libpulse uv
 uv tool install cmake && uv tool install ninja     # nur für den Simulator (oder: pacman -S cmake ninja)
 uv tool install platformio                         # nur für die Firmware
+sudo pacman -S --needed rust libpcap               # nur für den AION-2-Mitschnitt
 systemctl --user enable --now ydotool              # ydotoold für Hotkeys
 ```
 
@@ -136,31 +138,56 @@ Die Kachel „AION 2 DPS-Meter“ füllt eine Seite und zeigt die DPS der Gruppe
 Name, DPS und wahlweise Anteil oder Gesamtschaden, Balken in Klassenfarbe, die eigene Zeile
 hervorgehoben. Darüber stehen Bossname, Rest-HP und Kampfdauer.
 
-Die Daten kommen derzeit vom [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter),
-das die Spielpakete mitliest. Die DeckBar liest nur seinen Stream-Overlay-Server
-(`/overlay/events`, Server-Sent Events, etwa 3 × pro Sekunde, siehe `daemon/deckbar_daemon/dps.py`).
-Geplant ist, den Mitschnitt auf Basis des A2Tools-Kerns direkt in die DeckBar zu holen.
+Die Daten liest die DeckBar selbst aus dem Spielverkehr mit: `deckbar-capture` (Ordner
+`capture/`) setzt den Kern des [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter)
+ohne dessen Oberfläche zusammen (libpcap, Port-Erkennung, Parser, DPS-Berechnung). Der Daemon
+startet das Programm, sobald AION 2 läuft, und beendet es 30 s nach dem Spiel. Gebaut wird ohne
+die Online-Funktionen des Meters: kein Konto, keine Uploads, keine Update-Abfrage.
 
-1. Im A2Tools-Meter unter Einstellungen das **Stream-Overlay** einschalten.
-2. In der Web-UI (Karte „AION 2 DPS-Meter“) die Verbindung auf „Automatisch“ lassen: Port und
-   Schlüssel liest der Daemon aus `~/.local/share/com.a2tools.dps-meter/settings.json`, auch nach
-   „Neuer Schlüssel“ im Meter. Sonst Port und `key=…` aus der Overlay-URL von Hand.
+1. Bauen und installieren (einmal und nach jedem Update):
+
+   ```sh
+   capture/build.sh --install     # cargo build, Kopie nach ~/.local/bin, sudo setcap cap_net_raw
+   systemctl --user restart deckbar
+   ```
+
+   Mitschneiden braucht nur `cap_net_raw`, nicht root. Ein Neubau verliert die Rechte, deshalb
+   immer mit `--install` bauen.
+2. In der Web-UI (Karte „AION 2 DPS-Meter“) als Quelle „Eigener Mitschnitt“ wählen (Standard bei
+   neuer Konfiguration) und die Sprache für Boss- und Skillnamen.
 3. Eine Seite mit der Kachel „AION 2 DPS-Meter“ anlegen. Spielerzahl (1–8) und Zusatzwert stehen
    in den Kachel-Eigenschaften.
 4. Optional „Bei Kampfbeginn zeigen“: Sobald neuer Schaden kommt, springt die Leiste auf diese
    Seite und nach „Zurück nach“ Sekunden ohne Schaden wieder auf die vorige (nicht, wenn man
    inzwischen selbst weggewischt hat).
 
+Die Liste zeigt die Top N nach DPS am aktuellen Ziel (Bosse zuerst) plus einen selbst; im
+Dungeon ist das die Gruppe. Kampf-History im Format des Meters: `~/.local/share/deckbar/aion2/history/`.
+
+`deckbar-capture` spricht Zeilen-JSON über stdin/stdout (Format in `capture/src/main.rs`) und lässt
+sich zum Testen auch allein starten. `--save-packets DIR` zeichnet den Mitschnitt auf,
+`--replay packets_….txt [--realtime]` spielt ihn ohne Spiel wieder ab:
+
+```sh
+capture/target/release/deckbar-capture --replay packets_2026-10-12.txt --history-dir /tmp/test
+```
+
+Ein Spiel-Patch ändert meist Opcodes oder Datentabellen. Upstream zieht das schnell nach, dann
+das Submodul aktualisieren (`git -C capture/a2tools fetch --tags && git -C capture/a2tools checkout vX.Y.Z`)
+und neu bauen.
+
+**Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die DeckBar stattdessen dessen
+Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent Events). Dafür im
+Meter das Stream-Overlay einschalten. Port und Schlüssel liest der Daemon aus
+`~/.local/share/com.a2tools.dps-meter/settings.json`, sonst von Hand aus der Overlay-URL.
+
 Die Einstellungen liegen in `~/.config/deckbar/dps.yaml` (Modus 600, enthält ggf. den Schlüssel).
-Das Meter listet nicht streng die Gruppe, sondern die Top N nach DPS am Ziel plus einen selbst; im
-Dungeon ist das die Gruppe. Wie viele es höchstens sind, stellt man im Meter ein (Spielerlimit,
-Standard 6).
 
 ### Dungeon-Runs nach Discord
 
 Nach jedem Dungeon-Run postet der Daemon ein Bild mit dem Schaden pro Spieler und Boss an einen
 Discord-Webhook (Karte „Dungeon-Runs → Discord“, gespeichert in `~/.config/deckbar/runs.yaml`).
-Quelle ist die Kampf-History des Meters. Ein Run endet, sobald der Endboss liegt, bei einem
+Quelle ist die Kampf-History, je nach DPS-Quelle die von `deckbar-capture` oder die des Meters. Ein Run endet, sobald der Endboss liegt, bei einem
 Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
 `daemon/deckbar_daemon/runs.py`). Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
 
@@ -252,8 +279,9 @@ cd daemon && uv run python -m pytest -q
 DeckBar steht unter der **GNU General Public License v3.0 oder später** (`LICENSE`).
 
 Teile stammen aus dem [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter) (GPL-3.0):
-die Klassen-Icons in `daemon/deckbar_daemon/assets/classes/` und das Design der Dungeon-Run-Bilder
-(nach `src/styles.css`). Übernommene Dateien sind an Ort und Stelle gekennzeichnet, inklusive der
+der Mitschnitt-Kern als unverändertes Submodul `capture/a2tools`, die Zeilenaufbereitung in
+`capture/src/view.rs` (nach `stream_overlay/snapshot.rs`), die Klassen-Icons in
+`daemon/deckbar_daemon/assets/classes/` und das Design der Dungeon-Run-Bilder (nach `src/styles.css`). Übernommene Dateien sind an Ort und Stelle gekennzeichnet, inklusive der
 Änderungen.
 
 Weitere Fremdbestandteile:
