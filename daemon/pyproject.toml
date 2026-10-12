@@ -2,6 +2,7 @@
 name = "deckbar-daemon"
 version = "0.1.0"
 description = "PC-Daemon für die DeckBar-Touchleiste"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.10",
