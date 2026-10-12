@@ -190,7 +190,7 @@ overlay/install.sh        # ~/.local/bin/deckbar-overlay, User-Dienst, Starter f
 ```
 
 - **Einblenden:** Klick aufs Tray-Symbol, `deckbar-overlay --toggle` (Tastenkürzel in den
-  Systemeinstellungen auf „DeckBar DPS-Meter zeigen/verbergen“ legen) oder eine DeckBar-Kachel mit
+  Systemeinstellungen auf die Anwendung „DeckBar DPS-Meter“ legen) oder eine DeckBar-Kachel mit
   dieser Shell-Aktion. Weitere Befehle: `--show`, `--hide`, `--details`, `--history`, `--settings`, `--quit`.
 - **Über dem Vollbild-Spiel:** Beim ersten Start legt das Overlay die KWin-Regel `deckbar-overlay`
   an (Ebene „Overlay“, nur das Meter-Fenster). Änderungen daran bleiben erhalten.

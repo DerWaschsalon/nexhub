@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # DeckBar-Overlay einrichten: Programm nach ~/.local/bin (Link ins Repo), User-Dienst für den
-# Autostart, Starter „DeckBar DPS-Meter zeigen/verbergen“ für ein Tastenkürzel.
+# Autostart, Starter „DeckBar DPS-Meter“ (blendet ein und aus) für ein Tastenkürzel.
 # Braucht PySide6 mit QtWebEngine: sudo pacman -S --needed pyside6 qt6-webengine
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
@@ -9,11 +9,12 @@ python3 -c "import PySide6.QtWebEngineWidgets" 2>/dev/null || {
 mkdir -p ~/.local/bin ~/.config/systemd/user ~/.local/share/applications
 ln -sf "$PWD/deckbar-overlay" ~/.local/bin/deckbar-overlay
 cp deckbar-overlay.service ~/.config/systemd/user/
-cp deckbar-overlay-toggle.desktop ~/.local/share/applications/
+rm -f ~/.local/share/applications/deckbar-overlay-toggle.desktop
+cp deckbar-overlay.desktop ~/.local/share/applications/
 systemctl --user daemon-reload
 systemctl --user enable --now deckbar-overlay.service
 cat <<MSG
 Overlay läuft im Tray. Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „Neu“ →
-„Anwendung“ → „DeckBar DPS-Meter zeigen/verbergen“, dann eine Taste zuweisen.
+„Anwendung“ → „DeckBar DPS-Meter“ (blendet ein und aus), dann eine Taste zuweisen.
 Oder eine DeckBar-Kachel mit der Aktion Shell: deckbar-overlay --toggle
 MSG
