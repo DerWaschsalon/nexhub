@@ -121,6 +121,9 @@ label.check { flex-direction: row; align-items: center; gap: 8px; color: var(--t
 }
 .banner.error { background: rgba(255, 69, 58, 0.14); border: 1px solid rgba(255, 69, 58, 0.5); }
 .banner.warn { background: rgba(255, 159, 10, 0.1); border: 1px solid rgba(255, 159, 10, 0.4); }
+.banner.info { background: rgba(10, 132, 255, 0.12); border: 1px solid rgba(10, 132, 255, 0.45); display: flex; align-items: center; gap: 12px; }
+.banner.info[hidden] { display: none; }
+.banner.info span { flex: 1; }
 
 main { padding: 18px 24px 40px; max-width: 1400px; margin: 0 auto; }
 

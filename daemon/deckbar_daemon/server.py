@@ -24,6 +24,7 @@ from .capture import history_root
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout
 from .dps import DpsFeed, DpsSettings
+from .updates import Updates
 from .runs import DungeonRuns, RunSettings, a2tools_dir, render_run
 from .media import Media
 from .proc import have
@@ -102,6 +103,8 @@ class DeckBar:
         self.runs = DungeonRuns(config_dir)
         self.runs.history_dir = self._history_dir
         self.runs.listeners.append(self._runs_changed)
+        self.updates = Updates()
+        self.updates.listeners.append(self._updates_changed)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -182,6 +185,9 @@ class DeckBar:
     # ---------------------------------------------------------------- DPS-Meter
     async def _dps_changed(self) -> None:
         await self._broadcast_ui({"type": "dps", "dps": self.dps.info()})
+
+    async def _updates_changed(self) -> None:
+        await self._broadcast_ui({"type": "updates", "updates": self.updates.info()})
 
     async def _runs_changed(self) -> None:
         await self._broadcast_ui({"type": "runs", "runs": self.runs.info()})
@@ -374,6 +380,7 @@ class DeckBar:
             "status": self.status(),
             "dps": self.dps.info(),
             "runs": self.runs.info(),
+            "updates": self.updates.info(),
         }, ensure_ascii=False))
         try:
             async for m in ws:
@@ -468,6 +475,20 @@ class DeckBar:
         self.dps.save(settings)
         await self._dps_changed()
         return web.json_response({"ok": True, **self.dps.info()})
+
+    async def api_get_updates(self, request: web.Request) -> web.Response:
+        return web.json_response(self.updates.info())
+
+    async def api_check_updates(self, request: web.Request) -> web.Response:
+        await self.updates.check()
+        return web.json_response(self.updates.info())
+
+    async def api_run_update(self, request: web.Request) -> web.Response:
+        try:
+            result = await self.updates.run()
+        except (RuntimeError, OSError) as e:
+            return web.json_response({"error": str(e)}, status=500)
+        return web.json_response({"ok": True, "result": result})
 
     async def api_get_runs(self, request: web.Request) -> web.Response:
         return web.json_response(self.runs.info())
@@ -570,6 +591,9 @@ def build_app(deck: DeckBar) -> web.Application:
     app.router.add_get("/api/dps", deck.api_get_dps)
     app.router.add_put("/api/dps", deck.api_put_dps)
     app.router.add_get("/api/runs", deck.api_get_runs)
+    app.router.add_get("/api/updates", deck.api_get_updates)
+    app.router.add_post("/api/updates/check", deck.api_check_updates)
+    app.router.add_post("/api/updates/run", deck.api_run_update)
     app.router.add_put("/api/runs", deck.api_put_runs)
     app.router.add_get("/api/runs/preview.png", deck.api_runs_preview)
     app.router.add_post("/api/runs/test", deck.api_runs_test)

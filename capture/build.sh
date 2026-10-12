@@ -14,14 +14,17 @@ if [[ ${1:-} == --install ]]; then
   INSTALL=1
   shift
 fi
-git -C .. submodule update --init capture/a2tools
+# Nur anlegen, wenn es fehlt: ein per update.sh --a2tools lokal angehobener Stand bleibt so
+[[ -e a2tools/.git ]] || git -C .. submodule update --init capture/a2tools
 mkdir -p a2tools/dist
 [[ -e a2tools/dist/index.html ]] || echo '<!doctype html>' > a2tools/dist/index.html
 cargo build --release "$@"
 if (( INSTALL )); then
   DEST=~/.local/bin/deckbar-capture
   install -Dm755 target/release/deckbar-capture "$DEST"
-  sudo setcap cap_net_raw=ep "$DEST"
+  # Ohne Terminal (Tray-Button, update.sh --notify) grafisch nach dem Passwort fragen
+  if [[ -t 0 ]]; then SUDO=sudo; else SUDO=pkexec; fi
+  $SUDO /usr/bin/setcap cap_net_raw=ep "$(readlink -f "$DEST")"
   getcap "$DEST"
   echo "Installiert: $DEST (Daemon neu starten: systemctl --user restart deckbar)"
 fi

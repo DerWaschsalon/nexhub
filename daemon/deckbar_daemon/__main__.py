@@ -48,6 +48,7 @@ async def serve(args: argparse.Namespace) -> None:
         asyncio.ensure_future(deck.watch_background()),
         asyncio.ensure_future(deck.dps.watch()),
         asyncio.ensure_future(deck.runs.watch()),
+        asyncio.ensure_future(deck.updates.watch()) if settings.update_check else None,
         asyncio.ensure_future(UsbBridge(settings.usb, f"ws://127.0.0.1:{settings.port}/ws").watch()),
     ]
     announcer = Announcer(settings.name, settings.port) if settings.mdns and not args.no_mdns else None
@@ -68,7 +69,8 @@ async def serve(args: argparse.Namespace) -> None:
 
     log.info("beende …")
     for t in tasks:
-        t.cancel()
+        if t:
+            t.cancel()
     if announcer:
         await announcer.stop()
     await a2_runner.cleanup()

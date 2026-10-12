@@ -778,6 +778,8 @@ function connectLive() {
       S.status = msg.status;
       S.dps = msg.dps;
       S.runs = msg.runs;
+      S.updates = msg.updates;
+      renderUpdates();
       setBgPreview(msg.status?.background?.id);
       if (!S.dirty) setLayout(msg.layout);
       showError(msg.error);
@@ -802,6 +804,9 @@ function connectLive() {
     } else if (msg.type === "runs") {
       S.runs = msg.runs;
       renderRunsCard();
+    } else if (msg.type === "updates") {
+      S.updates = msg.updates;
+      renderUpdates();
     } else if (msg.type === "background") {
       setBgPreview(msg.id);
     } else if (msg.type === "layout_error") {
@@ -841,6 +846,32 @@ function renderChips(offline) {
   w.hidden = !missing.length;
   w.textContent = missing.length ? `Nicht installiert: ${missing.join(", ")} – die zugehörigen Aktionen/Statusanzeigen sind inaktiv.` : "";
   $("layout-path").textContent = S.status.layout_path ? `Datei: ${S.status.layout_path} (auch von Hand editierbar, wird live übernommen)` : "";
+}
+
+/* ================================================================= Updates */
+function updateText(u) {
+  const parts = [];
+  if (u.deckbar?.behind) parts.push(`DeckBar: ${u.deckbar.behind} neue${u.deckbar.behind === 1 ? "r" : ""} Commit${u.deckbar.behind === 1 ? "" : "s"} („${u.deckbar.latest}“)`);
+  if (u.a2tools?.newer) parts.push(`A2Tools ${u.a2tools.latest} (bisher ${u.a2tools.current})`);
+  return parts.join(" · ");
+}
+
+function renderUpdates() {
+  const u = S.updates;
+  const show = !!(u && u.available);
+  $("update-banner").hidden = !show;
+  if (!show) return;
+  $("update-text").textContent = `Update verfügbar: ${updateText(u)}`;
+  $("update-run").disabled = !!u.running;
+  $("update-run").textContent = u.running ? "Update läuft …" : "Jetzt aktualisieren";
+}
+
+function bindUpdates() {
+  $("update-run").addEventListener("click", async () => {
+    const r = await fetch("/api/updates/run", { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    toast(r.ok ? "Update läuft im Konsole-Fenster" : (j.error || "Update ging nicht"), !r.ok);
+  });
 }
 
 /* ================================================================= AION 2 DPS-Meter */
@@ -1030,6 +1061,7 @@ async function init() {
   S.icons = await (await fetch("/static/icons.json")).json();
   await document.fonts.load('20px "mdi"').catch(() => {});
   bindPageCard();
+  bindUpdates();
   bindDpsCard();
   bindRunsCard();
   renderAddMenu();

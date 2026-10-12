@@ -167,6 +167,8 @@ class Settings(_Strict):
     open_browser: bool = False
     # Rückfall per USB-Kabel, wenn WLAN nicht klappt: "auto" (Espressif-Ports passiv prüfen), "off" oder fester Pfad
     usb: str = "auto"
+    # Täglich nach neuen DeckBar-Commits und A2Tools-Releases sehen (GitHub), Hinweis in Tray und Web-UI
+    update_check: bool = True
 
 
 def config_dir() -> Path:

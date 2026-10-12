@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """DeckBar-Overlay: das AION-2-DPS-Meter am PC, mit der Oberfläche des A2Tools DPS Meter.
 
-Läuft im Hintergrund mit Tray-Symbol. Das Meter-Fenster liegt (per KWin-Regel) über dem Spiel und
+Läuft im Hintergrund mit Tray-Symbol. Gibt es ein Update (DeckBar-Commits oder ein neues
+A2Tools-Release, geprüft vom Daemon), meldet das Tray es einmal und bietet „Jetzt aktualisieren“ an. Das Meter-Fenster liegt (per KWin-Regel) über dem Spiel und
 lässt sich per Tastenkürzel ein- und ausblenden:
 
     deckbar-overlay              starten (Fenster verborgen, nur Tray)
@@ -32,7 +33,7 @@ os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")
 
 from PySide6.QtCore import QByteArray, QFile, QIODevice, QObject, QPoint, QRect, QSettings, Qt, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon
-from PySide6.QtNetwork import QLocalServer, QLocalSocket
+from PySide6.QtNetwork import QLocalServer, QLocalSocket, QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineScript, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -51,16 +52,18 @@ EDGES = {
 }
 
 
-def daemon_url() -> str:
-    """Port der Overlay-Oberfläche = Port des Daemons + 1 (config.yaml)."""
-    port = 8765
+def daemon_port() -> int:
     cfg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "deckbar" / "config.yaml"
     try:
         m = re.search(r"^port:\s*(\d+)", cfg.read_text(), re.M)
-        port = int(m.group(1)) if m else port
+        return int(m.group(1)) if m else 8765
     except OSError:
-        pass
-    return f"http://127.0.0.1:{port + 1}/"
+        return 8765
+
+
+def daemon_url() -> str:
+    """Port der Overlay-Oberfläche = Port des Daemons + 1 (config.yaml)."""
+    return f"http://127.0.0.1:{daemon_port() + 1}/"
 
 
 # ---------------------------------------------------------------- Click-Through per X11-Input-Shape
@@ -392,12 +395,81 @@ class Overlay(QObject):
         self.lock_action.toggled.connect(self._lock_from_tray)
         menu.addAction(self.lock_action)
         menu.addSeparator()
+        self.update_action = menu.addAction("Keine Updates", self.run_update)
+        self.update_action.setEnabled(False)
+        menu.addAction("Nach Updates suchen", lambda: self.api("POST", "/api/updates/check", self.on_updates))
+        menu.addSeparator()
         menu.addAction("Beenden", self.app.quit)
+        menu.aboutToShow.connect(lambda: self.api("GET", "/api/updates", self.on_updates))
         self.tray = QSystemTrayIcon(self.icon, self)
         self.tray.setToolTip("DeckBar DPS-Meter")
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda r: self.toggle() if r == QSystemTrayIcon.Trigger else None)
+        self.tray.messageClicked.connect(self.run_update)
         self.tray.show()
+        # Update-Stand vom Daemon (der prüft täglich)
+        self.net = QNetworkAccessManager(self)
+        self.daemon = f"http://127.0.0.1:{daemon_port()}"
+        self.updates: dict = {}
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(lambda: self.api("GET", "/api/updates", self.on_updates))
+        self.update_timer.start(10 * 60 * 1000)
+        QTimer.singleShot(150 * 1000, lambda: self.api("GET", "/api/updates", self.on_updates))
+
+    # ------------------------------------------------------------ Updates
+    def api(self, method: str, path: str, done=None) -> None:
+        req = QNetworkRequest(QUrl(self.daemon + path))
+        req.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
+        reply = self.net.post(req, b"{}") if method == "POST" else self.net.get(req)
+
+        def finished() -> None:
+            body = bytes(reply.readAll()).decode(errors="replace")
+            ok = reply.error() == QNetworkReply.NoError
+            reply.deleteLater()
+            try:
+                data = json.loads(body) if body else {}
+            except ValueError:
+                data = {}
+            if done:
+                done(data if ok else {"error": data.get("error") or reply.errorString()})
+
+        reply.finished.connect(finished)
+
+    def on_updates(self, u: dict) -> None:
+        if "error" in u and "available" not in u:
+            return  # Daemon nicht erreichbar: alten Stand behalten
+        self.updates = u
+        parts = []
+        d, a = u.get("deckbar") or {}, u.get("a2tools") or {}
+        if d.get("behind"):
+            parts.append(f"DeckBar +{d['behind']}")
+        if a.get("newer"):
+            parts.append(f"A2Tools {a.get('latest')}")
+        if u.get("running"):
+            self.update_action.setText("Update läuft …")
+            self.update_action.setEnabled(False)
+        elif u.get("available"):
+            self.update_action.setText(f"Jetzt aktualisieren ({', '.join(parts)})")
+            self.update_action.setEnabled(True)
+        else:
+            self.update_action.setText("Keine Updates" + (" (Prüfung fehlgeschlagen)" if u.get("error") else ""))
+            self.update_action.setEnabled(False)
+        self.tray.setToolTip("DeckBar DPS-Meter" + (f"\nUpdate verfügbar: {', '.join(parts)}" if u.get("available") else ""))
+        # Einmal je neuem Stand melden
+        key = f"{d.get('latest') if d.get('behind') else ''}|{a.get('latest') if a.get('newer') else ''}"
+        if u.get("available") and self.store.value("notifiedUpdate") != key:
+            self.store.setValue("notifiedUpdate", key)
+            self.tray.showMessage("DeckBar: Update verfügbar",
+                                  f"{', '.join(parts)}. Zum Aktualisieren hier klicken oder im Tray-Menü.",
+                                  QSystemTrayIcon.Information, 15000)
+
+    def run_update(self) -> None:
+        if not self.updates.get("available") or self.updates.get("running"):
+            return
+        self.update_action.setText("Update läuft …")
+        self.update_action.setEnabled(False)
+        self.api("POST", "/api/updates/run", lambda r: r.get("error") and self.tray.showMessage(
+            "DeckBar-Update", f"Ging nicht: {r['error']}", QSystemTrayIcon.Warning, 10000))
 
     def _lock_from_tray(self, on: bool) -> None:
         if self.main.locked != on:

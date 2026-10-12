@@ -173,9 +173,8 @@ sich zum Testen auch allein starten. `--save-packets DIR` zeichnet den Mitschnit
 capture/target/release/deckbar-capture --replay packets_2026-10-12.txt --history-dir /tmp/test
 ```
 
-Ein Spiel-Patch ändert meist Opcodes oder Datentabellen. Upstream zieht das schnell nach, dann
-das Submodul aktualisieren (`git -C capture/a2tools fetch --tags && git -C capture/a2tools checkout vX.Y.Z`)
-und neu bauen.
+Ein Spiel-Patch ändert meist Opcodes oder Datentabellen. Upstream zieht das schnell nach, die
+DeckBar meldet das neue Release (siehe „Updates“).
 
 ### Overlay am PC
 
@@ -223,6 +222,26 @@ Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
 
 Die History maskiert fremde Namen. Die DeckBar lernt die vollen Namen aus dem Live-Stream und
 speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von Hand korrigieren.
+
+## Updates
+
+Der Daemon sieht kurz nach dem Start und dann täglich nach, ob es neue Commits der DeckBar auf
+GitHub gibt oder ein neues Release des A2Tools-Meters (nach Spiel-Patches ändern sich dort Opcodes
+und Datentabellen). Dann meldet sich das Tray-Symbol des Overlays einmal mit einer Benachrichtigung,
+im Tray-Menü steht „Jetzt aktualisieren“, in der Web-UI ein Hinweis mit Button. Abschalten mit
+`update_check: false` in `config.yaml`.
+
+Der Button öffnet ein Konsole-Fenster mit `./update.sh`, von Hand geht es genauso:
+
+```sh
+./update.sh             # git pull, Submodul, deckbar-capture nur bei Änderungen neu bauen, Neustart
+./update.sh --a2tools   # zusätzlich A2Tools auf das neueste Release heben (lokal, bis es im Repo nachgezogen ist)
+```
+
+Muss `deckbar-capture` neu gebaut werden, fragt das Skript per `sudo` nach dem Passwort für die
+Mitschnitt-Rechte. Bei lokalen Änderungen im Repo bricht es ab, statt etwas zu überschreiben.
+Wer das Repo pflegt, zieht ein neues A2Tools-Release mit `git -C capture/a2tools checkout vX.Y.Z`
+und einem Commit für alle nach.
 
 ## Firmware
 
