@@ -1,21 +1,30 @@
 #!/usr/bin/env python3
-"""DeckBar-Overlay: das AION-2-DPS-Meter am PC, mit der Oberfläche des A2Tools DPS Meter.
+"""DeckBar-Overlay: Meter und Widgets über dem Spiel, mit Tray-Symbol.
 
-Läuft im Hintergrund mit Tray-Symbol. Gibt es ein Update (DeckBar-Commits oder ein neues
-A2Tools-Release, geprüft vom Daemon), meldet das Tray es einmal und bietet „Jetzt aktualisieren“ an. Das Meter-Fenster liegt (per KWin-Regel) über dem Spiel und
-lässt sich per Tastenkürzel ein- und ausblenden:
+Unter KDE Plasma (Wayland) legt das Programm eine durchsichtige layer-shell-Fläche über den
+Spielmonitor (Ebene „overlay“, über dem Vollbildspiel) und zeigt darin die Widget-Seite des
+Daemons (daemon/deckbar_daemon/web/overlay/): das A2Tools-Meter, Boss-Leiste, Event-Timer,
+Name mit Effekt. Die Fläche bekommt nie die Tastatur (außer beim Bearbeiten) und nimmt Klicks
+nur dort an, wo es nötig ist:
 
-    deckbar-overlay              starten (Fenster verborgen, nur Tray)
-    deckbar-overlay --toggle     Meter zeigen/verbergen (für ein Tastenkürzel)
-    deckbar-overlay --show | --hide | --details | --history | --settings | --quit
+    click   (Standard) nur das Meter nimmt Klicks an, alles andere geht ans Spiel
+    lock    nur noch der Schloss-Knopf des Meters (wie die Sperre im A2Tools-Meter)
+    edit    alles: Widgets ziehen, Mausrad = Größe, Esc = fertig
 
-Ein zweiter Aufruf gibt den Befehl an die laufende Instanz weiter. Die Seiten kommen vom
-DeckBar-Daemon (a2ui.py, http://127.0.0.1:<Port+1>/), der auch die Daten liefert. Hier passiert
-nur, was dort Tauri tut: rahmenlose, transparente Fenster, Ziehen, Größe, Click-Through-Sperre,
-Details-/History-/Einstellungsfenster (Fenster-Commands aus daemon/deckbar_daemon/web/a2shim.js).
+    deckbar-overlay                 starten (Tray)
+    deckbar-overlay --toggle        Overlay zeigen/verbergen (für ein Tastenkürzel)
+    deckbar-overlay --edit          Bearbeiten an/aus
+    deckbar-overlay --lock | --click | --show | --hide | --reload
+    deckbar-overlay --details | --history | --settings | --quit
+    deckbar-overlay --legacy        altes Meter-Fenster unter XWayland (ohne Widgets)
 
-Braucht PySide6 mit QtWebEngine (pacman -S pyside6 qt6-webengine). Läuft unter XWayland wie das
-A2Tools-Meter: nur dort lassen sich Fenster positionieren und die Sperre per Input-Shape bauen.
+Ein zweiter Aufruf gibt den Befehl an die laufende Instanz weiter (Socket im Laufzeitordner,
+auch der Daemon schickt darüber Befehle aus der Web-UI). Details, Verlauf und Einstellungen des
+Meters sind normale Fenster. Ohne layer-shell (GNOME, X11, layer-shell-qt fehlt) läuft
+automatisch das alte Meter-Fenster unter XWayland mit KWin-Regel und Input-Shape.
+
+Braucht PySide6 mit QtWebEngine, für layer-shell zusätzlich layer-shell-qt
+(pacman -S pyside6 qt6-webengine layer-shell-qt).
 """
 from __future__ import annotations
 
@@ -24,32 +33,27 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
 
-os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
-os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")  # transparente Fenster ohne Artefakte
-
-from PySide6.QtCore import QByteArray, QFile, QIODevice, QObject, QPoint, QRect, QSettings, Qt, QTimer, QUrl, Signal, Slot
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon
-from PySide6.QtNetwork import QLocalServer, QLocalSocket, QNetworkAccessManager, QNetworkReply, QNetworkRequest
-from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineScript, QWebEngineSettings
-from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
-
 APP = "deckbar-overlay"
-MAIN_TITLE = "DeckBar DPS-Meter"  # KWin-Regel: Ebene „Overlay“ nur für dieses Fenster
+MAIN_TITLE = "DeckBar DPS-Meter"  # KWin-Regel (nur Legacy): Ebene „Overlay“ für dieses Fenster
 REPO = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parent
 ICON = REPO / "capture" / "a2tools" / "src-tauri" / "icons" / "128x128.png"
-COMMANDS = ("toggle", "show", "hide", "details", "history", "settings", "quit")
+COMMANDS = ("toggle", "show", "hide", "edit", "lock", "click", "reload", "details", "history", "settings", "quit")
+MODES = ("click", "lock", "edit")
 TOOL_SIZES = {"settings": (760, 820, 520, 420), "history": (1100, 720, 480, 360), "details": (1180, 760, 520, 360)}
-EDGES = {
-    "North": Qt.TopEdge, "South": Qt.BottomEdge, "East": Qt.RightEdge, "West": Qt.LeftEdge,
-    "NorthEast": Qt.TopEdge | Qt.RightEdge, "NorthWest": Qt.TopEdge | Qt.LeftEdge,
-    "SouthEast": Qt.BottomEdge | Qt.RightEdge, "SouthWest": Qt.BottomEdge | Qt.LeftEdge,
-}
+
+
+def socket_path() -> str:
+    """Gleiche Regel wie deckbar_daemon/overlay.py."""
+    base = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/deckbar-{os.getuid()}"
+    os.makedirs(base, exist_ok=True)
+    return str(Path(base) / "deckbar-overlay.sock")
 
 
 def daemon_port() -> int:
@@ -62,14 +66,67 @@ def daemon_port() -> int:
 
 
 def daemon_url() -> str:
-    """Port der Overlay-Oberfläche = Port des Daemons + 1 (config.yaml)."""
+    """Overlay- und Meter-Oberfläche = Port des Daemons + 1 (config.yaml)."""
     return f"http://127.0.0.1:{daemon_port() + 1}/"
 
 
-# ---------------------------------------------------------------- Click-Through per X11-Input-Shape
+def fetch_layout() -> dict:
+    """Overlay-Einstellungen vom Daemon (Monitor, GPU, Startmodus); ohne Daemon Standardwerte."""
+    try:
+        with urllib.request.urlopen(daemon_url() + "api/overlay/layout", timeout=1.5) as r:
+            data = json.loads(r.read())
+            return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def choose_backend(args: list[str]) -> str:
+    """layer (layer-shell unter Wayland) oder legacy (XWayland-Fenster wie früher)."""
+    if "legacy" in args:
+        return "legacy"
+    if "layer" in args:
+        return "layer"
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        return "legacy"
+    if "GNOME" in os.environ.get("XDG_CURRENT_DESKTOP", "").upper():
+        return "legacy"  # Mutter kennt kein layer-shell
+    from PySide6.QtCore import QLibraryInfo
+    qml = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.QmlImportsPath))
+    return "layer" if (qml / "org" / "kde" / "layershell").is_dir() else "legacy"
+
+
+# Plattform vor dem ersten Qt-Fenster festlegen
+_ARGS = [a.removeprefix("--") for a in sys.argv[1:]]
+BACKEND = choose_backend(_ARGS)
+LAYOUT = fetch_layout() if BACKEND == "layer" else {}
+if BACKEND == "layer":
+    os.environ["QT_QPA_PLATFORM"] = "wayland"
+    if not LAYOUT.get("gpu", True):
+        os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")
+else:
+    os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")  # transparente Fenster ohne Artefakte
+
+from PySide6.QtCore import (QByteArray, QFile, QIODevice, QObject, QPoint, QRect, QSettings, Qt, QTimer, QUrl,  # noqa: E402
+                            Property, Signal, Slot)
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QRegion  # noqa: E402
+from PySide6.QtNetwork import QLocalServer, QLocalSocket, QNetworkAccessManager, QNetworkReply, QNetworkRequest  # noqa: E402
+from PySide6.QtWebChannel import QWebChannel  # noqa: E402
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineScript, QWebEngineSettings  # noqa: E402
+from PySide6.QtWebEngineWidgets import QWebEngineView  # noqa: E402
+from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon  # noqa: E402
+
+EDGES = {
+    "North": Qt.TopEdge, "South": Qt.BottomEdge, "East": Qt.RightEdge, "West": Qt.LeftEdge,
+    "NorthEast": Qt.TopEdge | Qt.RightEdge, "NorthWest": Qt.TopEdge | Qt.LeftEdge,
+    "SouthEast": Qt.BottomEdge | Qt.RightEdge, "SouthWest": Qt.BottomEdge | Qt.LeftEdge,
+}
+
+
+# ---------------------------------------------------------------- Click-Through per X11-Input-Shape (Legacy)
 class InputShape:
     """Nur ein Rechteck des Fensters nimmt Maus an (XShapeCombineRectangles, ShapeInput). Leer = alles
-    geht durch. Unter Wayland ohne XWayland nicht verfügbar."""
+    geht durch. Nur unter XWayland/X11."""
 
     class XRect(ctypes.Structure):
         _fields_ = [("x", ctypes.c_short), ("y", ctypes.c_short), ("w", ctypes.c_ushort), ("h", ctypes.c_ushort)]
@@ -104,9 +161,9 @@ class InputShape:
         self.x11.XFlush(self.dpy)
 
 
-# ---------------------------------------------------------------- Brücke zur Seite
+# ---------------------------------------------------------------- Fenster der Meter-Oberfläche
 class Host(QObject):
-    """Objekt "host" im QWebChannel jedes Fensters: call(cmd, argsJson) → JSON, Signal event."""
+    """Objekt "host" im QWebChannel jedes Meter-Fensters: call(cmd, argsJson) → JSON, Signal event."""
 
     event = Signal(str, str)
 
@@ -116,15 +173,12 @@ class Host(QObject):
 
     @Slot(str, str, result=str)
     def call(self, cmd: str, args_json: str) -> str:
-        try:
-            args = json.loads(args_json or "{}")
-            result = self.win.overlay.command(self.win, cmd, args)
-            return json.dumps({"result": result})
-        except Exception as e:  # noqa: BLE001 – die Seite bekommt den Fehler als Reject
-            return json.dumps({"error": str(e)})
+        return self.win.overlay.call_json(self.win, cmd, args_json)
 
 
 class A2Window(QWebEngineView):
+    """Fenster mit der Meter-Oberfläche: Details, Verlauf, Einstellungen – und im Legacy-Betrieb das Meter."""
+
     def __init__(self, overlay: Overlay, label: str, view: str) -> None:
         super().__init__()
         self.overlay, self.label, self.view = overlay, label, view
@@ -183,11 +237,127 @@ class A2Window(QWebEngineView):
         super().closeEvent(e)
 
 
+# ---------------------------------------------------------------- layer-shell-Fläche
+class LayerHost(QObject):
+    """Kontext-Objekt „host“ in Overlay.qml: Modus, Monitor, Eingabe-Region, Fenster-Befehle des Meters."""
+
+    modeChanged = Signal()
+    screenChanged = Signal()
+    readyChanged = Signal()
+
+    def __init__(self, overlay: Overlay, page: QUrl, start_mode: str) -> None:
+        super().__init__()
+        self.overlay = overlay
+        self._page = page
+        self._mode = start_mode if start_mode in ("click", "lock") else "click"
+        self.last = self._mode  # Modus vor dem Bearbeiten
+        self.regions: dict[str, list[QRect]] = {"click": [], "lock": []}
+        self.window = None
+        self._screen = None
+        self._ready = False
+
+    @Property(bool, notify=readyChanged)
+    def ready(self) -> bool:
+        return self._ready
+
+    @Slot()
+    def pageReady(self) -> None:
+        if not self._ready:
+            self._ready = True
+            self.readyChanged.emit()
+
+    @Slot()
+    def pageGone(self) -> None:
+        """Neu laden beginnt: Seite verstecken und nichts mehr abfangen, bis sie sich meldet."""
+        self.regions = {"click": [], "lock": []}
+        if self._ready:
+            self._ready = False
+            self.readyChanged.emit()
+        if self._mode != "edit":
+            self.apply_input()
+
+    @Property(QObject, notify=screenChanged)
+    def screen(self):
+        return self._screen
+
+    def set_screen(self, screen) -> None:
+        if screen is not self._screen:
+            self._screen = screen
+            self.screenChanged.emit()
+
+    @Property(str, notify=modeChanged)
+    def mode(self) -> str:
+        return self._mode
+
+    @Property(QUrl, constant=True)
+    def pageUrl(self) -> QUrl:
+        return self._page
+
+    def set_mode(self, mode: str) -> None:
+        if mode not in MODES or mode == self._mode:
+            return
+        if mode != "edit":
+            self.last = mode
+        self._mode = mode
+        self.apply_input()
+        self.modeChanged.emit()
+        self.overlay.mode_changed(mode)
+
+    def apply_input(self) -> None:
+        """Eingabe-Region: alles (edit), nur Widgets mit data-click (click), nur Schloss (lock)."""
+        w = self.window
+        if w is None:
+            return
+        if self._mode == "edit":
+            w.setFlag(Qt.WindowTransparentForInput, False)
+            w.setMask(QRegion())  # leere Maske = keine Maske = ganze Fläche
+            return
+        rects = self.regions.get(self._mode) or []
+        if not rects:
+            # zuerst die Flagge, sonst ist kurz die ganze Fläche klickbar (13.10. gemessen)
+            w.setFlag(Qt.WindowTransparentForInput, True)
+            w.setMask(QRegion())
+            return
+        region = QRegion()
+        for r in rects:
+            region = region.united(QRegion(r))
+        w.setFlag(Qt.WindowTransparentForInput, False)
+        w.setMask(region)
+
+    @Slot(str)
+    def setRegions(self, text: str) -> None:
+        try:
+            data = json.loads(text)
+            self.regions = {k: [QRect(*(int(round(v)) for v in r)) for r in data.get(k) or []] for k in ("click", "lock")}
+        except (ValueError, TypeError, AttributeError):
+            return
+        if self._mode != "edit":
+            self.apply_input()
+
+    @Slot(str)
+    def requestMode(self, mode: str) -> None:
+        self.set_mode(mode)
+
+    @Slot()
+    def finishEdit(self) -> None:
+        self.set_mode(self.last)
+
+    @Slot(str, str, result=str)
+    def call(self, cmd: str, args_json: str) -> str:
+        return self.overlay.call_json(None, cmd, args_json)
+
+    @Slot(str)
+    def log(self, text: str) -> None:
+        if os.environ.get("DECKBAR_OVERLAY_DEBUG"):
+            print(f"[seite] {text}", flush=True)
+
+
 # ---------------------------------------------------------------- Anwendung
 class Overlay(QObject):
-    def __init__(self, app: QApplication) -> None:
+    def __init__(self, app: QApplication, backend: str) -> None:
         super().__init__()
         self.app = app
+        self.backend = backend
         self.url = daemon_url()
         self.store = QSettings("deckbar", "overlay")
         self.icon = QIcon(str(ICON)) if ICON.is_file() else QIcon.fromTheme("utilities-system-monitor")
@@ -203,9 +373,58 @@ class Overlay(QObject):
         self.windows: dict[str, A2Window] = {}
         self.pending: dict[str, dict] = {}
         self.seq = 0
-        self.main = self._window("main", "main")
+        self.main: A2Window | None = None
+        self.layer: LayerHost | None = None
+        self.surface = None
         self._tray()
-        ensure_kwin_rule()
+        if backend == "layer":
+            self._layer()
+        else:
+            self.main = self._window("main", "main")
+            ensure_kwin_rule()
+
+    # ------------------------------------------------------------ layer-shell
+    def _layer(self) -> None:
+        from PySide6.QtQml import QQmlApplicationEngine
+
+        self.layer = LayerHost(self, QUrl(self.url + "__deckbar__/overlay/"), str(LAYOUT.get("start_mode") or "click"))
+        self.layer.set_screen(self._target_screen())
+        self.engine = QQmlApplicationEngine()
+        self.engine.rootContext().setContextProperty("host", self.layer)
+        self.engine.load(QUrl.fromLocalFile(str(HERE / "Overlay.qml")))
+        if not self.engine.rootObjects():
+            raise RuntimeError("Overlay.qml ließ sich nicht laden (layer-shell-qt installiert?)")
+        self.surface = self.engine.rootObjects()[0]
+        self.layer.window = self.surface
+        self._place_on_screen()
+        QGuiApplication.instance().screenAdded.connect(lambda *_: QTimer.singleShot(500, self._place_on_screen))
+        QGuiApplication.instance().screenRemoved.connect(lambda *_: QTimer.singleShot(500, self._place_on_screen))
+        self.layer.apply_input()  # vor dem Zeigen: sonst blockiert die Fläche kurz das Spiel
+        self.surface.show()
+        self.lock_action.setChecked(self.layer.mode == "lock")
+
+    @staticmethod
+    def _target_screen():
+        want = str(LAYOUT.get("screen") or "") or kde_primary()
+        return next((s for s in QGuiApplication.screens() if s.name() == want), None) or QGuiApplication.primaryScreen()
+
+    def _place_on_screen(self) -> None:
+        screen = self._target_screen()
+        if screen is None or self.surface is None:
+            return
+        self.layer.set_screen(screen)
+        self.surface.setScreen(screen)
+        self.surface.resize(screen.size())
+
+    def mode_changed(self, mode: str) -> None:
+        self.lock_action.blockSignals(True)
+        self.lock_action.setChecked(mode == "lock")
+        self.lock_action.blockSignals(False)
+        self.edit_action.blockSignals(True)
+        self.edit_action.setChecked(mode == "edit")
+        self.edit_action.blockSignals(False)
+        if mode == "edit" and self.surface is not None and not self.surface.isVisible():
+            self.surface.show()
 
     # ------------------------------------------------------------ Fenster
     def _window(self, label: str, view: str) -> A2Window:
@@ -236,21 +455,36 @@ class Overlay(QObject):
             self.store.setValue(f"geometry/{w.label}", w.saveGeometry())
 
     def tool(self, label: str, view: str) -> A2Window:
-        w = self.windows.get(label) or self._window(label, view)
-        return w
+        return self.windows.get(label) or self._window(label, view)
 
     def reveal(self, w: A2Window) -> None:
         w.show()
         w.raise_()
         w.activateWindow()
 
-    def toggle(self) -> None:
-        if self.main.isVisible():
-            self.hide_all()
-        else:
+    def visible(self) -> bool:
+        if self.surface is not None:
+            return self.surface.isVisible()
+        return bool(self.main and self.main.isVisible())
+
+    def show_main(self) -> None:
+        if self.surface is not None:
+            self.layer.apply_input()
+            self.surface.show()
+        elif self.main:
             self.reveal(self.main)
 
+    def toggle(self) -> None:
+        if self.visible():
+            self.hide_all()
+        else:
+            self.show_main()
+
     def hide_all(self) -> None:
+        if self.surface is not None:
+            if self.layer.mode == "edit":
+                self.layer.finishEdit()
+            self.surface.hide()
         for w in list(self.windows.values()):
             if w.isVisible():
                 self.remember(w)
@@ -280,9 +514,18 @@ class Overlay(QObject):
             g = screens[index].availableGeometry()
             w.move(g.center() - QPoint(w.width() // 2, w.height() // 2))
 
-    # ------------------------------------------------------------ Fenster-Commands der Seite
-    def command(self, w: A2Window, cmd: str, a: dict):
-        handle = w.windowHandle()
+    # ------------------------------------------------------------ Fenster-Commands der Seiten
+    def call_json(self, w: A2Window | None, cmd: str, args_json: str) -> str:
+        try:
+            args = json.loads(args_json or "{}")
+            return json.dumps({"result": self.command(w, cmd, args)})
+        except Exception as e:  # noqa: BLE001 – die Seite bekommt den Fehler als Reject
+            return json.dumps({"error": str(e)})
+
+    def command(self, w: A2Window | None, cmd: str, a: dict):
+        """w = Meter-Fenster der Oberfläche, None = Meter in der layer-shell-Fläche (Seite übernimmt
+        dort Ziehen, Größe und Sperre selbst und reicht nur den Rest durch)."""
+        handle = w.windowHandle() if w else None
         match cmd:
             case "start_drag":
                 if handle and not w.locked:
@@ -294,30 +537,35 @@ class Overlay(QObject):
                 if handle and a.get("direction") in EDGES:
                     handle.startSystemResize(EDGES[a["direction"]])
             case "begin_tool_resize":
-                w.setMinimumSize(int(a.get("minWidth") or 0), int(a.get("minHeight") or 0))
+                if w:
+                    w.setMinimumSize(int(a.get("minWidth") or 0), int(a.get("minHeight") or 0))
             case "begin_window_resize":
                 return False
             case "finish_window_resize":
                 return True
             case "resize_window":
-                if w.label == "main":
+                if w and w.label == "main":
                     # CSS-Pixel = logische Pixel in Qt; obere linke Ecke bleibt stehen
                     w.setFixedSize(max(1, math.ceil(float(a.get("width") or 1))), max(1, math.ceil(float(a.get("height") or 1))))
                     QTimer.singleShot(0, w.apply_lock)
             case "overlay_lock_supported":
-                return self.shape.ok
+                return self.shape.ok or self.layer is not None
             case "set_overlay_locked":
-                w.locked = bool(a.get("locked"))
-                self.lock_action.setChecked(w.locked)
-                w.apply_lock()
+                if w:
+                    w.locked = bool(a.get("locked"))
+                    self.lock_action.setChecked(w.locked)
+                    w.apply_lock()
             case "set_lock_button_rect":
-                w.lock_rect = QRect(math.floor(float(a.get("x") or 0)), math.floor(float(a.get("y") or 0)),
-                                    math.ceil(float(a.get("width") or 0)), math.ceil(float(a.get("height") or 0)))
-                w.apply_lock()
+                if w:
+                    w.lock_rect = QRect(math.floor(float(a.get("x") or 0)), math.floor(float(a.get("y") or 0)),
+                                        math.ceil(float(a.get("width") or 0)), math.ceil(float(a.get("height") or 0)))
+                    w.apply_lock()
             case "main_window_ready" | "window_show":
-                w.show()
+                if w:
+                    w.show()
             case "tool_window_ready" | "window_focus":
-                self.reveal(w)
+                if w:
+                    self.reveal(w)
                 return True
             case "details_window_ready":
                 pass
@@ -333,7 +581,7 @@ class Overlay(QObject):
             case "request_details_view":
                 self.request_details(a.get("payload") or {})
             case "take_pending_details_request":
-                return self.pending.pop(w.label, None)
+                return self.pending.pop(w.label, None) if w else None
             case "open_details_window":
                 d = self.tool("details", "details")
                 self.on_screen(d, int(a.get("monitorIndex") or 0))
@@ -342,7 +590,8 @@ class Overlay(QObject):
                 if d := self.windows.get("details"):
                     d.close()
             case "close_tool_window":
-                w.close()
+                if w:
+                    w.close()
             case "list_monitors":
                 return self.monitors()
             case "open_url":
@@ -372,28 +621,43 @@ class Overlay(QObject):
                         "scaleFactor": dpr, "isPrimary": s is primary, "side": side})
         return out
 
-    def screenshot(self, w: A2Window, a: dict) -> dict:
-        rect = QRect(int(a.get("x") or 0), int(a.get("y") or 0), int(a.get("width") or w.width()), int(a.get("height") or w.height()))
-        pix = w.grab(rect)
-        QApplication.clipboard().setPixmap(pix)
+    def screenshot(self, w: A2Window | None, a: dict) -> dict:
+        if w is None and self.surface is not None:
+            img = self.surface.grabWindow()
+            dpr = img.devicePixelRatio() or 1
+            rect = QRect(round(float(a.get("x") or 0) * dpr), round(float(a.get("y") or 0) * dpr),
+                         round(float(a.get("width") or 1) * dpr), round(float(a.get("height") or 1) * dpr))
+            img = img.copy(rect)
+            QApplication.clipboard().setImage(img)
+            save = img.save
+        else:
+            rect = QRect(int(a.get("x") or 0), int(a.get("y") or 0), int(a.get("width") or w.width()), int(a.get("height") or w.height()))
+            pix = w.grab(rect)
+            QApplication.clipboard().setPixmap(pix)
+            save = pix.save
         path = None
         if a.get("saveFile") and a.get("folder"):
             name = re.sub(r"[/\\\0]", "_", str(a.get("filename") or "a2tools.png"))
             path = str(Path(str(a["folder"])).expanduser() / name)
-            pix.save(path, "PNG")
+            save(path, "PNG")
         return {"clipboard": True, "file": path}
 
     # ------------------------------------------------------------ Tray und Befehle
     def _tray(self) -> None:
         menu = QMenu()
-        menu.addAction("Meter zeigen/verbergen", self.toggle)
-        menu.addAction("Details", lambda: self.request_details({"kind": "all"}))
-        menu.addAction("Verlauf", lambda: self.request_details({"kind": "history"}))
-        menu.addAction("Einstellungen", lambda: self.command(self.main, "open_settings_window", {}))
-        menu.addSeparator()
+        menu.addAction("Overlay zeigen/verbergen", self.toggle)
+        self.edit_action = QAction("Bearbeiten (Widgets verschieben)", menu, checkable=True)
+        self.edit_action.toggled.connect(self._edit_from_tray)
+        menu.addAction(self.edit_action)
         self.lock_action = QAction("Durchklicken (gesperrt)", menu, checkable=True)
         self.lock_action.toggled.connect(self._lock_from_tray)
         menu.addAction(self.lock_action)
+        menu.addSeparator()
+        menu.addAction("Details", lambda: self.request_details({"kind": "all"}))
+        menu.addAction("Verlauf", lambda: self.request_details({"kind": "history"}))
+        menu.addAction("Meter-Einstellungen", lambda: self.command(self.main, "open_settings_window", {}))
+        menu.addAction("DeckBar-Einstellungen öffnen …", lambda: QDesktopServices.openUrl(
+            QUrl(f"http://localhost:{daemon_port()}/#/aion2.overlay")))
         menu.addSeparator()
         self.update_action = menu.addAction("Keine Updates", self.run_update)
         self.update_action.setEnabled(False)
@@ -401,8 +665,9 @@ class Overlay(QObject):
         menu.addSeparator()
         menu.addAction("Beenden", self.app.quit)
         menu.aboutToShow.connect(lambda: self.api("GET", "/api/updates", self.on_updates))
+        self.edit_action.setVisible(self.backend == "layer")
         self.tray = QSystemTrayIcon(self.icon, self)
-        self.tray.setToolTip("DeckBar DPS-Meter")
+        self.tray.setToolTip("DeckBar Overlay")
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda r: self.toggle() if r == QSystemTrayIcon.Trigger else None)
         self.tray.messageClicked.connect(self.run_update)
@@ -437,7 +702,7 @@ class Overlay(QObject):
 
     def on_updates(self, u: dict) -> None:
         if "error" in u and "available" not in u:
-            return  # Daemon nicht erreichbar: alten Stand behalten
+            return  # Daemon nicht erreichbar oder Modul aus: alten Stand behalten
         self.updates = u
         parts = []
         d, a = u.get("deckbar") or {}, u.get("a2tools") or {}
@@ -454,7 +719,7 @@ class Overlay(QObject):
         else:
             self.update_action.setText("Keine Updates" + (" (Prüfung fehlgeschlagen)" if u.get("error") else ""))
             self.update_action.setEnabled(False)
-        self.tray.setToolTip("DeckBar DPS-Meter" + (f"\nUpdate verfügbar: {', '.join(parts)}" if u.get("available") else ""))
+        self.tray.setToolTip("DeckBar Overlay" + (f"\nUpdate verfügbar: {', '.join(parts)}" if u.get("available") else ""))
         # Einmal je neuem Stand melden
         key = f"{d.get('latest') if d.get('behind') else ''}|{a.get('latest') if a.get('newer') else ''}"
         if u.get("available") and self.store.value("notifiedUpdate") != key:
@@ -471,8 +736,15 @@ class Overlay(QObject):
         self.api("POST", "/api/updates/run", lambda r: r.get("error") and self.tray.showMessage(
             "DeckBar-Update", f"Ging nicht: {r['error']}", QSystemTrayIcon.Warning, 10000))
 
+    def _edit_from_tray(self, on: bool) -> None:
+        if self.layer is not None and on != (self.layer.mode == "edit"):
+            self.run("edit")
+
     def _lock_from_tray(self, on: bool) -> None:
-        if self.main.locked != on:
+        if self.layer is not None:
+            self.layer.set_mode("lock" if on else "click")
+            return
+        if self.main and self.main.locked != on:
             # Über die Seite, damit Schloss-Knopf und Einstellung mitziehen
             self.main.page().runJavaScript(
                 f"window.javaBridge?.setSetting?.('dpsMeter.overlayLocked', '{str(on).lower()}');"
@@ -485,9 +757,28 @@ class Overlay(QObject):
             case "toggle":
                 self.toggle()
             case "show":
-                self.reveal(self.main)
+                self.show_main()
             case "hide":
                 self.hide_all()
+            case "edit":
+                if self.layer is not None:
+                    if self.layer.mode == "edit":
+                        self.layer.finishEdit()
+                    else:
+                        self.show_main()
+                        self.layer.set_mode("edit")
+            case "lock" | "click":
+                if self.layer is not None:
+                    self.layer.set_mode(cmd)
+                else:
+                    self._lock_from_tray(cmd == "lock")
+            case "reload":
+                if self.surface is not None:
+                    view = self.surface.findChild(QObject, "view")
+                    if view is not None:
+                        view.reload()
+                elif self.main:
+                    self.main.reload()
             case "details":
                 self.request_details({"kind": "all"})
             case "history":
@@ -499,14 +790,16 @@ class Overlay(QObject):
 
 
 def ensure_kwin_rule() -> None:
-    """Meter-Fenster über dem Vollbild-Spiel: KWin-Regel Ebene „Overlay“ (wie beim A2Tools-Meter).
-    Nur einmal anlegen; was der Nutzer danach ändert oder löscht, bleibt so."""
+    """Legacy: Meter-Fenster über dem Vollbild-Spiel per KWin-Regel Ebene „Overlay“ (wie beim
+    A2Tools-Meter). Nur einmal anlegen; was der Nutzer danach ändert oder löscht, bleibt so."""
     store = QSettings("deckbar", "overlay")
-    if store.value("kwinRuleAdded") == "true" or not shutil_which("kwriteconfig6"):
+    if store.value("kwinRuleAdded") == "true" or not shutil.which("kwriteconfig6"):
         return
     group = "deckbar-overlay"
+
     def kw(key: str, value: str, grp: str = group) -> None:
         subprocess.run(["kwriteconfig6", "--file", "kwinrulesrc", "--group", grp, "--key", key, value], check=False)
+
     rules = subprocess.run(["kreadconfig6", "--file", "kwinrulesrc", "--group", "General", "--key", "rules"],
                            capture_output=True, text=True).stdout.strip()
     names = [r for r in rules.split(",") if r]
@@ -526,14 +819,22 @@ def ensure_kwin_rule() -> None:
     store.setValue("kwinRuleAdded", "true")
 
 
-def shutil_which(name: str) -> bool:
-    import shutil
-    return shutil.which(name) is not None
+def kde_primary() -> str:
+    """Hauptmonitor laut KDE (Priorität 1). Qt meldet unter Wayland oft einfach den ersten Ausgang."""
+    if not shutil.which("kscreen-doctor"):
+        return ""
+    try:
+        out = subprocess.run(["kscreen-doctor", "-j"], capture_output=True, text=True, timeout=3).stdout
+        outputs = [o for o in json.loads(out).get("outputs", []) if o.get("enabled")]
+        best = min(outputs, key=lambda o: o.get("priority") or 99)
+        return str(best.get("name") or "")
+    except (OSError, ValueError, subprocess.SubprocessError, AttributeError):
+        return ""
 
 
 def send_to_running(cmd: str) -> bool:
     sock = QLocalSocket()
-    sock.connectToServer(APP)
+    sock.connectToServer(socket_path())
     if not sock.waitForConnected(500):
         return False
     sock.write(cmd.encode() + b"\n")
@@ -543,11 +844,14 @@ def send_to_running(cmd: str) -> bool:
 
 
 def main() -> int:
-    args = [a.removeprefix("--") for a in sys.argv[1:]]
-    cmd = next((a for a in args if a in COMMANDS), None)
+    args = _ARGS
     if any(a in ("h", "help", "-h") for a in args):
         print(__doc__)
         return 0
+    cmd = next((a for a in args if a in COMMANDS), None)
+    if BACKEND == "layer":
+        from PySide6.QtWebEngineQuick import QtWebEngineQuick
+        QtWebEngineQuick.initialize()
     QGuiApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QApplication([sys.argv[0], "-name", APP])
     app.setApplicationName(APP)
@@ -557,17 +861,25 @@ def main() -> int:
         return 0  # läuft schon: Befehl weitergegeben
     if cmd == "quit":
         return 0
-    QLocalServer.removeServer(APP)
+    path = socket_path()
+    QLocalServer.removeServer(path)
     server = QLocalServer()
-    server.listen(APP)
-    overlay = Overlay(app)
+    server.setSocketOptions(QLocalServer.UserAccessOption)
+    if not server.listen(path):
+        print(f"Socket {path}: {server.errorString()}", file=sys.stderr)
+    try:
+        overlay = Overlay(app, BACKEND)
+    except RuntimeError as e:
+        print(f"{e} – starte das alte Meter-Fenster: deckbar-overlay --legacy", file=sys.stderr)
+        return 1
+    print(f"DeckBar-Overlay läuft ({'layer-shell' if BACKEND == 'layer' else 'Legacy-Fenster'})", flush=True)
 
     def incoming() -> None:
         conn = server.nextPendingConnection()
         conn.readyRead.connect(lambda: [overlay.run(line.strip()) for line in bytes(conn.readAll()).decode().splitlines()])
 
     server.newConnection.connect(incoming)
-    if cmd and cmd != "hide":
+    if cmd and cmd not in ("hide",):
         QTimer.singleShot(300, lambda: overlay.run(cmd))
     autosave = QTimer()
     autosave.timeout.connect(lambda: [overlay.remember(w) for w in overlay.windows.values() if w.isVisible()])

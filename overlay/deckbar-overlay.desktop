@@ -1,8 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=DeckBar DPS-Meter
-Comment=Overlay zeigen/verbergen (Oberfläche des A2Tools DPS Meter)
+Name=DeckBar Overlay ein/aus
+Comment=Overlay über dem Spiel zeigen oder verbergen
 Exec=deckbar-overlay --toggle
 Icon=utilities-system-monitor
 Categories=Game;Utility;
-NoDisplay=false

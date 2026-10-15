@@ -1,6 +1,6 @@
 [Unit]
-Description=DeckBar-Overlay (AION-2-DPS-Meter am PC, Tray)
-Documentation=file://%h/Github/deckbar/README.md
+Description=DeckBar-Overlay (Meter und Widgets über dem Spiel, Tray)
+Documentation=https://github.com/gamunex/deckbar
 PartOf=graphical-session.target
 After=graphical-session.target deckbar.service
 
