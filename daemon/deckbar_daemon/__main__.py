@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import signal
 import sys
 import webbrowser
@@ -13,51 +14,41 @@ from aiohttp import web
 from pydantic import ValidationError
 
 from .config import config_dir, load_settings
-from .mdns import Announcer
 from .a2ui import A2Ui
 from .server import DeckBar, build_app, local_only
-from .usb import UsbBridge
 
 log = logging.getLogger("deckbar")
 
 
-async def serve(args: argparse.Namespace) -> None:
+async def serve(args: argparse.Namespace) -> DeckBar:
     cdir = args.config_dir or config_dir()
     settings = load_settings(cdir)
-    deck = DeckBar(settings, cdir)
+    deck = DeckBar(settings, cdir, mdns=not args.no_mdns)
     app = build_app(deck)
 
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     await web.TCPSite(runner, settings.host, settings.port).start()
     url = f"http://localhost:{settings.port}/"
-    # Oberfläche des A2Tools-Meters fürs Overlay, eigener Port wegen ihrer absoluten Pfade
+    # Overlay-Seite und Oberfläche des A2Tools-Meters, eigener Port wegen ihrer absoluten Pfade
     a2 = A2Ui(deck.dps.capture, cdir / "a2-settings.json")
-    a2_runner = web.AppRunner(a2.app(local_only), access_log=None)
+
+    @web.middleware
+    async def overlay_on(request: web.Request, handler):
+        if not deck.modules.on("aion2.overlay"):
+            raise web.HTTPServiceUnavailable(text="Modul Overlay ist ausgeschaltet.")
+        return await handler(request)
+
+    a2_runner = web.AppRunner(a2.app(local_only, overlay_on, routes=deck.overlay.add_routes), access_log=None)
     await a2_runner.setup()
     try:
         await web.TCPSite(a2_runner, "127.0.0.1", settings.port + 1).start()
     except OSError as e:
         log.warning("Overlay-Oberfläche nicht verfügbar (Port %d): %s", settings.port + 1, e)
-    log.info("DeckBar-Daemon läuft auf %s:%d – Konfiguration: %s", settings.host, settings.port, url)
+    log.info("DeckBar-Daemon läuft auf %s:%d – Web-UI: %s", settings.host, settings.port, url)
 
-    tasks = [
-        asyncio.ensure_future(deck.audio.watch()),
-        asyncio.ensure_future(deck.media.watch()),
-        asyncio.ensure_future(deck.watch_layout_file()),
-        asyncio.ensure_future(deck.watch_background()),
-        asyncio.ensure_future(deck.dps.watch()),
-        asyncio.ensure_future(deck.runs.watch()),
-        asyncio.ensure_future(deck.updates.watch()) if settings.update_check else None,
-        asyncio.ensure_future(UsbBridge(settings.usb, f"ws://127.0.0.1:{settings.port}/ws").watch()),
-    ]
-    announcer = Announcer(settings.name, settings.port) if settings.mdns and not args.no_mdns else None
-    if announcer:
-        try:
-            await announcer.start()
-        except OSError as e:
-            log.warning("mDNS nicht verfügbar: %s", e)
-            announcer = None
+    await deck.modules.start()
+    log.info("Module: %s", ", ".join(sorted(deck.modules.enabled)) or "keine")
     if args.open or settings.open_browser:
         webbrowser.open(url)
 
@@ -67,14 +58,11 @@ async def serve(args: argparse.Namespace) -> None:
         loop.add_signal_handler(sig, stop.set)
     await stop.wait()
 
-    log.info("beende …")
-    for t in tasks:
-        if t:
-            t.cancel()
-    if announcer:
-        await announcer.stop()
+    log.info("starte neu …" if deck.restart_requested else "beende …")
+    await deck.modules.stop_all()
     await a2_runner.cleanup()
     await runner.cleanup()
+    return deck
 
 
 def main() -> int:
@@ -91,10 +79,15 @@ def main() -> int:
     )
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
     try:
-        asyncio.run(serve(args))
+        deck = asyncio.run(serve(args))
     except ValidationError as e:
         print(f"Konfiguration ungültig:\n{e}", file=sys.stderr)
         return 2
+    if deck.restart_requested:
+        # Neustart aus der Web-UI: dasselbe Programm mit denselben Argumenten (auch ohne systemd)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.execv(sys.executable, [sys.executable, "-m", "deckbar_daemon", *sys.argv[1:]])
     return 0
 
 

@@ -98,8 +98,10 @@ antwortet sofort mit dem aktuellen Cover und schickt danach jedes neue Cover una
 
 ### `error`
 
-`{"v":1,"type":"error","code":"auth"|"version"|"bad_request","message":"…"}`.
-Bei `auth` und `version` schließt der Daemon danach die Verbindung.
+`{"v":1,"type":"error","code":"auth"|"version"|"bad_request"|"disabled","message":"…"}`.
+Bei `auth` und `version` schließt der Daemon danach die Verbindung, ebenso bei `disabled`
+(Modul „Touch-Leiste“ in der Web-UI ausgeschaltet, Schließcode 4003). Das Gerät versucht es
+danach wie gewohnt in Abständen erneut.
 
 ### `layout`
 

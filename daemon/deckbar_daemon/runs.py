@@ -171,6 +171,18 @@ def dungeon_name(dungeon: int) -> str:
     return f"{name} ({diff})" if diff else name
 
 
+def dungeon_parts_en(dungeon: int) -> tuple[str, str | None]:
+    """Englischer Name und Schwierigkeit („Hard“) – sprachunabhängig, für Weitergaben an andere
+    Programme (bot.py), damit Meldungen verschiedener Spieler zusammenpassen."""
+    entry = _i18n("dungeons/en.json").get(str(dungeon)) or {}
+    diff = {"normal": "Normal", "exploration": "Exploration", "hard": "Hard"}.get(entry.get("difficulty"))
+    return entry.get("name") or f"Dungeon {dungeon}", diff
+
+
+def boss_name_en(mob: int, fallback: str = "") -> str:
+    return (_i18n("npcs/en.json").get(str(mob)) or {}).get("name") or fallback or f"Boss {mob}"
+
+
 @dataclass
 class Player:
     name: str
@@ -737,6 +749,8 @@ class DungeonRuns:
         self.last: Run | None = None  # zuletzt beendeter Run (Vorschau, Testpost)
         self.result = ""  # letzter Post: Erfolg oder Fehler, für die Web-UI
         self.listeners: list[Callable[[], Awaitable[None]]] = []
+        # Jeder beendete Run mit besiegtem Boss, Namen schon aufgelöst (z. B. Discord-Bot, bot.py)
+        self.run_listeners: list[Callable[[Run], Awaitable[None]]] = []
         self._ready = False
         # Wo die History liegt, hängt an der DPS-Quelle (server.py setzt das)
         self.history_dir: Callable[[], Path] = lambda: a2tools_dir() / "history"
@@ -927,6 +941,12 @@ class DungeonRuns:
             return
         if self.settings.enabled and self.settings.webhook:
             await self.post(session, run)
+        run.rename(self.names())
+        for fn in self.run_listeners:
+            try:
+                await fn(run)
+            except Exception:  # ein Zuhörer (Netz) darf das Auswerten nicht anhalten
+                log.exception("Run-Zuhörer")
         await self._notify()
 
     async def post(self, session: aiohttp.ClientSession, run: Run) -> bool:

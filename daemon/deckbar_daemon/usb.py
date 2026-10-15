@@ -123,13 +123,22 @@ class UsbBridge:
         except ImportError:
             log.warning("USB: pyserial fehlt, nur WLAN möglich")
             return
-        while True:
-            present = set(self._candidates())
-            self.rejected &= present  # abgesteckt = beim nächsten Einstecken neu prüfen
-            for path in present - self.busy - self.rejected:
-                self.busy.add(path)
-                asyncio.ensure_future(self._handle(path))
-            await asyncio.sleep(SCAN_S)
+        handlers: set[asyncio.Task] = set()
+        try:
+            while True:
+                present = set(self._candidates())
+                self.rejected &= present  # abgesteckt = beim nächsten Einstecken neu prüfen
+                for path in present - self.busy - self.rejected:
+                    self.busy.add(path)
+                    t = asyncio.ensure_future(self._handle(path))
+                    handlers.add(t)
+                    t.add_done_callback(handlers.discard)
+                await asyncio.sleep(SCAN_S)
+        finally:
+            # Modul aus / Daemon beendet: offene Ports schließen, nicht weiterlaufen lassen
+            for t in list(handlers):
+                t.cancel()
+            await asyncio.gather(*handlers, return_exceptions=True)
 
     async def _handle(self, path: str) -> None:
         loop = asyncio.get_running_loop()

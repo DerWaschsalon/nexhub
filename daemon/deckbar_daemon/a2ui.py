@@ -32,9 +32,17 @@ A2_ROOT = Path(__file__).resolve().parents[2] / "capture" / "a2tools"
 SHIM = Path(__file__).resolve().parent / "web" / "a2shim.js"
 SHIM_URL = "/__deckbar__/a2shim.js"
 QUEUE_MAX = 64  # Ereignisse je Client; ein hängender Client verliert lieber alte dps-update
-APP_VERSION = "2.0.64"  # Stand des Submoduls, zeigt die Oberfläche an
+
 # Nicht aus den Einstellungen des A2Tools-Meters übernehmen: Geheimnisse, Fensterlagen, Online-Kram
 NO_IMPORT = re.compile(r"(?i)key|token|secret|account|^window\.|streamOverlay|autoUpload|discord|kwinRule|plugin")
+
+
+def app_version(root: Path = A2_ROOT) -> str:
+    """Version des Submoduls (tauri.conf.json), zeigt die Oberfläche an."""
+    try:
+        return str(json.loads((root / "src-tauri" / "tauri.conf.json").read_text())["version"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return "?"
 
 
 def resolve(rel: str, root: Path = A2_ROOT) -> Path | None:
@@ -213,7 +221,7 @@ class A2Ui:
             case "build_features":
                 return {"online": False}
             case "get_app_version":
-                return APP_VERSION
+                return app_version()
             case "get_settings":
                 return self.settings
             case "update_settings":
@@ -313,8 +321,11 @@ class A2Ui:
             case _:
                 raise RuntimeError(f"{cmd}: in der DeckBar nicht verfügbar")
 
-    def app(self, middleware) -> web.Application:
-        app = web.Application(middlewares=[middleware], client_max_size=4 * 1024 * 1024)
+    def app(self, *middlewares, routes=None) -> web.Application:
+        """routes: weitere Routen (Overlay-Seite), vor der Auslieferung der Meter-Dateien."""
+        app = web.Application(middlewares=list(middlewares), client_max_size=4 * 1024 * 1024)
+        if routes:
+            routes(app)
         app.router.add_get("/api/a2/events", self.events)
         app.router.add_post("/api/a2/invoke", self.invoke)
         app.router.add_get("/{tail:.*}", self.static)

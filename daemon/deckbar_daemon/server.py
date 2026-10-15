@@ -5,6 +5,7 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from importlib import resources
@@ -20,19 +21,27 @@ from .actions import Executor
 from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, chunks
 from .background import UPLOAD_MAX, Background, save_upload
+from .bot import DiscordBot
 from .capture import history_root
 from .audio import Audio
-from .config import Layout, Page, Settings, load_layout, save_layout
-from .dps import DpsFeed, DpsSettings
+from .config import Layout, Page, Settings, load_layout, save_layout, save_settings
+from .config import config_dir as default_config_dir
+from .dps import STATUS_TEXT, DpsFeed, DpsSettings
+from .mdns import Announcer
+from .modules import ModuleManager
+from .overlay import UNIT as OVERLAY_UNIT, Overlay
 from .updates import Updates
 from .runs import DungeonRuns, RunSettings, a2tools_dir, render_run
 from .media import Media
 from .proc import have
 from .state import State
+from .usb import UsbBridge
 
 log = logging.getLogger(__name__)
 
 PROTO_V = 1
+# Einstellungen, die erst nach einem Neustart des Daemons wirken
+RESTART_FIELDS = ("host", "port", "token", "mdns", "usb", "heartbeat")
 BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url", "dps", "dps_active")
 # nur für Daemon/Web-UI; das Gerät bekommt das Cover als Bild per `art`
 DEVICE_HIDDEN_KEYS = {"art_url"}
@@ -78,8 +87,11 @@ def _validation_text(e: ValidationError) -> str:
 
 
 class DeckBar:
-    def __init__(self, settings: Settings, config_dir: Path) -> None:
+    def __init__(self, settings: Settings, config_dir: Path, mdns: bool = True) -> None:
         self.settings = settings
+        self.config_dir = config_dir
+        self.mdns = mdns and settings.mdns
+        self.restart_requested = False
         self.layout_path = config_dir / "layout.yaml"
         self.upload_dir = config_dir / "backgrounds"
         self.layout_error: str | None = None
@@ -105,9 +117,110 @@ class DeckBar:
         self.runs.listeners.append(self._runs_changed)
         self.updates = Updates()
         self.updates.listeners.append(self._updates_changed)
+        self.bot = DiscordBot(config_dir)
+        self.bot.listeners.append(self._bot_changed)
+        self.dps.fight_listeners.append(self.bot.on_fight)
+        self.runs.run_listeners.append(self.bot.on_run)
+        # Nur der Daemon mit der echten Konfiguration steuert den Overlay-Dienst (nicht Testinstanzen)
+        self.real_config = config_dir.resolve() == default_config_dir().resolve()
+        self.overlay = Overlay(config_dir, manage_unit=self.real_config)
+        self.overlay.listeners.append(self._overlay_changed)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
+        self.modules = ModuleManager(config_dir, self._initial_modules)
+        self.modules.listeners.append(self._modules_changed)
+        self._register_modules()
+
+    # ---------------------------------------------------------------- Module
+    def _initial_modules(self) -> set[str]:
+        """Erster Start mit Modulen: was bisher eingerichtet war, bleibt an (Umstieg ohne Überraschung)."""
+        c = self.config_dir
+        ids = {"deck"}
+        if self.settings.update_check:
+            ids.add("updates")
+        if (c / "dps.yaml").exists() and self.dps.settings.enabled:
+            ids.add("aion2.dps")
+        if (c / "runs.yaml").exists():
+            ids.add("aion2.runs")
+        if (c / "bot.yaml").exists():
+            ids.add("discord.bot")
+        unit = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / OVERLAY_UNIT
+        if self.real_config and unit.exists():
+            ids.add("aion2.overlay")
+        return ids
+
+    def _register_modules(self) -> None:
+        m = self.modules
+        usb_url = f"ws://127.0.0.1:{self.settings.port}/ws"
+        m.register("deck", self.audio.watch, self.media.watch, self.watch_layout_file, self.watch_background,
+                   UsbBridge(self.settings.usb, usb_url).watch, self._announce,
+                   hook=self._deck_toggled, status=self._deck_status)
+        m.register("aion2.dps", self.dps.watch, hook=self._dps_toggled, status=self._dps_status)
+        m.register("aion2.runs", self.runs.watch, status=self._runs_status)
+        m.register("aion2.overlay", self.overlay.watch, hook=self.overlay.on_module, status=self._overlay_status)
+        m.register("discord.bot", hook=self._bot_toggled, status=self._bot_status)
+        m.register("updates", self.updates.watch, status=self._updates_status)
+
+    async def _announce(self) -> None:
+        """mDNS-Anzeige für Geräte, solange die Touch-Leiste an ist."""
+        if not self.mdns:
+            return
+        announcer = Announcer(self.settings.name, self.settings.port)
+        try:
+            await announcer.start()
+        except OSError as e:
+            log.warning("mDNS nicht verfügbar: %s", e)
+            return
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await announcer.stop()
+
+    async def _deck_toggled(self, on: bool) -> None:
+        if not on:
+            for dev in list(self.devices):
+                await dev.ws.close(code=4003, message=b"module off")
+
+    async def _dps_toggled(self, on: bool) -> None:
+        if on and not self.dps.settings.enabled:
+            self.dps.save(self.dps.settings.model_copy(update={"enabled": True}))
+        if not on:
+            self.dps.status, self.dps.detail = "off", ""
+            self.state.update(dps=None, dps_active=False)
+            await self._dps_changed()
+
+    async def _bot_toggled(self, on: bool) -> None:
+        self.bot.enabled = on
+        if not on:
+            await self.bot.close()
+
+    def _deck_status(self) -> dict:
+        return {"devices": len(self.devices), "pages": len(self.layout.pages),
+                "items": sum(len(p.items) for p in self.layout.pages), "error": bool(self.layout_error)}
+
+    def _dps_status(self) -> dict:
+        top = (self.state.values.get("dps") or {}).get("rows") or []
+        return {"status": self.dps.status, "text": STATUS_TEXT[self.dps.status], "active": bool(self.state.values.get("dps_active")),
+                "target": (self.state.values.get("dps") or {}).get("target"), "top": top[:3]}
+
+    def _runs_status(self) -> dict:
+        r = self.runs
+        return {"open_run": bool(r.tracker.run), "posting": bool(r.settings.enabled and r.settings.webhook),
+                "last": {"name": r.last.name, "end": r.last.end_ms, "kills": r.last.kills} if r.last else None,
+                "result": r.result}
+
+    def _overlay_status(self) -> dict:
+        return {"unit": self.overlay.unit, "clients": len(self.overlay.clients)}
+
+    def _bot_status(self) -> dict:
+        s = self.bot.settings
+        return {"dps": bool(s.dps_enabled and s.dps_url), "runs": bool(s.runs_enabled and s.runs_url and s.runs_token),
+                "result": self.bot.result}
+
+    def _updates_status(self) -> dict:
+        u = self.updates.state
+        return {"available": u.get("available"), "checked_at": u.get("checked_at"), "error": u.get("error")}
 
     def _history_dir(self) -> Path:
         if self.dps.settings.source == "capture":
@@ -133,6 +246,7 @@ class DeckBar:
     async def _on_state(self, diff: dict) -> None:
         if diff.get("dps"):
             self.runs.observe(diff["dps"])
+        await self.overlay.on_state(diff)
         if "art_url" in diff:
             asyncio.ensure_future(self._update_art(diff["art_url"]))
         dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS}
@@ -191,6 +305,15 @@ class DeckBar:
 
     async def _runs_changed(self) -> None:
         await self._broadcast_ui({"type": "runs", "runs": self.runs.info()})
+
+    async def _bot_changed(self) -> None:
+        await self._broadcast_ui({"type": "bot", "bot": self.bot.info()})
+
+    async def _overlay_changed(self) -> None:
+        await self._broadcast_ui({"type": "overlay", "overlay": self.overlay.info()})
+
+    async def _modules_changed(self) -> None:
+        await self._broadcast_ui({"type": "modules", "modules": self.modules.info()})
 
     async def _on_combat(self, active: bool) -> None:
         """Kampfbeginn: auf die DPS-Seite wechseln; Kampfende: zurück, wenn dort noch."""
@@ -270,6 +393,10 @@ class DeckBar:
     async def ws_device(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(max_msg_size=MAX_MSG, heartbeat=None)
         await ws.prepare(request)
+        if not self.modules.on("deck"):
+            await self._send(ws, _msg("error", code="disabled", message="Modul Touch-Leiste ist ausgeschaltet"))
+            await ws.close(code=4003, message=b"module off")
+            return ws
         dev = Device(ws=ws, remote=request.remote or "?")
         hb = self.settings.heartbeat
 
@@ -381,6 +508,10 @@ class DeckBar:
             "dps": self.dps.info(),
             "runs": self.runs.info(),
             "updates": self.updates.info(),
+            "modules": self.modules.info(),
+            "bot": self.bot.info(),
+            "overlay": self.overlay.info(),
+            "settings": self.settings_info(),
         }, ensure_ascii=False))
         try:
             async for m in ws:
@@ -553,6 +684,139 @@ class DeckBar:
         log.info("Hintergrund hochgeladen: %s", path)
         return web.json_response({"ok": True, "path": str(path)})
 
+    # ---------------------------------------------------------------- Module, Einstellungen
+    async def api_get_modules(self, request: web.Request) -> web.Response:
+        return web.json_response(self.modules.info())
+
+    async def api_put_module(self, request: web.Request) -> web.Response:
+        mid = request.match_info["id"]
+        try:
+            data = await request.json()
+            on = data["enabled"]
+            if not isinstance(on, bool):
+                raise TypeError
+        except (ValueError, KeyError, TypeError):
+            return web.json_response({"error": 'erwartet {"enabled": true|false}'}, status=400)
+        try:
+            changed = await self.modules.set(mid, on)
+        except KeyError:
+            return web.json_response({"error": f"Modul {mid} gibt es nicht"}, status=404)
+        return web.json_response({"ok": True, "changed": changed, **self.modules.info()})
+
+    def settings_info(self) -> dict:
+        s = self.settings.model_dump()
+        s["token"] = "•" * 8
+        return {"settings": s, "config_dir": str(self.config_dir), "restart_fields": list(RESTART_FIELDS)}
+
+    async def api_get_settings(self, request: web.Request) -> web.Response:
+        return web.json_response(self.settings_info())
+
+    async def api_put_settings(self, request: web.Request) -> web.Response:
+        """Allgemeine Einstellungen (config.yaml). Port, Adresse und Token wirken erst nach einem Neustart."""
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "kein JSON-Objekt"}, status=400)
+        merged = self.settings.model_dump()
+        for k, v in data.items():
+            if k == "token" and (not v or set(str(v)) == {"•"}):
+                continue
+            merged[k] = v
+        try:
+            settings = Settings.model_validate(merged)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        save_settings(self.config_dir, settings)
+        restart = [k for k in RESTART_FIELDS if getattr(settings, k) != getattr(self.settings, k)]
+        # was sofort wirken kann, gleich übernehmen
+        live = settings.model_copy(update={k: getattr(self.settings, k) for k in RESTART_FIELDS})
+        self.settings = live
+        self.media.player = live.player
+        await self._broadcast_ui({"type": "settings", "settings": self.settings_info()})
+        return web.json_response({"ok": True, "restart": restart, **self.settings_info()})
+
+    async def api_get_token(self, request: web.Request) -> web.Response:
+        """Geräte-Token im Klartext (für die Firmware-Konfiguration), nur auf ausdrückliche Anfrage."""
+        return web.json_response({"token": self.settings.token})
+
+    async def api_restart(self, request: web.Request) -> web.Response:
+        self.restart_requested = True
+        asyncio.get_running_loop().call_later(0.3, os.kill, os.getpid(), 15)  # SIGTERM → sauber beenden
+        return web.json_response({"ok": True})
+
+    # ---------------------------------------------------------------- Discord-Bot
+    async def api_get_bot(self, request: web.Request) -> web.Response:
+        return web.json_response(self.bot.info())
+
+    async def api_put_bot(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "kein JSON-Objekt"}, status=400)
+        try:
+            self.bot.update(data)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        await self._bot_changed()
+        return web.json_response({"ok": True, **self.bot.info()})
+
+    async def api_bot_test(self, request: web.Request) -> web.Response:
+        if not self.modules.on("discord.bot"):
+            return web.json_response({"error": "Modul Discord-Bot ist aus"}, status=409)
+        kind = request.match_info["kind"]
+        if kind == "dps":
+            ok, text = await self.bot.test_fight()
+        else:
+            run = await asyncio.to_thread(self.runs.latest_run)
+            ok, text = await self.bot.test_run(run)
+        if not ok:
+            return web.json_response({"error": text}, status=502 if "antwortet" in text or ":" in text else 400)
+        return web.json_response({"ok": True, "text": text, **self.bot.info()})
+
+    # ---------------------------------------------------------------- Overlay
+    async def api_get_overlay(self, request: web.Request) -> web.Response:
+        if self.modules.on("aion2.overlay"):
+            await self.overlay.refresh_unit()
+        return web.json_response(self.overlay.info())
+
+    async def api_put_overlay(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "kein JSON-Objekt"}, status=400)
+        try:
+            await self.overlay.update(data)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        return web.json_response({"ok": True, **self.overlay.info()})
+
+    async def api_overlay_command(self, request: web.Request) -> web.Response:
+        try:
+            cmd = str((await request.json())["cmd"])
+            await self.overlay.command(cmd)
+        except (ValueError, KeyError, TypeError) as e:
+            return web.json_response({"error": str(e) or "erwartet {cmd}"}, status=400)
+        except RuntimeError as e:
+            return web.json_response({"error": str(e)}, status=409)
+        return web.json_response({"ok": True})
+
+    async def api_overlay_service(self, request: web.Request) -> web.Response:
+        """Overlay-Programm neu starten (nach Änderungen an Monitor oder GPU)."""
+        if not self.modules.on("aion2.overlay"):
+            return web.json_response({"error": "Modul Overlay ist aus"}, status=409)
+        code, out = await self.overlay._systemctl("restart", OVERLAY_UNIT)
+        await self.overlay.refresh_unit()
+        await self._overlay_changed()
+        if code:
+            return web.json_response({"error": out or "Neustart ging nicht"}, status=500)
+        return web.json_response({"ok": True, **self.overlay.info()})
+
     async def index(self, request: web.Request) -> web.FileResponse:
         return web.FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -597,11 +861,24 @@ def build_app(deck: DeckBar) -> web.Application:
     app.router.add_put("/api/runs", deck.api_put_runs)
     app.router.add_get("/api/runs/preview.png", deck.api_runs_preview)
     app.router.add_post("/api/runs/test", deck.api_runs_test)
+    app.router.add_get("/api/modules", deck.api_get_modules)
+    app.router.add_put("/api/modules/{id}", deck.api_put_module)
+    app.router.add_get("/api/settings", deck.api_get_settings)
+    app.router.add_put("/api/settings", deck.api_put_settings)
+    app.router.add_post("/api/settings/token", deck.api_get_token)
+    app.router.add_post("/api/restart", deck.api_restart)
+    app.router.add_get("/api/bot", deck.api_get_bot)
+    app.router.add_put("/api/bot", deck.api_put_bot)
+    app.router.add_post("/api/bot/test/{kind:dps|runs}", deck.api_bot_test)
+    app.router.add_get("/api/overlay", deck.api_get_overlay)
+    app.router.add_put("/api/overlay", deck.api_put_overlay)
+    app.router.add_post("/api/overlay/command", deck.api_overlay_command)
+    app.router.add_post("/api/overlay/restart", deck.api_overlay_service)
     app.router.add_static("/static/", WEB_DIR)
-    app["deck"] = deck
 
     async def cleanup(_app: web.Application) -> None:
         await deck.art.close()
+        await deck.bot.close()
 
     app.on_cleanup.append(cleanup)
     return app

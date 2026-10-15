@@ -206,6 +206,13 @@ def load_settings(directory: Path) -> Settings:
     return Settings.model_validate(data)
 
 
+def save_settings(directory: Path, settings: Settings) -> None:
+    """config.yaml aus der Web-UI schreiben (Kommentare gehen verloren), bleibt nur für den Nutzer lesbar."""
+    header = "# DeckBar-Daemon – enthält das Geräte-Token, nicht committen. Wird von der Web-UI überschrieben.\n"
+    text = yaml.safe_dump(settings.model_dump(), sort_keys=False, allow_unicode=True)
+    _atomic_write(directory / "config.yaml", header + text, 0o600)
+
+
 def default_layout_text() -> str:
     return resources.files("deckbar_daemon").joinpath("default_layout.yaml").read_text()
 

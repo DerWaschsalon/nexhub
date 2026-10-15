@@ -12,9 +12,11 @@ Server-Sent Events:
      "rows":[{"name":"…","cls":"cleric","dps":18432,"dmg":1529856,"pct":31.2,"you":true}]}
 
 Daraus wird der State-Schlüssel `dps` (gekürzt, siehe `compact`) und `dps_active`
-(gerade Schaden im Kampf). Port und Schlüssel stehen in den Einstellungen des Meters
-(settings.json) und werden im Modus „auto“ von dort gelesen. Beide Quellen liefern dasselbe
-Zeilenformat, deckbar-capture baut es wie das Stream-Overlay (capture/src/view.rs).
+(gerade Schaden im Kampf). Endet ein Kampf, bekommen `fight_listeners` den letzten Stand mit
+Gruppen-Flag (`fight_view`, z. B. für den Discord-Bot in bot.py). Port und Schlüssel stehen in
+den Einstellungen des Meters (settings.json) und werden im Modus „auto“ von dort gelesen. Beide
+Quellen liefern dasselbe Zeilenformat, deckbar-capture baut es wie das Stream-Overlay
+(capture/src/view.rs).
 """
 from __future__ import annotations
 
@@ -139,11 +141,41 @@ def compact(snap: dict, limit: int = MAX_ROWS) -> dict:
     }
 
 
+def fight_view(snap: dict) -> dict:
+    """Snapshot → Endstand eines Kampfs für Weitergaben (bot.py): alle Zeilen, mit Ziel-ID, Boss und
+    Gruppen-Flag. `party` ist None, wenn die Quelle es nicht kennt (A2Tools-Stream, altes deckbar-capture)."""
+    rows = []
+    for r in snap.get("rows") or []:
+        if not isinstance(r, dict):
+            continue
+        cls = r.get("cls")
+        party = r.get("party")
+        rows.append({
+            "name": str(r.get("name") or "?")[:32],
+            "cls": cls if cls in CLASSES else None,
+            "dps": _int(r.get("dps")),
+            "dmg": _int(r.get("dmg")),
+            "you": bool(r.get("you")),
+            "party": party if isinstance(party, bool) else None,
+        })
+    hp = snap.get("hp")
+    tid = snap.get("targetId")
+    return {
+        "target": str(snap.get("target") or "")[:80],
+        "target_id": tid if isinstance(tid, int) else None,
+        "boss": bool(snap.get("boss")),
+        "time": _int(snap.get("timeMs")) // 1000,
+        "hp": round(float(hp), 1) if isinstance(hp, (int, float)) else None,
+        "rows": rows,
+    }
+
+
 def total_damage(value: dict | None) -> int:
     return sum(r["dmg"] for r in value["rows"]) if value else 0
 
 
 CombatListener = Callable[[bool], Awaitable[None]]
+FightListener = Callable[[dict], Awaitable[None]]
 
 
 class DpsFeed:
@@ -156,6 +188,10 @@ class DpsFeed:
         self.detail = ""
         self.port: int | None = None
         self.status_listeners: list[Callable[[], Awaitable[None]]] = []
+        # Kampfende: letzter Stand mit Zeilen (fight_view), z. B. für den Discord-Bot
+        self.fight_listeners: list[FightListener] = []
+        self.fight: dict | None = None
+        self._pending: set[asyncio.Task] = set()
         self._wake = asyncio.Event()
         self._last_total = 0
         self._last_change = 0.0
@@ -210,10 +246,13 @@ class DpsFeed:
         for fn in self.status_listeners:
             await fn()
 
-    async def _apply(self, value: dict | None, baseline: bool = False) -> None:
+    async def _apply(self, value: dict | None, baseline: bool = False, fight: dict | None = None) -> None:
         """Neuer Stand vom Meter; erkennt Kampfbeginn am wachsenden Gesamtschaden.
-        baseline: erster Stand nach dem Verbinden – ein alter Kampf zählt nicht als Beginn."""
+        baseline: erster Stand nach dem Verbinden – ein alter Kampf zählt nicht als Beginn.
+        fight: derselbe Stand als fight_view (alle Zeilen), wird zum Endstand des Kampfs."""
         was_active = bool(self.state.values.get("dps_active"))
+        if fight and fight["rows"] and not baseline:
+            self.fight = fight
         total = total_damage(value)
         # Schaden kam hinzu (auch: Meter hat zurückgesetzt und ein neuer Kampf läuft)
         hit = total > 0 and total != self._last_total and not baseline
@@ -222,14 +261,33 @@ class DpsFeed:
         self._last_total = total
         active = value is not None and (was_active or hit)
         self.state.update(dps=value, dps_active=active)
-        if active != was_active and self.on_combat:
-            await self.on_combat(active)
+        if active != was_active:
+            await self._combat(active)
 
     async def check_idle(self) -> None:
         if self.state.values.get("dps_active") and time.monotonic() - self._last_change >= self.idle_after:
             self.state.update(dps_active=False)
-            if self.on_combat:
-                await self.on_combat(False)
+            await self._combat(False)
+
+    async def _combat(self, active: bool) -> None:
+        if self.on_combat:
+            await self.on_combat(active)
+        if active:
+            return
+        fight, self.fight = self.fight, None
+        if fight:
+            # entkoppelt: ein langsamer Zuhörer (Netz, bis 20 s) darf den Feed nicht anhalten
+            for fn in self.fight_listeners:
+                t = asyncio.ensure_future(self._notify_fight(fn, fight))
+                self._pending.add(t)
+                t.add_done_callback(self._pending.discard)
+
+    @staticmethod
+    async def _notify_fight(fn: FightListener, fight: dict) -> None:
+        try:
+            await fn(fight)
+        except Exception:
+            log.exception("Kampfende-Zuhörer")
 
     async def _sleep(self, seconds: float) -> None:
         """Wartet, wacht aber sofort auf, wenn sich die Einstellungen ändern."""
@@ -253,7 +311,8 @@ class DpsFeed:
     # ------------------------------------------------------------ eigener Mitschnitt
     async def _on_view(self, view: dict | None, first: bool) -> None:
         if self.status == "capturing":
-            await self._apply(compact(view) if view else None, baseline=first)
+            await self._apply(compact(view) if view else None, baseline=first,
+                              fight=fight_view(view) if view else None)
 
     async def _on_capture_change(self) -> None:
         c = self.capture
@@ -283,6 +342,7 @@ class DpsFeed:
 
         idle = asyncio.ensure_future(idle_loop())
         timeout = aiohttp.ClientTimeout(total=None, connect=3, sock_read=READ_TIMEOUT_S)
+        current: list[asyncio.Task] = []  # laufender Mitschnitt/Stream, bei Abbruch mitbeenden
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 while True:
@@ -296,6 +356,7 @@ class DpsFeed:
                         self.port = None
                         job = asyncio.ensure_future(self.capture.run(self.settings.capture_bin, self.settings.lang))
                         wake = asyncio.ensure_future(self._wake.wait())
+                        current[:] = [job, wake]
                         await asyncio.wait({job, wake}, return_when=asyncio.FIRST_COMPLETED)
                         for t in (job, wake):
                             t.cancel()
@@ -317,6 +378,7 @@ class DpsFeed:
                     # Einstellungen geändert → Verbindung sofort abbrechen und neu aufbauen
                     stream = asyncio.ensure_future(self._stream(session, port, key))
                     wake = asyncio.ensure_future(self._wake.wait())
+                    current[:] = [stream, wake]
                     await asyncio.wait({stream, wake}, return_when=asyncio.FIRST_COMPLETED)
                     for t in (stream, wake):
                         t.cancel()
@@ -324,6 +386,10 @@ class DpsFeed:
                         await self._sleep(RETRY_S)
         finally:
             idle.cancel()
+            # Modul aus: auch deckbar-capture beenden (asyncio.wait bricht die inneren Tasks nicht ab)
+            for t in current:
+                t.cancel()
+            await asyncio.gather(*current, return_exceptions=True)
 
     async def _stream(self, session: aiohttp.ClientSession, port: int, key: str) -> None:
         url = f"http://127.0.0.1:{port}/overlay/events"
@@ -348,7 +414,7 @@ class DpsFeed:
                     except ValueError:
                         continue
                     if isinstance(snap, dict):
-                        await self._apply(compact(snap), baseline=first)
+                        await self._apply(compact(snap), baseline=first, fight=fight_view(snap))
                         first = False
             await self._set_status("no_meter", "Verbindung beendet")
         except aiohttp.ClientConnectorError:

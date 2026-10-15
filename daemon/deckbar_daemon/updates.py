@@ -102,7 +102,9 @@ class Updates:
             raise RuntimeError(f"git fetch: {out[:200]}")
         code, upstream = await _git("rev-parse", "--abbrev-ref", "@{upstream}", cwd=r)
         if code:
-            raise RuntimeError("Zweig ohne Upstream")
+            # lokaler Entwicklungszweig: nichts zu holen, kein Fehler
+            _, branch = await _git("rev-parse", "--abbrev-ref", "HEAD", cwd=r)
+            return {"upstream": None, "branch": branch, "behind": 0, "ahead": 0, "latest": ""}
         _, behind = await _git("rev-list", "--count", "HEAD..@{upstream}", cwd=r)
         _, ahead = await _git("rev-list", "--count", "@{upstream}..HEAD", cwd=r)
         _, subject = await _git("log", "-1", "--format=%s", "@{upstream}", cwd=r)
