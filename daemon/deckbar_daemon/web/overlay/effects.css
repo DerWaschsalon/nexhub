@@ -9,15 +9,18 @@
   color: transparent !important;
   -webkit-text-fill-color: transparent;
   position: relative;
+  /* Der Textschatten des Meters (--player-name-shadow) läge über dem Verlauf und färbt die Schrift
+     schwarz; Kontrast kommt stattdessen per drop-shadow hinter dem Verlauf (siehe filter). */
+  text-shadow: none !important;
 }
 
 @keyframes dbx-sweep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 @keyframes dbx-rise { from { background-position: 0 0%; } to { background-position: 0 -300%; } }
 @keyframes dbx-flow { from { background-position: 0% 0; } to { background-position: 300% 0; } }
 @keyframes dbx-flicker {
-  0%, 100% { filter: drop-shadow(0 0 2px #ff5a00) drop-shadow(0 -1px 5px rgba(255, 110, 0, .55)); }
-  45% { filter: drop-shadow(0 0 3px #ff7a00) drop-shadow(0 -2px 7px rgba(255, 140, 0, .7)); }
-  70% { filter: drop-shadow(0 0 2px #ff4000) drop-shadow(0 -1px 4px rgba(255, 80, 0, .45)); }
+  0%, 100% { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 2px #ff5a00) drop-shadow(0 -1px 5px rgba(255, 110, 0, .55)); }
+  45% { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 3px #ff7a00) drop-shadow(0 -2px 7px rgba(255, 140, 0, .7)); }
+  70% { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 2px #ff4000) drop-shadow(0 -1px 4px rgba(255, 80, 0, .45)); }
 }
 
 /* Glanz: Lichtstreifen läuft über die Grundfarbe */
@@ -25,7 +28,7 @@
   background-image: linear-gradient(100deg, var(--dbx-base) 0%, var(--dbx-base) 42%, #fff 50%, var(--dbx-base) 58%, var(--dbx-base) 100%);
   background-size: 250% 100%;
   animation: dbx-sweep 2.4s steps(48) infinite;
-  filter: drop-shadow(0 0 3px rgba(150, 190, 255, .45));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 3px rgba(150, 190, 255, .45));
 }
 
 /* Gold: wie Glanz, warme Palette */
@@ -33,7 +36,7 @@
   background-image: linear-gradient(100deg, #b8860b 0%, #f5c542 35%, #fff6c8 50%, #f5c542 65%, #b8860b 100%);
   background-size: 250% 100%;
   animation: dbx-sweep 2.8s steps(56) infinite;
-  filter: drop-shadow(0 0 3px rgba(245, 197, 66, .5));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 3px rgba(245, 197, 66, .5));
 }
 
 /* Brennen: Flammenverlauf steigt nach oben, Glow flackert */
@@ -48,7 +51,7 @@
   background-image: linear-gradient(100deg, #7fd3ff 0%, #c9f1ff 40%, #ffffff 50%, #c9f1ff 60%, #7fd3ff 100%);
   background-size: 250% 100%;
   animation: dbx-sweep 4s steps(80) infinite;
-  filter: drop-shadow(0 0 3px rgba(127, 211, 255, .6));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 3px rgba(127, 211, 255, .6));
 }
 
 /* Holo: Regenbogen läuft durch */
@@ -56,7 +59,7 @@
   background-image: linear-gradient(90deg, #ff4d6d, #ffb84d, #f9f871, #4dffb8, #4db8ff, #b84dff, #ff4d6d);
   background-size: 300% 100%;
   animation: dbx-flow 3s steps(60) infinite;
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, .35));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 2px rgba(255, 255, 255, .35));
 }
 
 /* Leere: dunkles Violett mit pulsierendem Rand */
@@ -64,7 +67,7 @@
   background-image: linear-gradient(100deg, #3a0066 0%, #8a2be2 40%, #e0b0ff 50%, #8a2be2 60%, #3a0066 100%);
   background-size: 250% 100%;
   animation: dbx-sweep 3.2s steps(64) infinite;
-  filter: drop-shadow(0 0 3px rgba(138, 43, 226, .7));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .9)) drop-shadow(0 0 3px rgba(138, 43, 226, .7));
 }
 
 /* Glut-Funken über dem Namen (nur beim Brennen): EIN Element, Punktmuster wandert nach oben und
