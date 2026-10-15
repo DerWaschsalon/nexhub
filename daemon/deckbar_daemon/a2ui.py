@@ -32,7 +32,7 @@ A2_ROOT = Path(__file__).resolve().parents[2] / "capture" / "a2tools"
 SHIM = Path(__file__).resolve().parent / "web" / "a2shim.js"
 SHIM_URL = "/__deckbar__/a2shim.js"
 QUEUE_MAX = 64  # Ereignisse je Client; ein hängender Client verliert lieber alte dps-update
-APP_VERSION = "2.0.62"  # Stand des Submoduls, zeigt die Oberfläche an
+APP_VERSION = "2.0.64"  # Stand des Submoduls, zeigt die Oberfläche an
 # Nicht aus den Einstellungen des A2Tools-Meters übernehmen: Geheimnisse, Fensterlagen, Online-Kram
 NO_IMPORT = re.compile(r"(?i)key|token|secret|account|^window\.|streamOverlay|autoUpload|discord|kwinRule|plugin")
 
