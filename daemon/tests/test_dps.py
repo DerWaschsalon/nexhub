@@ -150,9 +150,9 @@ class FakeWS:
 
 async def test_auto_page(tmp_path):
     from deckbar_daemon.config import Settings
-    from deckbar_daemon.server import DeckBar, Device
+    from deckbar_daemon.server import NexBoard, Device
 
-    deck = DeckBar(Settings(token="testtoken-123"), tmp_path)
+    deck = NexBoard(Settings(token="testtoken-123"), tmp_path)
     deck.layout = Layout.model_validate({"pages": [{"id": "main", "items": []},
                                                    {"id": "aion", "items": [{"id": "d", "type": "dps", "h": 2}]}]})
     deck.dps.settings = DpsSettings(auto_page="aion", return_after=5)

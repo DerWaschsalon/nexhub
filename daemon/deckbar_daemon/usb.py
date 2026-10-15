@@ -1,4 +1,4 @@
-"""USB-Brücke: DeckBar per USB-Kabel, wenn WLAN nicht klappt.
+"""USB-Brücke: NexBoard per USB-Kabel, wenn WLAN nicht klappt.
 
 WLAN hat Vorrang. Die Firmware spricht über USB dasselbe JSON-Protokoll wie über WebSocket, nur
 zeilenweise mit Präfix „@@“ (alles andere auf der Schnittstelle sind Log-Ausgaben und wird ignoriert):
@@ -19,7 +19,7 @@ Den Port hält sie offen, um einen erneuten Rückfall sofort zu bemerken.
 Sicherheit für fremde ESP32 am selben PC (z. B. WLED): Kandidaten werden nur passiv geöffnet
 (DTR/RTS bleiben unverändert, kein Reset) und es wird nichts geschrieben, bevor dort „@@DECKBAR“
 kam. Ein Port ohne Kennung wird nach PROBE_S geschlossen und bis zum Abstecken nicht mehr geöffnet.
-Die Kennung kommt in beiden Zuständen, eine DeckBar im WLAN wird also ebenfalls erkannt.
+Die Kennung kommt in beiden Zuständen, eine NexBoard im WLAN wird also ebenfalls erkannt.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ PROBE_S = 8          # so lange auf die Kennung warten
 SCAN_S = 3           # neue Ports suchen
 KEEP_S = 5           # Lebenszeichen ans Gerät
 MAX_LINE = 64 * 1024
-CANDIDATES = ("/dev/serial/by-id/*Espressif*", "/dev/serial/by-id/*DeckBar*")
+CANDIDATES = ("/dev/serial/by-id/*Espressif*", "/dev/serial/by-id/*NexBoard*", "/dev/serial/by-id/*DeckBar*")
 
 
 def parse_line(raw: bytes) -> bytes | None:
@@ -152,10 +152,10 @@ class UsbBridge:
         try:
             first = await self._probe(port)
             if first is None:
-                log.debug("USB %s: keine DeckBar", path)
+                log.debug("USB %s: keine NexBoard", path)
                 self.rejected.add(path)
                 return
-            log.info("USB: DeckBar an %s (%s)", path, "wartet auf USB" if first == BEACON else "im WLAN")
+            log.info("USB: NexBoard an %s (%s)", path, "wartet auf USB" if first == BEACON else "im WLAN")
             await self._link(port, first)
         finally:
             port.close()
@@ -163,7 +163,7 @@ class UsbBridge:
 
     @staticmethod
     async def _probe(port: _Port) -> bytes | None:
-        """Erste Kennung (BEACON oder BEACON_WLAN), None = keine DeckBar."""
+        """Erste Kennung (BEACON oder BEACON_WLAN), None = keine NexBoard."""
         end = time.monotonic() + PROBE_S
         while (left := end - time.monotonic()) > 0:
             try:

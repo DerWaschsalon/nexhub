@@ -33,7 +33,7 @@ const TEMPLATES = [
   { name: "Vorheriger Titel", icon: "skip-previous", item: { label: "Zurück", icon: "skip-previous", action: { do: "media", op: "previous" } } },
   { name: "Link öffnen", icon: "web", item: { label: "Link", icon: "web", action: { do: "open", url: "https://" } } },
   { name: "Hotkey", icon: "keyboard", item: { label: "Hotkey", icon: "keyboard", action: { do: "hotkey", keys: "ctrl+shift+m" } } },
-  { name: "Befehl", icon: "console", item: { label: "Befehl", icon: "console", action: { do: "shell", cmd: "notify-send DeckBar Hallo" } } },
+  { name: "Befehl", icon: "console", item: { label: "Befehl", icon: "console", action: { do: "shell", cmd: "notify-send NexBoard Hallo" } } },
   { name: "Seite wechseln", icon: "chevron-right", item: { label: "Mehr", icon: "chevron-right", nav: "" } },
   { name: "AION 2 DPS-Meter", icon: "flash", item: { type: "dps" }, needs: "aion2.dps" },
 ];

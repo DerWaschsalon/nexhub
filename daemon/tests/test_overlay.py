@@ -51,7 +51,7 @@ async def test_page_and_api(tmp_path):
     o.add_routes(app)
     async with TestClient(TestServer(app)) as c:
         r = await c.get("/__deckbar__/overlay/")
-        assert r.status == 200 and "DeckBar Overlay" in await r.text()
+        assert r.status == 200 and "NexBoard Overlay" in await r.text()
         assert (await c.get("/__deckbar__/overlay/overlay.js")).status == 200
         assert (await c.get("/__deckbar__/overlay/../a2ui.py")).status == 404
         r = await c.put("/api/overlay/layout", json={"widgets": {"meter": {"x": 7, "y": 8, "scale": 1.5}}})

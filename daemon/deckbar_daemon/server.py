@@ -86,7 +86,7 @@ def _validation_text(e: ValidationError) -> str:
     return "\n".join(parts)
 
 
-class DeckBar:
+class NexBoard:
     def __init__(self, settings: Settings, config_dir: Path, mdns: bool = True) -> None:
         self.settings = settings
         self.config_dir = config_dir
@@ -831,7 +831,7 @@ async def local_only(request: web.Request, handler):
         remote = remote[7:]
     host = (request.host or "").rsplit(":", 1)[0].strip("[]")
     if remote not in LOCAL_HOSTS or host not in LOCAL_HOSTS:
-        raise web.HTTPForbidden(text="Die DeckBar-Konfiguration ist nur über localhost erreichbar.")
+        raise web.HTTPForbidden(text="Die NexBoard-Konfiguration ist nur über localhost erreichbar.")
     origin = request.headers.get("Origin")
     if origin and request.method not in ("GET", "HEAD"):
         o_host = origin.split("://", 1)[-1].rsplit(":", 1)[0].strip("[]")
@@ -840,7 +840,7 @@ async def local_only(request: web.Request, handler):
     return await handler(request)
 
 
-def build_app(deck: DeckBar) -> web.Application:
+def build_app(deck: NexBoard) -> web.Application:
     app = web.Application(middlewares=[local_only], client_max_size=256 * 1024)
     app.router.add_get("/ws", deck.ws_device)
     app.router.add_get("/", deck.index)

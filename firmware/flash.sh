@@ -10,7 +10,7 @@ if [[ -z ${PORT:-} ]]; then
   case ${#ports[@]} in
     0) echo "Kein ESP32 gefunden." >&2; exit 1 ;;
     1) PORT=${ports[0]} ;;
-    *) echo "Mehrere ESP32 angeschlossen, welcher ist die DeckBar?"
+    *) echo "Mehrere ESP32 angeschlossen, welcher ist die NexBoard?"
        select PORT in "${ports[@]}"; do [[ -n $PORT ]] && break; done ;;
   esac
 fi

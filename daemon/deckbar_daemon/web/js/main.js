@@ -11,7 +11,7 @@ import runs from "./modules/aion2-runs.js";
 import bot from "./modules/discord-bot.js";
 import updates from "./modules/updates.js";
 
-export const BRAND = "DeckBar";
+export const BRAND = "NexBoard";
 const UI = { deck, "aion2.dps": dps, "aion2.overlay": overlay, "aion2.runs": runs, "discord.bot": bot, updates };
 const SYSTEM = [
   { id: "modules", name: "Module", icon: "puzzle" },

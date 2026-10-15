@@ -1,4 +1,8 @@
-# DeckBar
+# NexBoard
+
+*Früher DeckBar. Technische Namen (Ordner, Dienste `deckbar*.service`, `~/.config/deckbar`,
+mDNS `_deckbar._tcp`, Programme `deckbar-*`, Repo) bleiben vorerst gleich, damit bestehende Geräte
+und Installationen weiterlaufen.*
 
 Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Waveshare
 **ESP32-S3-Touch-LCD-3.49** (640 × 172 im Querformat, Board V1 und V2). Die Optik ist im
@@ -116,7 +120,7 @@ Einstellungen** bearbeitet `config.yaml` (Name, Player, Adresse, Port, USB, mDNS
 Daemon bei Bedarf neu.
 
 Ein neues Modul besteht aus einem Eintrag in `MODULES` (`daemon/deckbar_daemon/modules.py`), seinen
-Aufgaben (`DeckBar._register_modules` in `server.py`) und einer Seite in
+Aufgaben (`NexBoard._register_modules` in `server.py`) und einer Seite in
 `daemon/deckbar_daemon/web/js/modules/` (Tabs, Dashboard-Karte, Inhalt). Die Web-UI kommt ohne
 Framework und ohne Build-Schritt aus (ES-Module).
 
@@ -170,7 +174,7 @@ Die Kachel „AION 2 DPS-Meter“ füllt eine Seite und zeigt die DPS der Gruppe
 Name, DPS und wahlweise Anteil oder Gesamtschaden, Balken in Klassenfarbe, die eigene Zeile
 hervorgehoben. Darüber stehen Bossname, Rest-HP und Kampfdauer.
 
-Die Daten liest die DeckBar selbst aus dem Spielverkehr mit: `deckbar-capture` (Ordner
+Die Daten liest die NexBoard selbst aus dem Spielverkehr mit: `deckbar-capture` (Ordner
 `capture/`) setzt den Kern des [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter)
 ohne dessen Oberfläche zusammen (libpcap, Port-Erkennung, Parser, DPS-Berechnung). Der Daemon
 startet das Programm, sobald AION 2 läuft, und beendet es 30 s nach dem Spiel. Gebaut wird ohne
@@ -205,7 +209,7 @@ capture/target/release/deckbar-capture --replay packets_2026-10-12.txt --history
 ```
 
 Ein Spiel-Patch ändert meist Opcodes oder Datentabellen. Upstream zieht das schnell nach, die
-DeckBar meldet das neue Release (siehe „Updates“).
+NexBoard meldet das neue Release (siehe „Updates“).
 
 ### Overlay am PC
 
@@ -236,7 +240,7 @@ overlay/install.sh        # ~/.local/bin/deckbar-overlay, User-Dienst, Starter f
 
 Danach schaltet das Modul „AION 2 · Overlay“ den Dienst ein und aus. Befehle: `--toggle`
 (zeigen/verbergen), `--edit`, `--lock`, `--click`, `--details`, `--history`, `--settings`,
-`--reload`, `--quit`; für Tastenkürzel die Starter „DeckBar Overlay ein/aus“ und „… bearbeiten“
+`--reload`, `--quit`; für Tastenkürzel die Starter „NexBoard Overlay ein/aus“ und „… bearbeiten“
 in den Systemeinstellungen auf eine Taste legen. Monitor (Standard: Hauptmonitor laut KDE),
 Startmodus, Namenseffekt und Widgets stehen in der Web-UI; das Layout liegt in
 `~/.config/deckbar/overlay/layout.json`.
@@ -252,7 +256,7 @@ kleinen Ersatz für Tauris JavaScript-API davor (`web/a2shim.js`). Daten-Befehle
 Einstellungen der Meter-Oberfläche liegen in `~/.config/deckbar/a2-settings.json`. Nicht dabei sind
 die Online-Funktionen, Plugins und die eigenen globalen Tastenkürzel des Meters.
 
-**Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die DeckBar stattdessen dessen
+**Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die NexBoard stattdessen dessen
 Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent Events). Dafür im
 Meter das Stream-Overlay einschalten. Port und Schlüssel liest der Daemon aus
 `~/.local/share/com.a2tools.dps-meter/settings.json`, sonst von Hand aus der Overlay-URL.
@@ -267,7 +271,7 @@ Quelle ist die Kampf-History, je nach DPS-Quelle die von `deckbar-capture` oder 
 Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
 `daemon/deckbar_daemon/runs.py`). Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
 
-Die History maskiert fremde Namen. Die DeckBar lernt die vollen Namen aus dem Live-Stream und
+Die History maskiert fremde Namen. Die NexBoard lernt die vollen Namen aus dem Live-Stream und
 speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von Hand korrigieren.
 
 ## Discord-Bot
@@ -289,7 +293,7 @@ Beide Wege lassen sich mit „Letzten Kampf senden“ bzw. „Letzten Run senden
 
 ## Updates
 
-Der Daemon sieht kurz nach dem Start und dann täglich nach, ob es neue Commits der DeckBar auf
+Der Daemon sieht kurz nach dem Start und dann täglich nach, ob es neue Commits der NexBoard auf
 GitHub gibt oder ein neues Release des A2Tools-Meters (nach Spiel-Patches ändern sich dort Opcodes
 und Datentabellen). Dann meldet sich das Tray-Symbol des Overlays einmal mit einer Benachrichtigung,
 im Tray-Menü steht „Jetzt aktualisieren“, in der Web-UI (Modul „Updates“) ein Hinweis mit Button.
@@ -389,7 +393,7 @@ cd daemon && uv run python -m pytest -q
 
 ## Lizenz
 
-DeckBar steht unter der **GNU General Public License v3.0 oder später** (`LICENSE`).
+NexBoard steht unter der **GNU General Public License v3.0 oder später** (`LICENSE`).
 
 Teile stammen aus dem [A2Tools DPS Meter](https://github.com/taengu/A2Tools-DPS-Meter) (GPL-3.0):
 der Mitschnitt-Kern und die Oberfläche des Overlays als unverändertes Submodul `capture/a2tools`,

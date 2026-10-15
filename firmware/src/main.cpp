@@ -1,5 +1,5 @@
 /*
- * DeckBar-Firmware: WLAN + mDNS + WebSocket oder USB, rendert den gemeinsamen shared-ui-Code.
+ * NexBoard-Firmware: WLAN + mDNS + WebSocket oder USB, rendert den gemeinsamen shared-ui-Code.
  *
  * WLAN hat Vorrang, USB ist der Rückfall: Dasselbe JSON-Protokoll läuft zeilenweise mit Präfix "@@"
  * über die USB-Schnittstelle (Gegenstück: daemon/deckbar_daemon/usb.py). Ohne USB-Verbindung meldet
@@ -419,7 +419,7 @@ void setup()
     Serial.setRxBufferSize(32 * 1024); /* Bildteile vom Daemon über USB (bis 16 KB pro Zeile) */
     Serial.begin(115200);
     Serial.setTxTimeoutMs(0); /* liest niemand mit, nicht blockieren */
-    log_printf("DeckBar %s, Reset-Grund %d\n", DECKBAR_FW_VERSION, (int)esp_reset_reason());
+    log_printf("NexBoard %s, Reset-Grund %d\n", DECKBAR_FW_VERSION, (int)esp_reset_reason());
     q_in = xQueueCreate(32, sizeof(net_ev_t));
     q_out = xQueueCreate(32, sizeof(char *));
     lvgl_mux = xSemaphoreCreateMutex();

@@ -1,5 +1,5 @@
 /*
- * DeckBar-Simulator: derselbe shared-ui-Code wie auf dem Gerät, in einem SDL-Fenster
+ * NexBoard-Simulator: derselbe shared-ui-Code wie auf dem Gerät, in einem SDL-Fenster
  * 640x172 (RGB565). Mausklicks = Touch. Verbindet sich per WebSocket mit dem echten Daemon.
  */
 #include <errno.h>
@@ -298,7 +298,7 @@ int main(int argc, char **argv)
     lv_tick_set_cb(tick_cb);
     lv_display_t *disp = lv_sdl_window_create(DECKBAR_W, DECKBAR_H);
     lv_sdl_window_set_zoom(disp, (uint8_t)zoom);
-    lv_sdl_window_set_title(disp, "DeckBar Simulator");
+    lv_sdl_window_set_title(disp, "NexBoard Simulator");
     lv_sdl_mouse_create();
     if (gesture_count) {
         lv_indev_t *script = lv_indev_create();

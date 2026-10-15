@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deckbar.local/protocol/v1.json",
-  "title": "DeckBar protocol v1 message",
+  "title": "NexBoard protocol v1 message",
   "type": "object",
   "required": ["v", "type"],
   "properties": {

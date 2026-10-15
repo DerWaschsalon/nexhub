@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DeckBar-Overlay: Meter und Widgets über dem Spiel, mit Tray-Symbol.
+"""NexBoard-Overlay: Meter und Widgets über dem Spiel, mit Tray-Symbol.
 
 Unter KDE Plasma (Wayland) legt das Programm eine durchsichtige layer-shell-Fläche über den
 Spielmonitor (Ebene „overlay“, über dem Vollbildspiel) und zeigt darin die Widget-Seite des
@@ -40,7 +40,7 @@ import urllib.request
 from pathlib import Path
 
 APP = "deckbar-overlay"
-MAIN_TITLE = "DeckBar DPS-Meter"  # KWin-Regel (nur Legacy): Ebene „Overlay“ für dieses Fenster
+MAIN_TITLE = "NexBoard DPS-Meter"  # KWin-Regel (nur Legacy): Ebene „Overlay“ für dieses Fenster
 REPO = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
 ICON = REPO / "capture" / "a2tools" / "src-tauri" / "icons" / "128x128.png"
@@ -191,7 +191,7 @@ class A2Window(QWebEngineView):
             flags |= Qt.Tool | Qt.WindowStaysOnTopHint  # nicht in der Taskleiste
             self.setWindowTitle(MAIN_TITLE)
         else:
-            self.setWindowTitle(f"DeckBar – {view.capitalize()}")
+            self.setWindowTitle(f"NexBoard – {view.capitalize()}")
         self.setWindowFlags(flags)
         self.setWindowIcon(overlay.icon)
 
@@ -656,7 +656,7 @@ class Overlay(QObject):
         menu.addAction("Details", lambda: self.request_details({"kind": "all"}))
         menu.addAction("Verlauf", lambda: self.request_details({"kind": "history"}))
         menu.addAction("Meter-Einstellungen", lambda: self.command(self.main, "open_settings_window", {}))
-        menu.addAction("DeckBar-Einstellungen öffnen …", lambda: QDesktopServices.openUrl(
+        menu.addAction("NexBoard-Einstellungen öffnen …", lambda: QDesktopServices.openUrl(
             QUrl(f"http://localhost:{daemon_port()}/#/aion2.overlay")))
         menu.addSeparator()
         self.update_action = menu.addAction("Keine Updates", self.run_update)
@@ -667,7 +667,7 @@ class Overlay(QObject):
         menu.aboutToShow.connect(lambda: self.api("GET", "/api/updates", self.on_updates))
         self.edit_action.setVisible(self.backend == "layer")
         self.tray = QSystemTrayIcon(self.icon, self)
-        self.tray.setToolTip("DeckBar Overlay")
+        self.tray.setToolTip("NexBoard Overlay")
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda r: self.toggle() if r == QSystemTrayIcon.Trigger else None)
         self.tray.messageClicked.connect(self.run_update)
@@ -707,7 +707,7 @@ class Overlay(QObject):
         parts = []
         d, a = u.get("deckbar") or {}, u.get("a2tools") or {}
         if d.get("behind"):
-            parts.append(f"DeckBar +{d['behind']}")
+            parts.append(f"NexBoard +{d['behind']}")
         if a.get("newer"):
             parts.append(f"A2Tools {a.get('latest')}")
         if u.get("running"):
@@ -719,12 +719,12 @@ class Overlay(QObject):
         else:
             self.update_action.setText("Keine Updates" + (" (Prüfung fehlgeschlagen)" if u.get("error") else ""))
             self.update_action.setEnabled(False)
-        self.tray.setToolTip("DeckBar Overlay" + (f"\nUpdate verfügbar: {', '.join(parts)}" if u.get("available") else ""))
+        self.tray.setToolTip("NexBoard Overlay" + (f"\nUpdate verfügbar: {', '.join(parts)}" if u.get("available") else ""))
         # Einmal je neuem Stand melden
         key = f"{d.get('latest') if d.get('behind') else ''}|{a.get('latest') if a.get('newer') else ''}"
         if u.get("available") and self.store.value("notifiedUpdate") != key:
             self.store.setValue("notifiedUpdate", key)
-            self.tray.showMessage("DeckBar: Update verfügbar",
+            self.tray.showMessage("NexBoard: Update verfügbar",
                                   f"{', '.join(parts)}. Zum Aktualisieren hier klicken oder im Tray-Menü.",
                                   QSystemTrayIcon.Information, 15000)
 
@@ -734,7 +734,7 @@ class Overlay(QObject):
         self.update_action.setText("Update läuft …")
         self.update_action.setEnabled(False)
         self.api("POST", "/api/updates/run", lambda r: r.get("error") and self.tray.showMessage(
-            "DeckBar-Update", f"Ging nicht: {r['error']}", QSystemTrayIcon.Warning, 10000))
+            "NexBoard-Update", f"Ging nicht: {r['error']}", QSystemTrayIcon.Warning, 10000))
 
     def _edit_from_tray(self, on: bool) -> None:
         if self.layer is not None and on != (self.layer.mode == "edit"):
@@ -791,9 +791,9 @@ class Overlay(QObject):
 
 def ensure_kwin_rule() -> None:
     """Legacy: Meter-Fenster über dem Vollbild-Spiel per KWin-Regel Ebene „Overlay“ (wie beim
-    A2Tools-Meter). Nur einmal anlegen; was der Nutzer danach ändert oder löscht, bleibt so."""
+    A2Tools-Meter). Nur einmal je Fenstertitel anlegen; was der Nutzer danach ändert, bleibt so."""
     store = QSettings("deckbar", "overlay")
-    if store.value("kwinRuleAdded") == "true" or not shutil.which("kwriteconfig6"):
+    if store.value("kwinRuleTitle") == MAIN_TITLE or not shutil.which("kwriteconfig6"):
         return
     group = "deckbar-overlay"
 
@@ -803,7 +803,7 @@ def ensure_kwin_rule() -> None:
     rules = subprocess.run(["kreadconfig6", "--file", "kwinrulesrc", "--group", "General", "--key", "rules"],
                            capture_output=True, text=True).stdout.strip()
     names = [r for r in rules.split(",") if r]
-    kw("Description", "DeckBar DPS-Meter über dem Spiel")
+    kw("Description", "NexBoard DPS-Meter über dem Spiel")
     kw("title", MAIN_TITLE)
     kw("titlematch", "1")  # exakt
     kw("wmclass", APP)  # WM_CLASS ist "deckbar-overlay", "deckbar-overlay" (-name + Programmname)
@@ -816,7 +816,7 @@ def ensure_kwin_rule() -> None:
         kw("rules", ",".join(names), "General")
         kw("count", str(len(names)), "General")
     subprocess.run(["qdbus6", "org.kde.KWin", "/KWin", "reconfigure"], check=False, capture_output=True)
-    store.setValue("kwinRuleAdded", "true")
+    store.setValue("kwinRuleTitle", MAIN_TITLE)  # neuer Titel (Umbenennung) → Regel wird nachgezogen
 
 
 def kde_primary() -> str:
@@ -872,7 +872,7 @@ def main() -> int:
     except RuntimeError as e:
         print(f"{e} – starte das alte Meter-Fenster: deckbar-overlay --legacy", file=sys.stderr)
         return 1
-    print(f"DeckBar-Overlay läuft ({'layer-shell' if BACKEND == 'layer' else 'Legacy-Fenster'})", flush=True)
+    print(f"NexBoard-Overlay läuft ({'layer-shell' if BACKEND == 'layer' else 'Legacy-Fenster'})", flush=True)
 
     def incoming() -> None:
         conn = server.nextPendingConnection()

@@ -1,7 +1,7 @@
-"""Nach Updates suchen: neue Commits der DeckBar und neue Releases des A2Tools DPS Meter.
+"""Nach Updates suchen: neue Commits der NexBoard und neue Releases des A2Tools DPS Meter.
 
 Einmal kurz nach dem Start und dann täglich (oder per POST /api/updates/check):
-  - DeckBar: `git fetch` im Repo, Commits auf dem Upstream-Zweig, die lokal fehlen
+  - NexBoard: `git fetch` im Repo, Commits auf dem Upstream-Zweig, die lokal fehlen
   - A2Tools: neuestes Release laut GitHub-API gegen das Tag im Submodul capture/a2tools
     (Spiel-Patches ändern Opcodes und Datentabellen, das Meter zieht schnell nach)
 
@@ -82,7 +82,7 @@ class Updates:
         try:
             self.state["deckbar"] = await self._check_repo()
         except (OSError, RuntimeError) as e:
-            errors.append(f"DeckBar: {e}")
+            errors.append(f"NexBoard: {e}")
         try:
             self.state["a2tools"] = await self._check_a2tools()
         except (OSError, RuntimeError, aiohttp.ClientError, TimeoutError, ValueError) as e:
@@ -91,7 +91,7 @@ class Updates:
         self.state.update(checked_at=int(time.time()), error="; ".join(errors),
                           available=bool(d.get("behind")) or bool(a.get("newer")))
         if self.state["available"]:
-            log.info("Update verfügbar: DeckBar %s Commit(s), A2Tools %s → %s",
+            log.info("Update verfügbar: NexBoard %s Commit(s), A2Tools %s → %s",
                      d.get("behind", 0), a.get("current"), a.get("latest"))
         await self._changed()
 
@@ -136,7 +136,7 @@ class Updates:
         if not shutil.which("systemd-run"):
             raise RuntimeError("systemd-run fehlt")
         if shutil.which("konsole"):
-            args = ["konsole", "--hold", "-p", "tabtitle=DeckBar-Update", "-e", *args]
+            args = ["konsole", "--hold", "-p", "tabtitle=NexBoard-Update", "-e", *args]
         proc = await asyncio.create_subprocess_exec(
             "systemd-run", "--user", "--collect", f"--unit={UNIT}-{int(time.time())}",
             "--property=Type=exec", *args,

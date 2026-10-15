@@ -1,4 +1,4 @@
-/* DeckBar-Overlay: Widgets über dem Spiel. Läuft im Overlay-Programm (layer-shell-Fläche, Qt
+/* NexBoard-Overlay: Widgets über dem Spiel. Läuft im Overlay-Programm (layer-shell-Fläche, Qt
  * WebEngine) und zum Ausprobieren auch im Browser (http://127.0.0.1:<Port+1>/__deckbar__/overlay/).
  *
  * Daten:   GET /api/overlay/events (SSE: layout, dps), PUT /api/overlay/layout (Positionen, Effekt)

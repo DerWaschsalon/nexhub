@@ -16,9 +16,9 @@ function hintFor(d) {
   const cap = d.capture || {};
   const hasTile = S.layout?.pages?.some((p) => p.items.some((i) => i.type === "dps"));
   return {
-    overlay_off: "Im A2Tools-Meter unter Einstellungen das Stream-Overlay einschalten. Port und Schlüssel liest die DeckBar dann selbst.",
-    no_meter: st.source === "auto" && !d.a2tools.installed ? "Das A2Tools DPS Meter ist nicht installiert (oder hat noch keine Einstellungen gespeichert)." : "Das A2Tools DPS Meter starten. Die DeckBar verbindet sich dann von selbst.",
-    bad_key: st.source === "manual" ? "Der Schlüssel passt nicht. Er steht in der Overlay-URL des Meters hinter key=." : "Der Schlüssel wurde abgelehnt. Wurde er im Meter gerade neu erzeugt? Die DeckBar versucht es gleich erneut.",
+    overlay_off: "Im A2Tools-Meter unter Einstellungen das Stream-Overlay einschalten. Port und Schlüssel liest die NexBoard dann selbst.",
+    no_meter: st.source === "auto" && !d.a2tools.installed ? "Das A2Tools DPS Meter ist nicht installiert (oder hat noch keine Einstellungen gespeichert)." : "Das A2Tools DPS Meter starten. Die NexBoard verbindet sich dann von selbst.",
+    bad_key: st.source === "manual" ? "Der Schlüssel passt nicht. Er steht in der Overlay-URL des Meters hinter key=." : "Der Schlüssel wurde abgelehnt. Wurde er im Meter gerade neu erzeugt? Die NexBoard versucht es gleich erneut.",
     no_game: "Startet von selbst, sobald AION 2 läuft, und endet mit dem Spiel.",
     no_capture: "Einmal bauen und installieren: capture/build.sh --install im Repo (braucht cargo, fragt nach sudo für die Mitschnitt-Rechte).",
     no_caps: `Mitschneiden braucht cap_net_raw: capture/build.sh --install (legt es nach ~/.local/bin) oder sudo setcap cap_net_raw=ep ${cap.binary || "deckbar-capture"}. Ein Neubau verliert die Rechte.`,

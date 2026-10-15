@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DeckBar aktualisieren: Repo, A2Tools-Kern, deckbar-capture, Dienste.
+# NexBoard aktualisieren: Repo, A2Tools-Kern, deckbar-capture, Dienste.
 #
 #   ./update.sh             git pull, Submodul auf den Stand des Repos, deckbar-capture nur bei
 #                           Änderungen neu bauen (fragt dann nach dem Passwort für cap_net_raw),
@@ -23,7 +23,7 @@ done
 note() {
   echo "$*"
   if (( NOTIFY )) && command -v notify-send >/dev/null; then
-    notify-send -a DeckBar -i system-software-update "DeckBar-Update" "$*" || true
+    notify-send -a NexBoard -i system-software-update "NexBoard-Update" "$*" || true
   fi
 }
 fail() { note "Fehlgeschlagen: $*"; exit 1; }
@@ -37,7 +37,7 @@ git pull --ff-only --quiet || fail "git pull ging nicht (lokale Commits? Dann vo
 NEW=$(git rev-parse HEAD)
 changed() { [[ $OLD != "$NEW" ]] && ! git diff --quiet "$OLD" "$NEW" -- "$@"; }
 SUMMARY=()
-[[ $OLD != "$NEW" ]] && SUMMARY+=("DeckBar: $(git rev-list --count "$OLD..$NEW") neue Commits")
+[[ $OLD != "$NEW" ]] && SUMMARY+=("NexBoard: $(git rev-list --count "$OLD..$NEW") neue Commits")
 
 # ------------------------------------------------------------------ A2Tools-Kern
 SUB=capture/a2tools

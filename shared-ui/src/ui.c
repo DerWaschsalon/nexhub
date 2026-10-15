@@ -1,5 +1,5 @@
 /*
- * DeckBar-UI: rendert das vom Daemon geschickte Layout, spiegelt den State und meldet
+ * NexBoard-UI: rendert das vom Daemon geschickte Layout, spiegelt den State und meldet
  * Touch-Ereignisse zurück. Enthält keinerlei Hardware-Code (siehe deckbar/hal.h).
  */
 #include "deckbar/ui.h"
@@ -294,7 +294,7 @@ static void build_status_ui(void)
     lv_obj_set_style_pad_row(ui.splash, 4, 0);
     lv_obj_t *icon = text_label(ui.splash, &db_icons_28, deckbar_icon_glyph("view-grid"));
     lv_obj_set_style_text_color(icon, db_theme_color(DB_STYLE_ACCENT), 0);
-    text_label(ui.splash, &db_font_title, "DeckBar");
+    text_label(ui.splash, &db_font_title, "NexBoard");
     ui.splash_status = text_label(ui.splash, &db_font_label, "");
     ui.splash_detail = text_label(ui.splash, &db_font_small, "");
     lv_obj_add_style(ui.splash_detail, &db_theme.text_dim, 0);

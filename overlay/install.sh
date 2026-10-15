@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# DeckBar-Overlay einrichten: Programm nach ~/.local/bin (Link ins Repo), User-Dienst für den
-# Autostart, Starter „DeckBar Overlay ein/aus“ und „… bearbeiten“ für Tastenkürzel.
+# NexBoard-Overlay einrichten: Programm nach ~/.local/bin (Link ins Repo), User-Dienst für den
+# Autostart, Starter „NexBoard Overlay ein/aus“ und „… bearbeiten“ für Tastenkürzel.
 # Braucht PySide6 mit QtWebEngine, für die layer-shell-Fläche (KDE Plasma, Wayland) layer-shell-qt:
 #   sudo pacman -S --needed pyside6 qt6-webengine layer-shell-qt
 # Den Dienst schaltet danach das Modul „AION 2 · Overlay“ in der Web-UI ein und aus.
@@ -25,6 +25,6 @@ if [[ ${1:-} != --no-start ]]; then
 fi
 cat <<MSG
 Overlay eingerichtet. Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „Neu“ →
-„Anwendung“ → „DeckBar Overlay ein/aus“ bzw. „DeckBar Overlay bearbeiten“, dann eine Taste
+„Anwendung“ → „NexBoard Overlay ein/aus“ bzw. „NexBoard Overlay bearbeiten“, dann eine Taste
 zuweisen. Ein- und ausschalten: Web-UI → Module → „AION 2 · Overlay“.
 MSG

@@ -15,15 +15,15 @@ from pydantic import ValidationError
 
 from .config import config_dir, load_settings
 from .a2ui import A2Ui
-from .server import DeckBar, build_app, local_only
+from .server import NexBoard, build_app, local_only
 
 log = logging.getLogger("deckbar")
 
 
-async def serve(args: argparse.Namespace) -> DeckBar:
+async def serve(args: argparse.Namespace) -> NexBoard:
     cdir = args.config_dir or config_dir()
     settings = load_settings(cdir)
-    deck = DeckBar(settings, cdir, mdns=not args.no_mdns)
+    deck = NexBoard(settings, cdir, mdns=not args.no_mdns)
     app = build_app(deck)
 
     runner = web.AppRunner(app, access_log=None)
@@ -45,7 +45,7 @@ async def serve(args: argparse.Namespace) -> DeckBar:
         await web.TCPSite(a2_runner, "127.0.0.1", settings.port + 1).start()
     except OSError as e:
         log.warning("Overlay-Oberfläche nicht verfügbar (Port %d): %s", settings.port + 1, e)
-    log.info("DeckBar-Daemon läuft auf %s:%d – Web-UI: %s", settings.host, settings.port, url)
+    log.info("NexBoard-Daemon läuft auf %s:%d – Web-UI: %s", settings.host, settings.port, url)
 
     await deck.modules.start()
     log.info("Module: %s", ", ".join(sorted(deck.modules.enabled)) or "keine")
@@ -66,7 +66,7 @@ async def serve(args: argparse.Namespace) -> DeckBar:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(prog="deckbar-daemon", description="PC-Daemon für die DeckBar")
+    ap = argparse.ArgumentParser(prog="deckbar-daemon", description="PC-Daemon für die NexBoard")
     ap.add_argument("--config-dir", type=Path, help="Standard: ~/.config/deckbar")
     ap.add_argument("--open", action="store_true", help="Web-UI im Browser öffnen")
     ap.add_argument("--no-mdns", action="store_true")

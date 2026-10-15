@@ -1,4 +1,4 @@
-/* DeckBar Web-UI – „Liquid Glass“: durchscheinende Flächen mit Lichtkante über einem langsam
+/* NexBoard Web-UI – „Liquid Glass“: durchscheinende Flächen mit Lichtkante über einem langsam
    fließenden Farbhintergrund. Hell und dunkel über dieselben Tokens; ohne backdrop-filter
    (oder mit „weniger Transparenz“) werden die Flächen einfach dichter. */
 @font-face { font-family: "mdi"; src: url("/static/mdi.woff") format("woff"); font-display: block; }

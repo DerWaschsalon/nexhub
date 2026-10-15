@@ -1,4 +1,4 @@
-# DeckBar-Protokoll v1
+# NexBoard-Protokoll v1
 
 Transport: WebSocket, Textframes, je Frame genau ein JSON-Objekt (UTF-8).
 Endpunkt: `ws://<daemon>:8765/ws` (Port per Config änderbar).
@@ -94,7 +94,7 @@ antwortet sofort mit dem aktuellen Cover und schickt danach jedes neue Cover una
 
 ### `welcome`
 
-`{"v":1,"type":"welcome","server":{"name":"DeckBar","version":"0.1.0"},"heartbeat":5}`
+`{"v":1,"type":"welcome","server":{"name":"NexBoard","version":"0.1.0"},"heartbeat":5}`
 
 ### `error`
 

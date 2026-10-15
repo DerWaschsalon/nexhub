@@ -1,6 +1,6 @@
-"""Die Oberfläche des A2Tools DPS Meter (Submodul capture/a2tools, GPL-3.0) fürs DeckBar-Overlay.
+"""Die Oberfläche des A2Tools DPS Meter (Submodul capture/a2tools, GPL-3.0) fürs NexBoard-Overlay.
 
-Läuft als eigener kleiner Webserver auf 127.0.0.1 (Port der DeckBar + 1), damit die absoluten
+Läuft als eigener kleiner Webserver auf 127.0.0.1 (Port der NexBoard + 1), damit die absoluten
 Pfade der Oberfläche (/src/js/…, /vendor/…) unverändert passen. Das Overlay (overlay/deckbar-overlay)
 lädt sie in Qt WebEngine. Statt Tauri spricht die Oberfläche mit dem Shim in web/a2shim.js:
 
@@ -319,7 +319,7 @@ class A2Ui:
                 return {"view": {"devMode": False, "online": False, "plugins": []}, "updated": [], "available": [],
                         "catalogError": None}
             case _:
-                raise RuntimeError(f"{cmd}: in der DeckBar nicht verfügbar")
+                raise RuntimeError(f"{cmd}: in der NexBoard nicht verfügbar")
 
     def app(self, *middlewares, routes=None) -> web.Application:
         """routes: weitere Routen (Overlay-Seite), vor der Auslieferung der Meter-Dateien."""

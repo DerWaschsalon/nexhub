@@ -45,7 +45,7 @@ function controlTab(ctx) {
             }, "ghost", "restart")),
           el("p", { class: "hint small", style: "margin-top:14px" },
             "Im Bearbeiten-Modus Widgets ziehen, Mausrad = Größe, Esc = fertig. Das Meter selbst lässt sich jederzeit an Kopf- oder Fußzeile verschieben. ",
-            "Für Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → Neu → Anwendung → „DeckBar Overlay ein/aus“ bzw. „… bearbeiten“.")),
+            "Für Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → Neu → Anwendung → „NexBoard Overlay ein/aus“ bzw. „… bearbeiten“.")),
         card("Darstellung", null, null,
           el("div", { class: "grid" },
             field("Monitor", select(screens, L.screen, (v) => { L.screen = v; save({ screen: v }); }), "Wirkt nach „Neu starten“."),

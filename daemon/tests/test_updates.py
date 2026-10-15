@@ -71,4 +71,4 @@ async def test_fehler_werden_gemeldet(tmp_path):
     up._check_a2tools = a2
     await up.check()
     info = up.info()
-    assert not info["available"] and "DeckBar" in info["error"] and "offline" in info["error"]
+    assert not info["available"] and "NexBoard" in info["error"] and "offline" in info["error"]

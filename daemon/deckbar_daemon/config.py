@@ -160,14 +160,14 @@ class Settings(_Strict):
     host: str = "0.0.0.0"
     port: int = Field(8765, ge=1, le=65535)
     token: str = Field(min_length=8)
-    name: str = "DeckBar"
+    name: str = "NexBoard"
     heartbeat: int = Field(5, ge=1, le=60)
     mdns: bool = True
     player: str | None = Field(None, description="playerctl -p … (leer = aktivster Player)")
     open_browser: bool = False
     # Rückfall per USB-Kabel, wenn WLAN nicht klappt: "auto" (Espressif-Ports passiv prüfen), "off" oder fester Pfad
     usb: str = "auto"
-    # Täglich nach neuen DeckBar-Commits und A2Tools-Releases sehen (GitHub), Hinweis in Tray und Web-UI
+    # Täglich nach neuen NexBoard-Commits und A2Tools-Releases sehen (GitHub), Hinweis in Tray und Web-UI
     update_check: bool = True
 
 
@@ -190,11 +190,11 @@ def load_settings(directory: Path) -> Settings:
     if not path.exists():
         token = secrets.token_urlsafe(18)
         text = (
-            "# DeckBar-Daemon – diese Datei enthält das Geräte-Token, nicht committen.\n"
+            "# NexBoard-Daemon – diese Datei enthält das Geräte-Token, nicht committen.\n"
             "host: 0.0.0.0        # Adresse für Geräte (LAN). Die Web-UI antwortet trotzdem nur auf localhost.\n"
             "port: 8765\n"
             f"token: {token}\n"
-            "name: DeckBar\n"
+            "name: NexBoard\n"
             "heartbeat: 5\n"
             "mdns: true\n"
             "player: null          # z. B. spotify; null = playerctl wählt\n"
@@ -208,7 +208,7 @@ def load_settings(directory: Path) -> Settings:
 
 def save_settings(directory: Path, settings: Settings) -> None:
     """config.yaml aus der Web-UI schreiben (Kommentare gehen verloren), bleibt nur für den Nutzer lesbar."""
-    header = "# DeckBar-Daemon – enthält das Geräte-Token, nicht committen. Wird von der Web-UI überschrieben.\n"
+    header = "# NexBoard-Daemon – enthält das Geräte-Token, nicht committen. Wird von der Web-UI überschrieben.\n"
     text = yaml.safe_dump(settings.model_dump(), sort_keys=False, allow_unicode=True)
     _atomic_write(directory / "config.yaml", header + text, 0o600)
 
@@ -229,5 +229,5 @@ def save_layout(path: Path, layout: Layout) -> None:
     data = layout.model_dump(exclude_none=True, exclude_defaults=True)
     # pages ist Pflicht und darf nie wegfallen
     data.setdefault("pages", [])
-    header = "# DeckBar-Layout – wird von der Web-UI überschrieben (Kommentare gehen dabei verloren).\n"
+    header = "# NexBoard-Layout – wird von der Web-UI überschrieben (Kommentare gehen dabei verloren).\n"
     _atomic_write(path, header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True))

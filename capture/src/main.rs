@@ -1,4 +1,4 @@
-//! deckbar-capture: AION-2-Mitschnitt für die DeckBar.
+//! deckbar-capture: AION-2-Mitschnitt für die NexBoard.
 //!
 //! Setzt den Kern des A2Tools DPS Meter (GPL-3.0, Submodul `a2tools/`) ohne dessen Oberfläche
 //! zusammen, so wie `app.rs` dort es tut: libpcap auf allen Interfaces → CaptureDispatcher

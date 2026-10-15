@@ -7,7 +7,7 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from deckbar_daemon.config import Settings
 from deckbar_daemon.modules import MODULES, ModuleManager, dependents, requirements
-from deckbar_daemon.server import DeckBar, build_app
+from deckbar_daemon.server import NexBoard, build_app
 
 
 def test_dependency_graph():
@@ -80,9 +80,12 @@ async def test_crashed_task_restarts(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-async def client(tmp_path):
+async def client(tmp_path, monkeypatch):
+    # nie an ein echtes, laufendes Overlay schicken (dessen Socket liegt im Laufzeitordner)
+    import deckbar_daemon.overlay as overlay_mod
+    monkeypatch.setattr(overlay_mod, "socket_path", lambda: tmp_path / "kein-overlay.sock")
     (tmp_path / "modules.yaml").write_text("enabled: [deck]\n")
-    deck = DeckBar(Settings(token="testtoken123", mdns=False, usb="off"), tmp_path, mdns=False)
+    deck = NexBoard(Settings(token="testtoken123", mdns=False, usb="off"), tmp_path, mdns=False)
     deck.overlay.manage_unit = False
     async with TestClient(TestServer(build_app(deck))) as c:
         c.deck = deck

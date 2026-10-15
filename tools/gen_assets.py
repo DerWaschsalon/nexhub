@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Erzeugt alle generierten Assets für DeckBar.
+"""Erzeugt alle generierten Assets für NexBoard.
 
     uv run --with pillow tools/gen_assets.py            # alles
     uv run --with pillow tools/gen_assets.py --bg foto.jpg   # eigenes Hintergrundbild

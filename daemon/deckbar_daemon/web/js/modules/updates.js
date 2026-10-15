@@ -3,7 +3,7 @@ import { fill, el, icon, api, S, on, button, chip, callout, card, toast, fmtWhen
 
 function summary(u) {
   const parts = [];
-  if (u?.deckbar?.behind) parts.push(`DeckBar: ${u.deckbar.behind} neue${u.deckbar.behind === 1 ? "r" : ""} Commit${u.deckbar.behind === 1 ? "" : "s"}`);
+  if (u?.deckbar?.behind) parts.push(`NexBoard: ${u.deckbar.behind} neue${u.deckbar.behind === 1 ? "r" : ""} Commit${u.deckbar.behind === 1 ? "" : "s"}`);
   if (u?.a2tools?.newer) parts.push(`A2Tools ${u.a2tools.latest} (bisher ${u.a2tools.current})`);
   return parts.join(" · ");
 }
@@ -22,7 +22,7 @@ function updatesTab(ctx) {
         }, "primary sm", "download", { disabled: !!u.running })) : null,
       u.error ? callout("warn", "alert", u.error) : null,
       el("div", { class: "cols" },
-        card("DeckBar", d.upstream ? `Zweig ${d.upstream}` : d.branch ? `lokaler Zweig ${d.branch} (ohne Upstream)` : "Git-Repository", d.behind ? chip(`${d.behind} neu`, "info") : chip("aktuell", "ok"),
+        card("NexBoard", d.upstream ? `Zweig ${d.upstream}` : d.branch ? `lokaler Zweig ${d.branch} (ohne Upstream)` : "Git-Repository", d.behind ? chip(`${d.behind} neu`, "info") : chip("aktuell", "ok"),
           el("table", { class: "list" }, el("tbody", {},
             el("tr", {}, el("td", { class: "faint", text: "Neueste Änderung" }), el("td", { text: d.latest || "–" })),
             el("tr", {}, el("td", { class: "faint", text: "Lokal voraus" }), el("td", { text: String(d.ahead ?? "–") }))))),

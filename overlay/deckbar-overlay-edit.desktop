@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=DeckBar Overlay bearbeiten
+Name=NexBoard Overlay bearbeiten
 Comment=Widgets des Overlays verschieben und ein-/ausschalten (Esc = fertig)
 Exec=deckbar-overlay --edit
 Icon=transform-move

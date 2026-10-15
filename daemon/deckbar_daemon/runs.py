@@ -16,7 +16,7 @@ ergeben einen Run. Er endet,
 Gepostet wird jeder Run mit mindestens einem besiegten Boss, per Discord-Webhook.
 
 Das Meter speichert fremde Namen maskiert („Mo***n“: zwei Zeichen vorn, eins hinten), der
-Live-Stream (State `dps`) zeigt sie aber voll. Die DeckBar merkt sich die vollen Namen
+Live-Stream (State `dps`) zeigt sie aber voll. Die NexBoard merkt sich die vollen Namen
 (Schlüssel „Maske|Klasse“, in runs-state.json); von Hand in der Web-UI Eingetragenes
 (`names` in runs.yaml) hat Vorrang.
 """
@@ -700,7 +700,7 @@ def render_run(run: Run) -> bytes:
             img.alpha_composite(p, (px, y))
         y += (rh + gap) * S
     d = ImageDraw.Draw(img)
-    _tracked(d, (W - x0, H - (foot - 6) * S), "DECKBAR  ·  DATEN: A2TOOLS DPS METER", font("num", 11),
+    _tracked(d, (W - x0, H - (foot - 6) * S), "NEXBOARD  ·  DATEN: A2TOOLS DPS METER", font("num", 11),
              _rgba(WHITE, 0.25), 1.0, anchor="ra")
     buf = io.BytesIO()
     img.convert("RGB").save(buf, "PNG", optimize=True)
@@ -717,7 +717,7 @@ def run_message(run: Run) -> str:
 
 async def post_discord(session: aiohttp.ClientSession, webhook: str, text: str, png: bytes, filename: str) -> None:
     """PNG + Text an einen Discord-Webhook; wartet einmal, falls Discord bremst (429)."""
-    payload = {"content": text, "username": "DeckBar", "allowed_mentions": {"parse": []},
+    payload = {"content": text, "username": "NexBoard", "allowed_mentions": {"parse": []},
                "attachments": [{"id": 0, "filename": filename}]}
     for attempt in range(2):
         form = aiohttp.FormData()

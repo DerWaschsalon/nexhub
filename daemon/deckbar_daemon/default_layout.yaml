@@ -1,4 +1,4 @@
-# DeckBar-Layout
+# NexBoard-Layout
 #
 # Jede Seite ist ein Raster aus cols x rows Zellen (Standard 6 x 2). Items belegen
 # w x h Zellen und werden der Reihe nach zeilenweise in die erste freie Lücke gesetzt.

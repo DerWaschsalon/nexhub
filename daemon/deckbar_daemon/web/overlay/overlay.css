@@ -1,4 +1,4 @@
-/* DeckBar-Overlay: Widgets im Look des A2Tools-Meters (dunkles HUD), Bearbeiten-Modus im
+/* NexBoard-Overlay: Widgets im Look des A2Tools-Meters (dunkles HUD), Bearbeiten-Modus im
    Glas-Look der Web-UI. Animiert wird nur transform/opacity bzw. Hintergrundposition. */
 :root {
   --hud: rgba(9, 13, 24, .78);

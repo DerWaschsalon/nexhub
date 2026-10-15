@@ -45,7 +45,7 @@ function runsTab(ctx) {
             }, "", "send")),
           (img = el("img", { class: "preview-img", hidden: true, alt: "Vorschau des letzten Runs", style: "margin-top:14px", onerror: () => { img.hidden = true; toast("Noch kein Dungeon-Run in der History", true); } })))),
       card("Namen der Mitspieler", "Das Meter speichert fremde Namen maskiert", null,
-        el("p", { class: "hint small", style: "margin-bottom:14px", text: "Echte Namen lernt die DeckBar während des Kampfs aus der Live-Anzeige (grau vorausgefüllt). Eintragen musst du nur, was falsch oder leer ist." }),
+        el("p", { class: "hint small", style: "margin-bottom:14px", text: "Echte Namen lernt die NexBoard während des Kampfs aus der Live-Anzeige (grau vorausgefüllt). Eintragen musst du nur, was falsch oder leer ist." }),
         namesGrid(r, patch)),
       callout("info", "shield-check", "Die Bilder zeigen Charakternamen deiner Mitspieler. Poste sie nur in Kanäle, in denen das für alle in Ordnung ist."));
   };

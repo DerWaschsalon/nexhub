@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=DeckBar Overlay ein/aus
+Name=NexBoard Overlay ein/aus
 Comment=Overlay über dem Spiel zeigen oder verbergen
 Exec=deckbar-overlay --toggle
 Icon=utilities-system-monitor

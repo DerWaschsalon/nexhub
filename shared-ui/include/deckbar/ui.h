@@ -1,5 +1,5 @@
 #pragma once
-/* Öffentliche Schnittstelle des gemeinsamen DeckBar-UI-Codes. */
+/* Öffentliche Schnittstelle des gemeinsamen NexBoard-UI-Codes. */
 #include <stdbool.h>
 #include <stddef.h>
 

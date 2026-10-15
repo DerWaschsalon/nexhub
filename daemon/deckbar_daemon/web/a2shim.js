@@ -1,6 +1,6 @@
 /*
  * Ersatz für window.__TAURI__, damit die Oberfläche des A2Tools DPS Meter (GPL-3.0, unverändert aus
- * capture/a2tools) im DeckBar-Overlay läuft. Steht in index.html vor allen anderen Skripten (a2ui.py).
+ * capture/a2tools) im NexBoard-Overlay läuft. Steht in index.html vor allen anderen Skripten (a2ui.py).
  *
  *   Daten-Commands     → POST /api/a2/invoke (Daemon → deckbar-capture)
  *   Fenster-Commands   → Qt-Overlay über QWebChannel (Objekt "host", siehe overlay/deckbar-overlay),
@@ -28,7 +28,7 @@
     const settings = JSON.parse(xhr.responseText).result || {};
     for (const [k, v] of Object.entries(settings)) localStorage.setItem(k, v);
   } catch (e) {
-    console.warn("DeckBar: Einstellungen nicht geladen", e);
+    console.warn("NexBoard: Einstellungen nicht geladen", e);
   }
 
   // ------------------------------------------------------------------ Qt-Overlay

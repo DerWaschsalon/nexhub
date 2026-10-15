@@ -1,7 +1,7 @@
 {
   "name": "deckbar-shared-ui",
   "version": "0.1.0",
-  "description": "Gemeinsamer LVGL-UI-Code für DeckBar (Firmware + Simulator)",
+  "description": "Gemeinsamer LVGL-UI-Code für NexBoard (Firmware + Simulator)",
   "frameworks": "*",
   "platforms": "*",
   "dependencies": { "lvgl/lvgl": "9.3.0" },

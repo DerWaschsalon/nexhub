@@ -148,7 +148,7 @@ def run_payload(run: Run) -> dict:
 
 
 async def post_json(session: aiohttp.ClientSession, url: str, payload: dict, token: str = "") -> None:
-    headers = {"User-Agent": "DeckBar"}
+    headers = {"User-Agent": "NexBoard"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     async with session.post(url, json=payload, headers=headers) as resp:

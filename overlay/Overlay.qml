@@ -1,4 +1,4 @@
-// DeckBar-Overlay: eine durchsichtige layer-shell-Fläche über dem ganzen Spielmonitor, darin die
+// NexBoard-Overlay: eine durchsichtige layer-shell-Fläche über dem ganzen Spielmonitor, darin die
 // Widget-Seite des Daemons (web/overlay/). Eingabe-Region und Modus setzt deckbar-overlay (Python).
 import QtQuick
 import QtQuick.Window
@@ -10,7 +10,7 @@ Window {
     id: win
     visible: false  // erst zeigen, wenn Python Monitor und Eingabe-Region gesetzt hat
     color: "transparent"
-    title: "DeckBar Overlay"
+    title: "NexBoard Overlay"
 
     LayerShell.Window.scope: "deckbar-overlay"
     LayerShell.Window.layer: LayerShell.Window.LayerOverlay

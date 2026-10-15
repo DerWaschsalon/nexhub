@@ -1,5 +1,5 @@
 #pragma once
-/* Einstellungen der DeckBar-Firmware. Zugangsdaten stehen in secrets.h (gitignored). */
+/* Einstellungen der NexBoard-Firmware. Zugangsdaten stehen in secrets.h (gitignored). */
 
 #define DECKBAR_FW_VERSION "0.3.0"
 

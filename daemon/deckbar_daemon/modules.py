@@ -7,7 +7,7 @@ geht ohne Neustart. Gespeichert wird nur, was eingeschaltet ist (modules.yaml):
     enabled: [deck, aion2.dps, aion2.overlay]
 
 Abhängigkeiten: Einschalten schaltet benötigte Module mit ein, Ausschalten schaltet die davon
-abhängigen mit aus. Neue Module: Eintrag in MODULES, Aufgaben in server.py (DeckBar.module_tasks)
+abhängigen mit aus. Neue Module: Eintrag in MODULES, Aufgaben in server.py (NexBoard.module_tasks)
 und eine Seite in web/app/modules/.
 """
 from __future__ import annotations
