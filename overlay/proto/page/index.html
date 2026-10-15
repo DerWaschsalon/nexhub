@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>DeckBar Overlay</title>
+<link rel="stylesheet" href="effects.css">
+<link rel="stylesheet" href="overlay.css">
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body>
+<div id="guides"><div class="gv"></div><div class="gh"></div></div>
+
+<div id="toolbar">
+  <b>Bearbeiten</b>
+  <span class="hint">Ziehen = verschieben · Mausrad = Größe · Shift = ohne Raster · Esc = fertig</span>
+  <label>Namenseffekt
+    <select id="fx">
+      <option value="">aus</option><option value="glanz">Glanz</option><option value="brennen">Brennen</option>
+      <option value="gold">Gold</option><option value="frost">Frost</option><option value="holo">Holo</option>
+      <option value="leere">Leere</option>
+    </select>
+  </label>
+  <span id="toggles"></span>
+  <button id="done">Fertig</button>
+</div>
+
+<section class="widget" id="w-meter" data-title="DPS-Meter" data-click>
+  <iframe id="meter" title="DPS-Meter"></iframe>
+</section>
+
+<section class="widget" id="w-name" data-title="Name">
+  <span class="name-demo" id="name-demo">Gamunex</span>
+</section>
+
+<section class="widget" id="w-boss" data-title="Boss">
+  <div class="boss-head"><span class="boss-name">Übungsboss</span><span id="boss-pct">100 %</span></div>
+  <div class="boss-bar"><div class="boss-fill" id="boss-fill"></div><div class="boss-mark" style="left:70%"></div><div class="boss-mark" style="left:40%"></div></div>
+  <div class="boss-foot"><span>Kill in <b id="boss-ttk">–</b></span><span>Enrage <b id="boss-enrage">5:00</b></span></div>
+</section>
+
+<section class="widget" id="w-timer" data-title="Events">
+  <div class="timer-list" id="timer-list"></div>
+</section>
+
+<section class="widget" id="w-auras" data-title="Auren">
+  <div class="auras" id="auras"></div>
+</section>
+
+<script src="overlay.js"></script>
+</body>
+</html>

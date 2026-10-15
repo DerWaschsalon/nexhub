@@ -1,0 +1,87 @@
+/* Namenseffekte. Gleiche Datei für das Namens-Widget und (per Skript eingehängt) die eigene
+   Zeile im A2Tools-Meter. Animiert wird nur background-position, in Schritten mit ~20 Bildern/s:
+   flüssig genug, kostet aber nur ein Drittel (gemessen 13.10.: 60 fps ≈ 10–15 % eines Kerns). */
+
+.dbx-fx {
+  --dbx-base: #6aa6ff;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+}
+
+@keyframes dbx-sweep { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@keyframes dbx-rise { from { background-position: 0 0%; } to { background-position: 0 -300%; } }
+@keyframes dbx-flow { from { background-position: 0% 0; } to { background-position: 300% 0; } }
+@keyframes dbx-flicker {
+  0%, 100% { filter: drop-shadow(0 0 2px #ff5a00) drop-shadow(0 -1px 5px rgba(255, 110, 0, .55)); }
+  45% { filter: drop-shadow(0 0 3px #ff7a00) drop-shadow(0 -2px 7px rgba(255, 140, 0, .7)); }
+  70% { filter: drop-shadow(0 0 2px #ff4000) drop-shadow(0 -1px 4px rgba(255, 80, 0, .45)); }
+}
+
+/* Glanz: Lichtstreifen läuft über die Grundfarbe */
+.dbx-fx-glanz {
+  background-image: linear-gradient(100deg, var(--dbx-base) 0%, var(--dbx-base) 42%, #fff 50%, var(--dbx-base) 58%, var(--dbx-base) 100%);
+  background-size: 250% 100%;
+  animation: dbx-sweep 2.4s steps(48) infinite;
+  filter: drop-shadow(0 0 3px rgba(150, 190, 255, .45));
+}
+
+/* Gold: wie Glanz, warme Palette */
+.dbx-fx-gold {
+  background-image: linear-gradient(100deg, #b8860b 0%, #f5c542 35%, #fff6c8 50%, #f5c542 65%, #b8860b 100%);
+  background-size: 250% 100%;
+  animation: dbx-sweep 2.8s steps(56) infinite;
+  filter: drop-shadow(0 0 3px rgba(245, 197, 66, .5));
+}
+
+/* Brennen: Flammenverlauf steigt nach oben, Glow flackert */
+.dbx-fx-brennen {
+  background-image: linear-gradient(0deg, #ff2a00 0%, #ff7b00 25%, #ffd000 45%, #fff2a8 55%, #ff7b00 75%, #ff2a00 100%);
+  background-size: 100% 300%;
+  animation: dbx-rise 1.1s steps(22) infinite, dbx-flicker .9s steps(3) infinite;
+}
+
+/* Frost: langsamer, kalter Schimmer */
+.dbx-fx-frost {
+  background-image: linear-gradient(100deg, #7fd3ff 0%, #c9f1ff 40%, #ffffff 50%, #c9f1ff 60%, #7fd3ff 100%);
+  background-size: 250% 100%;
+  animation: dbx-sweep 4s steps(80) infinite;
+  filter: drop-shadow(0 0 3px rgba(127, 211, 255, .6));
+}
+
+/* Holo: Regenbogen läuft durch */
+.dbx-fx-holo {
+  background-image: linear-gradient(90deg, #ff4d6d, #ffb84d, #f9f871, #4dffb8, #4db8ff, #b84dff, #ff4d6d);
+  background-size: 300% 100%;
+  animation: dbx-flow 3s steps(60) infinite;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, .35));
+}
+
+/* Leere: dunkles Violett mit pulsierendem Rand */
+.dbx-fx-leere {
+  background-image: linear-gradient(100deg, #3a0066 0%, #8a2be2 40%, #e0b0ff 50%, #8a2be2 60%, #3a0066 100%);
+  background-size: 250% 100%;
+  animation: dbx-sweep 3.2s steps(64) infinite;
+  filter: drop-shadow(0 0 3px rgba(138, 43, 226, .7));
+}
+
+/* Glut-Funken über dem Namen (nur beim Brennen): EIN Element, Punktmuster wandert nach oben und
+   blendet aus. Einzeln animierte Funken-Elemente kosteten ohne GPU ~8 % eines Kerns, das hier ~1 %. */
+.dbx-embers {
+  position: absolute; left: 0; right: 0; top: -18px; height: 26px; pointer-events: none;
+  background-image:
+    radial-gradient(circle, #ffd27a 0 1.2px, transparent 2px),
+    radial-gradient(circle, #ff8a00 0 1px, transparent 1.8px),
+    radial-gradient(circle, #ffb300 0 1.4px, transparent 2.2px);
+  background-size: 23px 26px, 31px 26px, 41px 26px;
+  background-position: 3px 0, 14px 9px, 27px 17px;
+  -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 95%);
+  mask-image: linear-gradient(to top, #000 10%, transparent 95%);
+  animation: dbx-embers 1.3s steps(26) infinite;
+}
+@keyframes dbx-embers {
+  from { background-position: 3px 0, 14px 9px, 27px 17px; }
+  to { background-position: 5px -26px, 11px -17px, 29px -9px; }
+}
