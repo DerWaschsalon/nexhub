@@ -33,7 +33,12 @@ if ! git diff --quiet --ignore-submodules || ! git diff --cached --quiet --ignor
   fail "lokale Änderungen im Repo. Bitte erst committen oder verwerfen."
 fi
 OLD=$(git rev-parse HEAD)
-git pull --ff-only --quiet || fail "git pull ging nicht (lokale Commits? Dann von Hand zusammenführen)."
+if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+  git pull --ff-only --quiet || fail "git pull ging nicht (lokale Commits? Dann von Hand zusammenführen)."
+else
+  # lokaler Entwicklungszweig ohne Gegenstück auf GitHub: nichts zu holen, Rest trotzdem
+  echo "Zweig $(git rev-parse --abbrev-ref HEAD) hat keinen Upstream – überspringe git pull."
+fi
 NEW=$(git rev-parse HEAD)
 changed() { [[ $OLD != "$NEW" ]] && ! git diff --quiet "$OLD" "$NEW" -- "$@"; }
 SUMMARY=()
