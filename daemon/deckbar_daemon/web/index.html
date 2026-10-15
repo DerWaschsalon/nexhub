@@ -2,178 +2,56 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
 <title>DeckBar</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='10' width='28' height='12' rx='4' fill='%235AC8FA'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235AC8FA'/%3E%3Cstop offset='1' stop-color='%238F7CFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='9' width='28' height='14' rx='5' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="stylesheet" href="/static/css/deck.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <span class="logo" aria-hidden="true"></span>
-    <h1>DeckBar</h1>
-  </div>
-  <div class="chips" id="chips"></div>
-  <div class="save" id="save-state" aria-live="polite"></div>
-</header>
+<div class="backdrop" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="scrim" id="scrim"></div>
 
-<div id="error" class="banner error" hidden></div>
-<div id="warnings" class="banner warn" hidden></div>
-<div id="update-banner" class="banner info" hidden>
-  <span id="update-text"></span>
-  <button type="button" id="update-run">Jetzt aktualisieren</button>
+<div class="shell">
+  <aside class="sidebar glass" aria-label="Navigation">
+    <a class="brand" href="#/" style="text-decoration:none;color:inherit">
+      <span class="logo ic" id="logo" aria-hidden="true"></span>
+      <span><b id="brand-name">DeckBar</b><small>Steuerzentrale</small></span>
+    </a>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="conn" id="conn"><span class="dot"></span><span class="t">Verbinde …</span></div>
+      <button type="button" class="btn ghost icon sm" id="theme-btn" title="Hell/Dunkel" aria-label="Hell/Dunkel umschalten"></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar glass">
+      <button type="button" class="btn ghost icon menu-btn" id="menu-btn" aria-label="Menü"></button>
+      <div class="crumbs"><small id="crumb"></small><h1 id="title">DeckBar</h1></div>
+      <div class="spacer"></div>
+      <div id="tabs"></div>
+      <div class="save-state" id="save-state" aria-live="polite"></div>
+    </header>
+    <div class="banners" id="banners"></div>
+    <div id="view"></div>
+  </main>
 </div>
 
-<main>
-  <section class="stage">
-    <div class="stage-bar">
-      <div class="tabs" id="page-tabs" role="tablist"></div>
-      <div class="mode" role="group" aria-label="Modus">
-        <button id="mode-edit" class="seg on" type="button">Bearbeiten</button>
-        <button id="mode-test" class="seg" type="button">Testen</button>
-      </div>
-    </div>
-    <div class="preview-wrap" id="preview-wrap">
-      <div class="preview" id="preview"></div>
-    </div>
-    <p class="hint" id="mode-hint">Klicke eine Kachel an, um sie zu bearbeiten. Im Modus „Testen“ lösen Klicks die echten Aktionen aus.</p>
-  </section>
-
-  <section class="editor">
-    <div class="col pages-col">
-      <div class="card">
-        <div class="card-head">
-          <h2>Seite</h2>
-          <div class="btns">
-            <button type="button" class="icon-btn" id="page-left" title="Nach links">‹</button>
-            <button type="button" class="icon-btn" id="page-right" title="Nach rechts">›</button>
-            <button type="button" class="icon-btn danger" id="page-del" title="Seite löschen">✕</button>
-          </div>
-        </div>
-        <div class="grid2">
-          <label>Name<input id="page-name" maxlength="24"></label>
-          <label>ID<input id="page-id" maxlength="32" pattern="[A-Za-z0-9_-]{1,32}"></label>
-          <label>Spalten<input id="page-cols" type="number" min="1" max="8"></label>
-          <label>Zeilen<input id="page-rows" type="number" min="1" max="3"></label>
-        </div>
-        <button type="button" class="wide" id="page-add">+ Neue Seite</button>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>Kacheln</h2>
-          <div class="add-wrap">
-            <button type="button" id="item-add" class="primary">+ Hinzufügen</button>
-            <div class="menu" id="add-menu" hidden></div>
-          </div>
-        </div>
-        <ol class="items" id="item-list"></ol>
-        <p class="hint small">Reihenfolge per Ziehen ändern. Kacheln werden zeilenweise in die erste freie Lücke gesetzt.</p>
-      </div>
-
-      <div class="card">
-        <h2>Design</h2>
-        <label class="row">Akzentfarbe <input id="accent" type="color"></label>
-        <label class="row">Hintergrund
-          <select id="background">
-            <option value="default">Standard</option>
-            <option value="wallpaper">Desktop-Hintergrund</option>
-            <option value="file">Eigenes Bild</option>
-          </select>
-        </label>
-        <div id="bg-file-row" hidden>
-          <button type="button" class="wide" id="bg-upload">Bild hochladen …</button>
-          <input id="bg-upload-input" type="file" accept="image/*" hidden>
-          <label>oder Pfad
-            <input id="bg-file" type="text" placeholder="/home/…/bild.jpg" spellcheck="false">
-          </label>
-        </div>
-        <p class="hint small">Das Bild wird auf 640 × 172 zugeschnitten, weichgezeichnet und leicht abgedunkelt. Der Desktop-Hintergrund folgt einem Wechsel automatisch.</p>
-        <p class="hint small" id="layout-path"></p>
-      </div>
-
-      <div class="card" id="dps-card">
-        <div class="card-head">
-          <h2>AION 2 DPS-Meter</h2>
-          <span class="chip" id="dps-chip"><span class="dot"></span><span id="dps-status">…</span></span>
-        </div>
-        <label class="check" style="margin-bottom:10px"><input type="checkbox" id="dps-enabled"> DPS aus AION 2 auf die Leiste holen</label>
-        <div class="grid2">
-          <label>Quelle
-            <select id="dps-source">
-              <option value="capture">Eigener Mitschnitt (deckbar-capture)</option>
-              <option value="auto">A2Tools-Meter, Stream-Overlay (automatisch)</option>
-              <option value="manual">A2Tools-Meter, Port und Schlüssel von Hand</option>
-            </select>
-          </label>
-          <label id="dps-lang-row">Sprache (Boss-, Skillnamen)
-            <select id="dps-lang">
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
-              <option value="pt">Português</option>
-              <option value="ru">Русский</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-              <option value="zh-Hans">简体中文</option>
-              <option value="zh-Hant">繁體中文</option>
-            </select>
-          </label>
-        </div>
-        <div class="grid2" id="dps-manual" style="margin-top:10px" hidden>
-          <label>Port<input id="dps-port" type="number" min="1024" max="65535"></label>
-          <label>Schlüssel<input id="dps-key" type="password" autocomplete="off" spellcheck="false" placeholder="key=… aus der Overlay-URL"></label>
-        </div>
-        <div class="grid2" style="margin-top:10px">
-          <label>Bei Kampfbeginn zeigen<select id="dps-page"></select></label>
-          <label>Zurück nach (s, 0 = nie)<input id="dps-return" type="number" min="0" max="600"></label>
-        </div>
-        <p class="hint small" id="dps-hint"></p>
-      </div>
-
-      <div class="card" id="runs-card">
-        <div class="card-head">
-          <h2>Dungeon-Runs → Discord</h2>
-          <span class="chip" id="runs-chip"><span class="dot"></span><span id="runs-status">…</span></span>
-        </div>
-        <label class="check" style="margin-bottom:10px"><input type="checkbox" id="runs-enabled"> Nach jedem Run ein Bild mit dem Schaden pro Boss posten</label>
-        <div class="grid2">
-          <label>Discord-Webhook<input id="runs-webhook" type="password" autocomplete="off" spellcheck="false" placeholder="https://discord.com/api/webhooks/…"></label>
-          <label>Run vorbei nach (min ohne Boss)<input id="runs-idle" type="number" min="2" max="120"></label>
-        </div>
-        <div class="btns" style="margin-top:10px">
-          <button type="button" id="runs-preview">Vorschau letzter Run</button>
-          <button type="button" id="runs-test">Letzten Run jetzt posten</button>
-        </div>
-        <p class="hint small" id="runs-hint"></p>
-        <details class="sub">
-          <summary>Namen der Mitspieler</summary>
-          <p class="hint small">Das A2Tools-Meter speichert Namen maskiert. Die DeckBar merkt sich die echten Namen während des Kampfs aus der Live-Anzeige (grau vorausgefüllt). Eintragen musst du nur, was falsch oder leer ist.</p>
-          <div id="runs-names" class="names"></div>
-        </details>
-      </div>
-    </div>
-
-    <div class="col props-col">
-      <div class="card" id="props">
-        <p class="empty">Keine Kachel ausgewählt.</p>
-      </div>
-    </div>
-  </section>
-</main>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <dialog id="icon-dialog">
-  <form method="dialog" class="icon-dlg">
-    <div class="dlg-head">
+  <form method="dialog" class="dlg">
+    <div class="row">
       <input id="icon-search" placeholder="Icon suchen …" autocomplete="off">
-      <button value="none" type="submit" class="ghost">Kein Icon</button>
-      <button value="cancel" type="submit" class="ghost">Abbrechen</button>
+      <button value="none" type="submit" class="btn ghost">Kein Icon</button>
+      <button value="cancel" type="submit" class="btn ghost">Abbrechen</button>
     </div>
     <div class="icon-grid" id="icon-grid"></div>
   </form>
 </dialog>
 
-<script src="/static/app.js"></script>
+<script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

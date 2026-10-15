@@ -1,0 +1,110 @@
+/* DeckBar-Overlay: Widgets im Look des A2Tools-Meters (dunkles HUD), Bearbeiten-Modus im
+   Glas-Look der Web-UI. Animiert wird nur transform/opacity bzw. Hintergrundposition. */
+:root {
+  --hud: rgba(9, 13, 24, .78);
+  --hud-line: rgba(255, 255, 255, .12);
+  --text: #eef2ff;
+  --muted: rgba(238, 242, 255, .6);
+  --accent: #6aa6ff;
+  --ok: #5fbf87;
+  --warn: #f0bb52;
+  --bad: #ff5d5d;
+  font: 500 14px/1.3 Inter, "Noto Sans", system-ui, sans-serif;
+  color: var(--text);
+}
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+[hidden] { display: none !important; }
+
+.widget {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  box-sizing: border-box;
+  transition: opacity .25s ease;
+}
+.widget.idle { opacity: 0 !important; }
+.hud {
+  background: var(--hud);
+  border: 1px solid var(--hud-line);
+  border-radius: 10px;
+  padding: 8px 12px 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+/* ------------------------------------------------------------ Meter */
+#w-meter { width: 380px; height: 260px; }
+#meter { width: 100%; height: 100%; border: 0; background: transparent; display: block; }
+
+/* ------------------------------------------------------------ Boss */
+#w-boss { width: 420px; }
+.boss-head, .boss-foot { display: flex; justify-content: space-between; gap: 16px; white-space: nowrap; }
+.boss-name { font-weight: 650; font-size: 15px; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+.boss-pct { font-variant-numeric: tabular-nums; font-weight: 650; }
+.boss-bar { position: relative; height: 14px; margin: 7px 0 6px; background: rgba(0, 0, 0, .35); border-radius: 4px; overflow: hidden; }
+.boss-fill {
+  position: absolute; inset: 0 auto 0 0; width: 100%;
+  background: linear-gradient(#e0574f, #a3262a);
+  transform-origin: 0 50%;
+  transition: transform .35s ease-out;
+}
+.boss-glow { position: absolute; top: 0; bottom: 0; width: 2px; background: #ffd9d6; box-shadow: 0 0 8px #ff8a80; transition: left .35s ease-out; }
+.boss-foot { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.boss-foot b { color: var(--text); font-weight: 650; }
+
+/* ------------------------------------------------------------ Timer */
+#w-timers { min-width: 240px; }
+.timer-list div { display: flex; justify-content: space-between; gap: 18px; font-size: 13px; padding: 1.5px 0; }
+.timer-list span:last-child { font-variant-numeric: tabular-nums; color: var(--muted); }
+.timer-list .soon span:last-child { color: var(--warn); }
+.timer-list .open span { color: var(--ok); }
+.timer-list .empty { color: var(--muted); }
+
+/* ------------------------------------------------------------ Bearbeiten */
+body.edit { background: rgba(4, 6, 14, .32); }
+body.edit .widget { outline: 1.5px dashed rgba(106, 166, 255, .9); outline-offset: 4px; cursor: grab; opacity: 1 !important; }
+body.edit .widget.idle { opacity: .55 !important; }
+body.edit .widget.dragging { outline-style: solid; cursor: grabbing; }
+body.edit .widget::before {
+  content: attr(data-title); position: absolute; top: -26px; left: -2px;
+  font-size: 11.5px; font-weight: 650; padding: 3px 8px; border-radius: 999px;
+  background: rgba(106, 166, 255, .9); color: #06101f; white-space: nowrap;
+}
+body.edit #meter { pointer-events: none; } /* sonst schluckt das iframe das Ziehen */
+
+#toolbar {
+  display: none; position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  gap: 14px; align-items: center; padding: 10px 14px 10px 18px; border-radius: 22px;
+  /* Unter dem Overlay liegt das Spiel, nicht diese Seite: backdrop-filter hat nichts zum Verwischen,
+     deshalb dunkles Glas mit Licht oben statt echter Unschärfe */
+  background: linear-gradient(135deg, rgba(40, 52, 84, .94), rgba(14, 18, 32, .94));
+  border: 1px solid rgba(255, 255, 255, .22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 18px 50px rgba(0, 0, 0, .45);
+  z-index: 10; white-space: nowrap; font-size: 13px;
+}
+body.edit #toolbar { display: flex; }
+.tb-title { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.tb-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.tb-hint { color: var(--muted); font-size: 12px; }
+.tb-group { display: flex; gap: 6px; }
+.tb-group label {
+  display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px;
+  background: rgba(0, 0, 0, .25); border: 1px solid rgba(255, 255, 255, .12); cursor: pointer; font-size: 12.5px;
+}
+.tb-group input { accent-color: var(--accent); margin: 0; }
+.tb-select { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+#toolbar select, #toolbar button {
+  font: inherit; color: var(--text); background: rgba(0, 0, 0, .3);
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; padding: 5px 12px;
+}
+#toolbar button { cursor: pointer; }
+#toolbar button.primary { background: var(--accent); color: #06101f; font-weight: 700; border-color: transparent; }
+
+#guides { display: none; }
+body.edit #guides { display: block; }
+#guides div { position: fixed; background: rgba(106, 166, 255, .6); display: none; z-index: 9; }
+#guides .gv { width: 1px; top: 0; bottom: 0; }
+#guides .gh { height: 1px; left: 0; right: 0; }
+
+#offline {
+  position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+  padding: 8px 14px; border-radius: 999px; background: rgba(9, 13, 24, .85); color: var(--warn); font-size: 13px;
+}

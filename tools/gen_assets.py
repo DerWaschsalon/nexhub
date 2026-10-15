@@ -8,7 +8,8 @@ Ausgaben (alle eingecheckt, damit Firmware/Simulator ohne Node bauen):
   shared-ui/fonts/*.c            LVGL-Schriften (lv_font_conv, via npx)
   shared-ui/src/icons_table.c    Icon-Name -> UTF-8-Glyph
   shared-ui/assets/bg_default.c  vorgeblurrter Hintergrund, RGB565 mit Dithering
-  daemon/deckbar_daemon/web/icons.json + mdi.woff   für die Web-UI
+  daemon/deckbar_daemon/web/icons.json + mdi.woff   für die Web-UI (Kachel-Icons)
+  daemon/deckbar_daemon/web/ui-icons.json            Icons der Web-UI selbst (tools/ui-icons.txt)
   docs/icons.md
 """
 from __future__ import annotations
@@ -67,6 +68,23 @@ def fetch_inter() -> Path:
         with urllib.request.urlopen(INTER_URL) as r:
             zipfile.ZipFile(io.BytesIO(r.read())).extractall(d)
     return ttf
+
+
+def read_names(path: Path) -> list[str]:
+    return [n for line in path.read_text().splitlines() if not line.lstrip().startswith("#") for n in line.split()]
+
+
+def gen_ui_icons(cps: dict[str, int]) -> int:
+    """Icons der Web-UI-Oberfläche: dieselbe MDI-Schrift (mdi.woff ist vollständig), eigene Liste."""
+    names = read_names(ROOT / "tools" / "ui-icons.txt")
+    missing = [n for n in names if n not in cps]
+    if missing:
+        print("Unbekannte MDI-Namen in ui-icons.txt:", ", ".join(missing), file=sys.stderr)
+        return 1
+    web = ROOT / "daemon" / "deckbar_daemon" / "web"
+    (web / "ui-icons.json").write_text(json.dumps({n: cps[n] for n in sorted(set(names))}, indent=0) + "\n")
+    print(f"ui-icons.json: {len(set(names))} Icons")
+    return 0
 
 
 def read_icon_names() -> list[str]:
@@ -239,7 +257,7 @@ def gen_background(src: Path | None) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--bg", type=Path, help="eigenes Hintergrundbild (wird eingepasst + weichgezeichnet)")
-    ap.add_argument("--only", choices=["fonts", "bg", "icons"], help="nur einen Teil erzeugen")
+    ap.add_argument("--only", choices=["fonts", "bg", "icons", "web"], help="nur einen Teil erzeugen")
     args = ap.parse_args()
 
     pkg = fetch_mdi()
@@ -250,6 +268,10 @@ def main() -> int:
         print("Unbekannte MDI-Namen:", ", ".join(missing), file=sys.stderr)
         return 1
     icons = {n: cps[n] for n in names}
+    if args.only in (None, "web") and gen_ui_icons(cps):
+        return 1
+    if args.only == "web":
+        return 0
 
     if args.only in (None, "icons", "fonts"):
         gen_icon_table(icons)

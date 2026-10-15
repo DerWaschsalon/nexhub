@@ -3,7 +3,9 @@
  * capture/a2tools) im DeckBar-Overlay läuft. Steht in index.html vor allen anderen Skripten (a2ui.py).
  *
  *   Daten-Commands     → POST /api/a2/invoke (Daemon → deckbar-capture)
- *   Fenster-Commands   → Qt-Overlay über QWebChannel (Objekt "host", siehe overlay/deckbar-overlay)
+ *   Fenster-Commands   → Qt-Overlay über QWebChannel (Objekt "host", siehe overlay/deckbar-overlay),
+ *                        bzw. eingebettet in die Overlay-Seite (web/overlay/) an deren
+ *                        window.__DECKBAR_OVERLAY__.hostCall (gleicher Ursprung)
  *   Events             → GET /api/a2/events (Server-Sent Events) und Signal host.event
  *
  * Das Overlay setzt vorab window.__DECKBAR_WINDOW__ = {label, view}. Im normalen Browser fehlt es,
@@ -30,7 +32,12 @@
   }
 
   // ------------------------------------------------------------------ Qt-Overlay
+  // Eingebettet als Widget der Overlay-Seite: die Seite ist der Host
+  const EMBED = (() => {
+    try { return window.parent !== window ? window.parent.__DECKBAR_OVERLAY__ || null : null; } catch { return null; }
+  })();
   const hostReady = new Promise((resolve) => {
+    if (EMBED) return resolve(null);
     if (typeof QWebChannel === "undefined" || !window.qt || !qt.webChannelTransport) return resolve(null);
     new QWebChannel(qt.webChannelTransport, (ch) => resolve(ch.objects.host || null));
   });
@@ -50,6 +57,7 @@
   };
 
   async function hostCall(cmd, args) {
+    if (EMBED) return EMBED.hostCall(cmd, args || {});
     const host = await hostReady;
     if (!host) {
       if (cmd === "request_details_view") throw "kein Overlay"; // Seite öffnet die Details dann inline

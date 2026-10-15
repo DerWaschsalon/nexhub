@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>DeckBar Overlay</title>
+<link rel="stylesheet" href="effects.css">
+<link rel="stylesheet" href="overlay.css">
+<script src="qrc:///qtwebchannel/qwebchannel.js" onerror="this.remove()"></script>
+</head>
+<body>
+<div id="guides" aria-hidden="true"><div class="gv"></div><div class="gh"></div></div>
+
+<div id="toolbar" role="toolbar" aria-label="Overlay bearbeiten">
+  <div class="tb-title"><span class="dot"></span>Overlay bearbeiten</div>
+  <span class="tb-hint">Ziehen = verschieben · Mausrad = Größe · Shift = frei · Esc = fertig</span>
+  <div class="tb-group" id="toggles"></div>
+  <label class="tb-select" title="Effekt auf deinem Namen in der Meter-Zeile">Namenseffekt
+    <select id="fx">
+      <option value="">aus</option><option value="glanz">Glanz</option><option value="brennen">Brennen</option>
+      <option value="gold">Gold</option><option value="frost">Frost</option><option value="holo">Holo</option>
+      <option value="leere">Leere</option>
+    </select>
+  </label>
+  <button id="reset" type="button">Positionen zurücksetzen</button>
+  <button id="done" type="button" class="primary">Fertig</button>
+</div>
+
+<div id="offline" hidden>DeckBar-Daemon nicht erreichbar – verbinde neu …</div>
+
+<section class="widget" id="w-meter" data-id="meter" data-title="DPS-Meter" data-click>
+  <iframe id="meter" title="DPS-Meter" src="about:blank"></iframe>
+</section>
+
+<section class="widget hud" id="w-boss" data-id="boss" data-title="Boss">
+  <div class="boss-head"><span class="boss-name" id="boss-name">Boss</span><span class="boss-pct" id="boss-pct"></span></div>
+  <div class="boss-bar"><div class="boss-fill" id="boss-fill"></div><div class="boss-glow" id="boss-glow"></div></div>
+  <div class="boss-foot"><span id="boss-time"></span><span id="boss-ttk"></span></div>
+</section>
+
+<section class="widget hud" id="w-timers" data-id="timers" data-title="Event-Timer">
+  <div class="timer-list" id="timer-list"></div>
+</section>
+
+<script src="overlay.js"></script>
+</body>
+</html>

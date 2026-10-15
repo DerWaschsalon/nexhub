@@ -1,0 +1,11 @@
+# Material-Design-Icons für die Oberfläche der Web-UI (nicht fürs Gerät, siehe icons.txt).
+# Nach Änderung: uv run --with pillow tools/gen_assets.py --only web
+view-dashboard view-dashboard-outline gesture-tap-button sword-cross layers-triple trophy robot
+update cog puzzle puzzle-outline chevron-right chevron-left chevron-down menu close check
+check-circle alert alert-circle information-outline power refresh play open-in-new monitor
+monitor-dashboard devices tablet lightning-bolt sword shield-check eye eye-off palette image
+weather-night white-balance-sunny theme-light-dark link-variant key-variant content-copy send
+test-tube timer-outline account-group chart-bar history download upload magnify delete plus
+drag gamepad-variant layers star-four-points forum github web console-line file-document-outline
+pencil cursor-move flash circle-small arrow-right arrow-left format-list-bulleted lock lock-open
+gesture-tap usb wifi lan connection server tune-variant bell-ring account music fire
