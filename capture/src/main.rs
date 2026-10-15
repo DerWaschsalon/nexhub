@@ -471,6 +471,8 @@ async fn run_live(args: Args) {
         "type": "hello",
         "version": env!("CARGO_PKG_VERSION"),
         "parser": rederive::parser_version(),
+        // Was der Daemon voraussetzen darf: "party" = Zeilen tragen das Gruppen-Flag (view.rs)
+        "features": ["party"],
         "pcap": pcap,
         "cap_net_raw": caps,
         "history_dir": args.history_dir,

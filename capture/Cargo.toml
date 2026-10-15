@@ -1,6 +1,6 @@
 [package]
 name = "deckbar-capture"
-version = "0.1.0"
+version = "0.2.0"
 description = "AION-2-Mitschnitt für die DeckBar: A2Tools-Kern ohne Oberfläche, JSON über stdin/stdout"
 license = "GPL-3.0-or-later"
 edition = "2024"

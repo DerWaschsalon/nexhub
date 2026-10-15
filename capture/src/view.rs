@@ -31,6 +31,9 @@ pub struct Row {
     pub dmg: i64,
     pub pct: f64,
     pub you: bool,
+    /// In der eigenen Gruppe: steht im Gruppen-Roster des Spiels (nur dort gibt es Kampfkraft
+    /// bzw. Ausrüstungsstufe). Ohne Gruppe ist niemand markiert, auch „du“ nicht.
+    pub party: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +87,7 @@ struct Candidate {
     class: Option<JobClass>,
     dps: i64,
     dmg: i64,
+    party: bool,
 }
 
 pub fn build(dps: &DpsData, opts: &Options) -> View {
@@ -104,6 +108,7 @@ pub fn build(dps: &DpsData, opts: &Options) -> View {
             class: class_of_job(&row.job),
             dps: row.dps.trunc() as i64,
             dmg: row.amount.trunc() as i64,
+            party: row.combat_power > 0 || row.gear_score > 0,
         };
         let score = |c: &Candidate| (c.class.is_some() as u8) * 2 + c.identified as u8;
         match by_name.iter_mut().find(|c| c.name == next.name) {
@@ -126,16 +131,16 @@ pub fn build(dps: &DpsData, opts: &Options) -> View {
         by_name.retain(is_you);
     }
 
-    // Top N, die eigene Zeile immer dabei (notfalls als N+1.)
+    // Top N, die eigene Zeile und die eigene Gruppe immer dabei (notfalls dahinter)
     let limit = opts.limit.max(1);
-    let you_index = by_name.iter().position(is_you);
     let mut shown: Vec<&Candidate> = by_name.iter().take(limit).collect();
-    if let Some(i) = you_index {
-        if i >= limit {
-            shown.push(&by_name[i]);
+    for c in by_name.iter().skip(limit) {
+        if is_you(c) || c.party {
+            shown.push(c);
         }
-        if opts.pin_you {
-            let pos = shown.iter().position(|c| is_you(c)).unwrap_or(0);
+    }
+    if opts.pin_you {
+        if let Some(pos) = shown.iter().position(|c| is_you(c)) {
             let you = shown.remove(pos);
             shown.insert(0, you);
         }
@@ -152,6 +157,7 @@ pub fn build(dps: &DpsData, opts: &Options) -> View {
             dmg: c.dmg,
             pct: if total > 0 { round1(c.dmg.max(0) as f64 * 100.0 / total as f64) } else { 0.0 },
             you: is_you(c),
+            party: c.party,
         })
         .collect();
 
@@ -226,5 +232,15 @@ mod tests {
         assert_eq!(names, ["Alpha", "Me"]);
         let v = build(&sample(), &Options { limit: 2, pin_you: true });
         assert_eq!(v.rows[0].name, "Me");
+    }
+
+    #[test]
+    fn party_members_are_marked_and_never_cut() {
+        let mut d = sample();
+        d.map.get_mut(&2).unwrap().combat_power = 41_000;
+        d.map.get_mut(&3).unwrap().gear_score = 3100;
+        let v = build(&d, &Options { limit: 1, pin_you: false });
+        let rows: Vec<_> = v.rows.iter().map(|r| (r.name.as_str(), r.party)).collect();
+        assert_eq!(rows, [("Alpha", false), ("Me", true), ("Bravo", true)]);
     }
 }
