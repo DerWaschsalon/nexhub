@@ -24,6 +24,7 @@ let layout = null;
 let mode = new URLSearchParams(location.search).get("mode") || "click";
 let dps = { dps: null, dps_active: false };
 let lockRect = null; // Schloss-Knopf der Meter-Oberfläche, in iframe-Koordinaten
+let cardOpen = false; // Karte (Popup) im Meter offen: dann nimmt auch gesperrt das ganze Meter Klicks an
 let dragging = false;
 
 /* ================================================================ Layout */
@@ -109,7 +110,8 @@ function regions() {
   const visible = (w) => !w.hidden && !w.classList.contains("idle");
   const click = WIDGETS.filter((w) => visible(w) && w.hasAttribute("data-click")).map(rectOf);
   let lock = [];
-  if (lockRect && visible(W.meter)) {
+  if (cardOpen && visible(W.meter)) lock = [rectOf(W.meter)];
+  else if (lockRect && visible(W.meter)) {
     const r = W.meter.getBoundingClientRect();
     const s = cfg("meter").scale || 1;
     lock = [[Math.floor(r.left + lockRect.x * s), Math.floor(r.top + lockRect.y * s),
@@ -391,6 +393,10 @@ window.__DECKBAR_OVERLAY__ = {
       case "overlay_lock_supported": return Promise.resolve(true);
       case "set_overlay_locked":
         requestMode(args.locked ? "lock" : "click");
+        return Promise.resolve(null);
+      case "set_overlay_card_open":
+        cardOpen = !!args.open;
+        regionsSoon();
         return Promise.resolve(null);
       case "set_lock_button_rect":
         lockRect = { x: +args.x || 0, y: +args.y || 0, width: +args.width || 0, height: +args.height || 0 };

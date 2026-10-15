@@ -45,7 +45,7 @@
   const HOST_COMMANDS = new Set([
     "open_url", "quit_app", "start_drag", "start_tool_drag", "resize_window", "begin_tool_resize",
     "begin_window_resize", "finish_window_resize", "overlay_lock_supported", "set_overlay_locked",
-    "set_lock_button_rect", "main_window_ready", "tool_window_ready", "details_window_ready",
+    "set_lock_button_rect", "set_overlay_card_open", "main_window_ready", "tool_window_ready", "details_window_ready",
     "open_settings_window", "close_settings_window", "open_details_window", "close_details_window",
     "request_details_view", "take_pending_details_request", "close_tool_window", "list_monitors",
     "capture_screenshot", "window_show", "window_focus", "window_resize_drag",

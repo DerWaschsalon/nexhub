@@ -183,6 +183,7 @@ class A2Window(QWebEngineView):
         super().__init__()
         self.overlay, self.label, self.view = overlay, label, view
         self.locked = False
+        self.card_open = False  # Karte im Meter offen: auch gesperrt ganz klickbar
         self.lock_rect = QRect()
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_DeleteOnClose, label.startswith("details-"))
@@ -224,7 +225,7 @@ class A2Window(QWebEngineView):
         if self.label != "main" or not self.isVisible():
             return
         rects = None
-        if self.locked:
+        if self.locked and not self.card_open:
             rects = [self.lock_rect] if self.lock_rect.isValid() else []
         self.overlay.shape.set(int(self.winId()), rects)
 
@@ -554,6 +555,10 @@ class Overlay(QObject):
                 if w:
                     w.locked = bool(a.get("locked"))
                     self.lock_action.setChecked(w.locked)
+                    w.apply_lock()
+            case "set_overlay_card_open":
+                if w:
+                    w.card_open = bool(a.get("open"))
                     w.apply_lock()
             case "set_lock_button_rect":
                 if w:

@@ -311,7 +311,11 @@ class A2Ui:
                 return ""
             case "share_status" | "get_hotkey_status":
                 return {}
-            case "plugin_list" | "plugin_set_dev_mode" | "plugin_add_folder" | "plugin_remove_folder" | "plugin_install" | "plugin_uninstall":
+            case "plugin_window_fit":
+                return None
+            case "plugin_boss_timers":
+                return []
+            case "plugin_list" | "plugin_set_dev_mode" | "plugin_add_folder" | "plugin_remove_folder" | "plugin_install" | "plugin_uninstall" | "plugin_set_enabled":
                 return {"devMode": False, "online": False, "plugins": []}
             case "plugin_catalog":
                 return []
