@@ -23,6 +23,7 @@ Live-Stream (State `dps`) zeigt sie aber voll. Die NexBoard merkt sich die volle
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import io
 import json
 import logging
@@ -56,6 +57,11 @@ LATE_POST_S = 3600
 KILL_RATIO = 0.97
 # gelernte Namen (runs-state.json); Weltbosse bringen schnell Dutzende Fremde mit
 MAX_LEARNED = 1000
+# so lange bleiben Kämpfe im Speicher (Mitspielerliste, Vorschau); beim Start werden nur so alte
+# Dateien gelesen, die Endbosse aus älteren stehen in runs-state.json
+KEEP_DAYS = 30
+# Aufräumen alter History-Dateien (Einstellung history_days) höchstens so oft
+CLEANUP_S = 6 * 3600
 # Endbosse je Dungeon (englischer Name wie in i18n/npcs/en.json, gilt für alle Schwierigkeiten
 # und Stufen). Recherche 11.10.2026: metabot.gg, games.gg, gamesfuze.com, thegameswiki.com, u4n.com.
 # Nicht gelistet, weil unklar: Mirror of Scarlet Desire, Consumed Deus Research Base – dort
@@ -96,6 +102,9 @@ class RunSettings(_Strict):
     idle_minutes: int = Field(15, ge=2, le=120)
     # „Mo***n|ranger“ → echter Name
     names: dict[str, str] = Field(default_factory=dict, max_length=200)
+    # Kampf-History des eigenen Mitschnitts nach so vielen Tagen löschen (0 = alles behalten);
+    # die History des A2Tools-Meters bleibt immer unangetastet
+    history_days: int = Field(0, ge=0, le=3650)
 
     @field_validator("webhook")
     @classmethod
@@ -650,7 +659,7 @@ def _panel(boss: Boss, height: int) -> Image.Image:
 
 
 def render_run(run: Run) -> bytes:
-    """Run → PNG: Kopf mit Dungeon, dann je ein Meter-Fenster für „Gesamt“ und jeden Boss."""
+    """Run → Bild (WebP): Kopf mit Dungeon, dann je ein Meter-Fenster für „Gesamt“ und jeden Boss."""
     bosses = run.bosses()
     panels = [run.total(), *bosses] if len(bosses) > 1 else bosses
     cols = 1 if len(panels) == 1 else 2 if len(panels) <= 4 else 3
@@ -661,12 +670,14 @@ def render_run(run: Run) -> bytes:
     H = (margin + head + sum(heights) + gap * (len(rows) - 1) + foot) * S
 
     img = Image.new("RGBA", (W, H), (*HUD_BG, 255))
-    # leichtes Leuchten oben links, damit die Fläche nicht tot wirkt
-    halo = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(halo).ellipse((-W // 4, -H // 2, W // 2, H // 3), fill=(95, 202, 255, 22))
-    img.alpha_composite(halo.filter(ImageFilter.GaussianBlur(80 * S)))
+    # leichtes Leuchten oben links, damit die Fläche nicht tot wirkt. Ein so weicher Verlauf sieht
+    # in 1/8 gerechnet und hochskaliert gleich aus, kostet aber nur einen Bruchteil.
+    q = 8
+    halo = Image.new("RGBA", (W // q, H // q), (0, 0, 0, 0))
+    ImageDraw.Draw(halo).ellipse((-W // 4 // q, -H // 2 // q, W // 2 // q, H // 3 // q), fill=(95, 202, 255, 22))
+    img.alpha_composite(halo.filter(ImageFilter.GaussianBlur(80 * S / q)).resize((W, H), Image.BILINEAR))
 
-    L = _Layers((W, H))
+    L = _Layers((W, (margin + head) * S))  # nur der Kopf
     x0 = margin * S
     L.label((x0, margin * S), run.name, font("name_bold", 28), WHITE, shadow=0.6)
     start = datetime.fromtimestamp(run.start_ms / 1000)
@@ -693,18 +704,33 @@ def render_run(run: Run) -> bytes:
         for i, boss in enumerate(r):
             px = x0 + i * (PANEL_W + gap) * S
             p = _panel(boss, rh)
-            shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            ImageDraw.Draw(shadow).rounded_rectangle((px, y + 8 * S, px + p.width, y + 8 * S + p.height), 10 * S,
-                                                     fill=(0, 0, 0, 115))
-            img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14 * S)))
+            # Schatten nur in Panelgröße plus Rand für die Unschärfe (nicht über die ganze Leinwand)
+            m = 3 * 14 * S
+            shadow = Image.new("RGBA", (p.width + 2 * m, p.height + 2 * m), (0, 0, 0, 0))
+            ImageDraw.Draw(shadow).rounded_rectangle((m, m, m + p.width, m + p.height), 10 * S, fill=(0, 0, 0, 115))
+            sx, sy = px - m, y + 8 * S - m
+            crop = (max(0, -sx), max(0, -sy))
+            img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14 * S)), (max(0, sx), max(0, sy)), crop)
             img.alpha_composite(p, (px, y))
         y += (rh + gap) * S
     d = ImageDraw.Draw(img)
     _tracked(d, (W - x0, H - (foot - 6) * S), "NEXBOARD  ·  DATEN: A2TOOLS DPS METER", font("num", 11),
              _rgba(WHITE, 0.25), 1.0, anchor="ra")
     buf = io.BytesIO()
-    img.convert("RGB").save(buf, "PNG", optimize=True)
+    # verlustfreies WebP: ~30 % kleiner als PNG; method 4 wäre noch kleiner, braucht aber +50 MB
+    img.convert("RGB").save(buf, "WEBP", lossless=True, method=0)
+    del img, L
+    _trim()
     return buf.getvalue()
+
+
+def _trim() -> None:
+    """Nach dem Rendern (~70 MB Spitze) den freien Speicher ans System zurückgeben; glibc behält
+    ihn sonst im Prozess (gemessen: +28 MB statt +6 MB nach einem Run-Bild)."""
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):  # nicht glibc
+        pass
 
 
 def run_message(run: Run) -> str:
@@ -722,7 +748,7 @@ async def post_discord(session: aiohttp.ClientSession, webhook: str, text: str, 
     for attempt in range(2):
         form = aiohttp.FormData()
         form.add_field("payload_json", json.dumps(payload), content_type="application/json")
-        form.add_field("files[0]", png, filename=filename, content_type="image/png")
+        form.add_field("files[0]", png, filename=filename, content_type="image/webp")
         async with session.post(webhook, data=form) as resp:
             if resp.status == 429 and attempt == 0:
                 retry = float((await resp.json(content_type=None) or {}).get("retry_after", 2))
@@ -745,7 +771,13 @@ class DungeonRuns:
         self.fights: dict[str, Fight] = {}  # alle Dungeon-Kämpfe nach id (Mitspielerliste, Vorschau)
         self.pending: list[tuple[Run, float]] = []  # beendet, wartet auf Ruhe in den Dateien
         self.done: set[str] = set()  # Kämpfe aus erledigten Runs – späte Änderungen ignorieren
-        self.last_ms, self.learned = self._read_state()
+        self.last_ms, self.learned, known = self._read_state()
+        self.full_read = known is None  # Endbosse noch nie gesichert: beim Start alles lesen
+        for dungeon, mobs in (known or {}).items():
+            for mob, hp in mobs.items():
+                self.tracker.known.setdefault(dungeon, {})[mob] = hp
+                if is_end_boss(mob):
+                    self.tracker.listed.add(dungeon)
         self.last: Run | None = None  # zuletzt beendeter Run (Vorschau, Testpost)
         self.result = ""  # letzter Post: Erfolg oder Fehler, für die Web-UI
         self.listeners: list[Callable[[], Awaitable[None]]] = []
@@ -754,6 +786,13 @@ class DungeonRuns:
         self._ready = False
         # Wo die History liegt, hängt an der DPS-Quelle (server.py setzt das)
         self.history_dir: Callable[[], Path] = lambda: a2tools_dir() / "history"
+        # True = eigener Mitschnitt: gelesen wird nur nach dessen Meldung „fights_saved“ (wake()),
+        # statt alle POLL_S den Ordner abzufragen. Das A2Tools-Meter meldet nichts, dort pollen.
+        self.event_driven: Callable[[], bool] = lambda: False
+        self.own_history: Callable[[], bool] = lambda: False  # darf alte Dateien löschen
+        self._dirty = True
+        self._unsettled = False
+        self._cleaned = 0.0
 
     # ------------------------------------------------------------ Einstellungen
     def _load(self) -> RunSettings:
@@ -828,13 +867,13 @@ class DungeonRuns:
             self._write_state()
 
     # ------------------------------------------------------------ Zustand über Neustarts
-    def _read_state(self) -> tuple[int | None, dict[str, str]]:
+    def _read_state(self) -> tuple[int | None, dict[str, str], dict[int, dict[int, int]] | None]:
         try:
             data = json.loads(self.state_path.read_text())
         except (OSError, ValueError):
-            return None, {}
+            return None, {}, None
         if not isinstance(data, dict):
-            return None, {}
+            return None, {}, None
         try:
             last_ms = int(data["last_ms"])
         except (KeyError, TypeError, ValueError):
@@ -843,17 +882,26 @@ class DungeonRuns:
         # Schlüssel neu bilden, falls sich die Maskenregel geändert hat (Klasse steht hinter dem „|“)
         learned = {char_key(str(v)[:24], str(k).partition("|")[2] or None): str(v)[:24]
                    for k, v in learned.items()} if isinstance(learned, dict) else {}
-        return last_ms, learned
+        known = None
+        if isinstance(data.get("known"), dict):
+            try:
+                known = {int(d): {int(m): int(hp) for m, hp in mobs.items()} for d, mobs in data["known"].items()}
+            except (TypeError, ValueError, AttributeError):
+                known = None
+        return last_ms, learned, known
 
     def _write_state(self) -> None:
-        data = {"last_ms": self.last_ms, "learned": self.learned}
+        known = {str(d): {str(m): hp for m, hp in mobs.items()} for d, mobs in self.tracker.known.items()}
+        data = {"last_ms": self.last_ms, "learned": self.learned, "known": known}
         _atomic_write(self.state_path, json.dumps(data, ensure_ascii=False, indent=1) + "\n")
 
-    def _scan(self, settle: bool = True) -> list[Fight]:
-        """Neue und seit dem letzten Lesen geänderte Kämpfe."""
+    def _scan(self, settle: bool = True, since: float | None = None) -> list[Fight]:
+        """Neue und seit dem letzten Lesen geänderte Kämpfe. since: ältere Dateien nur vormerken,
+        nicht lesen (Startup; ihre Endbosse stehen in runs-state.json)."""
         hist = self.history_dir()
         now = time.time()
         fights = []
+        self._unsettled = False
         try:
             entries = list(os.scandir(hist))
         except OSError:
@@ -865,14 +913,62 @@ class DungeonRuns:
                 mtime = e.stat().st_mtime
             except OSError:
                 continue
-            if self.mtimes.get(e.name) == mtime or (settle and now - mtime < SETTLE_S):
+            if self.mtimes.get(e.name) == mtime:
+                continue
+            if settle and now - mtime < SETTLE_S:
+                self._unsettled = True  # beim nächsten Durchlauf nochmal
                 continue
             self.mtimes[e.name] = mtime
+            if since is not None and mtime < since:
+                continue
             f = load_fight(Path(e.path))
             if f:
                 fights.append(f)
                 self.fights[f.id] = f
         return sorted(fights, key=lambda f: f.start_ms)
+
+    def _prune(self) -> None:
+        """Kämpfe älter als KEEP_DAYS aus dem Speicher; ihre vollen Namen bleiben als gelernte."""
+        cutoff = (time.time() - KEEP_DAYS * 86400) * 1000
+        old = [f for f in self.fights.values() if f.start_ms < cutoff]
+        if not old:
+            return
+        changed = False
+        for f in old:
+            del self.fights[f.id]
+            for p in f.players:
+                if "*" not in p.name and p.key not in self.learned and len(self.learned) < MAX_LEARNED:
+                    self.learned[p.key] = p.name
+                    changed = True
+        if changed:
+            self._write_state()
+
+    def _cleanup(self) -> int:
+        """History-Dateien des eigenen Mitschnitts löschen, die älter als history_days sind."""
+        days = self.settings.history_days
+        if not days or not self.own_history():
+            return 0
+        cutoff = time.time() - days * 86400
+        n = 0
+        try:
+            entries = list(os.scandir(self.history_dir()))
+        except OSError:
+            return 0
+        for e in entries:
+            try:
+                if e.name.endswith(".json") and e.stat().st_mtime < cutoff:
+                    os.unlink(e.path)
+                    self.mtimes.pop(e.name, None)
+                    n += 1
+            except OSError:
+                continue
+        if n:
+            log.info("History: %d Kämpfe älter als %d Tage gelöscht", n, days)
+        return n
+
+    def wake(self) -> None:
+        """Der Mitschnitt hat Kämpfe gespeichert (fights_saved): beim nächsten Durchlauf lesen."""
+        self._dirty = True
 
     def _update_pending(self, f: Fight) -> bool:
         """Neuer Stand eines Kampfs aus einem schon beendeten, noch nicht geposteten Run."""
@@ -886,7 +982,8 @@ class DungeonRuns:
 
     async def start(self) -> list[Run]:
         """Alte Kämpfe einlesen (lernt die Endbosse) und seit dem letzten Run Verpasstes nachholen."""
-        fights = await asyncio.to_thread(self._scan, False)
+        since = None if self.full_read else time.time() - KEEP_DAYS * 86400
+        fights = await asyncio.to_thread(self._scan, False, since)
         last_ms = self.last_ms
         if last_ms is None:  # erster Start: nichts Altes posten
             self.last_ms = last_ms = int(time.time() * 1000)
@@ -899,6 +996,10 @@ class DungeonRuns:
             else:
                 closed += self.tracker.add(f)
         closed += self.tracker.check_idle(int(time.time() * 1000))
+        if self.full_read:  # Endbosse jetzt gesichert, ab dem nächsten Start nur noch KEEP_DAYS lesen
+            self.full_read = False
+            self._write_state()
+        self._prune()
         self._ready = True
         return closed
 
@@ -913,7 +1014,16 @@ class DungeonRuns:
 
     async def poll(self, session: aiohttp.ClientSession) -> None:
         closed: list[Run] = []
-        for f in await asyncio.to_thread(self._scan):
+        fights: list[Fight] = []
+        if self._dirty or not self.event_driven():
+            self._dirty = False
+            fights = await asyncio.to_thread(self._scan)
+            self._dirty = self._unsettled  # gerade noch geschriebene Dateien beim nächsten Mal
+            self._prune()
+        if time.monotonic() - self._cleaned > CLEANUP_S:
+            self._cleaned = time.monotonic()
+            await asyncio.to_thread(self._cleanup)
+        for f in fights:
             log.info("Bosskampf: %s – %s (%s, %s)", dungeon_name(f.dungeon), f.boss,
                      fmt_time(f.duration_ms), "besiegt" if f.killed else "läuft/nicht besiegt")
             if f.id in self.done or self._update_pending(f):
@@ -953,7 +1063,7 @@ class DungeonRuns:
         run.rename(self.names())
         try:
             png = await asyncio.to_thread(render_run, run)
-            name = f"run-{datetime.fromtimestamp(run.start_ms / 1000):%Y%m%d-%H%M}.png"
+            name = f"run-{datetime.fromtimestamp(run.start_ms / 1000):%Y%m%d-%H%M}.webp"
             await post_discord(session, self.settings.webhook, run_message(run), png, name)
         except (aiohttp.ClientError, TimeoutError, RuntimeError, OSError) as e:
             self.result = f"Fehler beim Posten: {e}"
@@ -987,12 +1097,12 @@ class DungeonRuns:
 
 
 def _cli() -> None:
-    """python -m deckbar_daemon.runs [out.png] – letzten Run aus der History rendern (ohne zu posten)."""
+    """python -m deckbar_daemon.runs [out.webp] – letzten Run aus der History rendern (ohne zu posten)."""
     import sys
     run = DungeonRuns(Path("/nonexistent")).latest_run()
     if not run:
         sys.exit("keine Dungeon-Runs in der History")
-    out = Path(sys.argv[1] if len(sys.argv) > 1 else "run.png")
+    out = Path(sys.argv[1] if len(sys.argv) > 1 else "run.webp")
     out.write_bytes(render_run(run))
     print(run_message(run), "→", out)
 

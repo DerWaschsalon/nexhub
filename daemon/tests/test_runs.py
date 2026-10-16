@@ -88,13 +88,13 @@ def test_rename_and_merge():
     assert run.fights[0].players[0].name == "Mo***n"  # Kämpfe selbst bleiben unverändert
 
 
-def test_render_png():
+def test_render_webp():
     tr = RunTracker(idle_ms=60_000)
     for i in range(4):
         tr.add(F(i + 1, i * 100))
     [run] = tr.check_idle(T0 + 10**7)
-    png = render_run(run)
-    assert png[:8] == b"\x89PNG\r\n\x1a\n" and len(png) > 5000
+    img = render_run(run)
+    assert img[:4] == b"RIFF" and img[8:12] == b"WEBP" and len(img) > 5000
 
 
 def test_settings_validation():
@@ -259,3 +259,70 @@ def test_listed_end_boss_closes_first_run(monkeypatch):
     # Boss 1 hat zwar die meisten HP, ist aber nicht der gelistete Endboss
     assert tr.add(F(1, 3600, max_hp=5000, dmg=(4000, 1000))) == []
     assert tr.run and len(tr.run.fights) == 1
+
+
+async def test_event_driven_reads_only_after_fights_saved(tmp_path, monkeypatch):
+    hist = tmp_path / "hist"
+    hist.mkdir()
+    monkeypatch.setattr(runs_mod, "SETTLE_S", 0)
+    runs = DungeonRuns(tmp_path / "cfg")
+    runs.history_dir = lambda: hist
+    runs.event_driven = lambda: True
+    runs.last_ms = 0
+    await runs.start()
+    runs._dirty = False
+    base = (int(time.time()) * 1000 - T0) // 1000 - 300
+    (hist / "a.json").write_text(json.dumps(fight(1, base)))
+    await runs.poll(None)
+    assert runs.tracker.run is None  # ohne Meldung kein Blick in den Ordner
+    runs.wake()
+    await runs.poll(None)
+    assert runs.tracker.run and len(runs.tracker.run.fights) == 1
+
+
+async def test_start_reads_recent_files_and_keeps_known_end_bosses(tmp_path, monkeypatch):
+    hist = tmp_path / "hist"
+    hist.mkdir()
+    cfg = tmp_path / "cfg"
+    now_s = int(time.time())
+    old_base = now_s - 40 * 86400 - T0 // 1000  # vor 40 Tagen
+    old = [fight(1, old_base, names=("Morgan", "Gamunex")), fight(2, old_base + 100, max_hp=3000, dmg=(2000, 1000))]
+    for f in old:
+        p = hist / f"{f['id']}.json"
+        p.write_text(json.dumps(f))
+        t = now_s - 40 * 86400
+        os.utime(p, (t, t))
+
+    first = DungeonRuns(cfg)
+    first.history_dir = lambda: hist
+    assert first.full_read
+    await first.start()  # erster Start: liest alles, sichert die Endbosse
+    assert first.tracker.end_boss(DUNGEON) == 2
+    assert not first.fights  # älter als KEEP_DAYS: nicht im Speicher …
+    assert first.learned["Mo***n|ranger"] == "Morgan"  # … aber den vollen Namen gemerkt
+
+    loaded = []
+    real_load = runs_mod.load_fight
+    monkeypatch.setattr(runs_mod, "load_fight", lambda path: loaded.append(path.name) or real_load(path))
+    second = DungeonRuns(cfg)
+    second.history_dir = lambda: hist
+    assert not second.full_read and second.tracker.end_boss(DUNGEON) == 2
+    await second.start()
+    assert loaded == []  # alte Dateien nur vorgemerkt, nicht gelesen
+    assert second.names()["Mo***n|ranger"] == "Morgan"
+
+
+def test_cleanup_only_own_history(tmp_path):
+    hist = tmp_path / "hist"
+    hist.mkdir()
+    runs = DungeonRuns(tmp_path / "cfg")
+    runs.history_dir = lambda: hist
+    runs.save(RunSettings(history_days=10))
+    old, new = hist / "old.json", hist / "new.json"
+    for p, age in ((old, 11), (new, 9)):
+        p.write_text("{}")
+        t = time.time() - age * 86400
+        os.utime(p, (t, t))
+    assert runs._cleanup() == 0 and old.exists()  # A2Tools-History: nie löschen
+    runs.own_history = lambda: True
+    assert runs._cleanup() == 1 and not old.exists() and new.exists()

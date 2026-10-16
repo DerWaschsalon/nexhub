@@ -121,6 +121,9 @@ class NexBoard:
         self.dps.status_listeners.append(self._dps_changed)
         self.runs = DungeonRuns(config_dir)
         self.runs.history_dir = self._history_dir
+        own = lambda: self.dps.settings.source == "capture"  # noqa: E731
+        self.runs.event_driven = self.runs.own_history = own
+        self.dps.capture.data_listeners.append(self._capture_event)
         self.runs.listeners.append(self._runs_changed)
         self.updates = Updates()
         self.updates.listeners.append(self._updates_changed)
@@ -236,6 +239,10 @@ class NexBoard:
         if self.modules.on("aion2.dps") and self.dps.settings.source == "capture" and game is not None:
             return game
         return await asyncio.to_thread(aion2_running)
+
+    async def _capture_event(self, event: str, payload) -> None:
+        if event == "fights_saved":
+            self.runs.wake()
 
     def _history_dir(self) -> Path:
         if self.dps.settings.source == "capture":
@@ -741,7 +748,7 @@ class NexBoard:
         if not run:
             return web.json_response({"error": "noch kein Dungeon-Run in der History"}, status=404)
         png = await asyncio.to_thread(render_run, run)
-        return web.Response(body=png, content_type="image/png", headers={"Cache-Control": "no-store"})
+        return web.Response(body=png, content_type="image/webp", headers={"Cache-Control": "no-store"})
 
     async def api_runs_test(self, request: web.Request) -> web.Response:
         """Letzten Run jetzt nach Discord schicken (Knopf in der Web-UI)."""
