@@ -10,6 +10,10 @@ Type=simple
 ExecStart=%h/.local/bin/deckbar-daemon
 Restart=on-failure
 RestartSec=3
+# SIGTERM nur an den Daemon: er schließt die Eingabe von deckbar-capture (speichert laufende Kämpfe)
+# und beendet pactl/playerctl selbst; übrig Gebliebenes bekommt am Ende SIGKILL
+KillMode=mixed
+TimeoutStopSec=25
 
 [Install]
 WantedBy=graphical-session.target

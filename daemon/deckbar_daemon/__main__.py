@@ -18,6 +18,7 @@ from .a2ui import A2Ui
 from .server import NexBoard, build_app, local_only
 
 log = logging.getLogger("deckbar")
+SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Standard: 60 s)
 
 
 async def serve(args: argparse.Namespace) -> NexBoard:
@@ -26,7 +27,7 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     deck = NexBoard(settings, cdir, mdns=not args.no_mdns)
     app = build_app(deck)
 
-    runner = web.AppRunner(app, access_log=None)
+    runner = web.AppRunner(app, access_log=None, shutdown_timeout=SHUTDOWN_TIMEOUT)
     await runner.setup()
     await web.TCPSite(runner, settings.host, settings.port).start()
     url = f"http://localhost:{settings.port}/"
@@ -39,7 +40,8 @@ async def serve(args: argparse.Namespace) -> NexBoard:
             raise web.HTTPServiceUnavailable(text="Modul Overlay ist ausgeschaltet.")
         return await handler(request)
 
-    a2_runner = web.AppRunner(a2.app(local_only, overlay_on, routes=deck.overlay.add_routes), access_log=None)
+    a2_runner = web.AppRunner(a2.app(local_only, overlay_on, routes=deck.overlay.add_routes), access_log=None,
+                              shutdown_timeout=SHUTDOWN_TIMEOUT)
     await a2_runner.setup()
     try:
         await web.TCPSite(a2_runner, "127.0.0.1", settings.port + 1).start()
@@ -59,6 +61,8 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     await stop.wait()
 
     log.info("starte neu …" if deck.restart_requested else "beende …")
+    a2.close_clients()
+    await deck.close_clients()
     await deck.modules.stop_all()
     await a2_runner.cleanup()
     await runner.cleanup()

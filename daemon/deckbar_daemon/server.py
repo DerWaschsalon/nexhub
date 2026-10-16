@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from aiohttp import ClientSession, ClientTimeout, WSMsgType, web
+from aiohttp import ClientSession, ClientTimeout, WSCloseCode, WSMsgType, web
 from pydantic import ValidationError
 
 from . import __version__
@@ -396,6 +396,15 @@ class NexBoard:
         log.debug("%s: %s %s value=%s part=%s", source, event, item_id, value, part)
         await self.executor.on_event(item, event, value, part)
         return None
+
+    async def close_clients(self) -> None:
+        """Beim Beenden: Geräte, Web-UI-Tabs und Overlay-Streams trennen, damit aiohttp nicht auf
+        offene Handler wartet. Geräte verbinden sich nach dem Neustart von selbst wieder."""
+        self.overlay.close_clients()
+        sockets = [d.ws for d in list(self.devices)] + list(self.ui_clients)
+        if sockets:
+            await asyncio.wait([asyncio.ensure_future(ws.close(code=WSCloseCode.GOING_AWAY, message=b"shutdown"))
+                                for ws in sockets], timeout=2)
 
     # ---------------------------------------------------------------- Geräte-WebSocket
     async def ws_device(self, request: web.Request) -> web.WebSocketResponse:

@@ -187,6 +187,13 @@ class Overlay:
                     pass
             q.put_nowait(text)
 
+    def close_clients(self) -> None:
+        """Beim Beenden: offene Event-Streams sofort schließen (sonst wartet aiohttp darauf)."""
+        for q in list(self.clients):
+            while q.full():
+                q.get_nowait()
+            q.put_nowait(None)
+
     # ------------------------------------------------------------ Programm (User-Dienst)
     async def _systemctl(self, *args: str) -> tuple[int, str]:
         if not self.manage_unit and args[0] != "show":
@@ -321,8 +328,10 @@ class Overlay:
                     text = await asyncio.wait_for(q.get(), 15)
                 except TimeoutError:
                     text = ": ping\n\n"
+                if text is None:  # close_clients(): Daemon fährt herunter
+                    break
                 await resp.write(text.encode())
-        except (ConnectionResetError, asyncio.CancelledError):
+        except ConnectionResetError:
             pass
         finally:
             self.clients.discard(q)

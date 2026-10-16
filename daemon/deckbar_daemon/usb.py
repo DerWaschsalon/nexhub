@@ -63,7 +63,7 @@ class _Port:
         self.path = path
         self.lines: asyncio.Queue[bytes | None] = asyncio.Queue()
         # Standardwerte für DTR/RTS lassen: beide gesetzt = kein Reset beim USB-JTAG der ESP32-S3
-        self.ser = serial.Serial(path, 115200, timeout=0.5)
+        self.ser = serial.Serial(path, 115200, timeout=0.5, write_timeout=1)
         self._loop = loop
         self._lock = threading.Lock()
         self._closed = False

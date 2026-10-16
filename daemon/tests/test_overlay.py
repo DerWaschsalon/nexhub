@@ -123,3 +123,18 @@ async def test_page_and_api(tmp_path):
         first = await r.content.readuntil(b"\n\n")
         assert first.startswith(b"event: layout")
         r.close()
+
+
+async def test_close_clients_beendet_offene_streams(tmp_path):
+    """Beim Beenden des Daemons darf aiohttp nicht auf offene Event-Streams warten."""
+    o = Overlay(tmp_path, manage_unit=False)
+    app = web.Application()
+    o.add_routes(app)
+    async with TestClient(TestServer(app)) as c:
+        r = await c.get("/api/overlay/events")
+        await r.content.readuntil(b"\n\n")
+        await r.content.readuntil(b"\n\n")
+        assert len(o.clients) == 1
+        o.close_clients()
+        assert await asyncio.wait_for(r.content.read(), 2) == b""  # Server hat beendet
+        assert not o.clients

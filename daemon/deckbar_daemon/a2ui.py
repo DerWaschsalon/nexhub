@@ -152,6 +152,13 @@ class A2Ui:
                     pass
             q.put_nowait(text)
 
+    def close_clients(self) -> None:
+        """Beim Beenden: offene Event-Streams sofort schließen (sonst wartet aiohttp darauf)."""
+        for q in list(self.clients):
+            while q.full():
+                q.get_nowait()
+            q.put_nowait(None)
+
     async def events(self, request: web.Request) -> web.StreamResponse:
         resp = web.StreamResponse(headers={"Content-Type": "text/event-stream", "Cache-Control": "no-cache"})
         await resp.prepare(request)
@@ -172,8 +179,10 @@ class A2Ui:
                     text = await asyncio.wait_for(q.get(), 15)
                 except TimeoutError:
                     text = ": ping\n\n"
+                if text is None:  # close_clients(): Daemon fährt herunter
+                    break
                 await resp.write(text.encode())
-        except (ConnectionResetError, asyncio.CancelledError):
+        except ConnectionResetError:
             pass
         finally:
             self.clients.discard(q)
