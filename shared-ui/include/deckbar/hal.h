@@ -12,6 +12,7 @@
  */
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,6 +30,12 @@ bool deckbar_hal_store(const char *key, const char *data, size_t len);
 /* Gespeicherten Blob laden; Rückgabe mit malloc() allokiert (Aufrufer gibt mit free() frei)
  * oder NULL. */
 char *deckbar_hal_load(const char *key);
+
+/* Größeren Binär-Blob dauerhaft speichern (Hintergrundbild, ~220 KB): Kopf und Daten hintereinander.
+ * head == NULL und len == 0 löscht ihn. */
+bool deckbar_hal_store_bin(const char *key, const void *head, size_t head_len, const void *data, size_t len);
+/* Binär-Blob laden; Rückgabe mit malloc() allokiert (Aufrufer gibt mit free() frei) oder NULL. */
+uint8_t *deckbar_hal_load_bin(const char *key, size_t *len);
 
 #ifdef __cplusplus
 }

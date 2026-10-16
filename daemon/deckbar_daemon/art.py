@@ -11,6 +11,7 @@ import base64
 import hashlib
 import io
 import logging
+import struct
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -53,6 +54,21 @@ def chunks(aid: str, w: int, h: int, data: bytes) -> list[dict]:
         msgs.append({"id": aid, "w": w, "h": h, "y": y, "rows": n,
                      "data": base64.b64encode(part).decode()})
     return msgs
+
+
+BIN_CHUNK_BYTES = 12000  # Rohdaten pro Binärframe (WebSockets-Lib der Firmware: max. 15 KB/Nachricht)
+
+
+def bin_chunks(kind: bytes, aid: str, w: int, h: int, data: bytes) -> list[bytes]:
+    """Zerlegt ein RGB565-Bild in Binärframes für Geräte mit `caps: ["bin"]` (kind b"a" Cover,
+    b"b" Hintergrund): "DB", Art, id (16 Byte), w, h, y, rows (uint16 LE), dann die Zeilen.
+    Gegenüber JSON + base64 ein Drittel weniger Daten und ~9× weniger Nachrichten."""
+    row_bytes = w * 2
+    rows = max(1, BIN_CHUNK_BYTES // row_bytes)
+    idb = aid.encode()[:16].ljust(16, b"\0")
+    return [struct.pack("<2sc16sHHHH", b"DB", kind, idb, w, h, y, min(rows, h - y))
+            + data[y * row_bytes:(y + min(rows, h - y)) * row_bytes]
+            for y in range(0, h, rows)]
 
 
 class Art:

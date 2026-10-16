@@ -50,13 +50,18 @@ Gerät                                Daemon
 ### `hello`
 
 ```json
-{"v":1,"type":"hello","token":"…","layout_hash":"3f2a…","page":"main",
+{"v":1,"type":"hello","token":"…","layout_hash":"3f2a…","page":"main","bg_id":"9c01…",
+ "caps":["bin"],
  "device":{"id":"deckbar-a1b2c3","model":"waveshare-s3-lcd-3.49","fw":"0.1.0",
            "width":640,"height":172,"sim":false}}
 ```
 
 `layout_hash` ist optional und gibt den Hash des gecachten Layouts an. Stimmt er,
 lässt der Daemon das `layout` weg. `page` (optional) ist die gerade angezeigte Seite.
+`bg_id` (optional) ist der Hintergrund, den das Gerät zeigt; das Gerät speichert ihn im Flash,
+nach einem Neustart muss er also nicht neu übertragen werden. `caps` (optional): `bin` = das
+Gerät nimmt Bildteile als Binärframes an (siehe `art`). Die USB-Brücke streicht `bin`, über
+USB gibt es nur Textzeilen.
 
 ### `event`
 
@@ -80,11 +85,13 @@ Slider-Events drosselt das Gerät auf höchstens 20 pro Sekunde. Das letzte Even
 
 ### `art_request`
 
-`{"v":1,"type":"art_request","size":88}`
+`{"v":1,"type":"art_request","size":88,"have":"3f2a9c01b2d4"}`
 
 Kantenlänge (8–160 px) des Covers, das das Gerät für seine größte `media`-Kachel braucht.
 Das Gerät schickt die Nachricht nach `welcome` und nach jedem neuen Layout. Der Daemon
 antwortet sofort mit dem aktuellen Cover und schickt danach jedes neue Cover unaufgefordert.
+`have` (optional): dieses Cover in dieser Größe hat das Gerät schon; ist es noch aktuell,
+schickt der Daemon nichts.
 
 ### `pong`
 
@@ -187,7 +194,9 @@ Eigene Schlüssel sind erlaubt (z. B. aus Shell-Statusbefehlen) und lassen sich 
 ```
 
 `time` = Kampfdauer in s, `hp` = Rest-HP des Bosses in % (oder `null`), `rows` absteigend
-nach DPS (höchstens 8). `cls` ist einer von `gladiator`, `templar`, `ranger`, `assassin`,
+nach DPS (höchstens 8; ans Gerät nur so viele, wie seine DPS-Kachel zeigt). Ans Gerät geht
+`dps` höchstens einmal pro Sekunde und nur, solange die angezeigte Seite eine DPS-Kachel hat
+(beim Wechsel dorthin sofort). `cls` ist einer von `gladiator`, `templar`, `ranger`, `assassin`,
 `sorcerer`, `cleric`, `spiritmaster`, `chanter`, `brawler` oder `null` (noch unbekannt).
 
 ### `art`
@@ -199,10 +208,23 @@ nach DPS (höchstens 8). `cls` ist einer von `gladiator`, `templar`, `ranger`, `
 
 Cover des aktuellen Titels (`mpris:artUrl`), mittig quadratisch zugeschnitten und genau auf
 `size` aus `art_request` skaliert. `data` ist RGB565 little-endian (LVGL-Format), Zeilen
-`y` bis `y + rows - 1`. Ein Bild kommt in mehreren Nachrichten zu je ≤ 6000 Byte Rohdaten,
-der Reihe nach von `y = 0` an, weil die Firmware höchstens 15 KB pro Nachricht annimmt.
-Das Gerät zeigt das Bild erst, wenn alle Zeilen da sind. `id: ""` heißt: kein Cover.
-Die URL selbst (`art_url`) bleibt im Daemon und wird nicht ans Gerät geschickt.
+`y` bis `y + rows - 1`. Ein Bild kommt in mehreren Nachrichten zu je ≤ 2000 Byte Rohdaten,
+der Reihe nach von `y = 0` an. Das Gerät zeigt das Bild erst, wenn alle Zeilen da sind.
+`id: ""` heißt: kein Cover. Die URL selbst (`art_url`) bleibt im Daemon und wird nicht ans
+Gerät geschickt. Der Hintergrund (`bg`, 640×172) kommt genauso.
+
+**Binärframes** (Gerät mit `caps: ["bin"]`): Bildteile statt als JSON als WebSocket-Binärframe,
+ohne base64 und mit bis zu 12000 Byte Rohdaten (Firmware: höchstens 15 KB pro Nachricht):
+
+| Byte | Inhalt |
+|---|---|
+| 0–1 | `DB` |
+| 2 | `a` = Cover, `b` = Hintergrund |
+| 3–18 | `id`, mit Nullbytes aufgefüllt |
+| 19–26 | `w`, `h`, `y`, `rows`, je uint16 little-endian |
+| 27– | `rows × w × 2` Byte RGB565 |
+
+`id: ""` (kein Bild) bleibt eine JSON-Nachricht.
 
 ### `ping`
 

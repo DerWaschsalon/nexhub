@@ -17,7 +17,7 @@
 #include "ws_client.h"
 
 /* ------------------------------------------------------------------ Queue Netz -> LVGL */
-typedef enum { Q_OPEN, Q_CLOSE, Q_MSG } qtype_t;
+typedef enum { Q_OPEN, Q_CLOSE, Q_MSG, Q_BIN } qtype_t;
 typedef struct qitem {
     qtype_t type;
     char *data;
@@ -56,6 +56,7 @@ static void q_drain(void)
         qitem_t *next = it->next;
         if (it->type == Q_OPEN) deckbar_ui_net_connected();
         else if (it->type == Q_CLOSE) deckbar_ui_net_disconnected(false);
+        else if (it->type == Q_BIN) deckbar_ui_net_binary((const uint8_t *)it->data, it->len);
         else deckbar_ui_net_message(it->data, it->len);
         free(it->data);
         free(it);
@@ -66,6 +67,7 @@ static void q_drain(void)
 static void on_open(void *u) { (void)u; q_push(Q_OPEN, NULL, 0); }
 static void on_close(void *u) { (void)u; q_push(Q_CLOSE, NULL, 0); }
 static void on_message(void *u, const char *t, size_t l) { (void)u; q_push(Q_MSG, t, l); }
+static void on_binary(void *u, const unsigned char *d, size_t l) { (void)u; q_push(Q_BIN, (const char *)d, l); }
 
 /* ------------------------------------------------------------------ HAL */
 static char cache_dir[512];
@@ -107,6 +109,40 @@ char *deckbar_hal_load(const char *key)
     fseek(f, 0, SEEK_SET);
     char *buf = n > 0 && n < 1024 * 1024 ? malloc((size_t)n + 1) : NULL;
     if (buf && fread(buf, 1, (size_t)n, f) == (size_t)n) buf[n] = 0;
+    else {
+        free(buf);
+        buf = NULL;
+    }
+    fclose(f);
+    return buf;
+}
+
+bool deckbar_hal_store_bin(const char *key, const void *head, size_t head_len, const void *data, size_t len)
+{
+    if (!cache_dir[0]) return false;
+    char path[600], tmp[610];
+    snprintf(path, sizeof path, "%s/%s.bin", cache_dir, key);
+    if (!head && !len) return remove(path) == 0 || errno == ENOENT;
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    FILE *f = fopen(tmp, "wb");
+    if (!f) return false;
+    bool ok = fwrite(head, 1, head_len, f) == head_len && fwrite(data, 1, len, f) == len;
+    ok = fclose(f) == 0 && ok;
+    return ok && rename(tmp, path) == 0;
+}
+
+uint8_t *deckbar_hal_load_bin(const char *key, size_t *len)
+{
+    if (!cache_dir[0]) return NULL;
+    char path[600];
+    snprintf(path, sizeof path, "%s/%s.bin", cache_dir, key);
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *buf = n > 0 && n < 4 * 1024 * 1024 ? malloc((size_t)n) : NULL;
+    if (buf && fread(buf, 1, (size_t)n, f) == (size_t)n) *len = (size_t)n;
     else {
         free(buf);
         buf = NULL;
@@ -318,7 +354,7 @@ int main(int argc, char **argv)
         lv_sysmon_hide_performance(disp);
     }
 
-    ws_callbacks_t cb = {on_open, on_close, on_message};
+    ws_callbacks_t cb = {on_open, on_close, on_message, on_binary};
     ws = ws_client_start(url, &cb, NULL);
     if (!ws) return 1;
     deckbar_ui_set_detail(url);

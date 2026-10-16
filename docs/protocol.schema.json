@@ -29,7 +29,10 @@
     "art_request": {
       "type": "object",
       "required": ["size"],
-      "properties": { "size": { "type": "integer", "minimum": 8, "maximum": 160 } }
+      "properties": {
+        "size": { "type": "integer", "minimum": 8, "maximum": 160 },
+        "have": { "type": "string", "maxLength": 16 }
+      }
     },
     "art": {
       "type": "object",
@@ -53,6 +56,8 @@
         "token": { "type": "string", "maxLength": 128 },
         "layout_hash": { "type": "string", "maxLength": 64 },
         "page": { "$ref": "#/$defs/id" },
+        "bg_id": { "type": "string", "maxLength": 16 },
+        "caps": { "type": "array", "items": { "type": "string", "maxLength": 16 } },
         "device": {
           "type": "object",
           "required": ["id", "width", "height"],

@@ -216,6 +216,7 @@ static void session(ws_client_t *c)
 {
     char *msg = NULL;
     size_t msg_len = 0;
+    int msg_op = 0x1; /* Text oder Binär, für Fortsetzungsframes */
     for (;;) {
         unsigned char h[2];
         if (read_exact(c, h, 2) < 0) break;
@@ -246,7 +247,8 @@ static void session(ws_client_t *c)
             send_frame(c, 0x8, payload, len >= 2 ? 2 : 0);
             free(payload);
             break;
-        } else if (op == 0x1 || op == 0x0) {
+        } else if (op == 0x1 || op == 0x2 || op == 0x0) {
+            if (op) msg_op = op;
             char *nm = realloc(msg, msg_len + (size_t)len + 1);
             if (!nm) {
                 free(payload);
@@ -257,7 +259,9 @@ static void session(ws_client_t *c)
             msg_len += (size_t)len;
             msg[msg_len] = 0;
             if (fin) {
-                c->cb.on_message(c->user, msg, msg_len);
+                if (msg_op == 0x2) {
+                    if (c->cb.on_binary) c->cb.on_binary(c->user, (const unsigned char *)msg, msg_len);
+                } else c->cb.on_message(c->user, msg, msg_len);
                 free(msg);
                 msg = NULL;
                 msg_len = 0;

@@ -25,6 +25,11 @@
 #define DRAG_THRESHOLD 6
 #define HELLO_TIMEOUT_MS 5000
 #define CACHE_KEY "layout"
+#define BG_KEY "bg"          /* Hintergrund im Flash: nach einem Neustart nicht erneut übertragen */
+#define BG_MAGIC "DBG1"
+/* Binärframe mit einem Bildteil: "DB", Art ('a' Cover, 'b' Hintergrund), id (16 Byte, mit Nullen
+ * aufgefüllt), w, h, y, rows (je uint16 little endian), dann rows*w*2 Byte RGB565 */
+#define BIN_HEAD 27
 
 typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS } it_type_t;
 
@@ -95,7 +100,7 @@ typedef struct {
 typedef struct {
     lv_image_dsc_t dsc[2];
     uint8_t *buf[2];
-    char id[2][16];
+    char id[2][17];
     int front;          /* angezeigter Puffer, -1 = keins */
     int32_t back_rows;  /* bereits empfangene Zeilen im hinteren Puffer */
 } img_rx_t;
@@ -363,31 +368,31 @@ static void request_art(void)
     for (int i = 0; i < ui.tile_count; i++)
         if (ui.tiles[i].type == IT_MEDIA && ui.tiles[i].cover_px > px) px = ui.tiles[i].cover_px;
     if (!px || ui.net != DECKBAR_NET_ONLINE) return;
-    char buf[64];
-    snprintf(buf, sizeof buf, "{\"v\":%d,\"type\":\"art_request\",\"size\":%ld}", DECKBAR_PROTO_VERSION, (long)px);
+    char buf[96];
+    int f = ui.art.front;
+    /* have: dieses Cover in dieser Größe ist schon da, der Daemon schickt es dann nicht nochmal */
+    if (f >= 0 && (int32_t)ui.art.dsc[f].header.w == px)
+        snprintf(buf, sizeof buf, "{\"v\":%d,\"type\":\"art_request\",\"size\":%ld,\"have\":\"%s\"}",
+                 DECKBAR_PROTO_VERSION, (long)px, ui.art.id[f]);
+    else
+        snprintf(buf, sizeof buf, "{\"v\":%d,\"type\":\"art_request\",\"size\":%ld}", DECKBAR_PROTO_VERSION,
+                 (long)px);
     send_raw(buf);
 }
 
 /*
- * Nimmt einen Teil eines RGB565-Bilds an. Liefert 1, wenn das Bild damit vollständig ist
- * (vorderer Puffer gewechselt), -1 bei `id: ""` (kein Bild mehr), sonst 0.
+ * Prüft einen Teil eines RGB565-Bilds und liefert die Stelle im hinteren Puffer, an die seine
+ * Zeilen gehören (NULL = verwerfen). Danach img_rx_done().
  */
-static int img_rx_chunk(img_rx_t *rx, const cJSON *msg, int32_t min_w, int32_t max_w, int32_t max_h)
+static uint8_t *img_rx_target(img_rx_t *rx, const char *id, int32_t w, int32_t h, int32_t y, int32_t rows,
+                              int32_t min_w, int32_t max_w, int32_t max_h)
 {
-    const char *id = jstr(msg, "id");
-    if (!id || !*id) {
-        rx->front = -1;
-        return -1;
-    }
-    int32_t w = jint(msg, "w", 0), h = jint(msg, "h", 0);
-    int32_t y = jint(msg, "y", -1), rows = jint(msg, "rows", 0);
-    const char *data = jstr(msg, "data");
-    if (w < min_w || w > max_w || h < 1 || h > max_h || y < 0 || rows <= 0 || y + rows > h || !data) return 0;
+    if (w < min_w || w > max_w || h < 1 || h > max_h || y < 0 || rows <= 0 || y + rows > h) return NULL;
 
     int f = rx->front;
     /* dasselbe Bild nochmal (z. B. nach Neuverbindung): nichts tun */
     if (f >= 0 && !strcmp(rx->id[f], id) && (int32_t)rx->dsc[f].header.w == w && (int32_t)rx->dsc[f].header.h == h)
-        return 0;
+        return NULL;
 
     int b = f == 0 ? 1 : 0;
     lv_image_dsc_t *d = &rx->dsc[b];
@@ -400,7 +405,7 @@ static int img_rx_chunk(img_rx_t *rx, const cJSON *msg, int32_t min_w, int32_t m
         lv_image_cache_drop(d);
         memset(d, 0, sizeof *d);
         rx->id[b][0] = 0;
-        if (!rx->buf[b]) return 0;
+        if (!rx->buf[b]) return NULL;
         d->header.magic = LV_IMAGE_HEADER_MAGIC;
         d->header.cf = LV_COLOR_FORMAT_RGB565;
         d->header.w = (uint32_t)w;
@@ -411,8 +416,14 @@ static int img_rx_chunk(img_rx_t *rx, const cJSON *msg, int32_t min_w, int32_t m
         copy_str(rx->id[b], sizeof rx->id[b], id);
         rx->back_rows = 0;
     }
-    int32_t want = rows * w * 2;
-    if (b64_decode(data, rx->buf[b] + y * w * 2, want) != want) return 0;
+    return rx->buf[b] + y * w * 2;
+}
+
+/* Nach dem Schreiben eines Teils: 1, wenn das Bild damit vollständig ist (vorderer Puffer
+ * gewechselt), sonst 0. */
+static int img_rx_done(img_rx_t *rx, int32_t y, int32_t rows, int32_t h)
+{
+    int b = rx->front == 0 ? 1 : 0;
     rx->back_rows += rows;
     if (y + rows == h && rx->back_rows >= h) {
         rx->front = b;
@@ -421,16 +432,110 @@ static int img_rx_chunk(img_rx_t *rx, const cJSON *msg, int32_t min_w, int32_t m
     return 0;
 }
 
+/*
+ * Nimmt einen Teil eines RGB565-Bilds als JSON (`art`, `bg`, Daten in base64) an. Liefert 1, wenn
+ * das Bild damit vollständig ist, -1 bei `id: ""` (kein Bild mehr), sonst 0.
+ */
+static int img_rx_chunk(img_rx_t *rx, const cJSON *msg, int32_t min_w, int32_t max_w, int32_t max_h)
+{
+    const char *id = jstr(msg, "id");
+    if (!id || !*id) {
+        rx->front = -1;
+        return -1;
+    }
+    int32_t w = jint(msg, "w", 0), h = jint(msg, "h", 0);
+    int32_t y = jint(msg, "y", -1), rows = jint(msg, "rows", 0);
+    const char *data = jstr(msg, "data");
+    if (!data || strlen(id) > 16) return 0;
+    uint8_t *dst = img_rx_target(rx, id, w, h, y, rows, min_w, max_w, max_h);
+    if (!dst) return 0;
+    int32_t want = rows * w * 2;
+    if (b64_decode(data, dst, want) != want) return 0;
+    return img_rx_done(rx, y, rows, h);
+}
+
+static uint16_t le16(const uint8_t *p)
+{
+    return (uint16_t)(p[0] | p[1] << 8);
+}
+
+static void bg_store(void)
+{
+    if (ui.bgi.front < 0) {
+        deckbar_hal_store_bin(BG_KEY, NULL, 0, NULL, 0); /* Standardbild: Gespeichertes löschen */
+        return;
+    }
+    const lv_image_dsc_t *d = &ui.bgi.dsc[ui.bgi.front];
+    uint8_t head[24] = BG_MAGIC;
+    memcpy(head + 4, ui.bgi.id[ui.bgi.front], 16);
+    head[20] = (uint8_t)d->header.w;
+    head[21] = (uint8_t)(d->header.w >> 8);
+    head[22] = (uint8_t)d->header.h;
+    head[23] = (uint8_t)(d->header.h >> 8);
+    if (!deckbar_hal_store_bin(BG_KEY, head, sizeof head, d->data, d->data_size))
+        LV_LOG_WARN("Hintergrund nicht gespeichert");
+}
+
+/* Gespeicherten Hintergrund beim Start laden; seine id geht im hello mit. */
+static void bg_restore(void)
+{
+    size_t len = 0;
+    uint8_t *raw = deckbar_hal_load_bin(BG_KEY, &len);
+    if (!raw) return;
+    uint32_t w = 0, h = 0;
+    char id[17] = {0};
+    if (len >= 24) {
+        w = le16(raw + 20);
+        h = le16(raw + 22);
+        memcpy(id, raw + 4, 16);
+    }
+    uint8_t *dst = len >= 24 && !memcmp(raw, BG_MAGIC, 4) && len == 24 + w * h * 2 && *id
+                       ? img_rx_target(&ui.bgi, id, (int32_t)w, (int32_t)h, 0, (int32_t)h, DECKBAR_W, DECKBAR_W,
+                                       DECKBAR_H)
+                       : NULL;
+    if (dst) {
+        memcpy(dst, raw + 24, w * h * 2);
+        if (img_rx_done(&ui.bgi, 0, (int32_t)h, (int32_t)h)) lv_image_set_src(ui.bg, &ui.bgi.dsc[ui.bgi.front]);
+    } else LV_LOG_WARN("gespeicherter Hintergrund ungültig");
+    free(raw);
+}
+
 static void handle_art(const cJSON *msg)
 {
     if (img_rx_chunk(&ui.art, msg, 8, 160, 160) != 0) art_apply_all();
 }
 
-static void handle_bg(const cJSON *msg)
+static void bg_apply(int r)
 {
-    int r = img_rx_chunk(&ui.bgi, msg, DECKBAR_W, DECKBAR_W, DECKBAR_H);
     if (r == 0) return;
     lv_image_set_src(ui.bg, r > 0 ? (const void *)&ui.bgi.dsc[ui.bgi.front] : (const void *)&deckbar_bg_default);
+    bg_store();
+}
+
+static void handle_bg(const cJSON *msg)
+{
+    bg_apply(img_rx_chunk(&ui.bgi, msg, DECKBAR_W, DECKBAR_W, DECKBAR_H));
+}
+
+void deckbar_ui_net_binary(const uint8_t *data, size_t len)
+{
+    ui.last_rx = lv_tick_get();
+    if (len < BIN_HEAD || data[0] != 'D' || data[1] != 'B') return;
+    char id[17] = {0};
+    memcpy(id, data + 3, 16);
+    int32_t w = le16(data + 19), h = le16(data + 21), y = le16(data + 23), rows = le16(data + 25);
+    if (!*id || len != BIN_HEAD + (size_t)(rows * w * 2)) return;
+    if (data[2] == 'a') {
+        uint8_t *dst = img_rx_target(&ui.art, id, w, h, y, rows, 8, 160, 160);
+        if (!dst) return;
+        memcpy(dst, data + BIN_HEAD, (size_t)(rows * w * 2));
+        if (img_rx_done(&ui.art, y, rows, h)) art_apply_all();
+    } else if (data[2] == 'b') {
+        uint8_t *dst = img_rx_target(&ui.bgi, id, w, h, y, rows, DECKBAR_W, DECKBAR_W, DECKBAR_H);
+        if (!dst) return;
+        memcpy(dst, data + BIN_HEAD, (size_t)(rows * w * 2));
+        bg_apply(img_rx_done(&ui.bgi, y, rows, h));
+    }
 }
 
 /* ======================================================================= Kacheln: Zustände */
@@ -1315,6 +1420,8 @@ static void send_hello(void)
     if (ui.layout_hash[0]) cJSON_AddStringToObject(o, "layout_hash", ui.layout_hash);
     if (ui.page_count) cJSON_AddStringToObject(o, "page", ui.page_ids[ui.page_active]);
     if (ui.bgi.front >= 0) cJSON_AddStringToObject(o, "bg_id", ui.bgi.id[ui.bgi.front]);
+    /* bin: Bildteile auch als Binärframes (deckbar_ui_net_binary) */
+    cJSON_AddItemToArray(cJSON_AddArrayToObject(o, "caps"), cJSON_CreateString("bin"));
     cJSON *d = cJSON_AddObjectToObject(o, "device");
     cJSON_AddStringToObject(d, "id", ui.cfg.device_id ? ui.cfg.device_id : "deckbar");
     cJSON_AddStringToObject(d, "model", ui.cfg.model ? ui.cfg.model : "");
@@ -1471,6 +1578,7 @@ void deckbar_ui_init(const deckbar_config_t *cfg)
     ui.bg = lv_image_create(scr);
     lv_image_set_src(ui.bg, &deckbar_bg_default);
     lv_obj_set_pos(ui.bg, 0, 0);
+    bg_restore();
 
     build_status_ui();
 

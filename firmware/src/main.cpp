@@ -18,6 +18,7 @@
  */
 #include <Arduino.h>
 #include <ESPmDNS.h>
+#include <FFat.h>
 #include <Preferences.h>
 #include <WebSocketsClient.h>
 #include <WiFi.h>
@@ -41,7 +42,7 @@
 static const char *TAG = "deckbar";
 
 /* ------------------------------------------------------------------ Queues */
-enum { EV_OPEN, EV_CLOSE, EV_CLOSE_NOWIFI, EV_MSG, EV_DETAIL };
+enum { EV_OPEN, EV_CLOSE, EV_CLOSE_NOWIFI, EV_MSG, EV_BIN, EV_DETAIL };
 struct net_ev_t {
     uint8_t type;
     char *data; /* ps_malloc, Empfänger gibt frei */
@@ -118,6 +119,50 @@ extern "C" char *deckbar_hal_load(const char *key)
     return buf;
 }
 
+/* Größere Blobs (Hintergrund ~220 KB) im FAT-Bereich des Flashs (Partition ffat, 9 MB):
+ * NVS (Preferences) ist dafür zu klein. */
+static bool ffat_ok;
+
+static String blob_path(const char *key)
+{
+    return String("/") + key + ".bin";
+}
+
+extern "C" bool deckbar_hal_store_bin(const char *key, const void *head, size_t head_len, const void *data, size_t len)
+{
+    if (!ffat_ok) return false;
+    String path = blob_path(key), tmp = path + ".tmp";
+    if (!head && !len) return !FFat.exists(path) || FFat.remove(path);
+    uint32_t t0 = millis();
+    File f = FFat.open(tmp, FILE_WRITE);
+    if (!f) return false;
+    bool ok = f.write((const uint8_t *)head, head_len) == head_len && f.write((const uint8_t *)data, len) == len;
+    f.close();
+    if (ok) {
+        FFat.remove(path);
+        ok = FFat.rename(tmp, path);
+    }
+    log_printf("Blob %s gespeichert (%u Byte, %u ms): %s\n", key, (unsigned)(head_len + len),
+               (unsigned)(millis() - t0), ok ? "ok" : "Fehler");
+    return ok;
+}
+
+extern "C" uint8_t *deckbar_hal_load_bin(const char *key, size_t *len)
+{
+    if (!ffat_ok) return nullptr;
+    File f = FFat.open(blob_path(key), FILE_READ);
+    if (!f) return nullptr;
+    size_t n = f.size();
+    uint8_t *buf = n ? (uint8_t *)ps_malloc(n) : nullptr;
+    if (buf && f.read(buf, n) == n) *len = n;
+    else {
+        free(buf);
+        buf = nullptr;
+    }
+    f.close();
+    return buf;
+}
+
 /* ------------------------------------------------------------------ LVGL-Task */
 static uint32_t tick_cb(void)
 {
@@ -142,6 +187,7 @@ static void lvgl_task(void *arg)
 #endif
                     deckbar_ui_net_message(ev.data, ev.len);
                     break;
+                case EV_BIN: deckbar_ui_net_binary((const uint8_t *)ev.data, ev.len); break;
                 case EV_DETAIL: deckbar_ui_set_detail(ev.data); break;
                 }
                 free(ev.data);
@@ -211,6 +257,9 @@ static void ws_event(WStype_t type, uint8_t *payload, size_t len)
         break;
     case WStype_TEXT:
         push_in(EV_MSG, (const char *)payload, len);
+        break;
+    case WStype_BIN: /* Bildteile (hello.caps "bin") */
+        push_in(EV_BIN, (const char *)payload, len);
         break;
     case WStype_ERROR: log_printf("WS-Fehler %.*s\n", (int)len, payload ? (const char *)payload : ""); break;
     default: break;
@@ -424,6 +473,10 @@ void setup()
     q_out = xQueueCreate(32, sizeof(char *));
     lvgl_mux = xSemaphoreCreateMutex();
     prefs.begin("deckbar", false);
+    /* beim ersten Start einmal formatieren (dauert ein paar Sekunden) */
+    ffat_ok = FFat.begin(true);
+    log_printf("FFat %s (%u KB frei)\n", ffat_ok ? "bereit" : "nicht verfügbar",
+               ffat_ok ? (unsigned)(FFat.freeBytes() / 1024) : 0);
 
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA); /* WiFi.macAddress() liefert vor WiFi.mode() nur Nullen */

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import glob
+import json
 import logging
 import threading
 import time
@@ -52,6 +53,20 @@ def parse_line(raw: bytes) -> bytes | None:
     if i < 0:
         return None
     return raw[i + len(PREFIX):].strip(b"\r\n")
+
+
+def _text_only(text: str) -> str:
+    """Die Brücke reicht nur Textzeilen weiter: Binärbilder („bin“ im hello) gibt es über USB nicht."""
+    if '"hello"' not in text:
+        return text
+    try:
+        msg = json.loads(text)
+    except ValueError:
+        return text
+    if msg.get("type") != "hello" or "bin" not in (msg.get("caps") or []):
+        return text
+    msg["caps"] = [c for c in msg["caps"] if c != "bin"]
+    return json.dumps(msg, ensure_ascii=False, separators=(",", ":"))
 
 
 class _Port:
@@ -233,7 +248,7 @@ class UsbBridge:
                 if p == BEACON:
                     return "restart"
                 if p.startswith(b"{"):
-                    await ws.send_str(p.decode("utf-8", "replace"))
+                    await ws.send_str(_text_only(p.decode("utf-8", "replace")))
 
         async def ws_to_dev() -> str:
             async for msg in ws:

@@ -2,6 +2,7 @@
 /* Öffentliche Schnittstelle des gemeinsamen NexBoard-UI-Codes. */
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +36,8 @@ void deckbar_ui_net_connected(void);
 void deckbar_ui_net_disconnected(bool no_wifi);
 /* Ein empfangener Textframe (muss nicht nullterminiert sein). */
 void deckbar_ui_net_message(const char *text, size_t len);
+/* Ein empfangener Binärframe (Bildteil, siehe hello.caps "bin"). */
+void deckbar_ui_net_binary(const uint8_t *data, size_t len);
 
 /* Zusatzinfo in der Offline-Anzeige, z. B. IP oder SSID (NULL = keine). */
 void deckbar_ui_set_detail(const char *detail);

@@ -19,7 +19,7 @@ from pydantic import ValidationError
 from . import __version__
 from .actions import Executor
 from .art import MAX_SIZE as ART_MAX_SIZE
-from .art import Art, chunks
+from .art import Art, bin_chunks, chunks
 from .background import UPLOAD_MAX, Background, save_upload
 from .bot import DiscordBot
 from .capture import aion2_running, history_root
@@ -46,6 +46,8 @@ BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing",
 # nur für Daemon/Web-UI; das Gerät bekommt das Cover als Bild per `art`
 DEVICE_HIDDEN_KEYS = {"art_url"}
 MAX_MSG = 16 * 1024
+DPS_DEVICE_INTERVAL = 1.0  # DPS höchstens 1× pro Sekunde je Gerät (die Kachel zeigt ganze Sekunden)
+DPS_DEFAULT_PLAYERS = 5    # wie in shared-ui (build_dps)
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 WEB_DIR = Path(str(resources.files("deckbar_daemon").joinpath("web")))
 
@@ -63,6 +65,11 @@ class Device:
     last_seen: float = field(default_factory=time.monotonic)
     art_size: int = 0  # Kantenlänge des Covers laut art_request, 0 = keins gewünscht
     bg_id: str = ""    # Hintergrund, den das Gerät gerade zeigt ("" = eingebauter)
+    art_have: str = ""  # Cover, das das Gerät schon hat (art_request.have bzw. zuletzt geschickt)
+    binary: bool = False  # Bildteile als Binärframes (hello.caps "bin")
+    dps_sent: float = 0.0  # monotonic des letzten DPS-Versands
+    dps_last: str = ""     # zuletzt geschickte DPS-Nachricht (gleiche nicht nochmal)
+    dps_task: asyncio.Task | None = None
     return_page: str | None = None  # Seite vor dem automatischen Wechsel zur DPS-Seite
     # Bildübertragungen pro Gerät nacheinander, damit sich Teile zweier Bilder nicht mischen
     send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -257,25 +264,80 @@ class NexBoard:
         await self.overlay.on_state(diff)
         if "art_url" in diff:
             asyncio.ensure_future(self._update_art(diff["art_url"]))
-        dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS}
+        dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS and k != "dps"}
         if dev_diff:
             await self._broadcast_devices(_msg("state", full=False, values=dev_diff))
+        if "dps" in diff:
+            for dev in list(self.devices):
+                self._queue_dps(dev)
         await self._broadcast_ui({"type": "state", "values": diff})
+
+    # ---------------------------------------------------------------- DPS ans Gerät
+    def _dps_rows(self, dev: Device) -> int:
+        """So viele Zeilen zeigt die aktuelle Seite des Geräts (0 = keine DPS-Kachel). Seite
+        unbekannt (alte Firmware): die größte DPS-Kachel im Layout."""
+        pages = [p for p in self.layout.pages if p.id == dev.page] or ([] if dev.page else self.layout.pages)
+        return max((it.players or DPS_DEFAULT_PLAYERS for p in pages for it in p.items if it.type == "dps"), default=0)
+
+    def _dps_for(self, dev: Device, rows: int) -> dict | None:
+        value = self.state.values.get("dps")
+        if isinstance(value, dict) and len(value.get("rows") or []) > rows:
+            value = {**value, "rows": value["rows"][:rows]}
+        return value
+
+    def _queue_dps(self, dev: Device) -> None:
+        """DPS höchstens alle DPS_DEVICE_INTERVAL s und nur, solange die Seite eine DPS-Kachel hat.
+        Ein schon geplanter Versand nimmt beim Senden den dann neuesten Stand."""
+        if dev.dps_task and not dev.dps_task.done():
+            return
+        if not self._dps_rows(dev):
+            return
+        wait = dev.dps_sent + DPS_DEVICE_INTERVAL - time.monotonic()
+        dev.dps_task = asyncio.ensure_future(self._send_dps(dev, wait))
+
+    async def _send_dps(self, dev: Device, wait: float) -> None:
+        if wait > 0:
+            await asyncio.sleep(wait)
+        rows = self._dps_rows(dev)
+        if not rows or dev.ws.closed:
+            return
+        text = _msg("state", full=False, values={"dps": self._dps_for(dev, rows)})
+        if text == dev.dps_last:
+            return
+        dev.dps_sent, dev.dps_last = time.monotonic(), text
+        await self._send(dev.ws, text)
 
     # ---------------------------------------------------------------- Cover
     async def _update_art(self, url: str | None) -> None:
         if await self.art.set_url(url):
             await asyncio.gather(*(self._send_art(d) for d in list(self.devices) if d.art_size))
 
+    async def _send_bytes(self, ws: web.WebSocketResponse, data: bytes) -> None:
+        if ws.closed:
+            return
+        try:
+            await ws.send_bytes(data)
+        except (ConnectionError, RuntimeError) as e:
+            log.debug("Senden fehlgeschlagen: %s", e)
+
     async def _send_art(self, dev: Device) -> None:
         async with dev.send_lock:
             r = await self.art.render(dev.art_size)
             if r is None:
-                await self._send(dev.ws, _msg("art", id=""))
+                if dev.art_have != "-":
+                    await self._send(dev.ws, _msg("art", id=""))
+                    dev.art_have = "-"
                 return
             aid, data = r
-            for part in chunks(aid, dev.art_size, dev.art_size, data):
-                await self._send(dev.ws, _msg("art", **part))
+            if aid == dev.art_have:  # hat das Gerät schon (Neuverbindung, zweites art_request)
+                return
+            if dev.binary:
+                for frame in bin_chunks(b"a", aid, dev.art_size, dev.art_size, data):
+                    await self._send_bytes(dev.ws, frame)
+            else:
+                for part in chunks(aid, dev.art_size, dev.art_size, data):
+                    await self._send(dev.ws, _msg("art", **part))
+            dev.art_have = aid
 
     # ---------------------------------------------------------------- Hintergrund
     async def _send_bg(self, dev: Device) -> None:
@@ -285,6 +347,11 @@ class NexBoard:
                 return
             if not bid or data is None:
                 await self._send(dev.ws, _msg("bg", id=""))
+            elif dev.binary:
+                for frame in bin_chunks(b"b", bid, 640, 172, data):
+                    if dev.ws.closed:
+                        return
+                    await self._send_bytes(dev.ws, frame)
             else:
                 for part in chunks(bid, 640, 172, data):
                     if dev.ws.closed:
@@ -451,6 +518,8 @@ class NexBoard:
         dev.fw = str(info.get("fw", ""))[:32]
         dev.sim = bool(info.get("sim", False))
         dev.bg_id = str(hello.get("bg_id", ""))[:16]
+        caps = hello.get("caps")
+        dev.binary = isinstance(caps, list) and "bin" in caps
         page = hello.get("page")
         dev.page = page if isinstance(page, str) and page else None
         self.devices.add(dev)
@@ -461,6 +530,8 @@ class NexBoard:
         if hello.get("layout_hash") != self.layout_payload["hash"]:
             await self._send(ws, _msg("layout", **self.layout_payload))
         values = {k: v for k, v in self.state.values.items() if k not in DEVICE_HIDDEN_KEYS}
+        if "dps" in values:
+            values["dps"] = self._dps_for(dev, self._dps_rows(dev) or DPS_DEFAULT_PLAYERS)
         await self._send(ws, _msg("state", full=True, values=values))
         asyncio.ensure_future(self._send_bg(dev))
 
@@ -492,11 +563,14 @@ class NexBoard:
                 elif t == "art_request":
                     size = msg.get("size")
                     dev.art_size = size if isinstance(size, int) and 0 < size <= ART_MAX_SIZE else 0
+                    have = msg.get("have")
+                    dev.art_have = have[:16] if isinstance(have, str) else ""
                     if dev.art_size:
                         asyncio.ensure_future(self._send_art(dev))
                 elif t == "event":
                     if msg.get("event") == "page_change":
                         dev.page = msg.get("page")
+                        self._queue_dps(dev)  # auf eine DPS-Seite gewechselt: aktuellen Stand nachreichen
                         await self._devices_changed()
                     err = await self.handle_event(msg, dev.id)
                     if err:
@@ -505,6 +579,8 @@ class NexBoard:
                     log.debug("Gerät %s: unbekannter Typ %r", dev.id, t)
         finally:
             hb_task.cancel()
+            if dev.dps_task:
+                dev.dps_task.cancel()
             self.devices.discard(dev)
             log.info("Gerät getrennt: %s", dev.id)
             await self._devices_changed()
