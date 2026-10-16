@@ -276,10 +276,19 @@ async function meterFx() {
     st.id = "deckbar-fx";
     st.textContent = effectsCss;
     doc.head.append(st);
-    new MutationObserver(() => markOwnRow(doc)).observe(doc.documentElement,
+    // Nur die Zeilenliste: das Meter hängt Zeilen ein und schaltet isUser an ihnen um
+    const list = doc.querySelector(".list:not(.barPreviewList)") || doc.documentElement;
+    new MutationObserver(() => markOwnRow(doc)).observe(list,
       { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
   }
   markOwnRow(doc);
+  fxIdle();
+}
+
+/** Effekt nur im Kampf animieren (außerhalb steht er still und kostet nichts). */
+function fxIdle() {
+  const doc = $("meter").contentDocument;
+  doc?.documentElement?.classList.toggle("dbx-idle", !dps.dps_active);
 }
 
 function markOwnRow(doc) {
@@ -427,6 +436,7 @@ function fmt(s) {
 
 function onDps(part) {
   Object.assign(dps, part);
+  if ("dps_active" in part) fxIdle();
   const d = dps.dps;
   if (d && d.target && d.hp != null) {
     if (ttk.target !== d.target) { ttk.target = d.target; ttk.samples = []; }

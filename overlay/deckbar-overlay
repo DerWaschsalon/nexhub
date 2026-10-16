@@ -99,13 +99,16 @@ def choose_backend(args: list[str]) -> str:
 _ARGS = [a.removeprefix("--") for a in sys.argv[1:]]
 BACKEND = choose_backend(_ARGS)
 LAYOUT = fetch_layout() if BACKEND == "layer" else {}
+# Alle Seiten kommen vom Daemon (eine Herkunft): ein gemeinsamer Renderer statt einem je Fenster
+_FLAGS = ["--process-per-site"]
 if BACKEND == "layer":
     os.environ["QT_QPA_PLATFORM"] = "wayland"
     if not LAYOUT.get("gpu", True):
-        os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")
+        _FLAGS.append("--disable-gpu-compositing")
 else:
     os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
-    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")  # transparente Fenster ohne Artefakte
+    _FLAGS.append("--disable-gpu-compositing")  # transparente Fenster ohne Artefakte
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", " ".join(_FLAGS))
 
 from PySide6.QtCore import (QByteArray, QFile, QIODevice, QObject, QPoint, QRect, QSettings, Qt, QTimer, QUrl,  # noqa: E402
                             Property, Signal, Slot)
@@ -186,7 +189,9 @@ class A2Window(QWebEngineView):
         self.card_open = False  # Karte im Meter offen: auch gesperrt ganz klickbar
         self.lock_rect = QRect()
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_DeleteOnClose, label.startswith("details-"))
+        # Werkzeugfenster (Details, Verlauf, Einstellungen) beim Schließen freigeben: versteckt liefen
+        # ihre Seiten weiter (Event-Stream, Abfragen alle 1–10 s, Details-Neuberechnung alle 2 s)
+        self.setAttribute(Qt.WA_DeleteOnClose, label != "main")
         flags = Qt.FramelessWindowHint
         if label == "main":
             flags |= Qt.Tool | Qt.WindowStaysOnTopHint  # nicht in der Taskleiste
@@ -487,9 +492,12 @@ class Overlay(QObject):
                 self.layer.finishEdit()
             self.surface.hide()
         for w in list(self.windows.values()):
-            if w.isVisible():
-                self.remember(w)
-                w.hide()
+            if w.label == "main":
+                if w.isVisible():
+                    self.remember(w)
+                    w.hide()
+            else:
+                w.close()  # merkt die Position (closeEvent) und gibt das Fenster frei
 
     def request_details(self, payload: dict) -> None:
         kind = payload.get("kind")
@@ -581,8 +589,7 @@ class Overlay(QObject):
                 self.reveal(s or self.tool("settings", "settings"))
             case "close_settings_window":
                 if s := self.windows.get("settings"):
-                    self.remember(s)
-                    s.hide()
+                    s.close()
             case "request_details_view":
                 self.request_details(a.get("payload") or {})
             case "take_pending_details_request":
