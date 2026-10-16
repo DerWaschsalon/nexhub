@@ -1,7 +1,8 @@
 //! deckbar-capture: AION-2-Mitschnitt für die NexBoard.
 //!
 //! Setzt den Kern des A2Tools DPS Meter (GPL-3.0, Submodul `a2tools/`) ohne dessen Oberfläche
-//! zusammen, so wie `app.rs` dort es tut: libpcap auf allen Interfaces → CaptureDispatcher
+//! zusammen, so wie `app.rs` dort es tut: libpcap auf allen Interfaces (mit Kernel-Filter, pcap.rs)
+//! → CaptureDispatcher
 //! (Port-Erkennung, Reassembly, Parser) → DataStorage → DpsCalculator. Der Daemon startet das
 //! Programm und spricht mit ihm über Zeilen-JSON:
 //!
@@ -33,7 +34,6 @@ use std::time::Duration;
 use a2tools_dps_meter_lib::capture::captured_payload::CapturedPayload;
 use a2tools_dps_meter_lib::capture::combat_port_detector::CombatPortDetector;
 use a2tools_dps_meter_lib::capture::packet_accumulator::PacketAccumulator;
-use a2tools_dps_meter_lib::capture::pcap_capturer::PcapCapturer;
 use a2tools_dps_meter_lib::capture::stream_processor::StreamProcessor;
 use a2tools_dps_meter_lib::combat::capture_dispatcher::CaptureDispatcher;
 use a2tools_dps_meter_lib::combat::data_storage::DataStorage;
@@ -48,7 +48,10 @@ use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
+mod pcap;
 mod view;
+
+use pcap::PcapCapturer;
 
 const HISTORY_EVERY: Duration = Duration::from_secs(30);
 const STATUS_EVERY: Duration = Duration::from_secs(2);
@@ -266,7 +269,7 @@ impl Core {
                 }))
             }
             "window_title" => Ok(json!(platform::window_detector::find_aion2_window_title())),
-            "devices" => Ok(json!(capture::pcap_capturer::list_device_labels().unwrap_or_default())),
+            "devices" => Ok(json!(pcap::list_device_labels().unwrap_or_default())),
             "set_device" => {
                 let dev = str_arg("device")?.trim().to_string();
                 if let Some(p) = &self.ports {
@@ -479,7 +482,7 @@ async fn run_live(args: Args) {
     }));
 
     let (tx, rx) = mpsc::channel::<CapturedPayload>(4096);
-    let capturer = PcapCapturer::new(tx);
+    let capturer = PcapCapturer::new(tx, Some(ports.clone()));
     if pcap {
         capturer.start();
     }

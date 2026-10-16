@@ -787,6 +787,7 @@ name = "deckbar-capture"
 version = "0.2.0"
 dependencies = [
  "a2tools-dps-meter",
+ "libloading 0.8.9",
  "parking_lot",
  "serde",
  "serde_json",

@@ -18,6 +18,14 @@ fi
 [[ -e a2tools/.git ]] || git -C .. submodule update --init capture/a2tools
 mkdir -p a2tools/dist
 [[ -e a2tools/dist/index.html ]] || echo '<!doctype html>' > a2tools/dist/index.html
+# src/pcap.rs ist eine Kopie des Capturers aus dem Kern (mit Kernel-Filter): Hat sich das Original
+# geändert, die Änderung dort nachziehen und UPSTREAM_SHA anpassen
+want=$(grep -oP 'UPSTREAM_SHA: &str = "\K[0-9a-f]+' src/pcap.rs)
+have=$(sha256sum a2tools/src-tauri/src/capture/pcap_capturer.rs | cut -c1-16)
+if [[ $want != "$have" ]]; then
+  echo "Hinweis: a2tools/src-tauri/src/capture/pcap_capturer.rs hat sich geändert ($want → $have)." >&2
+  echo "         Änderungen nach capture/src/pcap.rs übernehmen, dann UPSTREAM_SHA dort anpassen." >&2
+fi
 cargo build --release "$@"
 if (( INSTALL )); then
   DEST=~/.local/bin/deckbar-capture
