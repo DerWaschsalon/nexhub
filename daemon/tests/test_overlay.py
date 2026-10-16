@@ -45,6 +45,68 @@ async def test_unit_untouched_for_test_instances(tmp_path):
     assert code == 1 and "Testinstanz" in out
 
 
+class FakeUnit:
+    """Stellt systemctl --user nach, ohne systemd anzufassen."""
+
+    def __init__(self, autostart=False):
+        self.calls: list[str] = []
+        self.active, self.autostart = False, autostart
+
+    async def __call__(self, *args):
+        self.calls.append(args[0])
+        match args[0]:
+            case "start":
+                self.active = True
+            case "stop":
+                self.active = False
+            case "disable":
+                self.autostart = False
+            case "show":
+                return 0, (f"LoadState=loaded\nActiveState={'active' if self.active else 'inactive'}\n"
+                           f"UnitFileState={'enabled' if self.autostart else 'disabled'}\n")
+        return 0, ""
+
+
+async def test_overlay_kommt_und_geht_mit_dem_spiel(tmp_path, monkeypatch):
+    import deckbar_daemon.overlay as ov
+    monkeypatch.setattr(ov, "GAME_POLL_S", 0.01)
+    monkeypatch.setattr(ov, "GAME_GRACE_S", 0.06)
+    o = Overlay(tmp_path, manage_unit=True)
+    unit = FakeUnit(autostart=True)
+    o._systemctl = unit
+    o.refresh_screens = lambda: asyncio.sleep(0)
+    game = {"on": False}
+
+    async def check():
+        return game["on"]
+    o.game_check = check
+
+    await o.on_module(True)
+    assert not unit.autostart and not unit.active  # früherer Login-Autostart ist weg, nichts gestartet
+    task = asyncio.ensure_future(o.watch())
+    await asyncio.sleep(0.05)
+    assert not unit.active and "start" not in unit.calls
+
+    game["on"] = True
+    await asyncio.sleep(0.05)
+    assert unit.active and o.game and unit.calls.count("start") == 1
+
+    unit.active = False  # Overlay mitten im Spiel von Hand beendet: bleibt aus
+    await asyncio.sleep(0.05)
+    assert unit.calls.count("start") == 1
+
+    unit.active = True
+    game["on"] = False
+    await asyncio.sleep(0.01)
+    assert unit.active  # Gnadenfrist (Ladebildschirm, Absturz mit Neustart)
+    await asyncio.sleep(0.1)
+    assert not unit.active and not o.game
+
+    await o.on_module(False)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+
+
 async def test_page_and_api(tmp_path):
     o = Overlay(tmp_path, manage_unit=False)
     app = web.Application()

@@ -108,6 +108,7 @@ class Capture:
         self.status: dict[str, Any] = {}
         self.error = ""
         self.game_running = aion2_running  # austauschbar für Tests
+        self.game: bool | None = None  # letzter Blick auf /proc (None = noch keiner bzw. ohne Programm)
         # Volle DpsData (Skills je Spieler) nur, solange jemand sie braucht (Overlay, a2ui.py)
         self.full = False
         self.data_listeners: list[Callable[[str, Any], Awaitable[None]]] = []  # (Ereignis, Inhalt)
@@ -141,15 +142,18 @@ class Capture:
             while True:
                 self.binary = find_binary(configured_binary)
                 if self.binary is None:
+                    self.game = None
                     await self._set("no_binary", f"{BINARY} nicht gefunden")
                     await asyncio.sleep(GAME_POLL_S)
                     continue
-                if not await asyncio.to_thread(self.game_running):
+                self.game = await asyncio.to_thread(self.game_running)
+                if not self.game:
                     await self._set("no_game")
                     await asyncio.sleep(GAME_POLL_S)
                     continue
                 await self._run_once(lang)
         finally:
+            self.game = None
             await self._stop()
 
     async def _run_once(self, lang: str) -> None:
@@ -189,7 +193,8 @@ class Capture:
         gone = 0.0
         while True:
             await asyncio.sleep(GAME_POLL_S)
-            if await asyncio.to_thread(self.game_running):
+            self.game = await asyncio.to_thread(self.game_running)
+            if self.game:
                 gone = 0
                 continue
             gone += GAME_POLL_S

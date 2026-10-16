@@ -22,7 +22,7 @@ from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, chunks
 from .background import UPLOAD_MAX, Background, save_upload
 from .bot import DiscordBot
-from .capture import history_root
+from .capture import aion2_running, history_root
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout, save_settings
 from .config import config_dir as default_config_dir
@@ -125,6 +125,7 @@ class NexBoard:
         self.real_config = config_dir.resolve() == default_config_dir().resolve()
         self.overlay = Overlay(config_dir, manage_unit=self.real_config)
         self.overlay.listeners.append(self._overlay_changed)
+        self.overlay.game_check = self._game_running
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -221,6 +222,13 @@ class NexBoard:
     def _updates_status(self) -> dict:
         u = self.updates.state
         return {"available": u.get("available"), "checked_at": u.get("checked_at"), "error": u.get("error")}
+
+    async def _game_running(self) -> bool:
+        """Läuft AION 2? Schaut der Mitschnitt ohnehin alle 5 s in /proc, gilt sein Blick."""
+        game = self.dps.capture.game
+        if self.modules.on("aion2.dps") and self.dps.settings.source == "capture" and game is not None:
+            return game
+        return await asyncio.to_thread(aion2_running)
 
     def _history_dir(self) -> Path:
         if self.dps.settings.source == "capture":

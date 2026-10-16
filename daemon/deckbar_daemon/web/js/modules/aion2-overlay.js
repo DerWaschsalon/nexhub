@@ -18,6 +18,7 @@ function unitChip(o) {
   const u = o?.unit || {};
   if (u.installed === false) return chip("nicht eingerichtet", "warn");
   if (u.active) return chip("läuft", "ok");
+  if (u.state === "inactive" && !o.game) return chip("wartet auf AION 2");
   if (u.state) return chip(u.state === "inactive" ? "beendet" : u.state, u.state === "failed" ? "bad" : "");
   return chip("…");
 }
@@ -34,7 +35,7 @@ function controlTab(ctx) {
     fill(box,
       o.unit?.installed === false ? callout("warn", "alert", el("span", {}, "Das Overlay-Programm ist noch nicht eingerichtet. Einmal im Repo ausführen: ", el("code", { text: "overlay/install.sh" }), " (braucht pyside6, qt6-webengine, layer-shell-qt).")) : null,
       el("div", { class: "cols" },
-        card("Overlay", "Läuft als eigenes Programm im Tray", unitChip(o),
+        card("Overlay", "Startet mit AION 2 und läuft dann als eigenes Programm im Tray", unitChip(o),
           el("div", { class: "row wrap" },
             button("Bearbeiten", () => cmd("edit"), "primary", "cursor-move"),
             button("Zeigen/Verbergen", () => cmd("toggle"), "", "eye"),

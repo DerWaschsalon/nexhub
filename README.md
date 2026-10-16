@@ -238,7 +238,8 @@ sudo pacman -S --needed pyside6 qt6-webengine layer-shell-qt
 overlay/install.sh        # ~/.local/bin/deckbar-overlay, User-Dienst, Starter für Tastenkürzel
 ```
 
-Danach schaltet das Modul „AION 2 · Overlay“ den Dienst ein und aus. Befehle: `--toggle`
+Danach startet das Modul „AION 2 · Overlay“ den Dienst, sobald AION 2 läuft, und beendet ihn 30 s
+nach Spielende; beim Login startet nichts. Von Hand (ohne Spiel): Web-UI → „Neu starten“. Befehle: `--toggle`
 (zeigen/verbergen), `--edit`, `--lock`, `--click`, `--details`, `--history`, `--settings`,
 `--reload`, `--quit`; für Tastenkürzel die Starter „NexBoard Overlay ein/aus“ und „… bearbeiten“
 in den Systemeinstellungen auf eine Taste legen. Monitor (Standard: Hauptmonitor laut KDE),

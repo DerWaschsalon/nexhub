@@ -9,7 +9,8 @@ Meter-Oberfläche). Die Seite holt hier:
 
 Die Web-UI (Port 8765) nutzt dieselben Daten über /api/overlay und schickt Befehle an das
 Programm (Bearbeiten, Sperren, Ein-/Ausblenden) über dessen Socket im Laufzeitordner.
-Das Modul schaltet den User-Dienst deckbar-overlay mit ein und aus.
+Das Modul startet den User-Dienst deckbar-overlay, sobald AION 2 läuft, und beendet ihn
+GAME_GRACE_S nach Spielende. Beim Login startet er nicht (kein Autostart).
 """
 from __future__ import annotations
 
@@ -19,11 +20,12 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Awaitable, Callable, Literal
 
 from aiohttp import web
 from pydantic import Field, ValidationError
 
+from .capture import aion2_running
 from .config import _atomic_write, _Strict
 
 log = logging.getLogger(__name__)
@@ -31,6 +33,9 @@ log = logging.getLogger(__name__)
 UNIT = "deckbar-overlay.service"
 PAGE_DIR = Path(__file__).resolve().parent / "web" / "overlay"
 QUEUE_MAX = 32
+GAME_POLL_S = 5
+GAME_GRACE_S = 30  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
+UNIT_POLL_S = 30   # Dienststatus fürs Dashboard nebenbei auffrischen
 COMMANDS = ("toggle", "show", "hide", "edit", "lock", "click", "reload", "details", "history", "settings")
 FX = Literal["", "glanz", "brennen", "gold", "frost", "holo", "leere"]
 
@@ -116,6 +121,9 @@ class Overlay:
         self.clients: set[asyncio.Queue] = set()
         self.dps: dict[str, Any] = {"dps": None, "dps_active": False}
         self.unit: dict[str, Any] = {"installed": None, "active": None}
+        # Läuft AION 2? Setzt der Daemon (nutzt den Blick des Mitschnitts, sonst eigener Scan)
+        self.game_check: Callable[[], Awaitable[bool]] | None = None
+        self.game = False
         self.screens: list[dict] = []
         self.listeners: list = []
 
@@ -142,7 +150,7 @@ class Overlay:
 
     def info(self) -> dict:
         return {"layout": self.layout.model_dump(), "unit": self.unit, "socket": socket_path().exists(),
-                "clients": len(self.clients), "screens": self.screens}
+                "clients": len(self.clients), "screens": self.screens, "game": self.game}
 
     async def refresh_screens(self) -> list[dict]:
         """Monitore laut KDE (kscreen-doctor), für die Auswahl in der Web-UI; sonst leer."""
@@ -181,7 +189,7 @@ class Overlay:
 
     # ------------------------------------------------------------ Programm (User-Dienst)
     async def _systemctl(self, *args: str) -> tuple[int, str]:
-        if not self.manage_unit and args[0] not in ("list-unit-files", "is-active"):
+        if not self.manage_unit and args[0] != "show":
             return 1, "Testinstanz: systemd bleibt unangetastet"
         if not shutil.which("systemctl"):
             return 127, "systemctl fehlt"
@@ -191,25 +199,40 @@ class Overlay:
         return proc.returncode or 0, out.decode(errors="replace").strip()
 
     async def refresh_unit(self) -> dict:
-        code, out = await self._systemctl("list-unit-files", UNIT, "--no-legend")
-        installed = code == 0 and UNIT in out
-        _, active = await self._systemctl("is-active", UNIT)
-        self.unit = {"installed": installed, "active": active == "active", "state": active}
+        code, out = await self._systemctl("show", UNIT, "--property=LoadState,ActiveState,UnitFileState")
+        props = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+        state = props.get("ActiveState") or "unknown"
+        self.unit = {"installed": code == 0 and props.get("LoadState") == "loaded",
+                     "active": state == "active", "state": state,
+                     "autostart": props.get("UnitFileState") == "enabled"}
         return self.unit
 
+    async def _unit(self, action: str) -> None:
+        code, out = await self._systemctl(action, UNIT)
+        if code:
+            log.warning("deckbar-overlay %s: %s", action, out)
+        await self.refresh_unit()
+
     async def on_module(self, on: bool) -> None:
-        """Modul an → Dienst einschalten (Autostart + jetzt), aus → beenden und Autostart aus."""
+        """Modul an → auf das Spiel warten (watch), aus → Dienst beenden. Ein Autostart beim Login
+        (frühere Einrichtung) wird in beiden Fällen abgeschaltet."""
         self.enabled = on
         await self.refresh_unit()
         if self.unit["installed"] and self.manage_unit:
-            code, out = await self._systemctl("enable" if on else "disable", "--now", UNIT)
-            if code:
-                log.warning("deckbar-overlay %s: %s", "starten" if on else "stoppen", out)
-            await self.refresh_unit()
+            if self.unit.get("autostart"):
+                log.info("deckbar-overlay: Autostart beim Login aus, startet jetzt mit AION 2")
+                await self._unit("disable")
+            if not on and self.unit["active"]:
+                await self._unit("stop")
         elif on and self.manage_unit:
             log.info("Overlay-Programm nicht eingerichtet (overlay/install.sh)")
         for fn in self.listeners:
             await fn()
+
+    async def _game_running(self) -> bool:
+        if self.game_check:
+            return await self.game_check()
+        return await asyncio.to_thread(aion2_running)
 
     async def command(self, cmd: str) -> None:
         if cmd not in COMMANDS:
@@ -228,15 +251,41 @@ class Overlay:
             pass
 
     async def watch(self) -> None:
-        """Zustand des Dienstes fürs Dashboard aktuell halten."""
+        """Dienst mit dem Spiel starten und GAME_GRACE_S nach Spielende beenden. Gehandelt wird nur
+        beim Wechsel: wer das Overlay mitten im Spiel beendet oder von Hand startet, behält das."""
         await self.refresh_screens()
-        while True:
-            old = dict(self.unit)
-            await self.refresh_unit()
-            if old != self.unit:
-                for fn in self.listeners:
-                    await fn()
-            await asyncio.sleep(10)
+        self.game = False
+        gone = 0.0
+        since_unit = UNIT_POLL_S
+        try:
+            while True:
+                old = (self.game, dict(self.unit))
+                if await self._game_running():
+                    gone = 0
+                    if not self.game:
+                        self.game = True
+                        if self.manage_unit and self.unit.get("installed") is not False:
+                            log.info("AION 2 läuft, starte deckbar-overlay")
+                            await self._unit("start")
+                            since_unit = 0
+                elif self.game:
+                    gone += GAME_POLL_S
+                    if gone >= GAME_GRACE_S:
+                        self.game = False
+                        if self.manage_unit and self.unit.get("active"):
+                            log.info("AION 2 beendet, stoppe deckbar-overlay")
+                            await self._unit("stop")
+                            since_unit = 0
+                if since_unit >= UNIT_POLL_S:
+                    await self.refresh_unit()
+                    since_unit = 0
+                if old != (self.game, self.unit):
+                    for fn in self.listeners:
+                        await fn()
+                await asyncio.sleep(GAME_POLL_S)
+                since_unit += GAME_POLL_S
+        finally:
+            self.game = False
 
     # ------------------------------------------------------------ Seite (Port+1)
     async def page(self, request: web.Request) -> web.StreamResponse:

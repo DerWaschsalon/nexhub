@@ -1,5 +1,7 @@
 [Unit]
 Description=NexBoard-Overlay (Meter und Widgets über dem Spiel, Tray)
+# Kein Autostart beim Login: der Daemon (Modul „AION 2 · Overlay“) startet den Dienst mit AION 2
+# und beendet ihn nach Spielende.
 Documentation=https://github.com/gamunex/deckbar
 PartOf=graphical-session.target
 After=graphical-session.target deckbar.service
@@ -9,6 +11,3 @@ Type=simple
 ExecStart=%h/.local/bin/deckbar-overlay
 Restart=on-failure
 RestartSec=5
-
-[Install]
-WantedBy=graphical-session.target
