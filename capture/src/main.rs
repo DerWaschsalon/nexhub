@@ -130,6 +130,7 @@ struct Core {
     suspended: Arc<AtomicBool>,
     ports: Option<Arc<CombatPortDetector>>, // nur im Live-Betrieb
     view: Mutex<(view::Options, bool)>, // Zeilen-Optionen, volle DpsData mitschicken
+    game: Mutex<(Option<std::time::Instant>, Option<String>)>, // letzte Spielsuche (game_title)
 }
 
 impl Core {
@@ -162,6 +163,7 @@ impl Core {
             suspended: Arc::new(AtomicBool::new(false)),
             ports,
             view: Mutex::new((view::Options::default(), false)),
+            game: Mutex::new((None, None)),
         });
         // Vor jedem Zurücksetzen der Kampfdaten (Zonenwechsel, Gruppenende) speichern, sonst
         // ginge alles seit dem letzten 30-s-Speichern verloren (wie im Meter, dort Issue #19).
@@ -268,7 +270,7 @@ impl Core {
                     "characterNameFromGame": self.storage.local_identity_from_self_record(),
                 }))
             }
-            "window_title" => Ok(json!(platform::window_detector::find_aion2_window_title())),
+            "window_title" => Ok(json!(game_title(self))),
             "devices" => Ok(json!(pcap::list_device_labels().unwrap_or_default())),
             "set_device" => {
                 let dev = str_arg("device")?.trim().to_string();
@@ -401,11 +403,21 @@ fn tick(core: &Core, last: &mut String) {
     }
 }
 
+/// Läuft das Spiel (Titel wie find_aion2_window_title)? Die Suche liest ganz /proc; Status (alle 2 s)
+/// und window_title (fragt jede offene Meter-Seite alle 3 s) teilen sich ein Ergebnis pro STATUS_EVERY.
+fn game_title(core: &Core) -> Option<String> {
+    let mut g = core.game.lock();
+    if g.0.is_none_or(|t| t.elapsed() >= STATUS_EVERY) {
+        *g = (Some(std::time::Instant::now()), platform::window_detector::find_aion2_window_title());
+    }
+    g.1.clone()
+}
+
 fn status(core: &Core, ports: Option<&CombatPortDetector>, capturing: bool) -> Value {
     json!({
         "type": "status",
         "capturing": capturing,
-        "game": platform::window_detector::find_aion2_window(),
+        "game": game_title(core).is_some(),
         "port": ports.and_then(|p| p.current_port()),
         "device": ports.and_then(|p| p.current_device()),
         "ping": core.ping.current_ping_ms(),

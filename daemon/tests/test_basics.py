@@ -121,3 +121,16 @@ def test_usb_parse_line():
     assert parse_line(b'@@{"type":"hello"}') == b'{"type":"hello"}'
     assert parse_line(b'[W] log ohne Zeilenende@@{"a":1}') == b'{"a":1}'
     assert parse_line(b"NET WLAN ok") is None
+
+
+@pytest.mark.parametrize("line,hit", [
+    ("Event 'change' on sink #56", True),
+    ("Event 'new' on source #12", True),
+    ("Event 'change' on server #-1", True),
+    ("Event 'change' on sink-input #120", False),  # Stream einer App (Discord, Browser …)
+    ("Event 'new' on source-output #9", False),
+    ("Event 'change' on client #3", False),
+])
+def test_pactl_events_only_for_devices(line, hit):
+    from deckbar_daemon.audio import _EVENT_RE
+    assert bool(_EVENT_RE.search(line)) is hit

@@ -334,9 +334,12 @@ class LayerHost(QObject):
     def setRegions(self, text: str) -> None:
         try:
             data = json.loads(text)
-            self.regions = {k: [QRect(*(int(round(v)) for v in r)) for r in data.get(k) or []] for k in ("click", "lock")}
+            regions = {k: [QRect(*(int(round(v)) for v in r)) for r in data.get(k) or []] for k in ("click", "lock")}
         except (ValueError, TypeError, AttributeError):
             return
+        if regions == self.regions:
+            return  # unverändert: kein neues setMask/Commit
+        self.regions = regions
         if self._mode != "edit":
             self.apply_input()
 

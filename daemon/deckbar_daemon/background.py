@@ -52,9 +52,28 @@ def _package_image(pkg: Path) -> Path | None:
     return best
 
 
+# kde_wallpaper() läuft alle 5 s: die ~50 KB große appletsrc nur neu parsen, wenn sie sich ändert
+_wallpaper_cache: tuple[tuple, Path | None] | None = None
+
+
 def kde_wallpaper(rc: Path | None = None) -> Path | None:
     """Hintergrundbild des Plasma-Hauptbildschirms (lastScreen=0), sonst das erste gefundene."""
+    global _wallpaper_cache
     rc = rc or _config_home() / PLASMA_RC
+    try:
+        st = rc.stat()
+        stamp = (str(rc), st.st_mtime_ns, st.st_size)
+    except OSError:
+        stamp = None
+    if stamp and _wallpaper_cache and _wallpaper_cache[0] == stamp:
+        return _wallpaper_cache[1]
+    found = _parse_wallpaper(rc)
+    if stamp:
+        _wallpaper_cache = (stamp, found)
+    return found
+
+
+def _parse_wallpaper(rc: Path) -> Path | None:
     cp = configparser.RawConfigParser(strict=False)
     cp.optionxform = str  # KDE-Schlüssel sind case-sensitiv
     try:

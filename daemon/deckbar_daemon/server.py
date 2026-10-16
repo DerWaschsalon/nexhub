@@ -125,7 +125,7 @@ class NexBoard:
         self.runs.event_driven = self.runs.own_history = own
         self.dps.capture.data_listeners.append(self._capture_event)
         self.runs.listeners.append(self._runs_changed)
-        self.updates = Updates()
+        self.updates = Updates(state_path=config_dir / "updates-state.json")
         self.updates.listeners.append(self._updates_changed)
         self.bot = DiscordBot(config_dir)
         self.bot.listeners.append(self._bot_changed)
@@ -136,6 +136,7 @@ class NexBoard:
         self.overlay = Overlay(config_dir, manage_unit=self.real_config)
         self.overlay.listeners.append(self._overlay_changed)
         self.overlay.game_check = self._game_running
+        self.overlay.ui_watching = lambda: bool(self.ui_clients)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -262,14 +263,17 @@ class NexBoard:
         await asyncio.gather(*(self._send(d.ws, text) for d in list(self.devices)))
 
     async def _broadcast_ui(self, obj: dict) -> None:
-        text = json.dumps(obj, ensure_ascii=False)
+        if not self.ui_clients:
+            return
+        text = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
         await asyncio.gather(*(self._send(ws, text) for ws in list(self.ui_clients)))
 
     async def _on_state(self, diff: dict) -> None:
         if diff.get("dps"):
             self.runs.observe(diff["dps"])
         await self.overlay.on_state(diff)
-        if "art_url" in diff:
+        if "art_url" in diff and any(d.art_size for d in self.devices):
+            # ohne Gerät mit Media-Kachel nichts herunterladen; _send_art holt es bei Bedarf nach
             asyncio.ensure_future(self._update_art(diff["art_url"]))
         dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS and k != "dps"}
         if dev_diff:
@@ -329,6 +333,7 @@ class NexBoard:
 
     async def _send_art(self, dev: Device) -> None:
         async with dev.send_lock:
+            await self.art.set_url(self.state.values.get("art_url"))  # nachholen, falls ohne Gerät übersprungen
             r = await self.art.render(dev.art_size)
             if r is None:
                 if dev.art_have != "-":
@@ -597,6 +602,8 @@ class NexBoard:
     async def ws_ui(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(heartbeat=20)
         await ws.prepare(request)
+        if self.modules.on("aion2.overlay") and not self.ui_clients:
+            await self.overlay.refresh_unit()  # ohne offene Web-UI fragt watch() nicht nach
         self.ui_clients.add(ws)
         await self._send(ws, json.dumps({
             "type": "hello",

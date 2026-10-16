@@ -244,6 +244,22 @@ export function debounce(fn, ms) {
 }
 
 /** Einstellungen eines Moduls speichern: Teil-Patch, entprellt, Ergebnis an onSaved. */
+/** Höchstens einmal pro `ms` ausführen, den letzten Aufruf aber nie verlieren. `.cancel()` beim Abbau. */
+export function throttle(fn, ms) {
+  let last = 0, timer = 0;
+  const run = () => { timer = 0; last = performance.now(); fn(); };
+  const t = () => {
+    if (timer) return;
+    const wait = ms - (performance.now() - last);
+    if (wait <= 0) run(); else timer = setTimeout(run, wait);
+  };
+  t.cancel = () => { clearTimeout(timer); timer = 0; };
+  return t;
+}
+
+/* Kommt mit einem State-Diff etwas, das die DPS-Anzeige betrifft? */
+export const dpsDiff = (v) => !!v && ("dps" in v || "dps_active" in v);
+
 export function saver(method, path, onSaved, ms = 400, okText = "Gespeichert") {
   let pending = {};
   const run = debounce(async () => {

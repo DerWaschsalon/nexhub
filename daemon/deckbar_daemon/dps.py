@@ -222,8 +222,10 @@ class DpsFeed:
     def info(self) -> dict:
         s = self.settings.model_dump()
         s["key"] = "•" * 8 if s["key"] else ""  # der Schlüssel verlässt den Daemon nicht
-        a2t = read_a2tools()
-        a2t.pop("key")
+        # Port/Schlüssel des A2Tools-Meters nur, wenn es die Quelle ist (sonst bei jedem Statuswechsel
+        # eine Datei lesen, für nichts)
+        a2t = read_a2tools() if self.settings.source != "capture" else {}
+        a2t.pop("key", None)
         return {
             "settings": s,
             "status": self.status,
@@ -235,9 +237,10 @@ class DpsFeed:
         }
 
     # ------------------------------------------------------------ Status
-    async def _set_status(self, status: Status, detail: str = "") -> None:
+    async def _set_status(self, status: Status, detail: str = "") -> bool:
+        """True, wenn sich etwas geändert hat (Zuhörer sind dann schon benachrichtigt)."""
         if (status, detail) == (self.status, self.detail):
-            return
+            return False
         if status != self.status:
             log.info("DPS-Meter: %s%s", STATUS_TEXT[status], f" ({detail})" if detail else "")
         self.status, self.detail = status, detail
@@ -245,6 +248,7 @@ class DpsFeed:
             await self._apply(None)
         for fn in self.status_listeners:
             await fn()
+        return True
 
     async def _apply(self, value: dict | None, baseline: bool = False, fight: dict | None = None) -> None:
         """Neuer Stand vom Meter; erkennt Kampfbeginn am wachsenden Gesamtschaden.
@@ -319,20 +323,21 @@ class DpsFeed:
         if self.settings.source != "capture" or not self.settings.enabled:
             return
         if c.phase == "no_binary":
-            await self._set_status("no_capture")
+            changed = await self._set_status("no_capture")
         elif c.phase == "no_game":
-            await self._set_status("no_game")
+            changed = await self._set_status("no_game")
         elif c.phase == "no_caps":
-            await self._set_status("no_caps")
+            changed = await self._set_status("no_caps")
         elif c.phase == "crashed":
-            await self._set_status("no_game", c.error)
+            changed = await self._set_status("no_game", c.error)
         elif c.phase == "starting":
-            await self._set_status("connecting")
+            changed = await self._set_status("connecting")
         else:
             port = c.status.get("port")
-            await self._set_status("capturing", f"Spielserver-Port {port}" if port else "wartet auf Kampfdaten")
-        for fn in self.status_listeners:  # Ping/Port ändern sich ohne Statuswechsel
-            await fn()
+            changed = await self._set_status("capturing", f"Spielserver-Port {port}" if port else "wartet auf Kampfdaten")
+        if not changed:  # Ping/Port ändern sich ohne Statuswechsel
+            for fn in self.status_listeners:
+                await fn()
 
     async def watch(self) -> None:
         async def idle_loop() -> None:

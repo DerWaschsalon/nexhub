@@ -127,3 +127,30 @@ async def test_images_binary_and_cover_not_resent(client):
     msgs = [json.loads(m.data) for m in await drain(old, 0.3) if m.type == WSMsgType.TEXT]
     assert sum(1 for m in msgs if m["type"] == "bg") == 172 // (2000 // 1280)
     await old.close()
+
+
+async def test_cover_cache_and_no_download_without_device(client, tmp_path):
+    from PIL import Image
+    from deckbar_daemon.art import Art
+    for name, color in (("a", "red"), ("b", "blue")):
+        Image.new("RGB", (1200, 900), color).save(tmp_path / f"{name}.png")
+    art = Art()
+    fetched = []
+    real = art._fetch
+
+    async def counting(url):
+        fetched.append(url)
+        return await real(url)
+    art._fetch = counting
+    a, b = (tmp_path / "a.png").as_uri(), (tmp_path / "b.png").as_uri()
+    for url in (a, b, a):
+        assert await art.set_url(url)
+    assert fetched == [a, b]  # zurück zu a: aus dem Cache
+    assert min(art._image.size) == 320  # verkleinert gespeichert
+
+    deck = client.deck
+    deck.art._fetch = counting
+    fetched.clear()
+    deck.state.update(art_url=b)
+    await asyncio.sleep(0.05)
+    assert fetched == []  # kein Gerät mit Media-Kachel: nichts geladen

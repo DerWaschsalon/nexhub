@@ -12,6 +12,7 @@ import hashlib
 import io
 import logging
 import struct
+from collections import OrderedDict
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -71,10 +72,14 @@ def bin_chunks(kind: bytes, aid: str, w: int, h: int, data: bytes) -> list[bytes
             for y in range(0, h, rows)]
 
 
+CACHE_ENTRIES = 20  # zuletzt gezeigte Cover (verkleinert, je ~0,3 MB): Titelwechsel ohne neuen Download
+
+
 class Art:
     def __init__(self) -> None:
         self.url: str | None = None
         self._image: Image.Image | None = None
+        self._cache: OrderedDict[str, Image.Image] = OrderedDict()
         self._scaled: dict[int, bytes] = {}
         self._session: aiohttp.ClientSession | None = None
         self._lock = asyncio.Lock()
@@ -91,12 +96,19 @@ class Art:
                 return False
             had = self._image is not None
             self.url, self._image, self._scaled = url, None, {}
-            if url:
+            if url in self._cache:
+                self._cache.move_to_end(url)
+                self._image = self._cache[url]
+            elif url:
                 try:
                     raw = await self._fetch(url)
                     self._image = await asyncio.to_thread(self._decode, raw)
                 except Exception as e:  # Netz, Datei, kaputtes Bild: einfach ohne Cover
                     log.info("Cover nicht ladbar (%s): %s", url, e)
+                else:
+                    self._cache[url] = self._image
+                    while len(self._cache) > CACHE_ENTRIES:
+                        self._cache.popitem(last=False)
             return had or self._image is not None
 
     async def render(self, size: int) -> tuple[str, bytes] | None:
@@ -119,6 +131,11 @@ class Art:
     def _decode(raw: bytes) -> Image.Image:
         img = Image.open(io.BytesIO(raw))
         img.load()
+        # to_rgb565 schneidet quadratisch auf höchstens MAX_SIZE zu: kurze Seite 2 × MAX_SIZE reicht
+        # dafür und hält den Cache klein (statt z. B. 1200 × 1200 von Spotify)
+        f = 2 * MAX_SIZE / min(img.size)
+        if f < 1:
+            img = img.convert("RGB").resize((round(img.width * f), round(img.height * f)), Image.Resampling.LANCZOS)
         return img
 
     async def _fetch(self, url: str) -> bytes:

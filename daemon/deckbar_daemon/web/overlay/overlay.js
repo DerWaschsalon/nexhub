@@ -121,11 +121,17 @@ function regions() {
 }
 
 let regionFrame = 0;
+let regionsSent = "";
 function regionsSoon() {
   if (regionFrame) return;
   regionFrame = requestAnimationFrame(() => {
     regionFrame = 0;
-    if (bridge) bridge.setRegions(JSON.stringify(regions()));
+    // Jede DPS-Meldung fragt nach; ans Programm (Wayland-Commit) nur, wenn sich etwas geändert hat
+    const text = JSON.stringify(regions());
+    if (bridge && text !== regionsSent) {
+      regionsSent = text;
+      bridge.setRegions(text);
+    }
   });
 }
 
@@ -458,7 +464,7 @@ function renderBoss() {
     $("boss-name").textContent = mode === "edit" ? "Boss-Leiste" : "Kein Ziel";
     $("boss-pct").textContent = "";
     $("boss-fill").style.transform = "scaleX(1)";
-    $("boss-glow").style.left = "calc(100% - 2px)";
+    $("boss-glow").style.transform = "translateX(0)";
     $("boss-time").textContent = "";
     $("boss-ttk").textContent = "";
     return;
@@ -467,7 +473,7 @@ function renderBoss() {
   $("boss-name").textContent = d.target;
   $("boss-pct").textContent = `${hp.toFixed(1).replace(".", ",")} %`;
   $("boss-fill").style.transform = `scaleX(${hp / 100})`;
-  $("boss-glow").style.left = `calc(${hp}% - 2px)`;
+  $("boss-glow").style.transform = `translateX(${hp - 100}%)`;
   $("boss-time").innerHTML = d.time ? `Kampf <b>${fmt(d.time)}</b>` : "";
   let text = "";
   if (c.show_ttk && ttk.samples.length >= 2) {

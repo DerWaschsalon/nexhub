@@ -31,6 +31,7 @@ GAME_POLL_S = 5
 STOP_AFTER_S = 30   # Spiel weg: so lange weiterlaufen lassen (Absturz mit Neustart, Ladebildschirm)
 STOP_WAIT_S = 10    # nach geschlossener Eingabe, dann SIGTERM
 MAX_LINE = 4 * 1024 * 1024  # volle DpsData mit allen Skills
+PING_STEP_MS = 5
 
 Phase = Literal["no_binary", "no_game", "starting", "running", "no_caps", "crashed"]
 
@@ -193,7 +194,10 @@ class Capture:
         gone = 0.0
         while True:
             await asyncio.sleep(GAME_POLL_S)
-            self.game = await asyncio.to_thread(self.game_running)
+            # deckbar-capture sucht das Spiel selbst (Status-Feld game, bei jeder Änderung gemeldet):
+            # dann kein zweiter /proc-Scan
+            game = self.status.get("game")
+            self.game = game if isinstance(game, bool) else await asyncio.to_thread(self.game_running)
             if self.game:
                 gone = 0
                 continue
@@ -247,8 +251,16 @@ class Capture:
                 ping = msg.get("ping")
                 if ping != self.status.get("ping"):
                     await self._notify("ping", ping)
-                self.status = msg
-                await self.on_change()
+                old, self.status = self.status, msg
+                # deckbar-capture meldet jede Ping-Änderung (alle 2 s); Web-UI und Dashboard nur bei
+                # spürbarer Änderung (≥ PING_STEP_MS) oder wenn sich sonst etwas tut
+                same = {k: v for k, v in old.items() if k != "ping"} == {k: v for k, v in msg.items() if k != "ping"}
+                p0, p1 = old.get("ping"), ping
+                small = isinstance(p0, (int, float)) and isinstance(p1, (int, float)) and abs(p1 - p0) < PING_STEP_MS
+                if not (same and (small or p0 == p1)):
+                    await self.on_change()
+                else:
+                    self.status = {**msg, "ping": old.get("ping")}  # Bezugswert bleibt der zuletzt gezeigte
             elif t == "hello":
                 self.hello = msg
                 if self.full:

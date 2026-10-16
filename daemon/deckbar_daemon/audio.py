@@ -14,7 +14,9 @@ NODES = {"sink": "@DEFAULT_AUDIO_SINK@", "source": "@DEFAULT_AUDIO_SOURCE@"}
 PREFIX = {"sink": "out", "source": "mic"}
 _VOL_RE = re.compile(r"Volume:\s*([0-9.]+)(\s*\[MUTED\])?")
 # pactl-Ereignisse, nach denen sich Standardgerät oder Pegel geändert haben kann
-_EVENT_RE = re.compile(r"Event '(change|new|remove)' on (sink|source|server)\b")
+# nur Geräte und Server; sink-input/source-output (Streams anderer Apps) ändern nichts an Lautstärke
+# oder Mute der Standardgeräte ("\b" griffe dort schon vor dem Bindestrich)
+_EVENT_RE = re.compile(r"Event '(change|new|remove)' on (sink|source|server) #")
 
 
 def parse_volume(text: str) -> tuple[int, bool] | None:

@@ -72,3 +72,31 @@ async def test_fehler_werden_gemeldet(tmp_path):
     await up.check()
     info = up.info()
     assert not info["available"] and "NexBoard" in info["error"] and "offline" in info["error"]
+
+
+async def test_ergebnis_uebersteht_neustart(tmp_path, monkeypatch):
+    import json as _json
+
+    from deckbar_daemon import updates as up_mod
+    path = tmp_path / "updates-state.json"
+    up = Updates(tmp_path, state_path=path)
+
+    async def local():
+        return "abc|v1"
+    up._local = local
+
+    async def nichts():
+        return {"behind": 0}
+    up._check_repo = up._check_a2tools = nichts
+    await up.check()
+    assert _json.loads(path.read_text())["local"] == "abc|v1"
+
+    again = Updates(tmp_path, state_path=path)
+    again._local = local
+    delay = await again._first_delay()
+    assert delay > up_mod.CHECK_EVERY_S - 60 and again.state["checked_at"]  # nicht gleich wieder prüfen
+
+    async def anders():
+        return "def|v1"  # update.sh hat aktualisiert
+    again._local = anders
+    assert await again._first_delay() == up_mod.FIRST_CHECK_S

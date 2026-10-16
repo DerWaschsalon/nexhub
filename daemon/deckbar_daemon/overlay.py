@@ -35,7 +35,7 @@ PAGE_DIR = Path(__file__).resolve().parent / "web" / "overlay"
 QUEUE_MAX = 32
 GAME_POLL_S = 5
 GAME_GRACE_S = 30  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
-UNIT_POLL_S = 30   # Dienststatus fürs Dashboard nebenbei auffrischen
+UNIT_POLL_S = 30   # Dienststatus fürs Dashboard auffrischen (nur mit Spiel oder offener Web-UI)
 COMMANDS = ("toggle", "show", "hide", "edit", "lock", "click", "reload", "details", "history", "settings")
 FX = Literal["", "glanz", "brennen", "gold", "frost", "holo", "leere"]
 
@@ -124,6 +124,7 @@ class Overlay:
         # Läuft AION 2? Setzt der Daemon (nutzt den Blick des Mitschnitts, sonst eigener Scan)
         self.game_check: Callable[[], Awaitable[bool]] | None = None
         self.game = False
+        self.ui_watching: Callable[[], bool] = lambda: True  # Web-UI offen? (setzt der Daemon)
         self.screens: list[dict] = []
         self.listeners: list = []
 
@@ -283,7 +284,7 @@ class Overlay:
                             log.info("AION 2 beendet, stoppe deckbar-overlay")
                             await self._unit("stop")
                             since_unit = 0
-                if since_unit >= UNIT_POLL_S:
+                if since_unit >= UNIT_POLL_S and (self.game or self.ui_watching()):
                     await self.refresh_unit()
                     since_unit = 0
                 if old != (self.game, self.unit):

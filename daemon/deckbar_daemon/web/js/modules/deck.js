@@ -2,7 +2,7 @@
    Jede Änderung wird nach kurzer Pause gespeichert; der Daemon schickt sie sofort an alle Geräte. */
 import {
   fill, $, el, icon, glyph, deckIcons, api, S, on, sendLive, toast, setSaveState, field, input as inputEl, select as selectEl,
-  button, chip, callout, card, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, CLASS_COLORS, modOn,
+  button, chip, callout, card, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, CLASS_COLORS, modOn, throttle, dpsDiff,
 } from "../core.js";
 
 const W = 640, H = 172, PAD = 8, GAP = 8;
@@ -64,7 +64,9 @@ on("layout", ({ layout }) => {
   setLayout(layout);
   if (root) renderAll();
 });
-on("state", () => { if (root) renderPreview(); });
+// Vorschau: DPS-Diffs (im Kampf 2×/s) höchstens 1×/s, alles andere (Lautstärke …) sofort
+const previewSlow = throttle(() => { if (root) renderPreview(); }, 1000);
+on("state", (v) => { if (!root) return; if (dpsDiff(v) && Object.keys(v).every((k) => k === "dps" || k === "dps_active")) previewSlow(); else renderPreview(); });
 on("background", (id) => { D.bgId = id || "default"; if (root) setBgPreview(); });
 on("hello", (msg) => { D.bgId = msg.status?.background?.id || "default"; });
 

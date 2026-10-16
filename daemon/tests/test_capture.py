@@ -121,3 +121,26 @@ async def test_kein_programm(tmp_path, monkeypatch):
     finally:
         job.cancel()
         await asyncio.gather(job, return_exceptions=True)
+
+
+async def test_ping_rauschen_weckt_die_web_ui_nicht():
+    """deckbar-capture meldet jede Ping-Änderung; on_change nur bei ≥ 5 ms oder anderen Feldern."""
+    import json
+    from types import SimpleNamespace
+    changes = []
+
+    async def on_change():
+        changes.append(dict(cap.status))
+
+    async def on_view(v, first):
+        pass
+
+    cap = Capture(on_view, on_change)
+    reader = asyncio.StreamReader()
+    for st in ({"port": 1, "ping": 20}, {"port": 1, "ping": 22}, {"port": 1, "ping": 24},
+               {"port": 1, "ping": 26}, {"port": 2, "ping": 26}):
+        reader.feed_data((json.dumps({"type": "status", **st}) + "\n").encode())
+    reader.feed_eof()
+    await cap._read(SimpleNamespace(stdout=reader))
+    # 20 (erste), 26 (6 ms über dem zuletzt gezeigten 20), Port 2
+    assert [(c["port"], c["ping"]) for c in changes] == [(1, 20), (1, 26), (2, 26)]

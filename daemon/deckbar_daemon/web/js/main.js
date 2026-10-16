@@ -2,7 +2,7 @@
    Jedes Modul hat eine eigene Datei in js/modules/ (Tabs, Dashboard-Karte, Seiten). */
 import {
   fill, $, el, icon, glyph, api, S, on, emit, connectLive, loadIcons, mod, modOn, setModule, modIcon, toast,
-  setSaveState, sw, field, input, select, button, chip, callout, card, settingsRow, seg, fmtWhen,
+  setSaveState, sw, field, input, select, button, chip, callout, card, settingsRow, seg, fmtWhen, throttle, dpsDiff,
 } from "./core.js";
 import deck from "./modules/deck.js";
 import dps from "./modules/aion2-dps.js";
@@ -146,7 +146,11 @@ function dashboard(ctx) {
   };
   let frame = 0;
   const soon = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; draw(); }); };
-  for (const t of ["hello", "modules", "devices", "state", "dps", "runs", "updates", "bot", "overlay", "settings", "online"]) ctx.onUnmount(on(t, soon));
+  for (const t of ["hello", "modules", "devices", "dps", "runs", "updates", "bot", "overlay", "settings", "online"]) ctx.onUnmount(on(t, soon));
+  // State-Diffs (im Kampf 2×/s) betreffen hier nur die DPS-Kachel: nur diese, höchstens 1×/s
+  const slow = throttle(soon, 1000);
+  ctx.onUnmount(on("state", (v) => { if (dpsDiff(v)) slow(); }));
+  ctx.onUnmount(slow.cancel);
   draw();
   return box;
 }
