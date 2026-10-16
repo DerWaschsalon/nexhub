@@ -41,6 +41,12 @@ typedef struct {
     lv_obj_t *name;
     lv_obj_t *val;   /* DPS */
     lv_obj_t *extra; /* Anteil oder Gesamtschaden */
+    /* zuletzt gesetzte Werte: Style-Setter lassen LVGL immer neu zeichnen, und das Panel nimmt nur
+     * ganze Frames an (220 KB über QSPI). Deshalb nur bei Änderung setzen. */
+    int32_t bar_px;
+    lv_color_t color;
+    bool color_set;
+    bool you;
 } dps_row_t;
 
 /* DPS-Kachel: Kopfzeile (Ziel, HP, Zeit) und bis zu 8 vorab angelegte Zeilen */
@@ -53,6 +59,7 @@ typedef struct {
     lv_obj_t *hp_track; /* dünne Spur unter der Kopfzeile … */
     lv_obj_t *hp;       /* … mit den Rest-HP des Bosses */
     int32_t hp_w;
+    int32_t hp_px;  /* zuletzt gesetzte HP-Breite */
     lv_obj_t *msg;  /* „nicht verbunden“ / „Warte auf Kampf“ */
     dps_row_t rows[DPS_MAX_ROWS];
 } dps_view_t;
@@ -1018,7 +1025,7 @@ static void fmt_amount(char *buf, size_t n, double v)
         if (*c == '.') *c = ',';
 }
 
-/* nur bei Änderung neu setzen, spart Neuzeichnen bei ~3 Updates pro Sekunde */
+/* nur bei Änderung neu setzen: jedes Neuzeichnen ist ein ganzer Frame */
 static void set_text(lv_obj_t *l, const char *txt)
 {
     if (strcmp(lv_label_get_text(l), txt)) lv_label_set_text(l, txt);
@@ -1050,8 +1057,11 @@ static void dps_update(tile_t *t)
         else snprintf(buf, sizeof buf, "%d:%02d", secs / 60, secs % 60);
         set_text(v->time, buf);
         if (count && cJSON_IsNumber(hp)) {
-            int32_t w = (int32_t)(v->hp_w * LV_CLAMP(0.0, hp->valuedouble, 100.0) / 100.0);
-            lv_obj_set_width(v->hp, LV_MAX(w, 1));
+            int32_t w = LV_MAX((int32_t)(v->hp_w * LV_CLAMP(0.0, hp->valuedouble, 100.0) / 100.0), 1);
+            if (w != v->hp_px) {
+                lv_obj_set_width(v->hp, w);
+                v->hp_px = w;
+            }
             set_hidden(v->hp_track, false);
         } else set_hidden(v->hp_track, true);
     }
@@ -1086,10 +1096,22 @@ static void dps_update(tile_t *t)
             }
             set_text(r->extra, buf);
         }
-        lv_obj_set_width(r->bar, LV_MAX((int32_t)(v->bar_w * x / best), 6));
-        lv_obj_set_style_bg_color(r->bar, class_color(jstr(jr, "cls")), 0);
+        int32_t bar_px = LV_MAX((int32_t)(v->bar_w * x / best), 6);
+        if (bar_px != r->bar_px) {
+            lv_obj_set_width(r->bar, bar_px);
+            r->bar_px = bar_px;
+        }
+        lv_color_t color = class_color(jstr(jr, "cls"));
+        if (!r->color_set || !lv_color_eq(color, r->color)) {
+            lv_obj_set_style_bg_color(r->bar, color, 0);
+            r->color = color;
+            r->color_set = true;
+        }
         bool you = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(jr, "you"));
-        lv_obj_set_style_border_opa(r->row, you ? 230 : LV_OPA_TRANSP, 0);
+        if (you != r->you) { /* angelegt ohne Rand (you = false) */
+            lv_obj_set_style_border_opa(r->row, you ? 230 : LV_OPA_TRANSP, 0);
+            r->you = you;
+        }
     }
 }
 
