@@ -152,9 +152,10 @@ class Updates:
             # lokaler Entwicklungszweig: nichts zu holen, kein Fehler
             _, branch = await _git("rev-parse", "--abbrev-ref", "HEAD", cwd=r)
             return {"upstream": None, "branch": branch, "behind": 0, "ahead": 0, "latest": ""}
-        _, behind = await _git("rev-list", "--count", "HEAD..@{upstream}", cwd=r)
-        _, ahead = await _git("rev-list", "--count", "@{upstream}..HEAD", cwd=r)
-        _, subject = await _git("log", "-1", "--format=%s", "@{upstream}", cwd=r)
+        # nur Commits, die nexboard/ betreffen: Hub, Bot und Planner liegen im selben Repo
+        _, behind = await _git("rev-list", "--count", "HEAD..@{upstream}", "--", ".", cwd=r)
+        _, ahead = await _git("rev-list", "--count", "@{upstream}..HEAD", "--", ".", cwd=r)
+        _, subject = await _git("log", "-1", "--format=%s", "@{upstream}", "--", ".", cwd=r)
         return {"upstream": upstream, "behind": int(behind or 0), "ahead": int(ahead or 0), "latest": subject}
 
     async def _check_a2tools(self) -> dict:

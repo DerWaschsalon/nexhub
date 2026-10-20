@@ -67,7 +67,7 @@ fi
 # ------------------------------------------------------------------ deckbar-capture
 BIN=~/.local/bin/deckbar-capture
 STAMP=${XDG_DATA_HOME:-$HOME/.local/share}/deckbar/capture-build-id
-BUILD_ID="$(git rev-parse HEAD:capture)-$(git -C "$SUB" rev-parse HEAD)"
+BUILD_ID="$(git rev-parse HEAD:./capture)-$(git -C "$SUB" rev-parse HEAD)"
 if [[ ! -x $BIN ]] || ! getcap "$BIN" 2>/dev/null | grep -q cap_net_raw || [[ "$(cat "$STAMP" 2>/dev/null)" != "$BUILD_ID" ]]; then
   note "Baue deckbar-capture neu, gleich kommt die Passwortabfrage für die Mitschnitt-Rechte …"
   capture/build.sh --install >/dev/null || fail "deckbar-capture bauen/installieren"

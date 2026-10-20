@@ -15,6 +15,14 @@ def git(cwd, *args):
     subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True)
 
 
+def commit(repo, path, msg):
+    f = repo / path
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(msg)
+    git(repo, "add", path)
+    git(repo, "commit", "-q", "-m", msg)
+
+
 async def test_commits_hinter_upstream(tmp_path):
     origin, work, other = tmp_path / "origin.git", tmp_path / "work", tmp_path / "other"
     subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
@@ -22,15 +30,16 @@ async def test_commits_hinter_upstream(tmp_path):
         subprocess.run(["git", "clone", "-q", str(origin), str(d)], check=True, capture_output=True)
         git(d, "config", "user.email", "t@example.invalid")
         git(d, "config", "user.name", "t")
-    git(work, "commit", "-q", "--allow-empty", "-m", "eins")
+    commit(work, "nexboard/a", "eins")
     git(work, "push", "-q", "origin", "HEAD:main")
     git(other, "pull", "-q", "origin", "main")
     git(other, "branch", "-u", "origin/main")
-    git(work, "commit", "-q", "--allow-empty", "-m", "zwei")
-    git(work, "commit", "-q", "--allow-empty", "-m", "drei")
+    commit(work, "nexboard/a", "zwei")
+    commit(work, "nexboard/a", "drei")
+    commit(work, "bot/b", "vier")  # anderer Teil des Monorepos: kein NexBoard-Update
     git(work, "push", "-q", "origin", "HEAD:main")
 
-    up = Updates(other)
+    up = Updates(other / "nexboard")
 
     async def kein_a2tools():
         return {"current": "v2.0.62", "latest": "v2.0.62", "newer": False}

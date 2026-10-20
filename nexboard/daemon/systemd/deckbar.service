@@ -1,6 +1,6 @@
 [Unit]
 Description=NexBoard-Daemon (Touch-Leiste)
-Documentation=file://%h/Github/deckbar/README.md
+Documentation=file://%h/Github/nexhub/nexboard/README.md
 # PipeWire-Session muss laufen, damit wpctl/pactl funktionieren
 After=pipewire.service wireplumber.service graphical-session.target
 Wants=pipewire.service
