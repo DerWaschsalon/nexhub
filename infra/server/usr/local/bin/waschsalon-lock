@@ -1,0 +1,76 @@
+#!/bin/sh
+# Sperre und Änderungsprotokoll für den VPS waschsalon.
+# Damit sich zwei Claude-Instanzen (und Menschen) nicht gleichzeitig am Server zu schaffen machen.
+#
+#   waschsalon-lock status                      wer die Sperre hält, letzte Protokolleinträge
+#   waschsalon-lock holen <wer> <wofür>          Sperre holen, scheitert, wenn jemand anderes sie hat
+#   waschsalon-lock log <wer> <was gemacht>      Eintrag ins Änderungsprotokoll
+#   waschsalon-lock freigeben <wer>              eigene Sperre freigeben
+#   waschsalon-lock freigeben <wer> --erzwingen  fremde Sperre lösen – nur auf Anweisung von Fabio
+#                                               oder Navonex, wird protokolliert
+#
+# <wer>: claude-gamunex, claude-navonex, gamunex, navonex
+set -eu
+DIR=${WASCHSALON_DIR:-/srv/waschsalon}  # überschreibbar nur für Tests
+LOCK=$DIR/LOCK
+LOG=$DIR/CHANGELOG.md
+mkdir -p "$DIR"
+[ -e "$LOG" ] || printf '# Änderungsprotokoll waschsalon\n\nNeueste Einträge unten. Zeiten in UTC.\n\n' > "$LOG"
+
+now() { date -u '+%Y-%m-%d %H:%M'; }
+eintrag() { printf -- '- %s · %s · %s\n' "$(now)" "$1" "$2" >> "$LOG"; }
+inhaber() { [ -e "$LOCK" ] && cut -d'|' -f1 "$LOCK" || true; }
+nutzung() { sed -n '2,12p' "$0" >&2; exit 2; }
+
+# Alles unter flock, damit holen/freigeben nicht gleichzeitig laufen
+exec 9>"$DIR/.lock.flock"
+flock -w 10 9 || { echo "Sperrdatei belegt, bitte nochmal versuchen" >&2; exit 1; }
+
+case ${1:-status} in
+  status)
+    if [ -e "$LOCK" ]; then
+      IFS='|' read -r wer wofuer seit < "$LOCK"
+      echo "GESPERRT von $wer seit $seit UTC: $wofuer"
+    else
+      echo "frei"
+    fi
+    echo "--- letzte Einträge ($LOG):"
+    grep '^- ' "$LOG" | tail -n 10 || true
+    ;;
+  holen)
+    [ $# -ge 3 ] || nutzung
+    wer=$2; shift 2; wofuer=$*
+    alt=$(inhaber)
+    if [ -n "$alt" ] && [ "$alt" != "$wer" ]; then
+      IFS='|' read -r _ w seit < "$LOCK"
+      echo "BELEGT: $alt arbeitet seit $seit UTC am Server ($w). Nichts ändern, abwarten oder nachfragen." >&2
+      exit 1
+    fi
+    printf '%s|%s|%s\n' "$wer" "$wofuer" "$(now)" > "$LOCK"
+    eintrag "$wer" "Sperre geholt: $wofuer"
+    echo "Sperre gehört jetzt $wer"
+    ;;
+  log)
+    [ $# -ge 3 ] || nutzung
+    wer=$2; shift 2
+    alt=$(inhaber)
+    [ -z "$alt" ] || [ "$alt" = "$wer" ] || echo "Hinweis: Sperre hält $alt, nicht $wer" >&2
+    eintrag "$wer" "$*"
+    ;;
+  freigeben)
+    [ $# -ge 2 ] || nutzung
+    wer=$2
+    alt=$(inhaber)
+    if [ -z "$alt" ]; then
+      echo "war schon frei"
+    elif [ "$alt" = "$wer" ]; then
+      rm -f "$LOCK"; eintrag "$wer" "Sperre freigegeben"; echo "frei"
+    elif [ "${3:-}" = "--erzwingen" ]; then
+      rm -f "$LOCK"; eintrag "$wer" "fremde Sperre von $alt gelöst (--erzwingen)"; echo "frei (erzwungen)"
+    else
+      echo "Die Sperre gehört $alt. Lösen nur mit --erzwingen und nur auf Anweisung von Fabio oder Navonex." >&2
+      exit 1
+    fi
+    ;;
+  *) nutzung ;;
+esac

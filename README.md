@@ -9,8 +9,10 @@ Alles rund um NexBoard und den Waschsalon-Discord an einem Ort.
 | [`hub/`](hub/) | NexHub-Website: Discord-Login, Gerätekopplung, Log-Uploads | geplant |
 | [`proto/`](proto/) | `nexproto`: gemeinsame Schemas für Board, Hub und Bot | geplant |
 | [`planner/`](planner/) | Daevanion-Planner | kommt noch |
+| [`infra/`](infra/) | Konfiguration des VPS waschsalon, Deploy und Sperre | im Aufbau |
 
-Jeder Ordner bringt seine eigene README mit Aufbau, Installation und Tests mit.
+Jeder Ordner bringt seine eigene README mit Aufbau, Installation und Tests mit. Regeln für die
+Zusammenarbeit (auch für Claude-Instanzen) stehen in [CLAUDE.md](CLAUDE.md).
 
 Das Bot-Image baut GitHub Actions bei Änderungen unter `bot/` nach
 `ghcr.io/derwaschsalon/thewashbot`.
