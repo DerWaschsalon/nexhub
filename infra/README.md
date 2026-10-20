@@ -18,9 +18,10 @@ infra/deploy.sh claude-gamunex --anwenden  # überträgt und protokolliert
 ssh waschsalon waschsalon-lock freigeben claude-gamunex
 ```
 
-Änderungen unter `etc/ssh/` spielt `deploy.sh` mit einem Rücknahme-Timer ein: Wird er nicht
-innerhalb von 5 Minuten mit `ssh waschsalon systemctl stop waschsalon-rollback.timer` gestoppt,
-kommt die vorherige SSH-Konfiguration zurück. Vorher in einer neuen Verbindung den Login testen.
+Änderungen unter `etc/ssh/` und an `etc/nftables.conf` spielt `deploy.sh` mit einem
+Rücknahme-Timer ein: Wird er nicht innerhalb von 5 Minuten mit
+`ssh waschsalon systemctl stop waschsalon-rollback.timer` gestoppt, kommt der vorherige Stand
+zurück. Vorher in einer neuen Verbindung den Login testen.
 
 ## Was eingerichtet ist
 - SSH nur mit Schlüssel (`etc/ssh/`), Root-Login nur per Schlüssel.
