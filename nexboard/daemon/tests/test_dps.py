@@ -184,3 +184,28 @@ async def test_auto_page(tmp_path):
     # schon auf der DPS-Seite → kein goto
     await deck._on_combat(True)
     assert len(ws.sent) == 4
+
+
+async def test_reset_button(tmp_path):
+    from deckbar_daemon.config import Settings
+    from deckbar_daemon.server import NexBoard
+
+    deck = NexBoard(Settings(token="testtoken-123"), tmp_path)
+    deck.layout = Layout.model_validate({"pages": [{"id": "aion", "items": [{"id": "d", "type": "dps", "h": 2}]}]})
+    sent = []
+
+    async def request(cmd, **args):
+        sent.append(cmd)
+
+    deck.dps.capture.request = request
+    msg = {"v": 1, "type": "event", "event": "button_press", "item": "d", "part": "reset"}
+    jsonschema.validate(msg, SCHEMA)
+
+    deck.dps.settings = DpsSettings(source="capture")
+    assert await deck.handle_event(msg, "test") is None
+    assert sent == ["reset"]
+
+    # Stream-Overlay des Meters: kein Reset möglich, nur Warnung
+    deck.dps.settings = DpsSettings(source="auto")
+    assert await deck.handle_event(msg, "test") is None
+    assert sent == ["reset"]
