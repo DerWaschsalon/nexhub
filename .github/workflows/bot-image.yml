@@ -1,8 +1,9 @@
-name: Image
+name: Bot-Image
 
 on:
   push:
     branches: [main]
+    paths: ["bot/**", ".github/workflows/bot-image.yml"]
   workflow_dispatch: {}
 
 permissions:
@@ -25,8 +26,8 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: .
+          context: bot
           push: true
           tags: |
-            ghcr.io/navonex/thewashbot:latest
-            ghcr.io/navonex/thewashbot:${{ github.sha }}
+            ghcr.io/derwaschsalon/thewashbot:latest
+            ghcr.io/derwaschsalon/thewashbot:${{ github.sha }}

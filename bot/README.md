@@ -69,7 +69,7 @@ Neustart des Bots weiter. Die `/setup`- und `/aufraeumen`-Befehle sehen nur Leut
 
 ## 2. Auf dem Home-Server starten (Docker)
 
-Das Image wird von GitHub Actions gebaut und nach `ghcr.io/navonex/thewashbot` gepusht (bei jedem
+Das Image wird von GitHub Actions gebaut und nach `ghcr.io/derwaschsalon/thewashbot` gepusht (bei jedem
 Push auf `main`, der diesen Ordner betrifft). `docker-compose.yml` zieht dieses fertige Image,
 kein Bauen mehr auf dem Server nötig.
 
@@ -336,7 +336,7 @@ Rolle.
    Discord → ID kopieren, braucht den Entwicklermodus). Nur diese Person sieht die drei Befehle.
 3. `docker compose up -d` — danach sind `/server`, `/server-neustart`, `/server-update` aktiv.
 
-**Wie `/server-update` funktioniert:** zieht `ghcr.io/navonex/thewashbot:latest`, liest die
+**Wie `/server-update` funktioniert:** zieht `ghcr.io/derwaschsalon/thewashbot:latest`, liest die
 laufende Container-Konfiguration aus (Umgebungsvariablen, Volumes, Ports, Restart-Policy) und
 startet damit einen kurzlebigen Helfer-Container (`bot/selfupdate_helper.py`), der wartet, bis
 der alte Bot-Container gestoppt ist, ihn entfernt und den neuen mit identischer Konfiguration,

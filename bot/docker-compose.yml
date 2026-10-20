@@ -1,6 +1,6 @@
 services:
   discord-bot:
-    image: ghcr.io/navonex/thewashbot:latest
+    image: ghcr.io/derwaschsalon/thewashbot:latest
     container_name: thewashbot
     restart: unless-stopped
     env_file: .env

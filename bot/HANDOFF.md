@@ -98,7 +98,7 @@ Fertig:
 - **Server-Status**: `bot/cogs/server.py` + `bot/serverstatus.py` (reine Hilfsfunktionen,
   ohne discord.py/docker-Importe) + `bot/selfupdate_helper.py` (eigenständiges Skript). `/server`
   (CPU/RAM/Uptime aus `/proc`, Festplatte unter `/data`, laufende Container über den Docker-Socket),
-  `/server-neustart container:` (mit Bestätigung), `/server-update` (zieht `ghcr.io/navonex/
+  `/server-neustart container:` (mit Bestätigung), `/server-update` (zieht `ghcr.io/derwaschsalon/
   thewashbot:latest`, ersetzt den **eigenen** Container live damit — siehe „Server-Status
   einrichten" im README für den genauen Ablauf). Nur für `OWNER_ID` (Env), nicht für eine Rolle,
   weil der Docker-Socket praktisch Root-Zugriff auf unraid-server ist. Socket-Mount in

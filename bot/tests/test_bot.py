@@ -1598,9 +1598,9 @@ def test_server_build_recreate_config_translates_inspect_data():
             "NetworkMode": "bridge",
         },
     }
-    cfg = build_recreate_config(inspect_data, "ghcr.io/navonex/thewashbot:v2")
+    cfg = build_recreate_config(inspect_data, "ghcr.io/derwaschsalon/thewashbot:v2")
     assert cfg["name"] == "thewashbot"  # führender "/" aus dem Inspect-Namen entfernt
-    assert cfg["image"] == "ghcr.io/navonex/thewashbot:v2"
+    assert cfg["image"] == "ghcr.io/derwaschsalon/thewashbot:v2"
     assert cfg["environment"] == ["DISCORD_TOKEN=secret", "LOG_LEVEL=INFO"]
     assert cfg["host_config_kwargs"]["binds"] == ["/mnt/user/appdata/thewashbot/data:/data"]
     assert cfg["host_config_kwargs"]["port_bindings"] == {"8787/tcp": "8787", "8789/tcp": "8789"}

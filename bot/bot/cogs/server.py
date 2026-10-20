@@ -22,7 +22,7 @@ from ..serverstatus import build_recreate_config, cpu_percent_from_samples, fmt_
 
 log = logging.getLogger(__name__)
 
-SELF_UPDATE_IMAGE = "ghcr.io/navonex/thewashbot:latest"
+SELF_UPDATE_IMAGE = "ghcr.io/derwaschsalon/thewashbot:latest"
 
 
 def require_owner(interaction: discord.Interaction) -> None:
