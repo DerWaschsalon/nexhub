@@ -1,0 +1,1 @@
+# Proxmox soll /etc/hostname nicht überschreiben, der Name kommt aus infra/server/etc/hostname
