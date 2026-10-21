@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
-import { apiLoad, BOT_API, type BotSection } from '#lib/api.ts';
+import { apiLoad } from '#lib/api.ts';
+import { BOT_API, type BotSection } from '#modules/bot/api.ts';
 import type { PageLoad } from './$types';
 
 // Reine Formular-Bereiche (allgemein, automod, …): Schema und Werte kommen vom Bot

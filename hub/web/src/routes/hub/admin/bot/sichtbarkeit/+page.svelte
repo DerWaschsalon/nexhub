@@ -1,7 +1,8 @@
 <!-- Sichtbarkeit: welche Rolle welchen Kanal sieht. Ein Klick auf eine Zelle stellt das Recht
      „Kanal ansehen“ für diese Rolle sofort auf dem Discord-Server um. -->
 <script lang="ts">
-	import { BOT_API, send, type VisibilityMatrix } from '#lib/api.ts';
+	import { send } from '#lib/api.ts';
+	import { BOT_API, type VisibilityMatrix } from '#modules/bot/api.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

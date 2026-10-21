@@ -1,5 +1,5 @@
 <script lang="ts">
-	import BotSection from '#lib/components/BotSection.svelte';
+	import BotSection from '#modules/bot/BotSection.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

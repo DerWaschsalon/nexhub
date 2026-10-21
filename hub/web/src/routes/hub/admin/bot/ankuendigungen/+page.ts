@@ -1,4 +1,5 @@
-import { apiLoad, BOT_API, type Announcement } from '#lib/api.ts';
+import { apiLoad } from '#lib/api.ts';
+import { BOT_API, type Announcement } from '#modules/bot/api.ts';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => ({

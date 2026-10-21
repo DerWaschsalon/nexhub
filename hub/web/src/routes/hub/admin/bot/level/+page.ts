@@ -1,4 +1,5 @@
-import { apiLoad, BOT_API, type BotSection, type LevelReward } from '#lib/api.ts';
+import { apiLoad } from '#lib/api.ts';
+import { BOT_API, type BotSection, type LevelReward } from '#modules/bot/api.ts';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => {

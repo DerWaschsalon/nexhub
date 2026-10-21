@@ -1,12 +1,15 @@
-<!-- Login-Bereich: Seitenleiste mit Menü und Konto, rechts die jeweilige Seite. -->
+<!-- Login-Bereich: Seitenleiste mit Menü (Kern + Module, lib/modules.ts), Sprache und Konto;
+     rechts die jeweilige Seite. -->
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { post, ROLE_LABEL } from '#lib/api.ts';
+	import { post } from '#lib/api.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Brand from '#lib/components/Brand.svelte';
 	import Icon from '#lib/components/Icon.svelte';
-	import { NAV } from '#lib/nav.ts';
+	import LangSwitch from '#lib/components/LangSwitch.svelte';
+	import { t } from '#lib/i18n.svelte.ts';
+	import { NAV } from '#lib/modules.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
@@ -33,17 +36,18 @@
 			{#each items as item (item.href)}
 				<a href={item.href} class:active={active(item.href)}>
 					<Icon name={item.icon} />
-					<span>{item.label}</span>
+					<span>{t(item.label)}</span>
 				</a>
 			{/each}
 		</nav>
+		<LangSwitch />
 		<div class="me">
 			<Avatar name={data.me.name} url={data.me.avatar_url} />
 			<div class="who">
 				<strong>{data.me.name}</strong>
-				<span class="chip accent">{ROLE_LABEL[data.me.role]}</span>
+				<span class="chip accent">{t(`role.${data.me.role}`)}</span>
 			</div>
-			<button class="btn small" onclick={logout} title="Abmelden" aria-label="Abmelden">
+			<button class="btn small" onclick={logout} title={t('shell.logout')} aria-label={t('shell.logout')}>
 				<Icon name="logout" size={16} />
 			</button>
 		</div>
@@ -109,6 +113,10 @@
 	nav a.active :global(svg) {
 		color: var(--accent);
 	}
+	aside > :global(.lang) {
+		align-self: flex-start;
+		margin-left: 8px;
+	}
 	.me {
 		display: flex;
 		align-items: center;
@@ -164,8 +172,10 @@
 			white-space: nowrap;
 			padding: 8px 12px;
 		}
-		.me {
+		aside > :global(.lang) {
 			margin-left: auto;
+		}
+		.me {
 			border: 0;
 			padding: 0;
 		}

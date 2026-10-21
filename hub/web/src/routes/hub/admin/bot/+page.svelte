@@ -1,6 +1,6 @@
 <!-- Übersicht: Zustand des Bots und Einstieg in die Bereiche. -->
 <script lang="ts">
-	import { BOT_NAV, botHref, formatUptime } from '#lib/bot.ts';
+	import { BOT_NAV, botHref, formatUptime } from '#modules/bot/bot.ts';
 	import { formatNumber } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 

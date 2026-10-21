@@ -1,7 +1,8 @@
 <!-- Verifizierung: Stand anzeigen und den Regel-Text im Panel ändern. Einrichten selbst geht nur
      in Discord, weil es Rechte auf dem ganzen Server umstellt. -->
 <script lang="ts">
-	import { BOT_API, send } from '#lib/api.ts';
+	import { send } from '#lib/api.ts';
+	import { BOT_API } from '#modules/bot/api.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

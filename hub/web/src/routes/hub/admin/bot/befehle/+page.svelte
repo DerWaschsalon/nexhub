@@ -1,6 +1,7 @@
 <!-- Eigene Befehle: „!name“ im Chat, der Bot antwortet mit festem Text. -->
 <script lang="ts">
-	import { BOT_API, send, type CustomCommand } from '#lib/api.ts';
+	import { send } from '#lib/api.ts';
+	import { BOT_API, type CustomCommand } from '#modules/bot/api.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

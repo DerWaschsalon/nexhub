@@ -1,15 +1,16 @@
-<!-- Run-Liste: alle hochgeladenen Runs, neueste zuerst. -->
+<!-- Modul Logs: alle hochgeladenen Runs, neueste zuerst. -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { formatDuration, formatMs } from '#lib/format.ts';
+	import { formatDuration, formatMs, formatNumber } from '#lib/format.ts';
+	import { t } from '#lib/i18n.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
 
 <header class="page-head">
-	<h1>Runs</h1>
-	<p>Dungeon-Runs, die eure NexBoards hochgeladen haben.</p>
+	<h1>{t('logs.list.title')}</h1>
+	<p>{t('logs.list.intro')}</p>
 </header>
 
 {#if data.runs.length}
@@ -17,39 +18,36 @@
 		<table class="table">
 			<thead>
 				<tr>
-					<th>Dungeon</th>
-					<th>Bosse</th>
-					<th>Dauer</th>
-					<th>Datum</th>
-					<th>Aufgenommen von</th>
+					<th>{t('logs.col.dungeon')}</th>
+					<th>{t('logs.col.bosses')}</th>
+					<th class="right">{t('logs.col.duration')}</th>
+					<th>{t('logs.col.played')}</th>
+					<th>{t('logs.col.uploadedBy')}</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each data.runs as run (run.id)}
-					<tr class="link" onclick={() => goto(`/hub/runs/${run.id}`)}>
+				{#each data.runs as r (r.id)}
+					<tr class="link" onclick={() => goto(`/hub/runs/${r.id}`)}>
 						<td>
-							<a href="/hub/runs/{run.id}"><strong>{run.dungeon}</strong></a>
-							{#if run.difficulty}<span class="chip">{run.difficulty}</span>{/if}
+							<a href="/hub/runs/{r.id}"><strong>{r.dungeon}</strong></a>
+							{#if r.difficulty}<span class="chip">{r.difficulty}</span>{/if}
 						</td>
 						<td>
-							<span class="chip" class:ok={run.complete}>{run.bosses_killed}/{run.bosses_total}</span>
+							<span class="chip" class:ok={r.bosses_killed === r.bosses_total} class:warn={r.bosses_killed !== r.bosses_total}>
+								{r.bosses_killed}/{r.bosses_total}
+							</span>
 						</td>
-						<td class="dim">{formatDuration(run.end_ms - run.start_ms)}</td>
-						<td class="dim">{formatMs(run.start_ms)}</td>
-						<td class="dim">{run.character ?? run.uploader}</td>
+						<td class="right num">{formatDuration(r.end_ms - r.start_ms)}</td>
+						<td class="dim">{formatMs(r.start_ms)}</td>
+						<td class="dim">{r.uploader}{r.character ? ` (${r.character})` : ''}</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
+		<p class="dim count">{t('logs.list.count', { n: formatNumber(data.runs.length) })}</p>
 	</section>
 {:else}
-	<section class="glass pad empty">
-		<p>Noch keine Runs.</p>
-		<p class="dim">
-			Im NexBoard-Modul „NexHub“ das Hochladen einschalten. Nach dem nächsten Dungeon erscheint der
-			Run hier.
-		</p>
-	</section>
+	<section class="glass pad"><p class="dim empty">{t('logs.list.empty')}</p></section>
 {/if}
 
 <style>
@@ -65,7 +63,11 @@
 		text-decoration: none;
 		margin-right: 8px;
 	}
-	.empty p {
-		margin: 0 0 4px;
+	.count {
+		margin: 12px 14px 0;
+		font-size: 13px;
+	}
+	.empty {
+		margin: 0;
 	}
 </style>

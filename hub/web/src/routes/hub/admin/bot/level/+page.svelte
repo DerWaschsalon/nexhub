@@ -1,7 +1,8 @@
 <!-- Levelsystem: Einstellungen aus dem Schema, dazu Rollen als Belohnung ab einem Level. -->
 <script lang="ts">
-	import { BOT_API, send, type LevelReward } from '#lib/api.ts';
-	import BotSection from '#lib/components/BotSection.svelte';
+	import { send } from '#lib/api.ts';
+	import { BOT_API, type LevelReward } from '#modules/bot/api.ts';
+	import BotSection from '#modules/bot/BotSection.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

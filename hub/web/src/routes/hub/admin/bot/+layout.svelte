@@ -1,7 +1,7 @@
 <!-- Bot: TheWashBot steuern. Oben die Unterseiten, darunter die jeweilige Seite. -->
 <script lang="ts">
 	import { page } from '$app/state';
-	import { BOT_NAV, botHref } from '#lib/bot.ts';
+	import { BOT_NAV, botHref } from '#modules/bot/bot.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
@@ -53,33 +53,7 @@
 		gap: 16px;
 	}
 	.tabs {
-		display: flex;
-		gap: 4px;
-		overflow-x: auto;
-		scrollbar-width: none;
-		margin: 0 -4px 20px;
-		padding: 4px;
-	}
-	.tabs a {
-		flex-shrink: 0;
-		padding: 7px 14px;
-		border-radius: 999px;
-		font-size: 14px;
-		font-weight: 550;
-		color: var(--dim);
-		text-decoration: none;
-		border: 1px solid transparent;
-		white-space: nowrap;
-	}
-	.tabs a:hover {
-		color: var(--text);
-		background: rgba(255, 255, 255, 0.06);
-	}
-	.tabs a.active {
-		color: var(--text);
-		background: rgba(255, 255, 255, 0.1);
-		border-color: var(--edge-soft);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+		margin-bottom: 20px;
 	}
 	.notice p {
 		margin: 6px 0 0;

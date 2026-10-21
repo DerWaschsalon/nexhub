@@ -1,29 +1,20 @@
-<!-- Geteilter Run: öffentlich, ohne Login. Nicht für Suchmaschinen. -->
+<!-- Run gesamt: Schaden über alle Kämpfe. -->
 <script lang="ts">
-	import { page } from '$app/state';
-	import RunView from '#lib/components/RunView.svelte';
+	import { t } from '#lib/i18n.svelte.ts';
+	import RankBars from '#modules/logs/components/RankBars.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head>
-	<title>{data.run.dungeon} · NexHub</title>
-	<meta name="robots" content="noindex, nofollow" />
-</svelte:head>
-
-<RunView run={data.run} fightHref={(f) => `/r/${page.params.token}/kampf/${encodeURIComponent(f)}`}>
-	{#snippet actions()}
-		<a class="btn small primary" href="/logs/r/{page.params.token}" data-sveltekit-reload>In NexLogs öffnen</a>
-	{/snippet}
-</RunView>
-
-<p class="dim note">Geteilt über NexHub.</p>
+<section class="glass pad">
+	<h2>{t('logs.run.damageRun')}</h2>
+	<RankBars players={data.run.summary.players} />
+</section>
 
 <style>
-	.note {
-		text-align: center;
-		font-size: 13px;
-		margin-top: 24px;
+	h2 {
+		font-size: 17px;
+		margin-bottom: 14px;
 	}
 </style>

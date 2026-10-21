@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -57,8 +57,6 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         await db.execute(text("SELECT 1"))
         return {"ok": True}
 
-    if settings.hub_logs_dir:
-        _serve_logs(app, settings.hub_logs_dir.resolve())
     if settings.hub_web_dir:
         _serve_web(app, settings.hub_web_dir.resolve())
     return app
@@ -78,18 +76,3 @@ def _serve_web(app: FastAPI, web) -> None:
             return FileResponse(file, headers={"Cache-Control": cache})
         return FileResponse(web / "200.html", headers={"Cache-Control": "no-cache"})
 
-
-def _serve_logs(app: FastAPI, logs) -> None:
-    """NexLogs unter /logs/ (eigene React-App, nexlogs/); unbekannte Pfade bekommen index.html."""
-
-    @app.get("/logs", include_in_schema=False)
-    async def logs_root() -> RedirectResponse:
-        return RedirectResponse("/logs/", status_code=308)
-
-    @app.get("/logs/{path:path}", include_in_schema=False)
-    async def logs_spa(path: str) -> FileResponse:
-        file = (logs / path).resolve()
-        if path and file.is_file() and file.is_relative_to(logs):
-            cache = "public, max-age=31536000, immutable" if path.startswith("assets/") else "no-cache"
-            return FileResponse(file, headers={"Cache-Control": cache})
-        return FileResponse(logs / "index.html", headers={"Cache-Control": "no-cache"})

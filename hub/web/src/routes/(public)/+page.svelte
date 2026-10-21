@@ -1,20 +1,18 @@
 <script lang="ts">
+	import { t } from '#lib/i18n.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
 
 <section class="hero">
-	<h1>Runs, Ranglisten und Geräte für den Waschsalon.</h1>
-	<p class="dim">
-		NexHub sammelt die Dungeon-Runs aus NexBoard, wertet sie aus und macht sie teilbar – für die
-		Gilde und für alle, denen ihr einen Link schickt.
-	</p>
+	<h1>{t('home.title')}</h1>
+	<p class="dim">{t('home.text')}</p>
 	<div class="actions">
 		{#if data.me}
-			<a class="btn primary large" href="/hub">Zum Hub</a>
+			<a class="btn primary large" href="/hub">{t('shell.toHub')}</a>
 		{:else}
-			<a class="btn primary large" href="/login">Mit Discord anmelden</a>
+			<a class="btn primary large" href="/login">{t('home.login')}</a>
 		{/if}
 	</div>
 </section>

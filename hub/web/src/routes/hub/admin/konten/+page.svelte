@@ -1,9 +1,10 @@
 <!-- Konten: wer sich angemeldet hat; Sitzungen beenden, sperren, entsperren. -->
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { post, ROLE_LABEL, type Account } from '#lib/api.ts';
+	import { post, type Account } from '#lib/api.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import { formatDateTime } from '#lib/format.ts';
+	import { t } from '#lib/i18n.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -12,7 +13,7 @@
 	let error = $state('');
 
 	async function act(account: Account, action: 'logout' | 'block' | 'unblock') {
-		if (action === 'block' && !confirm(`${account.name} sperren? Alle Sitzungen enden sofort.`)) return;
+		if (action === 'block' && !confirm(t('accounts.confirmBlock', { name: account.name }))) return;
 		busy = account.id;
 		error = '';
 		try {
@@ -27,8 +28,8 @@
 </script>
 
 <header class="page-head">
-	<h1>Konten</h1>
-	<p>Alle, die sich angemeldet haben. Admins stehen in der Server-Konfiguration.</p>
+	<h1>{t('accounts.title')}</h1>
+	<p>{t('accounts.intro')}</p>
 </header>
 
 {#if error}
@@ -39,10 +40,10 @@
 	<table class="table">
 		<thead>
 			<tr>
-				<th>Konto</th>
-				<th>Rolle</th>
-				<th>Letzte Anmeldung</th>
-				<th>Sitzungen</th>
+				<th>{t('accounts.col.account')}</th>
+				<th>{t('accounts.col.role')}</th>
+				<th>{t('accounts.col.lastLogin')}</th>
+				<th>{t('accounts.col.sessions')}</th>
 				<th></th>
 			</tr>
 		</thead>
@@ -59,25 +60,25 @@
 						</div>
 					</td>
 					<td>
-						<span class="chip" class:accent={account.role === 'admin'}>{ROLE_LABEL[account.role]}</span>
-						{#if account.blocked}<span class="chip danger">gesperrt</span>{/if}
+						<span class="chip" class:accent={account.role === 'admin'}>{t(`role.${account.role}`)}</span>
+						{#if account.blocked}<span class="chip danger">{t('accounts.blocked')}</span>{/if}
 					</td>
 					<td class="dim">{formatDateTime(account.last_login_at)}</td>
 					<td>{account.sessions}</td>
 					<td class="actions">
 						{#if account.sessions > 0}
 							<button class="btn small" disabled={busy === account.id} onclick={() => act(account, 'logout')}>
-								Abmelden
+								{t('accounts.logout')}
 							</button>
 						{/if}
 						{#if account.role !== 'admin'}
 							{#if account.blocked}
 								<button class="btn small" disabled={busy === account.id} onclick={() => act(account, 'unblock')}>
-									Entsperren
+									{t('accounts.unblock')}
 								</button>
 							{:else}
 								<button class="btn small danger" disabled={busy === account.id} onclick={() => act(account, 'block')}>
-									Sperren
+									{t('accounts.block')}
 								</button>
 							{/if}
 						{/if}

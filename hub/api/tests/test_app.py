@@ -35,24 +35,6 @@ def test_web_oberflaeche_mit_fallback(make_client, tmp_path):
         assert c.get("/api/gibtsnicht").status_code == 404
 
 
-def test_nexlogs_unter_logs(make_client, tmp_path):
-    web, logs = tmp_path / "web", tmp_path / "logs"
-    web.mkdir()
-    (web / "200.html").write_text("<html>hub</html>")
-    (logs / "assets").mkdir(parents=True)
-    (logs / "index.html").write_text("<html>logs</html>")
-    (logs / "assets" / "a.js").write_text("js")
-    (tmp_path / "geheim.txt").write_text("nein")
-    with make_client(hub_web_dir=str(web), hub_logs_dir=str(logs)) as c:
-        assert c.get("/logs").headers["location"] == "/logs/"
-        assert c.get("/logs/").text == "<html>logs</html>"
-        assert c.get("/logs/run/5/kampf/auto_1").text == "<html>logs</html>"  # Pfade der React-App
-        r = c.get("/logs/assets/a.js")
-        assert r.text == "js" and "immutable" in r.headers["cache-control"]
-        assert c.get("/logs/%2e%2e/geheim.txt").text == "<html>logs</html>"
-        assert c.get("/hub/runs").text == "<html>hub</html>"  # der Rest bleibt beim Hub
-
-
 def test_herkunftspruefung_nur_mit_cookie(client):
     # Ohne Sitzungscookie greift die Prüfung nicht (später: Geräte mit eigenem Token)
     assert client.post("/api/auth/logout").status_code == 204

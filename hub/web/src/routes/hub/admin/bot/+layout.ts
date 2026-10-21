@@ -1,4 +1,5 @@
-import { api, ApiError, BOT_API, type BotGuild, type BotStatus } from '#lib/api.ts';
+import { api, ApiError } from '#lib/api.ts';
+import { BOT_API, type BotGuild, type BotStatus } from '#modules/bot/api.ts';
 import type { LayoutLoad } from './$types';
 
 // Status und Kanäle/Rollen für alle Unterseiten. Ist der Bot nicht erreichbar, zeigt das Layout

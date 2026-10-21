@@ -1,7 +1,9 @@
-<!-- Öffentlicher Bereich: ohne Login sichtbar. Hier landen später geteilte Runs. -->
+<!-- Öffentlicher Bereich: ohne Login sichtbar (Startseite, Login, geteilte Runs). -->
 <script lang="ts">
 	import { page } from '$app/state';
 	import Brand from '#lib/components/Brand.svelte';
+	import LangSwitch from '#lib/components/LangSwitch.svelte';
+	import { t } from '#lib/i18n.svelte.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
@@ -9,11 +11,14 @@
 
 <header class="glass">
 	<Brand />
-	{#if data.me}
-		<a class="btn primary small" href="/hub">Zum Hub</a>
-	{:else if page.url.pathname !== '/login'}
-		<a class="btn small" href="/login">Anmelden</a>
-	{/if}
+	<div class="right">
+		<LangSwitch />
+		{#if data.me}
+			<a class="btn primary small" href="/hub">{t('shell.toHub')}</a>
+		{:else if page.url.pathname !== '/login'}
+			<a class="btn small" href="/login">{t('shell.login')}</a>
+		{/if}
+	</div>
 </header>
 
 <main>
@@ -33,6 +38,11 @@
 		min-height: 56px;
 		padding: 10px 12px 10px 18px;
 		border-radius: 999px;
+	}
+	.right {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
 	main {
 		max-width: 1100px;

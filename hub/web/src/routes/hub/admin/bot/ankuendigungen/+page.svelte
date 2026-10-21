@@ -1,6 +1,7 @@
 <!-- Ankündigungen: Texte, die der Bot in festen Abständen in einen Kanal postet. -->
 <script lang="ts">
-	import { BOT_API, send, type Announcement } from '#lib/api.ts';
+	import { send } from '#lib/api.ts';
+	import { BOT_API, type Announcement } from '#modules/bot/api.ts';
 	import { formatMs } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 

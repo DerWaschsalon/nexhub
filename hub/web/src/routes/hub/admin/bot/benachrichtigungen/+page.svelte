@@ -1,7 +1,8 @@
 <!-- Benachrichtigungen: GitHub/YouTube-Quellen pausieren oder löschen. Neu anlegen geht in
      Discord, weil der Assistent dort eine Vorschau zeigt. -->
 <script lang="ts">
-	import { BOT_API, send, type Feed } from '#lib/api.ts';
+	import { send } from '#lib/api.ts';
+	import { BOT_API, type Feed } from '#modules/bot/api.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();

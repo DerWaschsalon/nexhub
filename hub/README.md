@@ -1,12 +1,12 @@
 # NexHub-Website
 
-Website mit Discord-Login. Später kommen Kopplung von NexBoard-Geräten per Code und Uploads von
-Dungeon-Runs dazu, ähnlich Warcraft Logs. Läuft auf dem VPS zusammen mit dem Bot (siehe
+Website mit Discord-Login: NexBoard-Geräte koppeln, Dungeon-Runs hochladen und auswerten, ähnlich
+Warcraft Logs. Läuft auf dem VPS zusammen mit dem Bot (siehe
 [`infra/`](../infra/)).
 
-**Stand:** Grundgerüst – öffentlicher Bereich, Login, Admin-Seiten für Konten und System,
-Kopplung von NexBoard-Geräten, Runs hochladen und ansehen (Liste, Schaden je Boss und Spieler),
-Runs per Link öffentlich teilen.
+**Stand:** öffentlicher Bereich, Login, Admin-Seiten für Konten und System, Kopplung von
+NexBoard-Geräten, Runs hochladen und ausführlich ansehen (Modul Logs), Runs per Link öffentlich
+teilen, TheWashBot steuern. Oberfläche auf Englisch und Deutsch.
 
 ## Zwei Bereiche
 
@@ -33,11 +33,39 @@ api/nexhub_api/
   routes/        ein Modul pro Bereich: auth, account, devices, runs, public, admin
   main.py        App zusammenbauen, Herkunftsprüfung, Web-Seiten ausliefern
 web/src/
-  app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table
-  lib/           api.ts (Anfragen + Typen), nav.ts (Menü), components/
+  app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table .tabs
+  lib/           Kern: api.ts (Anfragen), i18n.svelte.ts (Sprache), format.ts (Zahlen, Zeiten),
+                 module.ts + modules.ts (Modul-Register, Menü), texts.ts, components/
+  modules/       ein Ordner je Modul: logs/ (Runs), devices/ (Geräte), bot/ (TheWashBot)
   routes/        (public)/ öffentlich, hub/ mit Login, hub/admin/ nur Admins
 Dockerfile       baut web/ und packt es mit der API in ein Image (Kontext: Repo-Wurzel, wegen proto/)
 ```
+
+## Kern und Module
+
+Die Web-Oberfläche ist ein Kern mit Modulen, ähnlich WordPress mit Plugins. Der **Kern** liefert
+alles, was jede Seite braucht, genau einmal: Rahmen mit Seitenleiste und öffentlichem Kopf
+(`routes/hub/+layout.svelte`, `routes/(public)/+layout.svelte`), Design (`app.css`), Login und
+Rollen, Sprache EN/DE (`lib/i18n.svelte.ts`, Standard Englisch, Umschalter im Rahmen),
+Formatierung (`lib/format.ts`, folgt der Sprache) und den API-Zugriff (`lib/api.ts`).
+
+Ein **Modul** bringt nur seinen Inhalt mit, in `web/src/modules/<id>/`:
+
+- `module.ts`: Menüeinträge (`nav`, Beschriftung als Textschlüssel, `admin: true` nur für Admins)
+  und Texte (`texts`), Typ `HubModule` aus `lib/module.ts`
+- `texts.ts`: `defineTexts(en, de)` – svelte-check meldet, wenn auf Deutsch ein Schlüssel fehlt;
+  Schlüssel mit dem Modulnamen davor (`logs.…`)
+- Typen der API, Komponenten mit eigenem `<style>` (Svelte begrenzt das auf die Komponente), Daten
+
+Seiten liegen unter `web/src/routes/hub/<pfad>/` (SvelteKit verlangt sie dort) und holen Komponenten
+aus dem Modul (`#modules/<id>/…`). Eigene Farben, Schriften oder Menüs bringt ein Modul nicht mit:
+Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
+
+| Modul | Menü | Seiten |
+|---|---|---|
+| `logs` | Runs | `hub/runs/…`, geteilt `(public)/r/<token>/…` |
+| `devices` | Geräte | `hub/geraete/` |
+| `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 
 ## Einen Bereich hinzufügen
 
@@ -48,8 +76,9 @@ Beispiel „Geräte“:
    oder `admin: AdminUser`.
 2. **Tabellen:** Modell in `models.py`, dann Migration (`uv run alembic revision -m "…"` mit
    gesetzter `DATABASE_URL`, Ergebnis von Hand prüfen).
-3. **Web:** Seite unter `web/src/routes/hub/geraete/`, Typen in `lib/api.ts`, Menüeintrag in
-   `lib/nav.ts`.
+3. **Web:** Modul `web/src/modules/devices/` (`module.ts` mit Menüeintrag, `texts.ts`, `api.ts`
+   mit den Typen), in `lib/modules.ts` in `MODULES` eintragen; Seite unter
+   `web/src/routes/hub/geraete/`.
 4. **Tests** in `api/tests/` – die Fixtures `as_user(ADMIN)` / `as_user(MEMBER)` liefern
    angemeldete Browser.
 
@@ -93,14 +122,21 @@ Code in `routes/runs.py`:
   Spieler aus den Einzeltreffern (fehlen sie, gibt es keine Kurve), Skills mit Anteil und Krit-,
   Rücken-, Perfekt- und Doppel-Quote aus der Kampfdatei, Tode.
 
-Die ausführliche Log-Ansicht ist NexLogs (`nexlogs/`, React), die der Hub unter `/logs/` ausliefert
-(`HUB_LOGS_DIR`); sie liest dieselben Routen.
+Im Web zeigt das Modul `logs` die Runs wie Warcraft Logs/AbyssLogs: je Boss Rangliste, DPS-Verlauf,
+Fähigkeiten (Krit, Min/Max/Ø, Rücken, Parade, Perfekt, Doppelt, Mehrfachtreffer, Spezialisierungen
+zum Aufklappen), Zeitleiste (Opener, jeder Zauber je Fähigkeit mit Filter, Buffs auf dem Spieler und
+Debuffs auf dem Boss) und Tode. Hub und geteilte Seite nutzen dieselben Komponenten
+(`modules/logs/components/RunView.svelte`, `FightView.svelte`).
 
-Im Web teilen sich Hub und öffentliche Seite die Ansichten `RunView.svelte` und `FightView.svelte`
-(`lib/components/`). Spieler haben im ganzen Run eine feste Farbe aus einer geprüften Palette
-(`lib/colors.ts`), die Klasse steht als Text daneben.
+- Klassenfarben und -symbole wie im Meter A2Tools-DPS-Meter (GPL-3.0): `modules/logs/classes.ts`,
+  Symbole in `web/static/klassen/`. Im DPS-Verlauf ist ein zweiter Spieler derselben Klasse gestrichelt.
+- Skill-Symbole vom CDN des Spiels (`assets.playnccdn.com`), Zuordnung wie in A2Tools
+  (`modules/logs/skillIcons.ts`, `data/skill_icons.json`).
+- Namen von Fähigkeiten und Buffs je Sprache aus den Spieldaten (`modules/logs/data/`, Herkunft in
+  `HERKUNFT.md`), erst bei Bedarf geladen (`names.svelte.ts`); ohne Eintrag gilt der Name aus der
+  Kampfdatei.
 
-Noch nicht: mehrere Uploads desselben Runs zusammenführen, Buffs, Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
+Noch nicht: mehrere Uploads desselben Runs zusammenführen, Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
 Domain wirklich öffentlich erreichbar sind: Impressum und Datenschutzerklärung klären.
 
 ## Bot

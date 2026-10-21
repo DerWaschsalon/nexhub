@@ -3,9 +3,11 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, type Device } from '#lib/api.ts';
+	import { api } from '#lib/api.ts';
 	import Icon from '#lib/components/Icon.svelte';
 	import { formatDateTime } from '#lib/format.ts';
+	import { t } from '#lib/i18n.svelte.ts';
+	import type { Device } from '#modules/devices/api.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -38,7 +40,7 @@
 	}
 
 	async function remove(device: Device) {
-		if (!confirm(`${device.name} entfernen? Das Gerät muss danach neu gekoppelt werden.`)) return;
+		if (!confirm(t('devices.confirmRemove', { name: device.name }))) return;
 		try {
 			await api<void>(`/api/devices/${device.id}`, { method: 'DELETE' });
 			await invalidateAll();
@@ -49,29 +51,26 @@
 </script>
 
 <header class="page-head">
-	<h1>Geräte</h1>
-	<p>NexBoards, die mit deinem Konto verbunden sind.</p>
+	<h1>{t('devices.title')}</h1>
+	<p>{t('devices.intro')}</p>
 </header>
 
 <section class="glass pad pair">
-	<h2>Gerät koppeln</h2>
-	<p class="dim">
-		In NexBoard das Modul „NexHub“ öffnen und auf „Koppeln“ klicken. Den angezeigten Code hier
-		eingeben.
-	</p>
+	<h2>{t('devices.pair')}</h2>
+	<p class="dim">{t('devices.pairHow')}</p>
 	<form onsubmit={approve}>
 		<label>
-			<span>Code</span>
+			<span>{t('devices.code')}</span>
 			<input class="code" bind:value={code} placeholder="BCDF-GHJK" autocomplete="off" spellcheck="false" required />
 		</label>
 		<label>
-			<span>Name (optional)</span>
-			<input bind:value={name} placeholder="z. B. Gaming-PC" maxlength="64" />
+			<span>{t('devices.name')}</span>
+			<input bind:value={name} placeholder={t('devices.namePlaceholder')} maxlength="64" />
 		</label>
-		<button class="btn primary" disabled={busy || !code.trim()}>Koppeln</button>
+		<button class="btn primary" disabled={busy || !code.trim()}>{t('devices.pairButton')}</button>
 	</form>
 	{#if paired}
-		<p class="notice ok" role="status">„{paired}“ ist bestätigt. NexBoard meldet sich in wenigen Sekunden.</p>
+		<p class="notice ok" role="status">{t('devices.paired', { name: paired })}</p>
 	{/if}
 	{#if error}
 		<p class="notice error" role="alert">{error}</p>
@@ -83,10 +82,10 @@
 		<table class="table">
 			<thead>
 				<tr>
-					<th>Gerät</th>
-					<th>Gekoppelt</th>
-					<th>Zuletzt gesehen</th>
-					<th>Version</th>
+					<th>{t('devices.col.device')}</th>
+					<th>{t('devices.col.paired')}</th>
+					<th>{t('devices.col.seen')}</th>
+					<th>{t('devices.col.version')}</th>
 					<th></th>
 				</tr>
 			</thead>
@@ -98,7 +97,7 @@
 						<td class="dim">{device.last_seen_at ? formatDateTime(device.last_seen_at) : '–'}</td>
 						<td class="dim">{device.version ?? '–'}</td>
 						<td class="actions">
-							<button class="btn small danger" onclick={() => remove(device)}>Entfernen</button>
+							<button class="btn small danger" onclick={() => remove(device)}>{t('devices.remove')}</button>
 						</td>
 					</tr>
 				{/each}
@@ -106,7 +105,7 @@
 		</table>
 	</section>
 {:else}
-	<p class="dim empty">Noch kein Gerät gekoppelt.</p>
+	<p class="dim empty">{t('devices.none')}</p>
 {/if}
 
 <style>
@@ -153,10 +152,6 @@
 	}
 	.notice {
 		margin: 16px 0 0;
-	}
-	.notice.ok {
-		border-color: rgba(74, 222, 128, 0.4);
-		background: rgba(74, 222, 128, 0.1);
 	}
 	.name {
 		display: inline-flex;

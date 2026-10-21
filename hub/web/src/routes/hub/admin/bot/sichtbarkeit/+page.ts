@@ -1,4 +1,5 @@
-import { apiLoad, BOT_API, type VisibilityMatrix } from '#lib/api.ts';
+import { apiLoad } from '#lib/api.ts';
+import { BOT_API, type VisibilityMatrix } from '#modules/bot/api.ts';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch }) => ({

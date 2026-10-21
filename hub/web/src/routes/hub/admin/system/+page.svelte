@@ -1,5 +1,6 @@
 <!-- System: Zustand des Hubs auf einen Blick. -->
 <script lang="ts">
+	import { t } from '#lib/i18n.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -7,37 +8,37 @@
 </script>
 
 <header class="page-head">
-	<h1>System</h1>
-	<p>Version, Datenbank und Login. Einstellungen stehen in <code>/srv/nexhub/.env</code> auf dem Server.</p>
+	<h1>{t('system.title')}</h1>
+	<p>{t('system.intro')} <code>/srv/nexhub/.env</code></p>
 </header>
 
 <section class="tiles">
 	<div class="glass pad tile">
-		<span class="label">Version</span>
+		<span class="label">{t('system.version')}</span>
 		<strong>{s.version}</strong>
 	</div>
 	<div class="glass pad tile">
-		<span class="label">Datenbank</span>
-		<strong>Schema {s.db_revision}</strong>
+		<span class="label">{t('system.db')}</span>
+		<strong>{t('system.schema', { rev: s.db_revision })}</strong>
 	</div>
 	<div class="glass pad tile">
-		<span class="label">Discord-Login</span>
-		<strong><span class="chip" class:ok={s.login} class:danger={!s.login}>{s.login ? 'an' : 'aus'}</span></strong>
+		<span class="label">{t('system.login')}</span>
+		<strong><span class="chip" class:ok={s.login} class:danger={!s.login}>{t(s.login ? 'system.on' : 'system.off')}</span></strong>
 	</div>
 	<div class="glass pad tile">
-		<span class="label">Mitglieder über Discord-Rolle</span>
+		<span class="label">{t('system.members')}</span>
 		<strong>
 			<span class="chip" class:ok={s.member_check} class:warn={!s.member_check}>
-				{s.member_check ? 'eingerichtet' : 'nur Admins'}
+				{t(s.member_check ? 'system.membersOn' : 'system.membersOff')}
 			</span>
 		</strong>
 	</div>
 	<div class="glass pad tile">
-		<span class="label">Konten</span>
+		<span class="label">{t('system.accounts')}</span>
 		<strong class="num">{s.accounts}</strong>
 	</div>
 	<div class="glass pad tile">
-		<span class="label">Aktive Sitzungen</span>
+		<span class="label">{t('system.sessions')}</span>
 		<strong class="num">{s.active_sessions}</strong>
 	</div>
 </section>

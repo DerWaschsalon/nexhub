@@ -34,11 +34,11 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
   Commits: keine Tokens, keine privaten Mailadressen (Commits mit der GitHub-noreply-Adresse),
   keine echten Hostnamen, internen IPs oder Discord-IDs von Personen. Beispielwerte:
   `bot.example.com`, `unraid-server`, `192.168.1.10`.
-- Aufbau: `nexboard/` (Touch-Leiste, Daemon, Overlay), `bot/` (TheWashBot), `hub/`, `nexlogs/` (Log-Ansicht), `proto/`,
+- Aufbau: `nexboard/` (Touch-Leiste, Daemon, Overlay), `bot/` (TheWashBot), `hub/` (Kern + Module, auch die Log-Ansicht), `proto/`,
   `planner/`, `infra/` (VPS). Jeder Teil hat eine eigene README mit Tests.
 - Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Bot
   `cd bot && python -m pytest -q tests`, Hub `cd hub/api && uv run pytest -q` und
-  `cd hub/web && npm run check`, NexLogs `cd nexlogs && npm run build`, Formate `cd proto && uv run pytest -q`.
+  `cd hub/web && npm run check`, Formate `cd proto && uv run pytest -q`.
 - `main` und `modular` sind die Branches, auf denen laufende NexBoard-Installationen per
   `update.sh` aktualisieren. Dort keine Force-Pushes und keine Pfadänderungen ohne Absprache,
   sonst bricht das Update beim nächsten Klick ab oder der Daemon findet seine Dateien nicht.

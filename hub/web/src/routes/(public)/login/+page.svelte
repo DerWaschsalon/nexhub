@@ -2,18 +2,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { t } from '#lib/i18n.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	const MESSAGES: Record<string, string> = {
-		abgelaufen: 'Die Anmeldung hat zu lange gedauert. Bitte noch einmal versuchen.',
-		abgebrochen: 'Die Anmeldung bei Discord wurde abgebrochen.',
-		ungueltig: 'Die Anmeldung war ungültig. Bitte noch einmal versuchen.',
-		discord: 'Discord hat nicht geantwortet. Bitte später noch einmal versuchen.',
-		nicht_freigeschaltet: 'Dein Discord-Konto ist noch nicht freigeschaltet.',
-		gesperrt: 'Dein Konto ist gesperrt. Wende dich an einen Admin.'
-	};
+	// Fehlercodes der API (?fehler=…), Texte in lib/texts.ts
+	const ERRORS = ['abgelaufen', 'abgebrochen', 'ungueltig', 'discord', 'nicht_freigeschaltet', 'gesperrt'];
 
 	const params = $derived(page.url.searchParams);
 	const error = $derived(params.get('fehler'));
@@ -26,14 +21,14 @@
 </script>
 
 <section class="glass pad card">
-	<h1>Anmelden</h1>
-	<p class="dim">NexHub nutzt dein Discord-Konto. Zugang haben die freigeschalteten Mitglieder.</p>
+	<h1>{t('login.title')}</h1>
+	<p class="dim">{t('login.text')}</p>
 
 	{#if error}
 		<div class="notice error" role="alert">
-			<p>{MESSAGES[error] ?? 'Die Anmeldung ist fehlgeschlagen.'}</p>
+			<p>{t(ERRORS.includes(error) ? `login.err.${error}` : 'login.err.other')}</p>
 			{#if error === 'nicht_freigeschaltet' && params.get('id')}
-				<p class="dim">Gib diese Discord-ID an einen Admin weiter:</p>
+				<p class="dim">{t('login.giveId')}</p>
 				<code>{params.get('id')}</code>
 			{/if}
 		</div>
@@ -41,10 +36,10 @@
 
 	{#if data.info.login}
 		<a class="btn primary large" href="/api/auth/login?next={encodeURIComponent(next)}">
-			Mit Discord anmelden
+			{t('login.button')}
 		</a>
 	{:else}
-		<p class="notice">Der Discord-Login ist auf diesem Server noch nicht eingerichtet.</p>
+		<p class="notice">{t('login.off')}</p>
 	{/if}
 </section>
 
