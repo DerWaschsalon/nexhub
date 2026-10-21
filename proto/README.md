@@ -25,7 +25,11 @@ Ein Run, so wie der Daemon ihn nach dem Ende hochlädt: **eine** gzip-gepackte J
           "bosses_total": 3, "bosses_killed": 3},
   "you": {"name": "Testheld", "cls": "ranger"},
   "names": {"Mo***n|cleric": "Moonlin"},
-  "fights": [ { "id": "auto_…", "bossName": "…", "actors": […], "details": {…}, "buffs": […], … } ]
+  "fights": [ { "id": "auto_…", "bossName": "…", "actors": […], "details": {…}, "buffs": […], … } ],
+  "hits": { "auto_…": { "version": 1, "fight": "auto_…", "target": 37797, "start_ms": …,
+                        "columns": ["t_ms","actor","owner","skill","damage","multi","flags"],
+                        "flags": {"crit": 1, "back": 2, …, "dot": 1024},
+                        "rows": [[1520, 8731, 0, 17030000, 31332, 0, 3], …] } }
 }
 ```
 
@@ -36,9 +40,10 @@ Ein Run, so wie der Daemon ihn nach dem Ende hochlädt: **eine** gzip-gepackte J
 | `you` | eigener Charakter des Aufnehmenden, wenn bekannt; damit verknüpft der Hub Charakter und Konto |
 | `names` | aufgelöste Namen der Mitspieler. Der Mitschnitt speichert fremde Namen maskiert („Mo\*\*\*n“), der Daemon kennt die vollen aus dem Live-Stream. Schlüssel wie in `runs.yaml`: `Maske|Klasse` |
 | `fights` | die Kampfdateien des Mitschnitts (`~/.local/share/deckbar/aion2/history/*.json`), **unverändert** im Format des A2Tools-Meters, 1 bis 64 Stück |
+| `hits` | **jeder einzelne Treffer** je Kampf-ID, so wie `deckbar-capture` ihn nach `hits/<id>.json` schreibt (siehe unten); fehlt für Kämpfe ohne Treffer-Datei |
 
 Regeln:
-- Alle Kämpfe stammen aus dem Dungeon des Runs.
+- Alle Kämpfe stammen aus dem Dungeon des Runs; `hits` gehört nur zu Kämpfen aus `fights`.
 - Das Modell prüft von den Kampfdateien nur, was der Hub sicher braucht (`id`, `bossName`,
   `mobCode`, `dungeonId`, `startTimeMs`, `durationMs`, `actors`, `details`). Alles andere geht
   unverändert durch, damit eine neue Meter-Version nichts kaputt macht.
@@ -52,23 +57,39 @@ data = pack(log)          # NexLog → bytes (gzip)
 log = unpack(data)        # bytes → NexLog, sonst NexLogError mit lesbarem Grund
 ```
 
-### Warum so und nicht als Ereignisstrom
+### Einzeltreffer (`hits`)
 
-Geplant war ein eigener Ereignisstrom (ein Eintrag pro Treffer). Der Mitschnitt schreibt aber
-heute schon pro Bosskampf eine Datei mit allem, was das A2Tools-Meter für seine eigene
-Detailansicht braucht: Schaden und Trefferquoten pro Spieler und Fähigkeit, Zeitpunkte jedes
-Treffers, Heilung, Buffs mit Zeitabschnitten, Tode, Ping, maximale Boss-HP, Ausrüstungswert.
-Diese Dateien unverändert einzupacken heißt: keine Änderung am Rust-Mitschnitt, nichts geht
-verloren, und der Hub kann später mehr auswerten, ohne dass Clients neu ausgerollt werden müssen.
+Eine Zeile pro Treffer, Zeit relativ zum Kampfbeginn:
 
-Was fehlt: der Schaden **jedes einzelnen** Treffers (es gibt Zeitpunkte pro Treffer, aber Schaden
-nur pro Fähigkeit). Für DPS-Kurven reicht das; braucht eine Auswertung später doch Einzeltreffer,
-kommt das als `version: 2` mit einem Zusatzfeld aus dem Mitschnitt.
+| Spalte | Inhalt |
+|---|---|
+| `t_ms` | ms seit Kampfbeginn (`start_ms`) |
+| `actor` | Figur, die getroffen hat (`actorId` wie in `actors`) |
+| `owner` | bei Beschwörungen die Figur dahinter, sonst 0 – gezählt wird `owner or actor` |
+| `skill` | Code wie in `details.skills[].code` der Kampfdatei; dort steht auch der Name |
+| `damage` | Schaden inklusive Mehrfachtreffer |
+| `multi` | Anzahl der Mehrfachtreffer |
+| `flags` | Merkmale als Bits, die Namen stehen in `flags` (crit, back, frontal, perfect, double, parry, shield_block, iron_wall, regeneration, perfect_block, dot) |
+
+Woher: Das A2Tools-Meter zählt Treffer nur zusammen (Schaden pro Fähigkeit, Zeitpunkte pro
+Treffer). Ein kleiner Haken im Kern ([`nexboard/capture/patches/`](../nexboard/capture/patches/),
+`capture/build.sh` wendet ihn an) meldet jeden Treffer an `deckbar-capture`, das beim Speichern
+eines Kampfes `hits/<id>.json` neben `history/<id>.json` schreibt. Gegenprobe mit einem echten
+Dungeon-Abend (13 Kämpfe, 28 000 Treffer, abgespielt mit `deckbar-capture --replay`): Schaden,
+Trefferzahl und Krits stimmen pro Figur, Fähigkeit und DoT exakt mit den Summen des Meters überein.
+
+### Warum Kampfdateien plus Treffer statt eines reinen Ereignisstroms
+
+Die Kampfdateien enthalten schon alles, was das Meter für seine Detailansicht braucht (Quoten pro
+Fähigkeit, Heilung, Buffs mit Zeitabschnitten, Tode, Ping, maximale Boss-HP, Ausrüstung). Sie
+unverändert mitzuschicken heißt: nichts geht verloren, und der Hub kann später mehr auswerten,
+ohne dass sich das Format ändert. Die Treffer ergänzen genau das, was dort fehlt.
 
 ### Gemessen (21.10.2026)
 
 Mit `tools/nexlog_messen.py` an einer echten Kampf-History (gamunex): 244 Kämpfe, daraus 24 Dungeon-Runs
 (grob gruppiert, < 20 min Pause im selben Dungeon), jeder als NexLog gepackt, entpackt und geprüft.
+Diese History stammt noch von vor dem Treffer-Haken, die Werte sind also **ohne** `hits`:
 
 | | Median | p90 | Maximum |
 |---|---|---|---|
@@ -76,6 +97,9 @@ Mit `tools/nexlog_messen.py` an einer echten Kampf-History (gamunex): 244 Kämpf
 | roh | 406 KB | 1,7 MB | 2,6 MB |
 | gepackt (gzip -6) | 57 KB | 309 KB | 467 KB |
 | Packen | 8 ms | 46 ms | 72 ms |
+
+Die Treffer kosten gepackt rund 16 KB je Kampf (Abspiel-Test: 18 KB ohne, 34 KB mit). Ein
+typischer Run mit 6 Kämpfen landet damit bei etwa 160 KB, der größte gemessene bei etwa 900 KB.
 
 zstd -3 war praktisch gleich groß (55 KB im Median), zstd -19 rund 30 % kleiner, aber knapp
 zehnmal langsamer. gzip gewinnt, weil es in Python und im Browser eingebaut ist und keine weitere

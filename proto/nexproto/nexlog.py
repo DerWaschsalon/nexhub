@@ -7,11 +7,12 @@ Aufbau (Einzelheiten in proto/README.md):
      "run": {...},        Zusammenfassung des Daemons (Dungeon, Zeiten, Bosse)
      "you": {...},        eigener Charakter, falls bekannt
      "names": {...},      aufgelöste Namen: "Mo***n|ranger" → "Moonlin"
-     "fights": [...]}     die Kampfdateien des Mitschnitts, unverändert im A2Tools-Format
+     "fights": [...],     die Kampfdateien des Mitschnitts, unverändert im A2Tools-Format
+     "hits": {...}}       Einzeltreffer je Kampf-ID, wie deckbar-capture sie schreibt (hits/<id>.json)
 
 Gepackt mit gzip. Die Kampfdateien bleiben roh, damit der Hub später mehr auswerten kann, ohne
 dass sich das Format ändert. Von ihnen prüft das Modell nur die Felder, die der Hub sicher braucht;
-alles andere wird unverändert durchgereicht.
+alles andere wird unverändert durchgereicht. Die Einzeltreffer prüft es vollständig.
 """
 from __future__ import annotations
 
@@ -28,6 +29,8 @@ VERSION = 1
 MAX_PACKED = 8 * 1024 * 1024
 MAX_UNPACKED = 32 * 1024 * 1024
 MAX_FIGHTS = 64
+MAX_HITS_PER_FIGHT = 200_000  # gemessen: bis knapp 6 000 in Dungeon-Kämpfen
+HIT_COLUMNS = ("t_ms", "actor", "owner", "skill", "damage", "multi", "flags")
 
 
 class NexLogError(ValueError):
@@ -82,6 +85,31 @@ class A2Fight(_A2):
     details: dict  # Skills, Heilung, Tode, Ping; wertet erst der Hub aus
 
 
+class FightHits(_Strict):
+    """Einzeltreffer eines Kampfes. Eine Zeile pro Treffer, Spalten wie `columns`:
+
+    t_ms    Zeit seit Kampfbeginn          actor   Figur, die getroffen hat (actorId)
+    owner   bei Beschwörungen deren Figur, sonst 0
+    skill   Code wie in details.skills[].code der Kampfdatei (dort steht auch der Name)
+    damage  Schaden inkl. Mehrfachtreffer   multi   Anzahl Mehrfachtreffer
+    flags   Merkmale als Bits, Bedeutung in `flags` (crit, back, perfect, double, dot, …)
+    """
+
+    version: Literal[1] = 1
+    fight: str = Field(max_length=64)
+    target: int
+    start_ms: int
+    columns: list[str]
+    flags: dict[str, int] = Field(max_length=32)
+    rows: list[tuple[int, int, int, int, int, int, int]] = Field(max_length=MAX_HITS_PER_FIGHT)
+
+    @model_validator(mode="after")
+    def _known_columns(self) -> FightHits:
+        if tuple(self.columns) != HIT_COLUMNS:
+            raise ValueError(f"Spalten müssen {list(HIT_COLUMNS)} sein")
+        return self
+
+
 class NexLog(_Strict):
     format: Literal["nexlog"] = FORMAT
     version: Literal[1] = VERSION
@@ -90,11 +118,17 @@ class NexLog(_Strict):
     you: Character | None = None
     names: dict[str, str] = Field(default_factory=dict, max_length=500)
     fights: list[A2Fight] = Field(min_length=1, max_length=MAX_FIGHTS)
+    # Kampf-ID → Treffer; fehlt für Kämpfe ohne Treffer-Datei (Mitschnitt ohne Treffer-Haken)
+    hits: dict[str, FightHits] = Field(default_factory=dict, max_length=MAX_FIGHTS)
 
     @model_validator(mode="after")
-    def _fights_belong_to_run(self) -> NexLog:
+    def _consistent(self) -> NexLog:
         if any(f.dungeonId != self.run.dungeon_id for f in self.fights):
             raise ValueError("alle Kämpfe müssen aus dem Dungeon des Runs stammen")
+        ids = {f.id for f in self.fights}
+        for key, h in self.hits.items():
+            if key not in ids or h.fight != key:
+                raise ValueError(f"Treffer zu unbekanntem Kampf {key!r}")
         return self
 
 

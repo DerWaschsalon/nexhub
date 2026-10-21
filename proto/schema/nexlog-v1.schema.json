@@ -114,6 +114,89 @@
       "title": "Character",
       "type": "object"
     },
+    "FightHits": {
+      "additionalProperties": false,
+      "description": "Einzeltreffer eines Kampfes. Eine Zeile pro Treffer, Spalten wie `columns`:\n\nt_ms    Zeit seit Kampfbeginn          actor   Figur, die getroffen hat (actorId)\nowner   bei Beschwörungen deren Figur, sonst 0\nskill   Code wie in details.skills[].code der Kampfdatei (dort steht auch der Name)\ndamage  Schaden inkl. Mehrfachtreffer   multi   Anzahl Mehrfachtreffer\nflags   Merkmale als Bits, Bedeutung in `flags` (crit, back, perfect, double, dot, …)",
+      "properties": {
+        "version": {
+          "const": 1,
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "fight": {
+          "maxLength": 64,
+          "title": "Fight",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "integer"
+        },
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "flags": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "maxProperties": 32,
+          "title": "Flags",
+          "type": "object"
+        },
+        "rows": {
+          "items": {
+            "maxItems": 7,
+            "minItems": 7,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "type": "array"
+          },
+          "maxItems": 200000,
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fight",
+        "target",
+        "start_ms",
+        "columns",
+        "flags",
+        "rows"
+      ],
+      "title": "FightHits",
+      "type": "object"
+    },
     "Recorder": {
       "additionalProperties": false,
       "properties": {
@@ -256,6 +339,14 @@
       "minItems": 1,
       "title": "Fights",
       "type": "array"
+    },
+    "hits": {
+      "additionalProperties": {
+        "$ref": "#/$defs/FightHits"
+      },
+      "maxProperties": 64,
+      "title": "Hits",
+      "type": "object"
     }
   },
   "required": [

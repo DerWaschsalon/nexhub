@@ -5,7 +5,7 @@ import json
 import pytest
 
 from nexproto import NexLog, NexLogError, pack, unpack
-from nexproto.nexlog import MAX_PACKED, MAX_UNPACKED
+from nexproto.nexlog import HIT_COLUMNS, MAX_PACKED, MAX_UNPACKED
 from nexproto.schema import SCHEMA_DIR, SCHEMAS, render
 
 
@@ -23,6 +23,13 @@ def fight(n: int = 1, dungeon: int = 600123) -> dict:
     }
 
 
+def hits(n: int = 1) -> dict:
+    """Treffer-Datei wie von deckbar-capture (hits/<id>.json)."""
+    return {"version": 1, "fight": f"auto_{n}", "target": 9000 + n, "start_ms": 1_792_000_000_000 + n * 120_000,
+            "columns": list(HIT_COLUMNS), "flags": {"crit": 1, "back": 2, "dot": 1024},
+            "rows": [[100, 1, 0, 1, 450_000, 0, 1], [900, 1, 0, 1, 450_000, 2, 0], [950, 7, 2, 2, 1, 0, 1024]]}
+
+
 def log(**overrides) -> NexLog:
     doc = {
         "recorder": {"nexboard": "0.5.0", "capture": "build-1"},
@@ -32,6 +39,7 @@ def log(**overrides) -> NexLog:
         "you": {"name": "Testheld", "cls": "ranger"},
         "names": {"Mo***n|cleric": "Moonlin"},
         "fights": [fight(1), fight(2)],
+        "hits": {"auto_1": hits(1)},
     }
     return NexLog.model_validate({**doc, **overrides})
 
@@ -47,6 +55,30 @@ def test_hin_und_zurueck_ohne_verlust():
     # Felder, die das Modell nicht kennt, kommen unverändert mit
     assert back.fights[0].model_dump()["buffs"][0]["segs"] == "0,90000,1,0"
     assert back.fights[0].actors[0].model_dump()["gearScore"] == 2400
+
+
+def test_treffer_kommen_mit():
+    back = unpack(pack(log()))
+    assert back.hits["auto_1"].rows[1] == (900, 1, 0, 1, 450_000, 2, 0)
+    assert "auto_2" not in back.hits  # Kampf ohne Treffer-Datei
+
+
+def test_treffer_zu_unbekanntem_kampf():
+    with pytest.raises(ValueError, match="unbekanntem Kampf"):
+        log(hits={"auto_9": hits(9)})
+    with pytest.raises(ValueError, match="unbekanntem Kampf"):
+        log(hits={"auto_1": hits(2)})
+
+
+def test_treffer_mit_falschen_spalten():
+    bad = hits(1)
+    bad["columns"] = ["t_ms", "actor", "skill", "owner", "damage", "multi", "flags"]
+    with pytest.raises(ValueError, match="Spalten"):
+        log(hits={"auto_1": bad})
+    bad = hits(1)
+    bad["rows"][0] = [100, 1, 0]
+    with pytest.raises(ValueError):
+        log(hits={"auto_1": bad})
 
 
 def test_packen_ist_reproduzierbar():
