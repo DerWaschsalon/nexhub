@@ -3,10 +3,19 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { RunCore } from '#lib/api.ts';
+	import { playerColors } from '#lib/colors.ts';
 	import DamageBars from '#lib/components/DamageBars.svelte';
 	import { formatDuration, formatMs, formatNumber } from '#lib/format.ts';
 
-	let { run, actions, extra }: { run: RunCore; actions?: Snippet; extra?: Snippet } = $props();
+	let {
+		run,
+		fightHref,
+		actions,
+		extra
+	}: { run: RunCore; fightHref: (fight: string) => string; actions?: Snippet; extra?: Snippet } = $props();
+
+	// Gleiche Reihenfolge wie die Kampf-Seiten: jeder Spieler hat im ganzen Run eine Farbe
+	const color = $derived(playerColors(run.summary.players.map((p) => p.name)));
 </script>
 
 <header class="page-head head">
@@ -46,17 +55,18 @@
 
 <section class="glass pad block">
 	<h2>Schaden im ganzen Run</h2>
-	<DamageBars players={run.summary.players} />
+	<DamageBars players={run.summary.players} colorOf={color} />
 </section>
 
 {#each run.summary.bosses as boss (boss.fight)}
 	<section class="glass pad block">
 		<div class="boss-head">
-			<h2>{boss.name}</h2>
+			<h2><a href={fightHref(boss.fight)}>{boss.name}</a></h2>
 			<span class="chip" class:ok={boss.killed} class:danger={!boss.killed}>{boss.killed ? 'besiegt' : 'nicht besiegt'}</span>
 			<span class="dim">{formatDuration(boss.duration_ms)}</span>
 		</div>
-		<DamageBars players={boss.players} />
+		<DamageBars players={boss.players} colorOf={color} />
+		<a class="more" href={fightHref(boss.fight)}>DPS-Verlauf und Skills →</a>
 	</section>
 {/each}
 
@@ -121,5 +131,18 @@
 	}
 	.boss-head h2 {
 		margin: 0;
+	}
+	.boss-head h2 a {
+		color: var(--text);
+		text-decoration: none;
+	}
+	.boss-head h2 a:hover {
+		color: var(--accent);
+	}
+	.more {
+		display: inline-block;
+		margin-top: 12px;
+		font-size: 14px;
+		text-decoration: none;
 	}
 </style>

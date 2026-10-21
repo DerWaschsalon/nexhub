@@ -22,3 +22,10 @@ export function formatDuration(ms: number): string {
 const number = new Intl.NumberFormat('de-DE');
 /** Große Zahlen mit Tausenderpunkten: 1.234.567 */
 export const formatNumber = (n: number): string => number.format(n);
+
+/** Achsenbeschriftung: 950 · 38 Tsd. · 1,2 Mio. */
+export function formatCompact(n: number): string {
+	if (n >= 1e6) return `${(n / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 1 })} Mio.`;
+	if (n >= 1e3) return `${Math.round(n / 1e3).toLocaleString('de-DE')} Tsd.`;
+	return String(Math.round(n));
+}

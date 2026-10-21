@@ -40,7 +40,7 @@
 
 <a class="back" href="/hub/runs">← Runs</a>
 
-<RunView {run}>
+<RunView {run} fightHref={(f) => `/hub/runs/${run.id}/kampf/${encodeURIComponent(f)}`}>
 	{#snippet actions()}
 		<a class="btn small" href="/api/runs/{run.id}/nexlog" download>NexLog herunterladen</a>
 		{#if run.can_delete}

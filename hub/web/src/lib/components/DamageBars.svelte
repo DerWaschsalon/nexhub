@@ -1,19 +1,19 @@
-<!-- Schaden je Spieler als Balken in Klassenfarbe, längster Balken = 100 %. -->
+<!-- Schaden je Spieler als Balken in der Farbe des Spielers, längster Balken = 100 %. -->
 <script lang="ts">
 	import type { RunPlayer } from '#lib/api.ts';
-	import { CLASS_LABELS, classColor } from '#lib/classes.ts';
+	import { CLASS_LABELS } from '#lib/classes.ts';
 	import { formatNumber } from '#lib/format.ts';
 
-	let { players }: { players: RunPlayer[] } = $props();
+	let { players, colorOf }: { players: RunPlayer[]; colorOf: (name: string) => string } = $props();
 	const top = $derived(Math.max(1, ...players.map((p) => p.damage)));
 	const total = $derived(players.reduce((sum, p) => sum + p.damage, 0) || 1);
 </script>
 
 <ol class="bars">
 	{#each players as p (p.name + p.cls)}
-		<li title={p.cls ? CLASS_LABELS[p.cls] : ''}>
-			<span class="fill" style:width="{(p.damage / top) * 100}%" style:--c={classColor(p.cls)}></span>
-			<span class="name">{p.name}</span>
+		<li>
+			<span class="fill" style:width="{(p.damage / top) * 100}%" style:--c={colorOf(p.name)}></span>
+			<span class="name">{p.name}{#if p.cls}<small>{CLASS_LABELS[p.cls]}</small>{/if}</span>
 			<span class="nums">
 				<b>{formatNumber(p.dps)}</b> DPS
 				<span class="dim">· {formatNumber(p.damage)} · {Math.round((p.damage / total) * 100)} %</span>
@@ -58,11 +58,18 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	.name small {
+		font-weight: 500;
+		font-size: 12px;
+		color: var(--dim);
+		margin-left: 8px;
+	}
 	.nums {
 		font-variant-numeric: tabular-nums;
 	}
 	@media (max-width: 520px) {
-		.nums .dim {
+		.nums .dim,
+		.name small {
 			display: none;
 		}
 	}

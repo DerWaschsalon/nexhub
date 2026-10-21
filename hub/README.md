@@ -88,10 +88,16 @@ Code in `routes/runs.py`:
   Zusammenfassung mit Mitspielernamen, aber kein Discord-Konto und nicht die Rohdatei, und bittet
   Suchmaschinen, sie nicht aufzunehmen (`X-Robots-Tag`, `<meta name="robots">`).
 
-Im Web teilen sich Hub und öffentliche Seite die Ansicht `lib/components/RunView.svelte`.
+- Kampf-Details: `GET /api/runs/{id}/fights/{kampf}` (geteilt: `/api/public/runs/{token}/fights/{kampf}`)
+  rechnet beim Aufruf aus der abgelegten Datei (`analysis.fight_detail`): Schaden je Sekunde je
+  Spieler aus den Einzeltreffern (fehlen sie, gibt es keine Kurve), Skills mit Anteil und Krit-,
+  Rücken-, Perfekt- und Doppel-Quote aus der Kampfdatei, Tode.
 
-Noch nicht: mehrere Uploads desselben Runs zusammenführen, Kampf-Details (DPS-Kurve, Skills,
-Buffs aus den Einzeltreffern), Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
+Im Web teilen sich Hub und öffentliche Seite die Ansichten `RunView.svelte` und `FightView.svelte`
+(`lib/components/`). Spieler haben im ganzen Run eine feste Farbe aus einer geprüften Palette
+(`lib/colors.ts`), die Klasse steht als Text daneben.
+
+Noch nicht: mehrere Uploads desselben Runs zusammenführen, Buffs, Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
 Domain wirklich öffentlich erreichbar sind: Impressum und Datenschutzerklärung klären.
 
 ## Login und Rollen

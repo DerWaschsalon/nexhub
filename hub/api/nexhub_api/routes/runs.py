@@ -4,6 +4,7 @@
     GET    /api/runs               alle Runs, neueste zuerst
     GET    /api/runs/{id}          Eckdaten und Zusammenfassung
     GET    /api/runs/{id}/nexlog   die Datei, so wie sie hochgeladen wurde
+    GET    /api/runs/{id}/fights/{kampf}   ein Kampf im Detail (DPS-Kurve, Skills, Tode)
     DELETE /api/runs/{id}          wer hochgeladen hat, oder ein Admin
     POST   /api/runs/{id}/share    Teilen-Link erzeugen (gleiche Rechte wie Löschen)
     DELETE /api/runs/{id}/share    Teilen-Link zurückziehen
@@ -28,7 +29,7 @@ from sqlalchemy import select
 from nexproto import NexLogError, unpack
 from nexproto.nexlog import MAX_PACKED
 
-from ..analysis import summarize
+from ..analysis import fight_detail, summarize
 from ..config import Settings
 from ..deps import DB, CurrentDevice, CurrentUser, SettingsDep
 from ..models import Run, User
@@ -178,6 +179,27 @@ async def unshare(run_id: int, user: CurrentUser, db: DB) -> Shared:
     run.share_token = run.shared_at = None
     await db.commit()
     return Shared(share_url=None)
+
+
+async def load_fight_detail(settings: Settings, run: Run, fight_id: str) -> dict:
+    """Kampf-Details aus der abgelegten Datei; dazu die Reihenfolge der Spieler im ganzen Run,
+    damit jeder Spieler in allen Kämpfen dieselbe Farbe bekommt."""
+    def work() -> dict | None:
+        nexlog = unpack(run_file(settings, run.id).read_bytes())
+        fight = next((f for f in nexlog.fights if f.id == fight_id), None)
+        return fight_detail(nexlog, fight) if fight else None
+
+    detail = await asyncio.to_thread(work)
+    if detail is None:
+        raise HTTPException(404, "Kampf nicht in diesem Run")
+    detail["run_players"] = [p["name"] for p in run.summary.get("players", [])]
+    return detail
+
+
+@router.get("/{run_id}/fights/{fight_id}")
+async def get_fight(run_id: int, fight_id: str, user: CurrentUser, db: DB, settings: SettingsDep) -> dict:
+    run, _ = await _get(db, run_id)
+    return await load_fight_detail(settings, run, fight_id)
 
 
 @router.get("/{run_id}/nexlog")

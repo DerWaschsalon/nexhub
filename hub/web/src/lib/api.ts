@@ -131,4 +131,29 @@ export type Run = {
 
 export type RunDetail = Run & RunCore & { size: number; can_delete: boolean; share_url: string | null };
 
+export type FightSkill = {
+	code: number;
+	name: string;
+	dot: boolean;
+	damage: number;
+	share: number;
+	hits: number;
+	crit: number;
+	back: number;
+	perfect: number;
+	double: number;
+};
+
+export type FightDetail = {
+	fight: string;
+	name: string;
+	duration_ms: number;
+	killed: boolean;
+	max_hp: number;
+	run_players: string[];
+	players: (RunPlayer & { actor: number; skills: FightSkill[] })[];
+	timeline: { bucket_ms: number; players: { actor: number; damage: number[] }[] } | null;
+	deaths: { name: string; t_ms: number; revived_ms: number | null }[];
+};
+
 export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', member: 'Mitglied' };

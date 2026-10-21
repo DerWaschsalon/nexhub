@@ -13,8 +13,11 @@ def fight(n: int, boss_dmg: int = 1_000_000) -> dict:
         "actors": [{"actorId": 1, "nickname": "Testheld", "jobId": 14},
                    {"actorId": 2, "nickname": "Mo***n", "jobId": 17}],
         "details": {"maxHp": 1_000_000, "totalTargetDamage": boss_dmg,
-                    "skills": [{"actorId": 1, "code": 1, "dmg": boss_dmg * 3 // 4},
-                               {"actorId": 2, "code": 2, "dmg": boss_dmg // 4}]},
+                    "skills": [{"actorId": 1, "code": 1, "name": "Pfeilhagel", "dmg": boss_dmg // 2, "time": 10,
+                                "crit": 4, "back": 5, "perfect": 0, "double": 1},
+                               {"actorId": 1, "code": 3, "name": "Gift", "isDot": True, "dmg": boss_dmg // 4, "time": 20},
+                               {"actorId": 2, "code": 2, "name": "Schlag", "dmg": boss_dmg // 4, "time": 8}],
+                    "deaths": [{"actorId": 2, "tsMs": 40_000, "revivedMs": 52_000}]},
     }
 
 
@@ -142,3 +145,33 @@ def test_teilen_nur_hochladende_oder_admins(client, as_user):
 def test_unbekannter_link(client):
     assert client.get("/api/public/runs/gibtsnicht").status_code == 404
     assert client.get("/api/public/runs/" + "x" * 200).status_code == 404
+
+
+def test_kampf_details(client, as_user):
+    member = as_user(MEMBER)
+    run_id = upload(client, pair(client, member), nexlog()).json()["id"]
+    d = member.get(f"/api/runs/{run_id}/fights/auto_1").json()
+    assert d["name"] == "Boss 1" and d["killed"] and d["duration_ms"] == 100_000
+    assert d["run_players"] == ["Testheld", "Moonlin"]  # Farbreihenfolge für alle Kämpfe des Runs
+    held, moon = d["players"]
+    assert (held["name"], held["cls"], held["damage"], held["dps"]) == ("Testheld", "ranger", 750_000, 7_500)
+    assert [(x["name"], x["dot"], x["share"], x["hits"], x["crit"], x["back"], x["double"]) for x in held["skills"]] == \
+        [("Pfeilhagel", False, 66.7, 10, 40.0, 50.0, 10.0), ("Gift", True, 33.3, 20, 0.0, 0.0, 0.0)]
+    assert d["deaths"] == [{"name": "Moonlin", "t_ms": 40_000, "revived_ms": 52_000}]
+    # DPS-Kurve aus den Einzeltreffern: je Sekunde, Länge = Kampfdauer
+    series = {p["actor"]: p["damage"] for p in d["timeline"]["players"]}
+    assert len(series[1]) == 101 and series[1][0] == 10 and series[2][0] == 5
+    # Ohne Einzeltreffer keine Kurve, der Rest geht trotzdem
+    assert member.get(f"/api/runs/{run_id}/fights/auto_2").json()["timeline"] is None
+    assert member.get(f"/api/runs/{run_id}/fights/gibtsnicht").status_code == 404
+    assert client.get(f"/api/runs/{run_id}/fights/auto_1").status_code == 401
+
+
+def test_kampf_details_geteilt(client, as_user):
+    member = as_user(MEMBER)
+    run_id = upload(client, pair(client, member), nexlog()).json()["id"]
+    token = member.post(f"/api/runs/{run_id}/share", headers=ORIGIN).json()["share_url"].rsplit("/", 1)[1]
+    r = client.get(f"/api/public/runs/{token}/fights/auto_1")
+    assert r.status_code == 200 and r.json()["players"][0]["name"] == "Testheld" and "noindex" in r.headers["x-robots-tag"]
+    member.delete(f"/api/runs/{run_id}/share", headers=ORIGIN)
+    assert client.get(f"/api/public/runs/{token}/fights/auto_1").status_code == 404
