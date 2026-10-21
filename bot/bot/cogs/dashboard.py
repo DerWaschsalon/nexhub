@@ -254,6 +254,56 @@ details .bar-row { padding: 4px 0; }
 }
 """
 
+# Zusätzliches Stylesheet NUR für die öffentlichen AION-Analyse-Seiten (/runs/<id>,
+# /leaderboard/<guild_id>) — ersetzt die Farb-/Schrift-Variablen von DASHBOARD_CSS durch die
+# echten Design-Tokens von AbyssLogs (aus deren ausgeliefertem CSS-Bundle ausgelesen: dieselben
+# Hex-Werte für --bg/--primary/--rank-1/2/3/etc., dieselbe Schrift „Space Grotesk" für
+# Überschriften), auf expliziten Wunsch möglichst nah am Original. Alle Struktur-Regeln
+# (.card/.bar-row/.chip/table/details/…) bleiben dieselben wie im Admin-Dashboard — nur die
+# Variablen-Werte und ein paar neue Komponenten (Tabs, Rang-Farben) kommen dazu.
+ANALYSIS_CSS = """
+:root {
+  --bg: #0b0c0f; --panel: #14171c; --panel-2: #191d24; --line: #2b313a;
+  --text: #e6ebef; --dim: #8b949e; --accent: #7dd8d8; --danger: #e74c3c;
+  --success: #4ee08a; --warning: #e8c884; --radius: 12px;
+}
+body { background: var(--bg); font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif; }
+h1, h2 { font-family: "Space Grotesk", system-ui, sans-serif; }
+.top { background: rgba(11, 12, 15, 0.85); }
+button[type=submit] { color: #0e1014; }
+
+.skill-icon { width: 28px; height: 28px; border-radius: 6px; }
+.bar-name { width: 160px; }
+@media (max-width: 600px) { .bar-name { width: 90px; } }
+
+.bar-row.rank-1 .bar-fill { background: linear-gradient(90deg, #f0c040, #ffe49a); }
+.bar-row.rank-2 .bar-fill { background: linear-gradient(90deg, #c0c0c0, #e8e8e8); }
+.bar-row.rank-3 .bar-fill { background: linear-gradient(90deg, #cd7f32, #e8a868); }
+.bar-row.rank-1 .bar-value, .bar-row.rank-1 .bar-name { color: #f0c040; }
+.bar-row.rank-2 .bar-value, .bar-row.rank-2 .bar-name { color: #c9d1d9; }
+.bar-row.rank-3 .bar-value, .bar-row.rank-3 .bar-name { color: #cd7f32; }
+
+.flag-crit { background: rgba(231, 76, 60, 0.18); color: #f0776a; }
+.flag-back { background: rgba(125, 216, 216, 0.18); color: #7dd8d8; }
+.flag-perfect { background: rgba(167, 139, 250, 0.18); color: #a78bfa; }
+.flag-double { background: rgba(78, 224, 138, 0.18); color: #4ee08a; }
+
+.tabbar {
+  display: flex; gap: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  border-bottom: 1px solid var(--line); margin-bottom: 16px;
+}
+.tabbar::-webkit-scrollbar { display: none; }
+.tab-btn {
+  background: none; border: none; border-bottom: 2px solid transparent; color: var(--dim);
+  padding: 10px 16px; margin: 0; min-height: auto; font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; border-radius: 0;
+}
+.tab-btn:hover { color: var(--text); background: none; }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+"""
+
 
 def layout(title: str, body: str, *, user: dict | None = None, active: str = "", flash: str = "") -> str:
     nav_html = "".join(
@@ -279,11 +329,15 @@ def layout(title: str, body: str, *, user: dict | None = None, active: str = "",
 
 def public_layout(title: str, body: str) -> str:
     """Wie `layout()`, aber ohne Discord-Login/Nav — für Seiten, die über einen geteilten Link
-    erreichbar sein sollen (z. B. `/runs/<id>`)."""
+    erreichbar sein sollen (z. B. `/runs/<id>`). Nutzt zusätzlich `ANALYSIS_CSS`, das Design/Optik
+    nah an AbyssLogs anlehnt (echte Farb-/Schrift-Tokens aus deren CSS-Bundle übernommen)."""
     return f"""<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)} – TheWashBot</title>
-<style>{DASHBOARD_CSS}</style></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>{DASHBOARD_CSS}{ANALYSIS_CSS}</style></head><body>
 <div class="top"><div class="brand"><span class="logo"></span>TheWashBot</div></div>
 <main><h1>{esc(title)}</h1>{body}</main>
 </body></html>"""
@@ -395,25 +449,27 @@ def render_timeline_table(timeline: list[dict], skills_map: dict, limit: int = 3
     )
 
 
-def render_fight_section(
+def build_fight_parts(
     players: list[dict], timeline: list[dict], skills_map: dict, canvas_id: str,
-) -> tuple[str, dict | None]:
-    """Schaden-Balken + (bei vorhandener Zeitleiste) DPS-Diagramm, Trefferstatistik,
-    Skill-Aufschlüsselung und Buffs/Debuffs für EINEN Kampf — genutzt für die Haupt-Rangliste UND
-    für jeden einzelnen Versuch unter „Versuche" (mehrere Boss-Pulls/Wipes in einem Lauf).
-    Gibt (HTML, Chart.js-Datensatz-Angabe-oder-None) zurück."""
+) -> tuple[dict[str, str], dict | None]:
+    """Baut die einzelnen Abschnitte für EINEN Kampf (Schaden-Balken, DPS-Diagramm,
+    Trefferstatistik, Skill-Aufschlüsselung, Buffs/Debuffs, Hit-für-Hit-Tabelle) als separates
+    Dict statt eines HTML-Blobs — damit `page_run` sie auf mehrere Tabs verteilen kann,
+    während `render_fight_section()` sie für einzelne Versuche weiterhin zusammengefasst
+    ausgibt. Gibt (Teile-Dict, Chart.js-Datensatz-Angabe-oder-None) zurück."""
     from .aion_dedup import bucket_dps, buff_uptime, skill_breakdown, timeline_stats
 
     max_damage = players[0]["damage"] if players else 0
     player_rows = []
-    for p in players:
+    for i, p in enumerate(players):
         pct = (100 * p["damage"] / max_damage) if max_damage else 0
+        rank_cls = f" rank-{i + 1}" if i < 3 else ""
         player_rows.append(
-            f'<div class="bar-row"><span class="bar-name">{esc(p["name"])}</span>'
+            f'<div class="bar-row{rank_cls}"><span class="bar-name">{esc(p["name"])}</span>'
             f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%"></div></div>'
             f'<span class="bar-value">{p["damage"]:,} ({p["dps"]:.0f}/s)</span></div>'
         )
-    html = f'<div class="bar-group">{"".join(player_rows)}</div>'
+    parts = {"bars": f'<div class="bar-group">{"".join(player_rows)}</div>'}
     chart_spec = None
     if timeline:
         fight_ms = max((ev.get("t_ms", 0) for ev in timeline), default=1) or 1
@@ -443,14 +499,39 @@ def render_fight_section(
             ) + "</details>"
             for name, buff_list in sorted(buffs.items()) if buff_list
         )
+        parts["chart"] = f'<canvas id="{canvas_id}" height="220"></canvas>'
+        parts["stats"] = (
+            '<table><tr><th>Spieler</th><th>Treffer</th><th>Crit</th><th>Back-Attack</th>'
+            f'<th>Perfect</th><th>Double</th></tr>{stat_rows}</table>'
+        )
+        if skill_blocks:
+            parts["skills"] = f'<div class="section"><h3>Skills</h3>{skill_blocks}</div>'
+        if buff_blocks:
+            parts["buffs"] = f'<div class="section"><h3>Buffs/Debuffs</h3>{buff_blocks}</div>'
         timeline_table = render_timeline_table(timeline, skills_map)
-        html += f"""
-<canvas id="{canvas_id}" height="220"></canvas>
-<table><tr><th>Spieler</th><th>Treffer</th><th>Crit</th><th>Back-Attack</th><th>Perfect</th><th>Double</th></tr>{stat_rows}</table>
-{f'<div class="section"><h3>Skills</h3>{skill_blocks}</div>' if skill_blocks else ''}
-{f'<div class="section"><h3>Buffs/Debuffs</h3>{buff_blocks}</div>' if buff_blocks else ''}
-<div class="section"><h3>Zeitleiste</h3><details><summary>Alle Treffer ({len(timeline):,})</summary>{timeline_table}</details></div>"""
+        parts["timeline_table"] = (
+            f'<div class="section"><h3>Zeitleiste</h3><details><summary>Alle Treffer '
+            f'({len(timeline):,})</summary>{timeline_table}</details></div>'
+        )
         chart_spec = (canvas_id, "line", bucket_dps(timeline, fight_ms), "Sekunden")
+    return parts, chart_spec
+
+
+def render_fight_section(
+    players: list[dict], timeline: list[dict], skills_map: dict, canvas_id: str,
+) -> tuple[str, dict | None]:
+    """Schaden-Balken + (bei vorhandener Zeitleiste) DPS-Diagramm, Trefferstatistik,
+    Skill-Aufschlüsselung, Buffs/Debuffs und Hit-für-Hit-Tabelle für EINEN Kampf als ein
+    HTML-Blob — genutzt für jeden einzelnen Versuch unter „Versuche" (mehrere Boss-Pulls/Wipes
+    in einem Lauf). Für die Hauptseite verteilt `page_run` dieselben Teile stattdessen über
+    `build_fight_parts()` auf mehrere Tabs. Gibt (HTML, Chart.js-Datensatz-Angabe-oder-None) zurück."""
+    parts, chart_spec = build_fight_parts(players, timeline, skills_map, canvas_id)
+    html = parts["bars"]
+    if "chart" in parts:
+        html += (
+            parts["chart"] + parts["stats"] + parts.get("skills", "") + parts.get("buffs", "")
+            + parts["timeline_table"]
+        )
     return html, chart_spec
 
 
@@ -1499,7 +1580,7 @@ class Dashboard(commands.Cog):
         run_id = request.match_info["id"]
         if not re.match(r"^[A-Za-z0-9_-]{10,40}$", run_id):
             return web.Response(text="Ungültiger Link.", status=400)
-        from .aion_dedup import boss_hp_series, bucket_dps, buff_uptime, heals_summary, runs_dir, skill_breakdown, timeline_stats
+        from .aion_dedup import boss_hp_series, heals_summary, runs_dir
 
         path = runs_dir(self.db) / f"{run_id}.json"
         try:
@@ -1510,6 +1591,7 @@ class Dashboard(commands.Cog):
         players = data.get("players") or []
         bosses = data.get("bosses") or []
         timeline = data.get("timeline") or []
+        skills_map = data.get("skills") or {}
         players_meta = {m["name"]: m for m in (data.get("players_meta") or [])}
         fight_ms = data.get("fight_ms") or 0
         minutes, seconds = divmod(round(fight_ms / 1000), 60)
@@ -1525,10 +1607,11 @@ class Dashboard(commands.Cog):
 
         max_damage = players[0]["damage"] if players else 0
         player_rows = []
-        for p in players:
+        for i, p in enumerate(players):
             pct = (100 * p["damage"] / max_damage) if max_damage else 0
+            rank_cls = f" rank-{i + 1}" if i < 3 else ""
             player_rows.append(
-                f'<div class="bar-row"><span class="bar-name">{esc(p["name"])}{meta_line(p["name"])}</span>'
+                f'<div class="bar-row{rank_cls}"><span class="bar-name">{esc(p["name"])}{meta_line(p["name"])}</span>'
                 f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%"></div></div>'
                 f'<span class="bar-value">{p["damage"]:,} ({p["dps"]:.0f}/s)</span></div>'
             )
@@ -1538,75 +1621,18 @@ class Dashboard(commands.Cog):
             boss_players = sorted(b.get("players") or [], key=lambda p: -p["dps"])
             max_dps = boss_players[0]["dps"] if boss_players else 0
             rows = []
-            for p in boss_players:
+            for i, p in enumerate(boss_players):
                 pct = (100 * p["dps"] / max_dps) if max_dps else 0
+                rank_cls = f" rank-{i + 1}" if i < 3 else ""
                 rows.append(
-                    f'<div class="bar-row"><span class="bar-name">{esc(p["name"])}</span>'
+                    f'<div class="bar-row{rank_cls}"><span class="bar-name">{esc(p["name"])}</span>'
                     f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%"></div></div>'
                     f'<span class="bar-value">{p["dps"]:.0f}/s</span></div>'
                 )
-            boss_cards.append(f'<div class="card"><h2>🗡️ {esc(b["name"])}</h2>{"".join(rows)}</div>')
+            boss_cards.append(f'<div class="card"><h2>{esc(b["name"])}</h2>{"".join(rows)}</div>')
 
-        timeline_html = ""
-        scripts = []
-        if timeline:
-            stats = timeline_stats(timeline)
-            dps_chart = bucket_dps(timeline, fight_ms or 1)
-            stat_rows = "".join(
-                f"<tr><td>{esc(name)}</td><td>{s['hits']}</td><td>{s['crit_pct']}%</td>"
-                f"<td>{s['back_pct']}%</td><td>{s['perfect_pct']}%</td><td>{s['double_pct']}%</td></tr>"
-                for name, s in sorted(stats.items(), key=lambda kv: -kv[1]["damage"])
-            )
-
-            skills_map = data.get("skills") or {}
-            skills = skill_breakdown(timeline, skills_map)
-            skill_blocks = []
-            for name, skill_list in sorted(skills.items(), key=lambda kv: -sum(s["damage"] for s in kv[1])):
-                if not skill_list:
-                    continue
-                max_skill_dmg = skill_list[0]["damage"]
-                skill_rows = "".join(
-                    f'<div class="bar-row">'
-                    f'<span class="bar-name">{skill_icon_html(s.get("icon"))}{esc(s["skill"])}</span>'
-                    f'<div class="bar-track"><div class="bar-fill" style="width:{100 * s["damage"] / max_skill_dmg:.1f}%"></div></div>'
-                    f'<span class="bar-value">{s["pct"]}% ({s["hits"]}×)</span></div>'
-                    for s in skill_list
-                )
-                skill_blocks.append(
-                    f"<details><summary>{esc(name)}</summary>{skill_rows}</details>"
-                )
-
-            buffs_by_player = buff_uptime(timeline, skills_map)
-            buff_blocks = []
-            for name, buff_list in sorted(buffs_by_player.items(), key=lambda kv: kv[0]):
-                if not buff_list:
-                    continue
-                buff_rows = "".join(
-                    f'<div class="bar-row">'
-                    f'<span class="bar-name">{skill_icon_html(b.get("icon"))}{esc(b["buff"])}</span>'
-                    f'<div class="bar-track"><div class="bar-fill" style="width:{b["pct"]:.1f}%"></div></div>'
-                    f'<span class="bar-value">{b["pct"]}%</span></div>'
-                    for b in buff_list
-                )
-                buff_blocks.append(f"<details><summary>{esc(name)}</summary>{buff_rows}</details>")
-            buffs_html = (
-                f'<div class="card"><h2>Buffs/Debuffs <span class="hint">(Anwesenheit bei eigenen Treffern)</span></h2>'
-                f'{"".join(buff_blocks)}</div>'
-                if buff_blocks else ""
-            )
-
-            timeline_html = f"""
-<div class="card">
-  <h2>DPS über Zeit</h2>
-  <canvas id="dpsChart" height="260"></canvas>
-</div>
-<div class="card">
-  <h2>Trefferstatistik</h2>
-  <table><tr><th>Spieler</th><th>Treffer</th><th>Crit</th><th>Back-Attack</th><th>Perfect</th><th>Double</th></tr>{stat_rows}</table>
-</div>
-<div class="card"><h2>Skill-Aufschlüsselung</h2>{"".join(skill_blocks)}</div>
-{buffs_html}"""
-            scripts.append(("dpsChart", "line", dps_chart, "Sekunden"))
+        fight_parts, chart_spec = build_fight_parts(players, timeline, skills_map, "dpsChart")
+        scripts = [chart_spec] if chart_spec else []
 
         hp_html = ""
         boss_hp = data.get("boss_hp") or []
@@ -1622,12 +1648,11 @@ class Dashboard(commands.Cog):
                 f"<tr><td>{esc(h['name'])}</td><td>{h['heals']}</td><td>{h['amount']:,.0f}</td></tr>"
                 for h in heals_summary(heals)
             )
-            heal_html = f'<div class="card"><h2>Heilung</h2><table><tr><th>Spieler</th><th>Heilungen</th><th>Gesamt</th></tr>{heal_rows}</table></div>'
+            heal_html = f'<table><tr><th>Spieler</th><th>Heilungen</th><th>Gesamt</th></tr>{heal_rows}</table>'
 
         attempts_html = ""
         attempts = data.get("attempts") or []
         if attempts:
-            skills_map = data.get("skills") or {}
             blocks = []
             for i, a in enumerate(attempts):
                 badge = "✅ Kill" if a.get("killed") else "💀 Wipe"
@@ -1642,7 +1667,41 @@ class Dashboard(commands.Cog):
                     f"<details{' open' if i == len(attempts) - 1 else ''}>"
                     f"<summary>{esc(a['label'])} — {badge}{dur_txt}</summary>{inner}</details>"
                 )
-            attempts_html = f'<div class="card"><h2>Versuche ({len(attempts)})</h2>{"".join(blocks)}</div>'
+            attempts_html = "".join(blocks)
+
+        # Tab-Reihenfolge wie bei AbyssLogs (Übersicht/Zeitleiste/Skills/Buffs/Bosse/Versuche) —
+        # nur Tabs mit tatsächlich vorhandenen Daten werden gezeigt.
+        tabs: list[tuple[str, str, str]] = []  # (id, Label, HTML)
+        tabs.append((
+            "overview", "Übersicht",
+            f'<div class="card"><h2>Schaden gesamt</h2>{"".join(player_rows)}</div>',
+        ))
+        if "chart" in fight_parts:
+            tabs.append((
+                "timeline", "Zeitleiste",
+                f'<div class="card"><h2>DPS über Zeit</h2>{fight_parts["chart"]}</div>'
+                f'<div class="card"><h2>Trefferstatistik</h2>{fight_parts["stats"]}</div>'
+                f'<div class="card">{fight_parts["timeline_table"]}</div>',
+            ))
+        if "skills" in fight_parts:
+            tabs.append(("skills", "Skills", f'<div class="card">{fight_parts["skills"]}</div>'))
+        if "buffs" in fight_parts:
+            tabs.append(("buffs", "Buffs/Debuffs", f'<div class="card">{fight_parts["buffs"]}</div>'))
+        if boss_cards or hp_html:
+            tabs.append(("bosses", "Bosse", "".join(boss_cards) + hp_html))
+        if heal_html:
+            tabs.append(("healing", "Heilung", f'<div class="card">{heal_html}</div>'))
+        if attempts_html:
+            tabs.append(("attempts", "Versuche", f'<div class="card">{attempts_html}</div>'))
+
+        tabbar_html = "".join(
+            f'<button class="tab-btn{" active" if i == 0 else ""}" data-tab="{tid}">{esc(label)}</button>'
+            for i, (tid, label, _) in enumerate(tabs)
+        )
+        panels_html = "".join(
+            f'<div id="tab-{tid}" class="tab-panel{" active" if i == 0 else ""}">{html}</div>'
+            for i, (tid, _, html) in enumerate(tabs)
+        )
 
         script_html = ""
         if scripts:
@@ -1653,37 +1712,50 @@ class Dashboard(commands.Cog):
                     chunks.append(f"""
   {{
     const data = {chart_json};
-    const colours = ["#5ac8fa","#8f7cff","#ff9f0a","#30d158","#ff453a","#f2f3f7","#64d2ff","#bf5af2"];
+    const colours = ["#7dd8d8","#a78bfa","#e8c884","#4ee08a","#e74c3c","#e6ebef","#f29ce0","#f0c040"];
     const datasets = Object.keys(data.series).map((name, i) => ({{
       label: name, data: data.series[name], borderColor: colours[i % colours.length],
       backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2,
     }}));
-    new Chart(document.getElementById("{canvas_id}"), {{
+    window.__charts.push(new Chart(document.getElementById("{canvas_id}"), {{
       type: "line", data: {{ labels: data.labels_s, datasets }},
       options: {{ scales: {{
-        x: {{ title: {{ display: true, text: "{x_label}", color: "#aaa" }}, ticks: {{ color: "#aaa" }}, grid: {{ color: "rgba(255,255,255,0.08)" }} }},
-        y: {{ ticks: {{ color: "#aaa" }}, grid: {{ color: "rgba(255,255,255,0.08)" }} }},
-      }}, plugins: {{ legend: {{ labels: {{ color: "#f2f3f7" }} }} }} }},
-    }});
+        x: {{ title: {{ display: true, text: "{x_label}", color: "#8b949e" }}, ticks: {{ color: "#8b949e" }}, grid: {{ color: "rgba(255,255,255,0.06)" }} }},
+        y: {{ ticks: {{ color: "#8b949e" }}, grid: {{ color: "rgba(255,255,255,0.06)" }} }},
+      }}, plugins: {{ legend: {{ labels: {{ color: "#e6ebef" }} }} }} }},
+    }}));
   }}""")
                 else:
                     chunks.append(f"""
   {{
     const data = {chart_json};
-    new Chart(document.getElementById("{canvas_id}"), {{
+    window.__charts.push(new Chart(document.getElementById("{canvas_id}"), {{
       type: "line",
-      data: {{ labels: data.labels_s, datasets: [{{ label: "HP %", data: data.values, borderColor: "#ff453a",
-        backgroundColor: "rgba(255,69,58,0.12)", fill: true, tension: 0.15, pointRadius: 0, borderWidth: 2 }}] }},
+      data: {{ labels: data.labels_s, datasets: [{{ label: "HP %", data: data.values, borderColor: "#e74c3c",
+        backgroundColor: "rgba(231,76,60,0.12)", fill: true, tension: 0.15, pointRadius: 0, borderWidth: 2 }}] }},
       options: {{ scales: {{
-        x: {{ title: {{ display: true, text: "{x_label}", color: "#aaa" }}, ticks: {{ color: "#aaa" }}, grid: {{ color: "rgba(255,255,255,0.08)" }} }},
-        y: {{ min: 0, max: 100, ticks: {{ color: "#aaa" }}, grid: {{ color: "rgba(255,255,255,0.08)" }} }},
+        x: {{ title: {{ display: true, text: "{x_label}", color: "#8b949e" }}, ticks: {{ color: "#8b949e" }}, grid: {{ color: "rgba(255,255,255,0.06)" }} }},
+        y: {{ min: 0, max: 100, ticks: {{ color: "#8b949e" }}, grid: {{ color: "rgba(255,255,255,0.06)" }} }},
       }}, plugins: {{ legend: {{ display: false }} }} }},
-    }});
+    }}));
   }}""")
             script_html = (
                 '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>'
-                f"<script>(function() {{{''.join(chunks)}}})();</script>"
+                f"<script>window.__charts = [];(function() {{{''.join(chunks)}}})();</script>"
             )
+
+        tabs_script = """
+<script>
+document.querySelectorAll('.tab-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    requestAnimationFrame(function() { (window.__charts || []).forEach(function(c) { c.resize(); }); });
+  });
+});
+</script>"""
 
         reported = datetime_fromtimestamp_de(data.get("created"))
         body = f"""
@@ -1693,13 +1765,10 @@ class Dashboard(commands.Cog):
   <span class="chip"><span class="dot"></span>{data.get('reporters', 1)} Meldung(en)</span>
   <span class="chip"><span class="dot"></span>{reported}</span>
 </div>
-<div class="card"><h2>Schaden gesamt</h2>{"".join(player_rows)}</div>
-{"".join(boss_cards)}
-{hp_html}
-{heal_html}
-{timeline_html}
-{attempts_html}
-{script_html}"""
+<div class="tabbar">{tabbar_html}</div>
+{panels_html}
+{script_html}
+{tabs_script}"""
         return web.Response(text=public_layout(title, body), content_type="text/html")
 
     async def page_leaderboard(self, request: web.Request) -> web.Response:
@@ -1729,14 +1798,15 @@ class Dashboard(commands.Cog):
             lines = []
             for i, r in enumerate(top, start=1):
                 bar_pct = (100 * r["dps"] / max_dps) if max_dps else 0
+                rank_cls = f" rank-{i}" if i <= 3 else ""
                 name_html = f'<a href="/runs/{r["run_id"]}">{esc(r["player"])}</a>' if r["run_id"] else esc(r["player"])
                 cls = f' <span class="bar-meta">{esc(r["class"])}</span>' if r["class"] else ""
                 lines.append(
-                    f'<div class="bar-row"><span class="bar-name">#{i} {name_html}{cls}</span>'
+                    f'<div class="bar-row{rank_cls}"><span class="bar-name">#{i} {name_html}{cls}</span>'
                     f'<div class="bar-track"><div class="bar-fill" style="width:{bar_pct:.1f}%"></div></div>'
                     f'<span class="bar-value">{r["dps"]:.0f}/s</span></div>'
                 )
-            boss_cards.append(f'<div class="card"><h2>🗡️ {esc(boss)}</h2>{"".join(lines)}</div>')
+            boss_cards.append(f'<div class="card"><h2>{esc(boss)}</h2>{"".join(lines)}</div>')
 
         body = (
             f'<div class="chips" style="margin-bottom:16px"><span class="chip ok"><span class="dot"></span>'

@@ -687,6 +687,30 @@ def test_dashboard_render_fight_section():
     assert "flag-crit" in html2
 
 
+def test_dashboard_build_fight_parts():
+    from bot.cogs.dashboard import build_fight_parts, render_fight_section
+
+    players = [{"name": "A", "damage": 300, "dps": 30}, {"name": "B", "damage": 100, "dps": 10}]
+    # ohne Zeitleiste: nur "bars" im Teile-Dict, keine der timeline-abhängigen Keys
+    parts, spec = build_fight_parts(players, [], {}, "chart0")
+    assert set(parts) == {"bars"}
+    assert spec is None
+    assert "rank-1" in parts["bars"] and "rank-2" in parts["bars"]  # Top-3-Rang-Färbung
+
+    timeline = [{"t_ms": 0, "player": "A", "skill": "s1", "damage": 300, "crit": True, "buffs": ["b1"]}]
+    parts2, spec2 = build_fight_parts(players, timeline, {"s1": {"name": "Fireball"}}, "chart1")
+    assert set(parts2) >= {"bars", "chart", "stats", "skills", "timeline_table"}
+    assert spec2 is not None and spec2[0] == "chart1"
+    assert "Fireball" in parts2["skills"]
+    assert "timeline-scroll" in parts2["timeline_table"]
+
+    # render_fight_section() bleibt ein dünner Wrapper, der dieselben Teile zu einem HTML-Blob
+    # zusammenfügt wie früher (Abwärtskompatibilität für die Versuche-Anzeige)
+    html, spec3 = render_fight_section(players, timeline, {"s1": {"name": "Fireball"}}, "chart1")
+    assert parts2["bars"] in html and parts2["timeline_table"] in html
+    assert spec3 == spec2
+
+
 def test_dashboard_render_timeline_table():
     from bot.cogs.dashboard import render_timeline_table
 
@@ -805,6 +829,12 @@ def test_aion_store_run_and_serve_analysis_page():
             assert "Versuch 2" in resp.text and "✅ Kill" in resp.text
             assert 'id="attemptChart1"' in resp.text  # Diagramm nur für den Versuch mit Zeitleiste
             assert 'id="attemptChart0"' not in resp.text
+            # Tab-Navigation (AbyssLogs-Stil): nur Tabs mit tatsächlich vorhandenen Daten
+            assert 'data-tab="overview"' in resp.text and 'data-tab="timeline"' in resp.text
+            assert 'data-tab="skills"' in resp.text and 'data-tab="buffs"' in resp.text
+            assert 'data-tab="bosses"' in resp.text  # boss_hp vorhanden -> Bosse-Tab zeigt die HP-Kurve
+            assert 'data-tab="healing"' in resp.text and 'data-tab="attempts"' in resp.text
+            assert "Alle Treffer" in resp.text  # Hit-für-Hit-Tabelle jetzt auch beim Hauptkampf
 
             await db.close()
 

@@ -277,3 +277,33 @@ bei jedem einzelnen „Versuch" (teilt sich den Renderer). Schutzgrenze `limit=3
 pathologisch lange Mitschnitte (reine Absicherung, keine normale UX-Grenze — AbyssLogs selbst zeigt
 ebenfalls die volle Liste). Aufklappbar per `<details>`, damit die Seite bei kurzen Läufen nicht
 sofort von einer langen Tabelle dominiert wird. 66 Tests grün.
+
+## Analyse-Seite: Design/Struktur näher an AbyssLogs (2026-10-21)
+
+Auf expliziten Wunsch „genau wie AbyssLogs, fast eine 1:1 Kopie" — Design UND Funktionsumfang.
+
+- **Echte AbyssLogs-Design-Tokens übernommen**: aus deren ausgeliefertem CSS-Bundle ausgelesen
+  (`:root`-Variablen wie `--bg: #0b0c0f`, `--primary: #7dd8d8`, `--rank-1/2/3`, Schrift
+  „Space Grotesk" für Überschriften). Neues `ANALYSIS_CSS` (nur für `/runs/<id>` und
+  `/leaderboard/<guild_id>`, NICHT für das Admin-Dashboard) überschreibt die Variablen von
+  `DASHBOARD_CSS` mit diesen Werten — alle Struktur-Regeln (`.card`/`.bar-row`/`table`/`details`/…)
+  bleiben dieselben, nur Farben/Schrift ändern sich. Google Fonts „Space Grotesk" per `<link>`
+  geladen (eigener aiohttp-Server, keine CSP-Einschränkung wie bei Artifacts).
+- **Tab-Navigation statt einer langen Scroll-Seite**: `/runs/<id>` zeigt jetzt Übersicht/
+  Zeitleiste/Skills/Buffs-Debuffs/Bosse/Heilung/Versuche als Tabs (nur Tabs mit tatsächlich
+  vorhandenen Daten werden angezeigt), reines Vanilla-JS ohne Framework. Chart.js-Instanzen landen
+  in `window.__charts`, beim Tab-Wechsel wird `.resize()` auf allen aufgerufen (sonst bleiben
+  Diagramme in zunächst verdeckten Tabs auf 0×0 Pixel hängen, weil `display:none` beim ersten
+  Rendern noch keine Breite hat).
+- **Rang-Färbung Gold/Silber/Bronze** für die Top 3 in jeder Rangliste (Schaden gesamt, pro Boss,
+  Bestenliste) — `.bar-row.rank-1/2/3`, dieselben Hex-Werte wie AbyssLogs' `--rank-1/2/3`.
+- **Größere Skill-Icons** (28px statt 18px) für bessere Sichtbarkeit, wie gewünscht.
+- **Bug nebenbei behoben**: Die Hit-für-Hit-Tabelle aus dem vorherigen Commit war nur in
+  `render_fight_section()` eingehängt (Versuche), NICHT in `page_run`s eigenem, bis dahin
+  separatem Inline-Code für den Hauptkampf — der zeigte sie also gar nicht. Durch den Umbau auf
+  `build_fight_parts()` (neue Variante von `render_fight_section()`, die die Abschnitte als Dict
+  statt als einen HTML-Blob liefert, damit `page_run` sie auf Tabs verteilen kann) ist die
+  Duplikation komplett weg, der Hauptkampf hat jetzt dieselbe Hit-Tabelle wie jeder Versuch.
+- 67 Tests grün. Noch nicht 1:1: AbyssLogs hat zusätzlich eigene Tabs für reine Damage-Taken-/
+  Deaths-/Cooldown-/Gear-Ansichten — dafür fehlen uns die Rohdaten im Payload (DeckBar liefert
+  aktuell nur Schaden/Buffs/Heilung, keine erlittenen Treffer oder Todeszeitpunkte).
