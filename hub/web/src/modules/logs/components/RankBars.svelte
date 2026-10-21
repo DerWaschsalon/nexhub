@@ -2,7 +2,7 @@
 <script lang="ts">
 	import { formatCompact, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
-	import type { Player } from '../api.ts';
+	import { playerId, type Player } from '../api.ts';
 	import { classColor } from '../classes.ts';
 	import PlayerName from './PlayerName.svelte';
 
@@ -10,7 +10,7 @@
 		players,
 		selected = null,
 		onSelect
-	}: { players: Player[]; selected?: string | null; onSelect?: (name: string) => void } = $props();
+	}: { players: (Player & { actor?: number })[]; selected?: string | null; onSelect?: (id: string) => void } = $props();
 
 	const max = $derived(players[0]?.damage || 1);
 	const total = $derived(players.reduce((s, p) => s + p.damage, 0) || 1);
@@ -30,10 +30,10 @@
 {/snippet}
 
 <ol class="ranks">
-	{#each players as p, i (p.name)}
-		<li class:selected={selected === p.name}>
+	{#each players as p, i (playerId(p))}
+		<li class:selected={selected === playerId(p)}>
 			{#if onSelect}
-				<button type="button" class="row" aria-pressed={selected === p.name} onclick={() => onSelect(p.name)}>
+				<button type="button" class="row" aria-pressed={selected === playerId(p)} onclick={() => onSelect(playerId(p))}>
 					{@render body(p, i)}
 				</button>
 			{:else}

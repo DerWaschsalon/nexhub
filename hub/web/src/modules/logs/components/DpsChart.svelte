@@ -30,7 +30,7 @@
 				const win = perSec.slice(Math.max(0, i - SMOOTH_S + 1), i + 1);
 				return win.reduce((a, b) => a + b, 0) / win.length;
 			});
-			return { name: p?.name ?? `#${s.actor}`, color: classColor(cls), dashed: nth > 0, values };
+			return { id: `#${s.actor}`, name: p?.name ?? `#${s.actor}`, color: classColor(cls), dashed: nth > 0, values };
 		});
 	});
 
@@ -69,10 +69,10 @@
 			{#each xTicks as i (i)}
 				<text x={x(i)} y={H - 8} text-anchor="middle" class="axis">{formatDuration(i * bucket)}</text>
 			{/each}
-			{#each series as s (s.name)}
-				<polyline fill="none" stroke={s.color} stroke-width={highlight === s.name ? 3 : 1.8}
+			{#each series as s (s.id)}
+				<polyline fill="none" stroke={s.color} stroke-width={highlight === s.id ? 3 : 1.8}
 					stroke-dasharray={s.dashed ? '6 4' : undefined} stroke-linejoin="round"
-					opacity={highlight && highlight !== s.name ? 0.25 : 1}
+					opacity={highlight && highlight !== s.id ? 0.25 : 1}
 					points={s.values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')} />
 			{/each}
 			{#if hover !== null}
@@ -82,13 +82,13 @@
 		{#if hover !== null}
 			<div class="tip glass" style:left="{(x(hover) / W) * 100}%">
 				<strong>{formatDuration(hover * bucket)}</strong>
-				{#each hoverRows as r (r.name)}
+				{#each hoverRows as r (r.id)}
 					<span><i style:background={r.color}></i>{r.name}<b class="num">{formatNumber(r.v)}</b></span>
 				{/each}
 			</div>
 		{/if}
 		<figcaption class="legend">
-			{#each series as s (s.name)}
+			{#each series as s (s.id)}
 				<span><i class:dashed={s.dashed} style:background={s.dashed ? 'none' : s.color} style:border-color={s.color}></i>{s.name}</span>
 			{/each}
 		</figcaption>

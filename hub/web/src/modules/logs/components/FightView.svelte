@@ -2,7 +2,7 @@
 <script lang="ts">
 	import { formatDuration } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
-	import type { Fight } from '../api.ts';
+	import { playerId, type Fight } from '../api.ts';
 	import BuffTimeline from './BuffTimeline.svelte';
 	import DpsChart from './DpsChart.svelte';
 	import PlayerName from './PlayerName.svelte';
@@ -17,14 +17,14 @@
 
 	let tab = $state<Tab>('damage');
 	let player = $state<string | null>(null);
-	const selected = $derived(fight.players.find((p) => p.name === player) ?? fight.players[0]);
+	const selected = $derived(fight.players.find((p) => playerId(p) === player) ?? fight.players[0]);
 </script>
 
 {#snippet picker()}
 	<div class="tabs pick" role="radiogroup" aria-label={t('logs.player.pick')}>
-		{#each fight.players as p (p.name)}
-			<button type="button" role="radio" aria-checked={p.name === selected.name} class:active={p.name === selected.name}
-				onclick={() => (player = p.name)}>
+		{#each fight.players as p (p.actor)}
+			<button type="button" role="radio" aria-checked={p.actor === selected.actor} class:active={p.actor === selected.actor}
+				onclick={() => (player = playerId(p))}>
 				<PlayerName name={p.name} cls={p.cls} />
 			</button>
 		{/each}
@@ -55,12 +55,12 @@
 {:else if tab === 'skills' && selected}
 	<section class="glass pad">
 		{@render picker()}
-		{#key selected.name}<SkillTable player={selected} boss={fight.name} />{/key}
+		{#key selected.actor}<SkillTable player={selected} boss={fight.name} />{/key}
 	</section>
 {:else if tab === 'timeline' && selected}
 	<section class="glass pad">
 		{@render picker()}
-		{#key selected.name}<SkillTimeline player={selected} durationMs={fight.duration_ms} boss={fight.name} />{/key}
+		{#key selected.actor}<SkillTimeline player={selected} durationMs={fight.duration_ms} boss={fight.name} />{/key}
 	</section>
 	<section class="glass pad">
 		<h2>{t('logs.timeline.buffs')}</h2>

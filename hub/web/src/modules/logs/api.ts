@@ -66,6 +66,10 @@ export type Buff = { actor: number; by: number; id: number; up: number; segments
 
 export type FightPlayer = Player & { actor: number; skills: FightSkill[] };
 
+/** Eindeutiger Schlüssel eines Spielers: im Kampf die Actor-ID (zwei Spieler können gleich heißen,
+ * z. B. nach einem Relog oder zwei gleich maskierte Namen), in der Run-Übersicht der Name. */
+export const playerId = (p: { name: string; actor?: number }): string => (p.actor != null ? `#${p.actor}` : p.name);
+
 export type Fight = {
 	fight: string;
 	name: string;
