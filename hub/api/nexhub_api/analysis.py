@@ -10,6 +10,35 @@ KILL_RATIO = 0.97
 
 
 BUCKET_MS = 1000  # Auflösung der DPS-Kurve
+MAX_CASTS = 5_000  # Zeitpunkte je Fähigkeit, Schutz gegen riesige Weltboss-Kämpfe
+MAX_BUFFS = 3_000  # Buff-Spuren je Kampf
+
+
+def _list(value: object) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _ints(values: object, limit: int) -> list[int]:
+    """Liste aus der Kampfdatei als ganze Zahlen; Unbrauchbares fällt weg."""
+    if not isinstance(values, list):
+        return []
+    return [int(v) for v in values[:limit] if isinstance(v, (int, float)) and not isinstance(v, bool)]
+
+
+def _segments(segs: object) -> list[list[int]]:
+    """Buff-Abschnitte „start,ende,stapel,wie;…“ (A2Tools, fight_buffs.rs) als [[start, ende, stapel, wie]].
+
+    Zeiten in ms seit Kampfbeginn, vor dem Pull negativ. `wie`: wodurch der Abschnitt endete
+    (0 = Stapel geändert, 10 = am Kampfende noch aktiv, …). Kaputte Teile fallen weg."""
+    out = []
+    for part in segs.split(";") if isinstance(segs, str) else []:
+        try:
+            start, end, stacks, how = (int(float(x)) for x in part.split(","))
+        except ValueError:
+            continue
+        if end >= start:
+            out.append([start, end, stacks, how])
+    return out
 
 
 def _dps(damage: int, ms: int) -> int:
@@ -57,7 +86,10 @@ def fight_detail(log: NexLog, fight: A2Fight) -> dict:
 
     {fight, name, mob, duration_ms, killed, max_hp,
      players: [{actor, name, cls, damage, dps, skills: [{code, name, dot, damage, share, hits,
-               crit, back, perfect, double}]}],                 Quoten in Prozent der Treffer
+               crit, back, perfect, double, parry,              Quoten in Prozent der Treffer
+               min, max, avg, multi_hits, multi_damage,         Schaden je Treffer, Mehrfachtreffer
+               specs, casts}]}],                                aktive Spezialisierungen (1–5), Zeitpunkte in ms
+     buffs: [{actor, by, id, up, segments: [[start, ende, stapel, wie]]}],  auf Spielern und dem Boss
      timeline: {bucket_ms, players: [{actor, damage: [je Sekunde]}]} oder None ohne Einzeltreffer,
      deaths: [{name, t_ms, revived_ms}]}
     """
@@ -69,7 +101,12 @@ def fight_detail(log: NexLog, fight: A2Fight) -> dict:
             "code": s.get("code"), "name": s.get("name") or f"#{s.get('code')}", "dot": bool(s.get("isDot")),
             "damage": dmg, "hits": hits, "crit": _rate(int(s.get("crit") or 0), hits),
             "back": _rate(int(s.get("back") or 0), hits), "perfect": _rate(int(s.get("perfect") or 0), hits),
-            "double": _rate(int(s.get("double") or 0), hits)})
+            "double": _rate(int(s.get("double") or 0), hits), "parry": _rate(int(s.get("parry") or 0), hits),
+            "min": int(s.get("minDmg") or 0), "max": int(s.get("maxDmg") or 0),
+            "avg": round(dmg / hits) if hits else 0,
+            "multi_hits": int(s.get("multiHitCount") or 0), "multi_damage": int(s.get("multiHitDamage") or 0),
+            "specs": [i + 1 for i, on in enumerate(_list(s.get("specs"))[:5]) if on is True],
+            "casts": sorted(_ints(s.get("hitTimestamps"), MAX_CASTS))})
     players = []
     for actor, rows in skills.items():
         total = sum(r["damage"] for r in rows)
@@ -96,9 +133,21 @@ def fight_detail(log: NexLog, fight: A2Fight) -> dict:
 
     deaths = [{"name": names[d["actorId"]][0], "t_ms": int(d.get("tsMs") or 0), "revived_ms": d.get("revivedMs")}
               for d in fight.details.get("deaths") or [] if d.get("actorId") in names]
+    extra = fight.model_extra or {}
+    target = extra.get("targetId") or fight.details.get("targetId")
+    # Buffs und Debuffs auf den Spielern des Kampfes und auf dem Boss (Debuffs der Gruppe)
+    on_whom = set(names) | ({target} if isinstance(target, int) else set())
+    buffs = [{"actor": b["on"], "by": b.get("by") if isinstance(b.get("by"), int) else 0, "id": b["id"],
+              "up": int(b.get("up") or 0), "segments": _segments(b.get("segs"))}
+             for b in (extra.get("buffs") or [])[:MAX_BUFFS]
+             if isinstance(b, dict) and isinstance(b.get("on"), int) and b["on"] in on_whom
+             and isinstance(b.get("id"), int)]
+
     max_hp = int(fight.details.get("maxHp") or 0)
-    dealt = int(fight.details.get("totalTargetDamage") or (fight.model_extra or {}).get("totalDamage") or 0)
+    dealt = int(fight.details.get("totalTargetDamage") or extra.get("totalDamage") or 0)
     return {"fight": fight.id, "name": fight.bossName, "mob": fight.mobCode, "duration_ms": fight.durationMs,
             "killed": max_hp > 0 and dealt >= max_hp * KILL_RATIO, "max_hp": max_hp,
-            "players": players, "timeline": timeline, "deaths": sorted(deaths, key=lambda d: d["t_ms"])}
+            "target": target if isinstance(target, int) else None,
+            "players": players, "timeline": timeline, "deaths": sorted(deaths, key=lambda d: d["t_ms"]),
+            "buffs": [b for b in buffs if b["segments"]]}
 

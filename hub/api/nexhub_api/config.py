@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     hub_session_days: int = 30
     # Gebaute Web-Oberfläche (hub/web/build); leer: nur die API
     hub_web_dir: Path | None = None
+    # Gebaute Log-Ansicht NexLogs (nexlogs/dist), ausgeliefert unter /logs/; leer: keine
+    hub_logs_dir: Path | None = None
     # Stand des Codes, setzt das Image beim Bauen (z. B. "monorepo@71b65a2")
     hub_version: str = "dev"
     # Hochgeladene Dateien (runs/<id>.nexlog.gz); im Container ein eigenes Volume
@@ -40,7 +42,7 @@ class Settings(BaseSettings):
             return frozenset(int(x) for x in v.replace(" ", "").split(",") if x)
         return v
 
-    @field_validator("hub_guild_id", "hub_member_role_id", "hub_web_dir", mode="before")
+    @field_validator("hub_guild_id", "hub_member_role_id", "hub_web_dir", "hub_logs_dir", mode="before")
     @classmethod
     def _empty_is_none(cls, v: object) -> object:
         return None if v == "" else v
