@@ -231,9 +231,10 @@ Discord-Bot-Modul (`daemon/deckbar_daemon/bot.py`) umgesetzt, Einrichtung dort �
    }
    ```
 
-   `bosses` ist optional — ohne das Feld zeigt das Embed nur die Gesamt-Rangliste als Balkendiagramm
-   (PNG, gerendert wie die Rangkarte des Levelsystems), mit dem Feld zusätzlich ein eigenes
-   Text-Feld pro Boss mit der DPS je Spieler für genau diesen Kampf.
+   `bosses` ist optional — ohne das Feld zeigt der Post nur das Gesamt-Balkendiagramm (PNG,
+   gerendert wie die Rangkarte des Levelsystems), mit dem Feld zusätzlich ein eigenes Balkendiagramm
+   pro Boss mit dem Schaden je Spieler für genau diesen Kampf (eigenes Embed je Boss, max. 9 Bosse
+   pro Nachricht — Discords Limit für Embeds pro Nachricht).
 
    `timeline` ist ebenfalls optional (einzelne Treffer mit Zeitstempel in ms seit Kampfbeginn,
    `player` muss zu einem Namen in `players[]` passen, der Rest ist optional) — damit postet der
