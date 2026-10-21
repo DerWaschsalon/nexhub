@@ -18,6 +18,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from ..errors import UserError
+from ..hubpages import Action, Column, Page, Table, channel_label, user_label
 
 log = logging.getLogger(__name__)
 TZ = ZoneInfo("Europe/Berlin")
@@ -141,6 +142,25 @@ class Reminders(commands.Cog):
         await self.db.execute("DELETE FROM reminders WHERE id=?", (erinnerung_id,))
         await interaction.response.send_message(f"Erinnerung #{erinnerung_id} gelöscht.", ephemeral=True)
 
+    # ---- NexHub ----
+
+    def hub_pages(self) -> list[Page]:
+        return [Page("erinnerungen", "Erinnerungen", "Community", (
+            Table("reminders", "Offene Erinnerungen", (
+                Column("user", "Für"), Column("text", "Text"), Column("due", "Fällig", "time"), Column("where", "Wo"),
+            ), self._hub_rows, actions=(
+                Action("delete", "Löschen", self._hub_delete, confirm="Erinnerung löschen?", danger=True),
+            ), empty="Keine offenen Erinnerungen."),
+        ), "Mitglieder legen sie mit /erinnere an.", order=80)]
+
+    async def _hub_rows(self, ctx) -> list[dict]:
+        rows = await self.db.fetchall("SELECT * FROM reminders WHERE guild_id=? ORDER BY due LIMIT 200", (ctx.guild.id,))
+        return [{"id": str(r["id"]), "user": user_label(ctx.guild, r["user_id"]), "text": r["text"], "due": r["due"],
+                 "where": "per DM" if r["private"] else channel_label(ctx.guild, r["channel_id"])} for r in rows]
+
+    async def _hub_delete(self, ctx, _v, item):
+        await self.db.execute("DELETE FROM reminders WHERE id=? AND guild_id=?", (int(item or 0), ctx.guild.id))
+        return "Gelöscht."
 
 async def setup(bot):
     await bot.add_cog(Reminders(bot))

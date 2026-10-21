@@ -2,8 +2,8 @@
 
 `/api/admin/bot/<pfad>` → `<BOT_CONTROL_URL>/control/<pfad>` mit dem gemeinsamen Schlüssel.
 Was erlaubt ist und wie Werte geprüft werden, entscheidet der Bot (bot/bot/cogs/control.py);
-der Hub prüft nur, dass ein Admin fragt. Der Name des Admins geht als `X-Hub-User` mit, der Bot
-schreibt ihn ins Discord-Audit-Log.
+der Hub prüft nur, dass ein Admin fragt. Name und Discord-ID des Admins gehen als `X-Hub-User` und
+`X-Hub-User-Id` mit, der Bot schreibt den Namen ins Discord-Audit-Log.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ async def forward(path: str, request: Request, admin: AdminUser, settings: Setti
         raise HTTPException(413, "Anfrage zu groß")
     headers = {"Authorization": f"Bearer {settings.bot_control_key}",
                # Header sind nur Latin-1, Discord-Namen nicht
-               "X-Hub-User": quote(admin.name, safe="")}
+               "X-Hub-User": quote(admin.name, safe=""), "X-Hub-User-Id": str(admin.discord_id)}
     if body:
         headers["Content-Type"] = "application/json"
     http: httpx.AsyncClient = request.app.state.http

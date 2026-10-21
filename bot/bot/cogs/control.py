@@ -7,10 +7,11 @@ Hub-API (`/api/admin/bot/…`, nur Admins) spricht mit ihm. Wer angemeldet ist u
 prüft der Hub; der Bot vertraut dem Schlüssel und schreibt den Namen aus `X-Hub-User` ins
 Discord-Audit-Log, wo er etwas am Server ändert.
 
-Die Formular-Bereiche stehen einmal hier in `SECTIONS` (Feldtyp, Beschriftung, Hinweis). Der Hub
-zeichnet daraus seine Formulare, ohne die einzelnen Schlüssel zu kennen. Was kein einfaches
-Formular ist (Level-Belohnungen, Ankündigungen, eigene Befehle, Benachrichtigungen,
-Sichtbarkeits-Matrix, Regel-Text), hat eigene Endpunkte.
+Menü und Seiten des Hubs kommen aus `/control/pages`: Formular-Bereiche aus `SECTIONS`, dazu was
+jeder Cog per `hub_pages()` beschreibt (Tabellen, Status, Aktionen, siehe `bot/hubpages.py`). Der
+Hub zeichnet das allgemein, ohne die einzelnen Funktionen zu kennen. Eigene Endpunkte haben nur
+noch die Seiten mit eigener Oberfläche (Level-Belohnungen, Ankündigungen, eigene Befehle,
+Sichtbarkeits-Matrix, Regel-Text).
 
 Discord-IDs gehen als Strings raus und rein: JavaScript rechnet mit Gleitkommazahlen und würde
 die letzten Stellen einer 18-stelligen ID verfälschen.
@@ -32,40 +33,20 @@ import discord
 from aiohttp import web
 from discord.ext import commands
 
+from .. import hubpages
+from ..errors import UserError
+from ..hubpages import ApiError, Ctx, Field, Form, Page
+
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8790
 STARTED = time.time()
 
-TEXT_TYPES = (discord.ChannelType.text, discord.ChannelType.news)
-VOICE_TYPES = (discord.ChannelType.voice,)
-
-
-class ApiError(Exception):
-    """Wird zur JSON-Antwort `{"detail": …}` mit diesem Status (wie bei der Hub-API)."""
-
-    def __init__(self, status: int, detail: str):
-        super().__init__(detail)
-        self.status = status
-        self.detail = detail
+TEXT_TYPES = hubpages.TEXT_TYPES
+VOICE_TYPES = hubpages.VOICE_TYPES
 
 
 # ---- Formular-Bereiche ---------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class Field:
-    """Ein Eingabefeld. `kind`: channel, voice, role, channels, roles, bool, int, text, textarea, choice."""
-    key: str
-    kind: str
-    label: str
-    group: str = ""
-    hint: str = ""
-    default: Any = None
-    min: int | None = None
-    # int: 0 heißt „aus“ und löscht den Wert, statt 0 zu speichern
-    zero_is_off: bool = False
-    options: tuple[str, ...] = ()
-
 
 @dataclass(frozen=True)
 class Section:
@@ -132,6 +113,24 @@ SECTIONS: dict[str, Section] = {s.id: s for s in [
     ), actions={"token": "Neuen Token erzeugen (der alte wird ungültig)"}),
 ]}
 
+# Seiten, die nicht von einem Cog kommen: Formular-Bereiche oben und eigene Seiten im Hub
+# (routes/hub/admin/bot/<id>). Alles andere liefern die Cogs per hub_pages() (siehe hubpages.py).
+CORE_PAGES: tuple[Page, ...] = (
+    Page("", "Übersicht", "Server", order=0, custom=True),
+    Page("allgemein", "Allgemein", "Server", (Form("allgemein"),), SECTIONS["allgemein"].description, order=10),
+    Page("verifizierung", "Verifizierung", "Server", order=20, custom=True),
+    Page("tickets", "Tickets", "Server", (Form("tickets"),), SECTIONS["tickets"].description, order=30),
+    Page("sichtbarkeit", "Sichtbarkeit", "Server", order=40, custom=True),
+    Page("community", "Community", "Community", (Form("community"),), SECTIONS["community"].description, order=10),
+    Page("level", "Levelsystem", "Community", order=20, custom=True),
+    Page("ankuendigungen", "Ankündigungen", "Community", order=60, custom=True),
+    Page("befehle", "Eigene Befehle", "Community", order=70, custom=True),
+    Page("verwarnungen", "Automatische Strafe", "Moderation", (Form("verwarnungen"),),
+         SECTIONS["verwarnungen"].description, order=30),
+    Page("automod", "Automod", "Moderation", (Form("automod"),), SECTIONS["automod"].description, order=40),
+    Page("aion", "AION 2", "Spiele", (Form("aion"),), SECTIONS["aion"].description, order=10),
+)
+
 
 def read_field(db, guild_id: int, f: Field) -> Any:
     if f.kind in ("channel", "voice", "role", "text", "textarea", "choice"):
@@ -192,8 +191,8 @@ def convert_field(guild, f: Field, value: Any) -> str | int | bool | None:
             raise ApiError(400, f"{f.label}: Text erwartet")
         return value.strip()[:4000] or None
     if f.kind == "choice":
-        if value not in f.options:
-            raise ApiError(400, f"{f.label}: nur {', '.join(f.options)}")
+        if value not in dict(f.choices()):
+            raise ApiError(400, f"{f.label}: nur {', '.join(dict(f.choices()))}")
         return value
     raise ValueError(f.kind)
 
@@ -232,9 +231,11 @@ def guild_info(guild) -> dict:
               # Rollen über der eigenen kann der Bot nicht vergeben (z. B. als Level-Belohnung)
               "assignable": me_top is None or r < me_top}
              for r in sorted(guild.roles, key=lambda r: -r.position) if not r.is_default() and not r.managed]
+    people = sorted((m for m in guild.members if not m.bot), key=lambda m: m.display_name.lower())[:2000]
     return {"id": str(guild.id), "name": guild.name,
             "icon_url": str(guild.icon.url) if guild.icon else None,
-            "members": guild.member_count or len(guild.members), "channels": channels, "roles": roles}
+            "members": guild.member_count or len(guild.members), "channels": channels, "roles": roles,
+            "people": [{"id": str(m.id), "name": m.display_name, "tag": m.name} for m in people]}
 
 
 def visible_roles(guild: discord.Guild) -> list[discord.Role]:
@@ -316,6 +317,9 @@ class Control(commands.Cog):
         r.add_get("/control/matrix", self.matrix)
         r.add_put("/control/matrix", self.matrix_set)
         r.add_post("/control/run-link", self.run_link)
+        r.add_get("/control/pages", self.pages)
+        r.add_get("/control/pages/{page}", self.page)
+        r.add_post("/control/pages/{page}/{block}/{action}", self.page_action)
         return app
 
     async def cog_load(self) -> None:
@@ -422,9 +426,7 @@ class Control(commands.Cog):
     def section_out(self, guild, s: Section) -> dict:
         return {
             "id": s.id, "title": s.title, "description": s.description, "note": s.note,
-            "fields": [{"key": f.key, "kind": f.kind, "label": f.label, "group": f.group, "hint": f.hint,
-                        "min": f.min, "options": list(f.options), "value": read_field(self.db, guild.id, f)}
-                       for f in s.fields],
+            "fields": [f.out(read_field(self.db, guild.id, f)) for f in s.fields],
             "info": self.section_info(guild, s),
             "actions": [{"id": k, "label": v} for k, v in s.actions.items()],
         }
@@ -669,6 +671,52 @@ class Control(commands.Cog):
             raise ApiError(400, "allow: ja/nein erwartet")
         await channel.set_permissions(role, view_channel=data["allow"], reason=self.reason(request))
         return matrix(guild)
+
+    # ---- Seiten (hubpages.py) ------------------------------------------------------------------
+
+    def all_pages(self) -> list[Page]:
+        pages = list(CORE_PAGES)
+        for cog in self.bot.cogs.values():
+            if hasattr(cog, "hub_pages"):
+                pages.extend(cog.hub_pages())
+        return sorted(pages, key=lambda p: (hubpages.group_rank(p.group), p.order, p.title))
+
+    def _page(self, request: web.Request) -> Page:
+        pid = request.match_info["page"]
+        for p in self.all_pages():
+            if p.id == pid and not p.custom:
+                return p
+        raise ApiError(404, "Diese Seite hat der Bot nicht")
+
+    def ctx(self, request: web.Request) -> Ctx:
+        who = urllib.parse.unquote(request.headers.get("X-Hub-User", "")).strip()[:60]
+        uid = request.headers.get("X-Hub-User-Id", "")
+        return Ctx(self.bot, self.guild(), who, int(uid) if uid.isdigit() else None)
+
+    async def pages(self, request: web.Request) -> list[dict]:
+        self.guild()
+        return [p.nav() for p in self.all_pages()]
+
+    async def page(self, request: web.Request) -> dict:
+        ctx = self.ctx(request)
+        return await hubpages.page_out(ctx, self._page(request),
+                                       lambda sid: self.section_out(ctx.guild, SECTIONS[sid]))
+
+    async def page_action(self, request: web.Request) -> dict:
+        """Aktion ausführen, danach die Seite neu liefern (Tabellen und Status sind dann aktuell)."""
+        ctx = self.ctx(request)
+        page = self._page(request)
+        action = page.action(request.match_info["block"], request.match_info["action"])
+        data = await self.body(request)
+        values = hubpages.action_values(ctx.guild, action.fields, data.get("values"))
+        item = data.get("item")
+        try:
+            message = await action.run(ctx, values, str(item) if item is not None else None)
+        except UserError as e:
+            raise ApiError(400, str(e)) from None
+        log.info("Hub-Aktion %s/%s/%s von %s", page.id, request.match_info["block"], action.id, ctx.who or "?")
+        out = await hubpages.page_out(ctx, page, lambda sid: self.section_out(ctx.guild, SECTIONS[sid]))
+        return {"message": message or "Erledigt.", "page": out}
 
     # ---- Runs aus dem Hub ---------------------------------------------------------------------
 

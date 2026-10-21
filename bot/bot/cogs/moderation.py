@@ -21,6 +21,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..errors import UserError
+from ..hubpages import Action, Actions, Column, Field, Page, Table, user_label
 
 log = logging.getLogger(__name__)
 
@@ -441,6 +442,103 @@ class Moderation(commands.Cog):
             raise UserError("Dieser User ist nicht gebannt.")
         await interaction.response.send_message(f"Bann für `{user_id}` aufgehoben.", ephemeral=True)
 
+
+    # ---- NexHub ----
+
+    def hub_pages(self) -> list[Page]:
+        member = Field("member", "member", "Mitglied", required=True)
+        reason = Field("reason", "text", "Grund", hint="Steht im Log und in der DM an das Mitglied.")
+        return [Page("moderation", "Moderation", "Moderation", (
+            Actions("massnahmen", "Maßnahmen", (
+                Action("timeout", "Timeout", self._hub_timeout, (
+                    member, Field("minutes", "int", "Minuten", default=60, min=1, max=40320), reason)),
+                Action("kick", "Kick", self._hub_kick, (member, reason),
+                       confirm="Mitglied vom Server entfernen?", danger=True),
+                Action("ban", "Bann", self._hub_ban, (
+                    member, reason, Field("days", "int", "Nachrichten der letzten Tage löschen", default=0, min=0, max=7)),
+                    confirm="Mitglied bannen?", danger=True),
+            ), "Wirkt sofort und steht im Log-Kanal. Im Discord-Audit-Log steht „NexHub: <dein Name>“."),
+            Table("warnings", "Verwarnungen", (
+                Column("member", "Mitglied"), Column("reason", "Grund"), Column("by", "Von"),
+                Column("created", "Wann", "time"),
+            ), self._hub_warnings,
+                create=Action("warn", "Verwarnen", self._hub_warn, (member, Field("reason", "text", "Grund", required=True))),
+                actions=(Action("delete", "Löschen", self._hub_warn_delete, confirm="Verwarnung löschen?", danger=True),),
+                empty="Keine Verwarnungen."),
+            Table("bans", "Gebannt", (Column("user", "Nutzer"), Column("reason", "Grund")), self._hub_bans,
+                  actions=(Action("unban", "Bann aufheben", self._hub_unban, confirm="Bann aufheben?"),),
+                  empty="Niemand ist gebannt."),
+        ), order=10)]
+
+    def _hub_check(self, guild: discord.Guild, member: discord.Member, what: str) -> None:
+        if member.bot and what == "verwarnen":
+            raise UserError("Bots kann ich nicht verwarnen.")
+        if what != "verwarnen" and (member.top_role >= guild.me.top_role or member == guild.owner):
+            raise UserError(f"{member.display_name} kann ich nicht {what}.")
+
+    async def _hub_timeout(self, ctx, v, _item):
+        m = v["member"]
+        self._hub_check(ctx.guild, m, "stummschalten")
+        await m.timeout(timedelta(minutes=v["minutes"]), reason=f"{ctx.reason}: {v['reason'] or 'ohne Grund'}")
+        await self.log(ctx.guild, discord.Embed(
+            title="⏳ Timeout", colour=discord.Colour.orange(),
+            description=f"{m.mention} für {v['minutes']} Min.\nVon {ctx.who or 'NexHub'} (NexHub)"
+                        + (f"\nGrund: {v['reason']}" if v["reason"] else "")))
+        return f"{m.display_name} ist für {v['minutes']} Min. stumm."
+
+    async def _hub_kick(self, ctx, v, _item):
+        m = v["member"]
+        self._hub_check(ctx.guild, m, "entfernen")
+        try:
+            await m.send(f"Du wurdest von **{ctx.guild.name}** entfernt." + (f"\nGrund: {v['reason']}" if v["reason"] else ""))
+        except discord.HTTPException:
+            pass
+        await m.kick(reason=f"{ctx.reason}: {v['reason'] or 'ohne Grund'}")
+        await self.log(ctx.guild, discord.Embed(
+            title="👢 Kick", colour=discord.Colour.orange(),
+            description=f"{m.mention} ({m})\nVon {ctx.who or 'NexHub'} (NexHub)"
+                        + (f"\nGrund: {v['reason']}" if v["reason"] else "")))
+        return f"{m.display_name} wurde entfernt."
+
+    async def _hub_ban(self, ctx, v, _item):
+        m = v["member"]
+        self._hub_check(ctx.guild, m, "bannen")
+        try:
+            await m.send(f"Du wurdest von **{ctx.guild.name}** gebannt." + (f"\nGrund: {v['reason']}" if v["reason"] else ""))
+        except discord.HTTPException:
+            pass
+        await m.ban(reason=f"{ctx.reason}: {v['reason'] or 'ohne Grund'}", delete_message_seconds=v["days"] * 86400)
+        return f"{m.display_name} wurde gebannt."
+
+    async def _hub_warnings(self, ctx) -> list[dict]:
+        rows = await self.db.fetchall(
+            "SELECT id, user_id, moderator_id, reason, created FROM warnings WHERE guild_id=? ORDER BY created DESC LIMIT 200",
+            (ctx.guild.id,))
+        return [{"id": str(r["id"]), "member": user_label(ctx.guild, r["user_id"]), "reason": r["reason"],
+                 "by": user_label(ctx.guild, r["moderator_id"]), "created": r["created"]} for r in rows]
+
+    async def _hub_warn(self, ctx, v, _item):
+        m = v["member"]
+        self._hub_check(ctx.guild, m, "verwarnen")
+        count = await self.add_warning(ctx.guild, m, ctx.member or ctx.guild.me, v["reason"])
+        return f"{m.display_name} verwarnt (Nr. {count})."
+
+    async def _hub_warn_delete(self, ctx, _v, item):
+        await self.db.execute("DELETE FROM warnings WHERE id=? AND guild_id=?", (int(item or 0), ctx.guild.id))
+        return "Verwarnung gelöscht."
+
+    async def _hub_bans(self, ctx) -> list[dict]:
+        if not ctx.guild.me.guild_permissions.ban_members:
+            return []
+        return [{"id": str(b.user.id), "user": b.user.name, "reason": b.reason or ""}
+                async for b in ctx.guild.bans(limit=500)]
+
+    async def _hub_unban(self, ctx, _v, item):
+        try:
+            await ctx.guild.unban(discord.Object(id=int(item or 0)), reason=ctx.reason)
+        except discord.NotFound:
+            raise UserError("Dieser Nutzer ist nicht gebannt.")
+        return "Bann aufgehoben."
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))

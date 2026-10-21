@@ -39,7 +39,7 @@ def test_reicht_anfrage_mit_schluessel_durch(make_client, fake):
     put = seen[0]
     assert str(put.url) == "http://bot:8790/control/sections/allgemein"
     assert put.headers["authorization"] == "Bearer " + "s" * 32
-    assert put.headers["x-hub-user"] == "Testname"
+    assert put.headers["x-hub-user"] == "Testname" and put.headers["x-hub-user-id"] == str(ADMIN)
     assert json.loads(put.content) == {"values": {"log_channel": "1"}}
     assert seen[1].method == "DELETE" and seen[1].url.path == "/control/commands/regeln"
 

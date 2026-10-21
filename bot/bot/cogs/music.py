@@ -18,6 +18,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..errors import UserError
+from ..hubpages import Action, Actions, Column, Field, Page, Status, Table, user_label
 from ..sources import RadioBrowser, Track, resolve, stream_url
 
 log = logging.getLogger(__name__)
@@ -510,6 +511,141 @@ class Music(commands.Cog):
         player.queue.pop(platz - 1)
         await interaction.response.send_message(f"🗑️ {track_link(track)} entfernt.", suppress_embeds=True, delete_after=10)
         await player.refresh_np()
+
+    # ---- NexHub ----
+
+    def hub_pages(self) -> list[Page]:
+        return [Page("musik", "Musik", "Musik", (
+            Status("jetzt", "Läuft gerade", self._hub_now, (
+                Action("pause", "Pause", self._hub_pause, when="playing"),
+                Action("resume", "Weiter", self._hub_resume, when="paused"),
+                Action("skip", "Überspringen", self._hub_skip, when="active"),
+                Action("shuffle", "Mischen", self._hub_shuffle, when="active"),
+                Action("volume", "Lautstärke", self._hub_volume,
+                       (Field("percent", "int", "Lautstärke in %", default=60, min=0, max=150),), when="active"),
+                Action("loop", "Wiederholen", self._hub_loop,
+                       (Field("mode", "choice", "Modus", default="aus", options=tuple(LOOP_LABELS.items())),),
+                       when="active"),
+                Action("stop", "Stoppen", self._hub_stop, confirm="Musik stoppen und Kanal verlassen?", danger=True,
+                       when="active"),
+            )),
+            Actions("abspielen", "Abspielen", (
+                Action("play", "Abspielen", self._hub_play, (
+                    Field("channel", "voice", "Sprachkanal", required=True,
+                          hint="Spielt der Bot schon woanders, bleibt er dort."),
+                    Field("query", "text", "Link oder Suche", required=True,
+                          hint="YouTube, SoundCloud, Spotify oder Suchbegriff"),
+                    Field("front", "bool", "An den Anfang der Warteschlange"),
+                )),
+            )),
+            Table("queue", "Warteschlange", (
+                Column("pos", "#", "num"), Column("title", "Titel"), Column("length", "Länge"),
+                Column("by", "Gewünscht von"),
+            ), self._hub_queue, actions=(Action("remove", "Entfernen", self._hub_remove),),
+                empty="Die Warteschlange ist leer."),
+        ), "Steuert die Wiedergabe für alle im Sprachkanal, wie die DJ-Rolle in Discord.", order=10)]
+
+    def _hub_player(self, ctx) -> Player:
+        player = self.players.get(ctx.guild.id)
+        if not player or not ctx.guild.voice_client:
+            raise UserError("Gerade läuft nichts.")
+        return player
+
+    async def _hub_now(self, ctx) -> list[dict]:
+        player = self.players.get(ctx.guild.id)
+        vc = ctx.guild.voice_client
+        if not player or not vc or not player.current:
+            return [{"label": "Status", "value": "Gerade läuft nichts."}]
+        t = player.current
+        return [
+            {"label": "Titel", "value": t.title, "href": t.page_url},
+            {"label": "Länge", "value": "Live" if t.live else fmt_time(t.duration)},
+            {"label": "Gewünscht von", "value": user_label(ctx.guild, t.requester_id)},
+            {"label": "Kanal", "value": vc.channel.name if vc.channel else "–"},
+            {"label": "Lautstärke", "value": f"{round(player.volume * 100)} %"},
+            {"label": "Wiederholen", "value": LOOP_LABELS[player.loop]},
+            {"label": "Status", "value": "pausiert" if vc.is_paused() else "spielt"},
+            {"active": True, "playing": vc.is_playing(), "paused": vc.is_paused()},
+        ]
+
+    async def _hub_queue(self, ctx) -> list[dict]:
+        player = self.players.get(ctx.guild.id)
+        if not player:
+            return []
+        return [{"id": str(i), "pos": i, "title": t.title, "length": fmt_time(t.duration),
+                 "by": user_label(ctx.guild, t.requester_id)} for i, t in enumerate(player.queue[:200], 1)]
+
+    async def _hub_play(self, ctx, v, _item):
+        channel = v["channel"]
+        perms = channel.permissions_for(ctx.guild.me)
+        if not perms.connect or not perms.speak:
+            raise UserError(f"Ich darf in {channel.name} nicht beitreten oder sprechen.")
+        tracks, name = await resolve(v["query"], ctx.who_id or ctx.guild.me.id, self.session)
+        vc = ctx.guild.voice_client
+        player = self.players.get(ctx.guild.id)
+        if vc is None:
+            await channel.connect(self_deaf=True)
+        elif vc.channel != channel and not (player and (player.current or player.queue)):
+            await vc.move_to(channel)
+        if not player or player.task.done():
+            player = self.players[ctx.guild.id] = Player(self, ctx.guild)
+        if v["front"]:
+            player.queue[0:0] = tracks
+        else:
+            player.queue.extend(tracks)
+        player.wake()
+        await player.refresh_np()
+        return f"{len(tracks)} Titel hinzugefügt" + (f" aus {name}" if name else "") + "." if len(tracks) > 1 \
+            else f"„{tracks[0].title}“ hinzugefügt."
+
+    async def _hub_pause(self, ctx, _v, _i):
+        self._hub_player(ctx)
+        ctx.guild.voice_client.pause()
+        return "Pausiert."
+
+    async def _hub_resume(self, ctx, _v, _i):
+        self._hub_player(ctx)
+        ctx.guild.voice_client.resume()
+        return "Weiter geht's."
+
+    async def _hub_skip(self, ctx, _v, _i):
+        self._hub_player(ctx).skip()
+        return "Übersprungen."
+
+    async def _hub_shuffle(self, ctx, _v, _i):
+        player = self._hub_player(ctx)
+        random.shuffle(player.queue)
+        await player.refresh_np()
+        return "Gemischt."
+
+    async def _hub_volume(self, ctx, v, _i):
+        player = self._hub_player(ctx)
+        player.volume = v["percent"] / 100
+        source = ctx.guild.voice_client.source
+        if isinstance(source, discord.PCMVolumeTransformer):
+            source.volume = player.volume
+        await player.refresh_np()
+        return f"Lautstärke {v['percent']} %."
+
+    async def _hub_loop(self, ctx, v, _i):
+        player = self._hub_player(ctx)
+        player.loop = v["mode"]
+        await player.refresh_np()
+        return f"Wiederholen: {LOOP_LABELS[player.loop]}."
+
+    async def _hub_stop(self, ctx, _v, _i):
+        self._hub_player(ctx)
+        await self.disconnect(ctx.guild)
+        return "Gestoppt."
+
+    async def _hub_remove(self, ctx, _v, item):
+        player = self._hub_player(ctx)
+        pos = int(item or 0)
+        if not 1 <= pos <= len(player.queue):
+            raise UserError("Den Titel gibt es nicht mehr in der Warteschlange.")
+        track = player.queue.pop(pos - 1)
+        await player.refresh_np()
+        return f"„{track.title}“ entfernt."
 
     # ---- Sprachkanal beobachten ----
 

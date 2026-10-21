@@ -1,6 +1,6 @@
 <!-- Übersicht: Zustand des Bots und Einstieg in die Bereiche. -->
 <script lang="ts">
-	import { BOT_NAV, botHref, formatUptime } from '#modules/bot/bot.ts';
+	import { formatUptime } from '#modules/bot/bot.ts';
 	import { formatNumber } from '#lib/format.ts';
 	import type { PageProps } from './$types';
 
@@ -43,16 +43,6 @@
 	</div>
 </section>
 
-<h2 class="sub">Bereiche</h2>
-<nav class="areas">
-	{#each BOT_NAV.slice(1) as item (item.slug)}
-		<a class="glass" href={botHref(item.slug)}>{item.label}</a>
-	{/each}
-</nav>
-<p class="dim note">
-	Giveaways, Server-Status und neue GitHub- oder YouTube-Benachrichtigungen richtest du weiter in
-	Discord ein, weil sie dort eine Vorschau oder Bestätigung brauchen.
-</p>
 
 <style>
 	.hero {
@@ -96,27 +86,5 @@
 	.num small {
 		font-size: 15px;
 		color: var(--dim);
-	}
-	.sub {
-		font-size: 18px;
-		margin: 28px 4px 12px;
-	}
-	.areas {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-		gap: 10px;
-	}
-	.areas a {
-		padding: 14px 18px;
-		border-radius: var(--radius-sm);
-		color: var(--text);
-		text-decoration: none;
-		font-weight: 550;
-	}
-	.areas a:hover {
-		border-color: rgba(106, 211, 255, 0.45);
-	}
-	.note {
-		margin: 18px 4px 0;
 	}
 </style>

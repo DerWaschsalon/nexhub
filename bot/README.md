@@ -206,6 +206,14 @@ interne Docker-Netz gedacht, wer den Schlüssel hat, darf alle Einstellungen än
 Die Formular-Bereiche stehen einmal in `SECTIONS` (Feldtyp, Beschriftung, Hinweis); der Hub
 zeichnet daraus seine Formulare. Ein neues Feld = ein `Field(...)`-Eintrag dort.
 
+
+**Neue Funktion in den Hub bringen:** Der Cog bekommt eine Methode `hub_pages()`, die Seiten aus
+Blöcken beschreibt (`bot/hubpages.py`): `Form` (Einstellungen aus `SECTIONS`), `Table` (Liste mit
+„Neu anlegen“ und Aktionen je Zeile), `Status` (Kennzahlen mit Knöpfen) und `Actions` (Knöpfe mit
+kleinem Formular). Jede Aktion ist eine Methode `async (ctx, werte, zeile) -> Rückmeldung`, die Werte
+sind schon geprüft (Kanal, Rolle, Mitglied, Zahl …). Menüeintrag, Formulare und Tabellen zeichnet der
+Hub daraus selbst, dort ist nichts zu ändern. `UserError` wird zur Fehlermeldung im Hub.
+
 ## Server-Status einrichten
 
 `/server` (Status, laufende Container), `/server-neustart container:` (ein anderer Container neu

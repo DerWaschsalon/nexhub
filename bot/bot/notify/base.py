@@ -33,6 +33,12 @@ class Provider:
     source_label: str = "Quelle"
     source_example: str = ""
     source_help: str = ""
+    # Zusätzliche Filter fürs Formular im NexHub (hubpages.Field, Schlüssel wie in `filters`)
+    filter_fields: tuple = ()
+
+    def filters_from(self, values: dict) -> dict:
+        """Werte der `filter_fields` aus dem Hub → gespeicherte `filters` (leere fallen weg)."""
+        return {k: v for k, v in values.items() if v not in (None, "", [])}
 
     async def validate_source(self, source: str) -> str:
         """Wirft `ProviderError` bei ungültiger Eingabe, gibt sonst die normalisierte Quelle zurück."""
