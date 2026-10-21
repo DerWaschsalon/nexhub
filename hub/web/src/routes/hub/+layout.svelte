@@ -8,6 +8,7 @@
 	import Brand from '#lib/components/Brand.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import LangSwitch from '#lib/components/LangSwitch.svelte';
+	import LegalLinks from '#lib/components/LegalLinks.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { NAV } from '#lib/modules.ts';
 	import type { LayoutProps } from './$types';
@@ -51,6 +52,7 @@
 				<Icon name="logout" size={16} />
 			</button>
 		</div>
+		<LegalLinks />
 	</aside>
 
 	<main>
@@ -117,6 +119,9 @@
 		align-self: flex-start;
 		margin-left: 8px;
 	}
+	aside > :global(.legal) {
+		margin: -14px 8px 0;
+	}
 	.me {
 		display: flex;
 		align-items: center;
@@ -174,6 +179,11 @@
 		}
 		aside > :global(.lang) {
 			margin-left: auto;
+		}
+		aside > :global(.legal) {
+			order: 4;
+			flex-basis: 100%;
+			margin: 0 4px;
 		}
 		.me {
 			border: 0;

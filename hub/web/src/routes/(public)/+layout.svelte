@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import Brand from '#lib/components/Brand.svelte';
 	import LangSwitch from '#lib/components/LangSwitch.svelte';
+	import LegalLinks from '#lib/components/LegalLinks.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { LayoutProps } from './$types';
 
@@ -25,6 +26,8 @@
 	{@render children()}
 </main>
 
+<footer><LegalLinks /></footer>
+
 <style>
 	header {
 		position: sticky;
@@ -38,6 +41,11 @@
 		min-height: 56px;
 		padding: 10px 12px 10px 18px;
 		border-radius: 999px;
+	}
+	footer {
+		display: flex;
+		justify-content: center;
+		padding: 0 16px 32px;
 	}
 	.right {
 		display: flex;

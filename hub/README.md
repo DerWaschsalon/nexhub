@@ -137,8 +137,11 @@ Debuffs auf dem Boss) und Tode. Hub und geteilte Seite nutzen dieselben Komponen
   Kampfdatei.
 
 Noch nicht: mehrere Uploads desselben Runs zusammenführen, Rohdateien nach 90 Tagen löschen.
-Offen, seit der Hub öffentlich erreichbar ist (21.10., über die IP des Servers): Impressum und
-Datenschutzerklärung.
+Impressum und Datenschutzerklärung: `/impressum`, `/datenschutz` (öffentlich, verlinkt im Fuß und in
+der Seitenleiste). Wer den Hub betreibt, kommt nur aus `.env` (`HUB_OPERATOR_NAME`,
+`HUB_OPERATOR_ADDRESS` mit „;“ zwischen den Zeilen, `HUB_OPERATOR_EMAIL`, `HUB_HOSTER`), nie aus dem
+Repo. Die Datenschutzerklärung beschreibt, was der Code tatsächlich tut – ändert sich das (neue
+Cookies, Protokolle, Inhalte von fremden Servern, Löschfristen), die Seite mit ändern.
 
 ## Bot
 
@@ -193,7 +196,8 @@ Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 [`infra/server/srv/nexhub/env.beispiel`](../infra/server/srv/nexhub/env.beispiel)):
 `DATABASE_URL`, `HUB_BASE_URL`, `HUB_SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
 `HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs),
-`BOT_CONTROL_URL` und `BOT_CONTROL_KEY` (Bereich „Bot“, siehe oben).
+`BOT_CONTROL_URL` und `BOT_CONTROL_KEY` (Bereich „Bot“, siehe oben), `HUB_OPERATOR_*` und
+`HUB_HOSTER` (Impressum, Datenschutz).
 
 ## Entwickeln
 

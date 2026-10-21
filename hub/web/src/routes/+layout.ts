@@ -9,7 +9,7 @@ export const prerender = false;
 export const load: LayoutLoad = async ({ fetch }) => {
 	const [me, info] = await Promise.all([
 		loadMe(fetch),
-		api<PublicInfo>('/api/public/info', undefined, fetch).catch(() => ({ login: false }))
+		api<PublicInfo>('/api/public/info', undefined, fetch).catch((): PublicInfo => ({ login: false, operator: null, hoster: null }))
 	]);
 	return { me, info };
 };

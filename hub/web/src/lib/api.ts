@@ -51,7 +51,10 @@ export type Role = 'admin' | 'member';
 
 export type Me = { discord_id: string; name: string; avatar_url: string | null; role: Role };
 
-export type PublicInfo = { login: boolean };
+export type Operator = { name: string; address: string[]; email: string | null };
+
+/** Für alle sichtbar: Login eingerichtet? Wer betreibt den Hub (Impressum, aus .env)? */
+export type PublicInfo = { login: boolean; operator: Operator | null; hoster: string | null };
 
 export type Account = {
 	id: number;

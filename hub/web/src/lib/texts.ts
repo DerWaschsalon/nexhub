@@ -56,7 +56,14 @@ export const CORE_TEXTS = defineTexts(
 		'system.membersOn': 'set up',
 		'system.membersOff': 'admins only',
 		'system.accounts': 'Accounts',
-		'system.sessions': 'Active sessions'
+		'system.sessions': 'Active sessions',
+		'legal.imprint': 'Legal notice',
+		'legal.privacy': 'Privacy',
+		'legal.imprintTitle': 'Legal notice',
+		'legal.imprintBasis': 'Information according to § 5 DDG',
+		'legal.contact': 'Contact',
+		'legal.missing': 'The operator has not entered these details yet.',
+		'legal.germanOnly': 'The German version of this page is the binding one.'
 	},
 	{
 		'lang.label': 'Sprache',
@@ -111,6 +118,13 @@ export const CORE_TEXTS = defineTexts(
 		'system.membersOn': 'eingerichtet',
 		'system.membersOff': 'nur Admins',
 		'system.accounts': 'Konten',
-		'system.sessions': 'Aktive Sitzungen'
+		'system.sessions': 'Aktive Sitzungen',
+		'legal.imprint': 'Impressum',
+		'legal.privacy': 'Datenschutz',
+		'legal.imprintTitle': 'Impressum',
+		'legal.imprintBasis': 'Angaben gemäß § 5 DDG',
+		'legal.contact': 'Kontakt',
+		'legal.missing': 'Die Angaben hat der Betreiber noch nicht eingetragen.',
+		'legal.germanOnly': 'Verbindlich ist die deutsche Fassung dieser Seite.'
 	}
 );

@@ -10,9 +10,17 @@ def test_health(client):
 
 
 def test_oeffentliche_info_ohne_login(client, make_client):
-    assert client.get("/api/public/info").json() == {"login": True}
+    assert client.get("/api/public/info").json() == {"login": True, "operator": None, "hoster": None}
     with make_client(discord_client_id="") as c:
-        assert c.get("/api/public/info").json() == {"login": False}
+        assert c.get("/api/public/info").json()["login"] is False
+
+
+def test_impressum_aus_der_konfiguration(make_client):
+    with make_client(hub_operator_name=" Erika Muster ", hub_operator_address="Musterweg 1; 12345 Musterstadt;",
+                     hub_operator_email="", hub_hoster="Beispiel-Hosting, Deutschland") as c:
+        info = c.get("/api/public/info").json()
+    assert info["operator"] == {"name": "Erika Muster", "address": ["Musterweg 1", "12345 Musterstadt"], "email": None}
+    assert info["hoster"] == "Beispiel-Hosting, Deutschland"
 
 
 def test_ohne_web_dir_nur_api(client):

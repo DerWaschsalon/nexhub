@@ -50,6 +50,11 @@ services:
       # Bereich „Bot“ im Hub: Steuer-API des Dienstes bot (leer = „nicht verbunden“)
       BOT_CONTROL_URL: ${BOT_CONTROL_URL:-}
       BOT_CONTROL_KEY: ${BOT_CONTROL_KEY:-}
+      # Impressum und Datenschutz (öffentlich sichtbar): wer den Hub betreibt, wo er läuft
+      HUB_OPERATOR_NAME: ${HUB_OPERATOR_NAME:-}
+      HUB_OPERATOR_ADDRESS: ${HUB_OPERATOR_ADDRESS:-}
+      HUB_OPERATOR_EMAIL: ${HUB_OPERATOR_EMAIL:-}
+      HUB_HOSTER: ${HUB_HOSTER:-}
     volumes:
       # Hochgeladene Runs (NexLog-Dateien); gehört dem Container-Nutzer 10001
       - ./daten/hub:/data

@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # (BOT_CONTROL_KEY, auf beiden Seiten gleich). Leer: der Bereich „Bot“ meldet „nicht verbunden“.
     bot_control_url: str = ""
     bot_control_key: str = ""
+    # Anbieterkennzeichnung für /impressum und /datenschutz – öffentlich sichtbar, steht nur in .env,
+    # nie im Repo. Anschrift: Zeilen mit „;“ getrennt. Leer: die Seiten sagen „noch nicht eingetragen“.
+    hub_operator_name: str = ""
+    hub_operator_address: str = ""
+    hub_operator_email: str = ""
+    # Wo der Server läuft (Anbieter, Land), für die Datenschutzerklärung; leer: allgemeiner Satz
+    hub_hoster: str = ""
 
     @field_validator("hub_admin_ids", mode="before")
     @classmethod
@@ -66,6 +73,14 @@ class Settings(BaseSettings):
     @property
     def redirect_uri(self) -> str:
         return f"{self.hub_base_url}/api/auth/callback"
+
+    @property
+    def operator(self) -> dict | None:
+        if not self.hub_operator_name.strip():
+            return None
+        return {"name": self.hub_operator_name.strip(),
+                "address": [line.strip() for line in self.hub_operator_address.split(";") if line.strip()],
+                "email": self.hub_operator_email.strip() or None}
 
     @property
     def discord_configured(self) -> bool:

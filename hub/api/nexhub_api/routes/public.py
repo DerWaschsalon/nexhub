@@ -1,7 +1,7 @@
 """Öffentlicher Bereich: alles hier ist ohne Login erreichbar.
 
 Nur herausgeben, was geteilt werden darf:
-    GET /api/public/info            ist der Login eingerichtet?
+    GET /api/public/info            ist der Login eingerichtet? Wer betreibt den Hub (Impressum)?
     GET /api/public/runs/{token}    ein geteilter Run (Teilen-Link /r/<token>)
     GET /api/public/runs/{token}/fights/{kampf}   ein Kampf daraus im Detail
 
@@ -23,13 +23,21 @@ from .runs import load_fight_detail
 router = APIRouter(prefix="/api/public", tags=["öffentlich"])
 
 
+class Operator(BaseModel):
+    name: str
+    address: list[str]
+    email: str | None
+
+
 class Info(BaseModel):
     login: bool  # ist der Discord-Login eingerichtet?
+    operator: Operator | None  # Impressum, aus HUB_OPERATOR_* in .env
+    hoster: str | None
 
 
 @router.get("/info")
 async def info(settings: SettingsDep) -> Info:
-    return Info(login=settings.discord_configured)
+    return Info(login=settings.discord_configured, operator=settings.operator, hoster=settings.hub_hoster.strip() or None)
 
 
 class SharedRun(BaseModel):
