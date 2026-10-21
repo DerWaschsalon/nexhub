@@ -1,32 +1,65 @@
 // Zugriff auf die Hub-API. Cookies gehen automatisch mit, die Seite läuft auf derselben Adresse.
 
-export type Me = {
-	discord_id: string;
-	username: string;
-	display_name: string | null;
-	avatar_url: string | null;
-	role: 'admin' | 'member';
-};
-
-export type Health = { ok: boolean; login: boolean };
+export class ApiError extends Error {
+	constructor(
+		public status: number,
+		message: string
+	) {
+		super(message);
+	}
+}
 
 type Fetch = typeof fetch;
 
+/** JSON von der API holen; wirft ApiError mit der deutschen Meldung der API. */
+export async function api<T>(path: string, init?: RequestInit, f: Fetch = fetch): Promise<T> {
+	const r = await f(path, init);
+	if (!r.ok) {
+		const body = await r.json().catch(() => null);
+		throw new ApiError(r.status, body?.detail ?? `Fehler ${r.status}`);
+	}
+	return (r.status === 204 ? undefined : await r.json()) as T;
+}
+
+export const post = (path: string) => api<void>(path, { method: 'POST' });
+
+/** Wie api(), aber 401 heißt „nicht angemeldet“ statt Fehler. */
 export async function loadMe(f: Fetch = fetch): Promise<Me | null> {
-	const r = await f('/api/me');
-	if (r.status === 401) return null;
-	if (!r.ok) throw new Error(`/api/me: HTTP ${r.status}`);
-	return r.json();
+	try {
+		return await api<Me>('/api/me', undefined, f);
+	} catch (e) {
+		if (e instanceof ApiError && e.status === 401) return null;
+		throw e;
+	}
 }
 
-export async function loadHealth(f: Fetch = fetch): Promise<Health> {
-	const r = await f('/api/health');
-	if (!r.ok) return { ok: false, login: false };
-	return r.json();
-}
+// Antworten der API (Pydantic-Modelle in hub/api/nexhub_api/routes/)
 
-export async function logout(): Promise<void> {
-	await fetch('/api/auth/logout', { method: 'POST' });
-}
+export type Role = 'admin' | 'member';
 
-export const ROLE_LABEL: Record<Me['role'], string> = { admin: 'Admin', member: 'Mitglied' };
+export type Me = { discord_id: string; name: string; avatar_url: string | null; role: Role };
+
+export type PublicInfo = { login: boolean };
+
+export type Account = {
+	id: number;
+	discord_id: string;
+	name: string;
+	avatar_url: string | null;
+	role: Role;
+	created_at: string;
+	last_login_at: string;
+	blocked: boolean;
+	sessions: number;
+};
+
+export type Status = {
+	version: string;
+	db_revision: string;
+	login: boolean;
+	member_check: boolean;
+	accounts: number;
+	active_sessions: number;
+};
+
+export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', member: 'Mitglied' };

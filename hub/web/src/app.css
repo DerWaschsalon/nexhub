@@ -1,0 +1,271 @@
+/*
+ * NexHub-Design: dunkles „Liquid Glass“.
+ * Farben und Maße stehen als Variablen oben; Bausteine (.glass, .btn, .chip, .table) darunter.
+ * Seiten benutzen diese Klassen und bringen nur noch ihr eigenes Layout mit.
+ */
+:root {
+	--bg: #05060d;
+	--text: #f4f5fa;
+	--dim: rgba(244, 245, 250, 0.64);
+	--faint: rgba(244, 245, 250, 0.4);
+	--accent: #6ad3ff;
+	--accent-2: #a78bfa;
+	--ok: #4ade80;
+	--warn: #fbbf24;
+	--danger: #ff6b6b;
+	--edge: rgba(255, 255, 255, 0.14);
+	--edge-soft: rgba(255, 255, 255, 0.08);
+	--radius: 22px;
+	--radius-sm: 12px;
+	--blur: 28px;
+	color-scheme: dark;
+}
+
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+}
+html {
+	/* vererbt sich auf alle Scrollbereiche */
+	scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+body {
+	background: var(--bg);
+	color: var(--text);
+	font: 15px/1.55 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	-webkit-font-smoothing: antialiased;
+	overflow-x: hidden;
+}
+h1,
+h2,
+h3 {
+	margin: 0;
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
+a {
+	color: var(--accent);
+}
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+.dim {
+	color: var(--dim);
+}
+
+/* Hintergrund: langsam treibende Farbflecken, durch das Glas hindurch sichtbar */
+.backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	overflow: hidden;
+	background: radial-gradient(1200px 800px at 50% 120%, #0c1030, transparent 70%), var(--bg);
+}
+.backdrop span {
+	position: absolute;
+	width: 46vmax;
+	height: 46vmax;
+	border-radius: 50%;
+	filter: blur(70px);
+	opacity: 0.55;
+	animation: drift 38s ease-in-out infinite alternate;
+}
+.backdrop span:nth-child(1) {
+	background: radial-gradient(circle, #5b3df5, transparent 65%);
+	top: -18vmax;
+	left: -12vmax;
+}
+.backdrop span:nth-child(2) {
+	background: radial-gradient(circle, #0ea5e9, transparent 65%);
+	bottom: -22vmax;
+	right: -14vmax;
+	animation-delay: -12s;
+}
+.backdrop span:nth-child(3) {
+	background: radial-gradient(circle, #f97316, transparent 65%);
+	top: 30%;
+	right: 25%;
+	width: 26vmax;
+	height: 26vmax;
+	opacity: 0.22;
+	animation-delay: -24s;
+}
+@keyframes drift {
+	to {
+		transform: translate(8vmax, 6vmax) scale(1.12);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.backdrop span {
+		animation: none;
+	}
+}
+
+/* Glas: halbdurchsichtig, unscharfer Hintergrund, helle Oberkante wie eine Lichtkante */
+.glass {
+	position: relative;
+	background: linear-gradient(150deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 55%);
+	backdrop-filter: blur(var(--blur)) saturate(170%);
+	-webkit-backdrop-filter: blur(var(--blur)) saturate(170%);
+	border: 1px solid var(--edge);
+	border-radius: var(--radius);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.24),
+		inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+		0 24px 60px -24px rgba(0, 0, 0, 0.75);
+}
+.glass::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	background: radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.1), transparent 55%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+	.glass {
+		background: rgba(20, 22, 40, 0.92);
+	}
+}
+.pad {
+	padding: 24px;
+}
+
+/* Knöpfe: Glaspillen; .primary leuchtet im Akzentverlauf */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	font: inherit;
+	font-weight: 600;
+	font-size: 14px;
+	color: var(--text);
+	text-decoration: none;
+	cursor: pointer;
+	padding: 9px 16px;
+	border-radius: 999px;
+	border: 1px solid var(--edge);
+	background: rgba(255, 255, 255, 0.07);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	transition:
+		background 0.15s,
+		transform 0.15s,
+		border-color 0.15s;
+}
+.btn:hover {
+	background: rgba(255, 255, 255, 0.13);
+}
+.btn:active {
+	transform: scale(0.98);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+.btn.primary {
+	color: #071019;
+	border-color: rgba(255, 255, 255, 0.35);
+	background: linear-gradient(135deg, var(--accent), var(--accent-2));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.5),
+		0 8px 28px -8px rgba(106, 211, 255, 0.55);
+}
+.btn.primary:hover {
+	filter: brightness(1.08);
+}
+.btn.danger {
+	color: #ffd4d4;
+	border-color: rgba(255, 107, 107, 0.35);
+	background: rgba(255, 107, 107, 0.12);
+}
+.btn.small {
+	padding: 5px 12px;
+	font-size: 13px;
+}
+.btn.large {
+	padding: 13px 24px;
+	font-size: 15px;
+}
+
+/* Kleine Kennzeichnungen: Rolle, Status */
+.chip {
+	display: inline-block;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 2px 10px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--edge-soft);
+	color: var(--dim);
+	white-space: nowrap;
+}
+.chip.accent {
+	color: var(--accent);
+	background: rgba(106, 211, 255, 0.12);
+}
+.chip.ok {
+	color: var(--ok);
+	background: rgba(74, 222, 128, 0.12);
+}
+.chip.warn {
+	color: var(--warn);
+	background: rgba(251, 191, 36, 0.12);
+}
+.chip.danger {
+	color: var(--danger);
+	background: rgba(255, 107, 107, 0.12);
+}
+
+/* Hinweis- und Fehlerkästen */
+.notice {
+	padding: 12px 16px;
+	border-radius: var(--radius-sm);
+	border: 1px solid rgba(251, 191, 36, 0.35);
+	background: rgba(251, 191, 36, 0.1);
+}
+.notice.error {
+	border-color: rgba(255, 107, 107, 0.4);
+	background: rgba(255, 107, 107, 0.1);
+}
+
+/* Tabellen in Glaskarten; auf schmalen Bildschirmen seitlich scrollbar statt gequetscht */
+.table-wrap {
+	overflow-x: auto;
+}
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14px;
+}
+.table th {
+	text-align: left;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--faint);
+	padding: 0 14px 10px;
+}
+.table td {
+	padding: 12px 14px;
+	border-top: 1px solid var(--edge-soft);
+	vertical-align: middle;
+}
+
+/* Seitenkopf innerhalb des Hubs */
+.page-head {
+	margin-bottom: 20px;
+}
+.page-head h1 {
+	font-size: 26px;
+}
+.page-head p {
+	margin: 4px 0 0;
+	color: var(--dim);
+}

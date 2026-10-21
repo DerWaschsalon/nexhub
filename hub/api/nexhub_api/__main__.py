@@ -3,15 +3,19 @@ import logging
 
 import uvicorn
 
+from . import logs
 from .config import Settings
 from .db import migrate
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logs.setup()
     migrate(Settings().database_url)
-    uvicorn.run("nexhub_api.main:create_app", factory=True, host="0.0.0.0", port=8000,
-                proxy_headers=True, forwarded_allow_ips="*")
+    config = uvicorn.Config("nexhub_api.main:create_app", factory=True, host="0.0.0.0", port=8000,
+                            proxy_headers=True, forwarded_allow_ips="*")
+    # uvicorn richtet sein Logging in Config() ein; der Filter muss danach dazukommen
+    logging.getLogger("uvicorn.access").addFilter(logs.HideSecretQuery())
+    uvicorn.Server(config).run()
 
 
 if __name__ == "__main__":

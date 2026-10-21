@@ -94,12 +94,29 @@ def client(make_client):
         yield c
 
 
-def start_login(client: TestClient, next: str = "/") -> dict[str, str]:
-    r = client.get("/api/auth/login", params={"next": next})
+def start_login(client: TestClient, next: str | None = None) -> dict[str, str]:
+    r = client.get("/api/auth/login", params={"next": next} if next else {})
     assert r.status_code == 302
     return {k: v[0] for k, v in parse_qs(urlsplit(r.headers["location"]).query).items()}
 
 
-def log_in(client: TestClient, next: str = "/") -> httpx.Response:
+def log_in(client: TestClient, next: str | None = None) -> httpx.Response:
     q = start_login(client, next)
     return client.get("/api/auth/callback", params={"code": "c0de", "state": q["state"]})
+
+
+@pytest.fixture
+def as_user(make_client, fake):
+    """Neuer Browser, angemeldet als `discord_id` (ADMIN, MEMBER, …)."""
+    clients = []
+
+    def _login(discord_id: int) -> TestClient:
+        c = make_client()
+        c.__enter__()
+        clients.append(c)
+        fake.user = discord_id
+        log_in(c)
+        return c
+    yield _login
+    for c in clients:
+        c.__exit__(None, None, None)

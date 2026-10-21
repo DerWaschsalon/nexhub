@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     hub_session_days: int = 30
     # Gebaute Web-Oberfläche (hub/web/build); leer: nur die API
     hub_web_dir: Path | None = None
+    # Stand des Codes, setzt das Image beim Bauen (z. B. "monorepo@71b65a2")
+    hub_version: str = "dev"
 
     @field_validator("hub_admin_ids", mode="before")
     @classmethod

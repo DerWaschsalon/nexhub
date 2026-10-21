@@ -19,7 +19,9 @@ COPY api/ ./
 RUN uv sync --frozen --no-dev
 COPY --from=web /web/build /app/web
 
-ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 HUB_WEB_DIR=/app/web
+# Stand des Codes für die System-Seite, z. B. "monorepo@71b65a2" (setzt nexhub-update)
+ARG GIT_REV=dev
+ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 HUB_WEB_DIR=/app/web HUB_VERSION=$GIT_REV
 USER nexhub
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \

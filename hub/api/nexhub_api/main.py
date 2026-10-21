@@ -3,36 +3,20 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Annotated
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from . import auth
-from .auth import DB, require_user
 from .config import Settings
-from .models import User
+from .deps import DB, SESSION_COOKIE
+from .routes import ROUTERS
 
 log = logging.getLogger(__name__)
 
-
-class Me(BaseModel):
-    # Discord-IDs als Text: als Zahl verlieren sie in JavaScript die letzten Stellen
-    discord_id: str
-    username: str
-    display_name: str | None
-    avatar_url: str | None
-    role: str
-
-
-def avatar_url(user: User) -> str | None:
-    if not user.avatar:
-        return None
-    return f"https://cdn.discordapp.com/avatars/{user.discord_id}/{user.avatar}.png?size=128"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None = None) -> FastAPI:
@@ -50,34 +34,44 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
             await app.state.http.aclose()
         await engine.dispose()
 
-    app = FastAPI(title="NexHub", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json",
-                  redoc_url=None)
+    app = FastAPI(title="NexHub", version=settings.hub_version, lifespan=lifespan,
+                  docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
     app.state.settings = settings
-    app.include_router(auth.router)
+    for router in ROUTERS:
+        app.include_router(router)
 
-    @app.get("/api/health")
+    @app.middleware("http")
+    async def check_origin(request: Request, call_next):
+        """Schutz vor fremden Seiten, die im Namen des Browsers etwas auslösen (CSRF).
+
+        Gilt für alles, was etwas ändert und mit Sitzungscookie kommt. Anfragen ohne Cookie
+        (später z. B. Geräte mit eigenem Token) betrifft das nicht.
+        """
+        if (request.method not in SAFE_METHODS and SESSION_COOKIE in request.cookies
+                and request.headers.get("origin") != settings.origin):
+            return JSONResponse({"detail": "Fremde Herkunft"}, status_code=403)
+        return await call_next(request)
+
+    @app.get("/api/health", tags=["system"])
     async def health(db: DB) -> dict:
         await db.execute(text("SELECT 1"))
-        return {"ok": True, "login": settings.discord_configured}
-
-    @app.get("/api/me")
-    async def me(user: Annotated[User, Depends(require_user)]) -> Me:
-        return Me(discord_id=str(user.discord_id), username=user.username, display_name=user.display_name,
-                  avatar_url=avatar_url(user), role=user.role)
+        return {"ok": True}
 
     if settings.hub_web_dir:
-        web = settings.hub_web_dir.resolve()
-
-        @app.get("/{path:path}", include_in_schema=False)
-        async def spa(path: str) -> FileResponse:
-            if path == "api" or path.startswith("api/"):
-                raise HTTPException(404)
-            file = (web / path).resolve()
-            if path and file.is_file() and file.is_relative_to(web):
-                # Dateien unter _app/immutable tragen einen Hash im Namen und ändern sich nie
-                cache = "public, max-age=31536000, immutable" if path.startswith("_app/immutable/") else "no-cache"
-                return FileResponse(file, headers={"Cache-Control": cache})
-            # 200.html ist die leere Hülle der SvelteKit-App (adapter-static, fallback)
-            return FileResponse(web / "200.html", headers={"Cache-Control": "no-cache"})
-
+        _serve_web(app, settings.hub_web_dir.resolve())
     return app
+
+
+def _serve_web(app: FastAPI, web) -> None:
+    """Gebaute Web-Oberfläche ausliefern; unbekannte Pfade bekommen die App-Hülle 200.html."""
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404)
+        file = (web / path).resolve()
+        if path and file.is_file() and file.is_relative_to(web):
+            # Dateien unter _app/immutable tragen einen Hash im Namen und ändern sich nie
+            cache = "public, max-age=31536000, immutable" if path.startswith("_app/immutable/") else "no-cache"
+            return FileResponse(file, headers={"Cache-Control": cache})
+        return FileResponse(web / "200.html", headers={"Cache-Control": "no-cache"})

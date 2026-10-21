@@ -4,18 +4,54 @@ Website mit Discord-Login. Später kommen Kopplung von NexBoard-Geräten per Cod
 Dungeon-Runs dazu, ähnlich Warcraft Logs. Läuft auf dem VPS zusammen mit dem Bot (siehe
 [`infra/`](../infra/)).
 
-**Stand:** Grundgerüst. Anmelden, Abmelden, Rollen – noch keine Inhalte.
+**Stand:** Grundgerüst – öffentlicher Bereich, Login, Admin-Seiten für Konten und System.
+
+## Zwei Bereiche
+
+| Bereich | Web | API | Wer |
+|---|---|---|---|
+| öffentlich | `/`, `/login`, später geteilte Runs | `/api/public/…` | alle |
+| Hub | `/hub/…` | `/api/…` | angemeldete Admins und Mitglieder |
+| Admin | `/hub/admin/…` | `/api/admin/…` | nur Admins |
+
+Die Web-Seiten leiten nur um; die eigentliche Prüfung macht die API bei jeder Anfrage.
 
 ## Aufbau
 
-| Ordner | Inhalt |
-|---|---|
-| `api/` | FastAPI, SQLAlchemy (async) + Alembic, Postgres. Paket `nexhub_api`. |
-| `web/` | SvelteKit 3 als reine Browser-App (`adapter-static`, Fallback `200.html`). |
-| `Dockerfile` | baut `web/` und packt es mit der API in ein Image; die API liefert die Seiten aus. |
+```
+api/nexhub_api/
+  config.py      Einstellungen aus Umgebungsvariablen
+  db.py          Datenbankverbindung, Migrationen beim Start
+  models.py      Tabellen (users, sessions); Änderungen nur mit Migration
+  migrations/    Alembic, eine Datei pro Schema-Stand
+  deps.py        Bausteine für Routen: DB, CurrentUser, AdminUser, …
+  discord.py     Discord-OAuth2
+  logs.py        Logging, Zugriffslog ohne OAuth-Code
+  routes/        ein Modul pro Bereich: auth, account, public, admin
+  main.py        App zusammenbauen, Herkunftsprüfung, Web-Seiten ausliefern
+web/src/
+  app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table
+  lib/           api.ts (Anfragen + Typen), nav.ts (Menü), components/
+  routes/        (public)/ öffentlich, hub/ mit Login, hub/admin/ nur Admins
+Dockerfile       baut web/ und packt es mit der API in ein Image
+```
 
-Endpunkte: `GET /api/health`, `GET /api/me`, `GET /api/auth/login`, `GET /api/auth/callback`,
-`POST /api/auth/logout`. OpenAPI unter `/api/docs`.
+## Einen Bereich hinzufügen
+
+Beispiel „Geräte“:
+
+1. **API:** `api/nexhub_api/routes/devices.py` mit `router = APIRouter(prefix="/api/devices")`,
+   in `routes/__init__.py` in `ROUTERS` eintragen. Zugriff über Parameter: `user: CurrentUser`
+   oder `admin: AdminUser`.
+2. **Tabellen:** Modell in `models.py`, dann Migration (`uv run alembic revision -m "…"` mit
+   gesetzter `DATABASE_URL`, Ergebnis von Hand prüfen).
+3. **Web:** Seite unter `web/src/routes/hub/geraete/`, Typen in `lib/api.ts`, Menüeintrag in
+   `lib/nav.ts`.
+4. **Tests** in `api/tests/` – die Fixtures `as_user(ADMIN)` / `as_user(MEMBER)` liefern
+   angemeldete Browser.
+
+Was öffentlich sein soll, bekommt eine Route unter `/api/public/…` und eine Seite unter
+`web/src/routes/(public)/`. Dort nur herausgeben, was geteilt werden darf.
 
 ## Login und Rollen
 
@@ -30,7 +66,12 @@ nur ID, Name und Avatar.
 
 Alle anderen kommen nicht hinein; die Login-Seite zeigt ihnen ihre Discord-ID zum Weitergeben.
 Die Rolle wird bei jedem Login neu bestimmt. Sitzungen liegen in der Datenbank (nur der SHA-256
-des Cookies) und laufen nach `HUB_SESSION_DAYS` (30) ab.
+des Cookies) und laufen nach `HUB_SESSION_DAYS` (30) ab. Admins können unter Konten alle
+Sitzungen eines Kontos beenden und Mitglieder sperren.
+
+Alles, was etwas ändert (POST usw.) und mit Sitzungscookie kommt, muss von der eigenen Adresse
+stammen (`Origin`-Prüfung in `main.py`), damit fremde Seiten nichts im Namen eines Browsers
+auslösen können.
 
 In der Discord-Anwendung (Developer Portal → OAuth2) muss `<HUB_BASE_URL>/api/auth/callback` als
 Redirect eingetragen sein, ohne Domain also `http://localhost:8080/api/auth/callback`.
@@ -53,10 +94,6 @@ cd hub/web && npm ci                               # braucht Node ≥ 22.17
 npm run check && npm run build
 npm run dev                                        # leitet /api an localhost:8000 weiter
 ```
-
-Neue Tabelle oder Spalte: Modell in `nexhub_api/models.py` ändern, dann
-`DATABASE_URL=… uv run alembic revision -m "…"` und die Migration von Hand prüfen. Beim Start
-migriert `python -m nexhub_api` selbst.
 
 ## Auf dem Server
 

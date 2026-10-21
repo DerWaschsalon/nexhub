@@ -1,11 +1,15 @@
-import { loadHealth, loadMe } from '#lib/api.ts';
+import { api, loadMe, type PublicInfo } from '#lib/api.ts';
 import type { LayoutLoad } from './$types';
 
 // Alles läuft im Browser; Daten kommen aus der API
 export const ssr = false;
 export const prerender = false;
 
+// Wer angemeldet ist und ob der Login eingerichtet ist, brauchen beide Bereiche
 export const load: LayoutLoad = async ({ fetch }) => {
-	const [me, health] = await Promise.all([loadMe(fetch), loadHealth(fetch)]);
-	return { me, health };
+	const [me, info] = await Promise.all([
+		loadMe(fetch),
+		api<PublicInfo>('/api/public/info', undefined, fetch).catch(() => ({ login: false }))
+	]);
+	return { me, info };
 };

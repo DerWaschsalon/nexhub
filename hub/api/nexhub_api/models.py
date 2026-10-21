@@ -15,6 +15,8 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
+    """Ein Discord-Konto, das sich mindestens einmal angemeldet hat."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigID, primary_key=True)
@@ -26,12 +28,25 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_login_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Von einem Admin gesperrt: kein Login, bestehende Sitzungen gelten nicht mehr
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def name(self) -> str:
+        return self.display_name or self.username
+
+    @property
+    def avatar_url(self) -> str | None:
+        if not self.avatar:
+            return None
+        return f"https://cdn.discordapp.com/avatars/{self.discord_id}/{self.avatar}.png?size=128"
 
 
 class Session(Base):
+    """Eine Anmeldung im Browser. Der Cookie trägt das Token, hier steht nur sein Hash."""
+
     __tablename__ = "sessions"
 
-    # SHA-256 des Cookie-Werts; das Token selbst steht nirgends in der Datenbank
     token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
