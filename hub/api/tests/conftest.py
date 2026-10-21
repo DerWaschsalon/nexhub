@@ -79,7 +79,9 @@ def make_client(database_url, fake):
     def _make(**overrides) -> TestClient:
         values = dict(database_url=database_url, hub_base_url=BASE, hub_secret_key="test-geheimnis",
                       discord_client_id="cid", discord_client_secret="csecret",
-                      hub_admin_ids=f"{ADMIN}", hub_guild_id=str(GUILD), hub_member_role_id=str(ROLE))
+                      hub_admin_ids=f"{ADMIN}", hub_guild_id=str(GUILD), hub_member_role_id=str(ROLE),
+                      # explizit, sonst greift HUB_WEB_DIR aus der Umgebung (im Image gesetzt)
+                      hub_web_dir=None)
         settings = Settings(**{**values, **overrides})
         app = create_app(settings, http=httpx.AsyncClient(transport=httpx.MockTransport(fake)))
         return TestClient(app, base_url=BASE, follow_redirects=False)
