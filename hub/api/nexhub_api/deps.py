@@ -3,6 +3,7 @@
 In einer Route reicht ein Parameter mit dem passenden Typ:
     async def seite(user: CurrentUser, db: DB): ...   # nur Angemeldete
     async def verwalten(admin: AdminUser): ...         # nur Admins
+    async def hochladen(device: CurrentDevice): ...   # gekoppeltes NexBoard (Bearer-Token)
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .config import Settings
 from .db import get_db
 from .discord import Discord
-from .models import Session, User
+from .models import Device, Session, User
 
 SESSION_COOKIE = "nexhub_session"
 
@@ -62,5 +63,24 @@ async def require_admin(user: Annotated[User, Depends(require_user)]) -> User:
     return user
 
 
+async def require_device(request: Request, db: DB) -> Device:
+    """Gerät zum Token in `Authorization: Bearer …`; merkt sich Zeit und Version des Kontakts.
+
+    Gehört das Gerät zu einem gesperrten Konto, gilt das Token nicht mehr."""
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(401, "Geräte-Token fehlt", headers={"WWW-Authenticate": "Bearer"})
+    device = await db.scalar(
+        select(Device).join(User, User.id == Device.user_id)
+        .where(Device.token_hash == hash_token(token), User.blocked_at.is_(None)))
+    if device is None:
+        raise HTTPException(401, "Gerät unbekannt oder entfernt", headers={"WWW-Authenticate": "Bearer"})
+    device.last_seen_at = datetime.now(UTC)
+    device.version = request.headers.get("x-nexboard-version", device.version or "")[:40] or None
+    await db.commit()
+    return device
+
+
 CurrentUser = Annotated[User, Depends(require_user)]
 AdminUser = Annotated[User, Depends(require_admin)]
+CurrentDevice = Annotated[Device, Depends(require_device)]

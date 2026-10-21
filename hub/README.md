@@ -4,7 +4,8 @@ Website mit Discord-Login. Später kommen Kopplung von NexBoard-Geräten per Cod
 Dungeon-Runs dazu, ähnlich Warcraft Logs. Läuft auf dem VPS zusammen mit dem Bot (siehe
 [`infra/`](../infra/)).
 
-**Stand:** Grundgerüst – öffentlicher Bereich, Login, Admin-Seiten für Konten und System.
+**Stand:** Grundgerüst – öffentlicher Bereich, Login, Admin-Seiten für Konten und System,
+Kopplung von NexBoard-Geräten.
 
 ## Zwei Bereiche
 
@@ -27,7 +28,7 @@ api/nexhub_api/
   deps.py        Bausteine für Routen: DB, CurrentUser, AdminUser, …
   discord.py     Discord-OAuth2
   logs.py        Logging, Zugriffslog ohne OAuth-Code
-  routes/        ein Modul pro Bereich: auth, account, public, admin
+  routes/        ein Modul pro Bereich: auth, account, devices, public, admin
   main.py        App zusammenbauen, Herkunftsprüfung, Web-Seiten ausliefern
 web/src/
   app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table
@@ -52,6 +53,21 @@ Beispiel „Geräte“:
 
 Was öffentlich sein soll, bekommt eine Route unter `/api/public/…` und eine Seite unter
 `web/src/routes/(public)/`. Dort nur herausgeben, was geteilt werden darf.
+
+## Geräte koppeln
+
+NexBoards melden sich mit eigenem Token, nicht mit dem Discord-Login. Gekoppelt wird nach
+RFC 8628 („Device Authorization Grant“, wie beim Fernseher), Code in `routes/devices.py`:
+
+1. Daemon: `POST /api/devices/pair` → geheimer `device_code`, kurzer `user_code` (`BCDF-GHJK`,
+   nur Konsonanten), Link auf `/hub/geraete?code=…`. Gilt 10 Minuten, höchstens 50 offene.
+2. Mensch: auf der Seite „Geräte“ bestätigen (`POST /api/devices/pair/approve`, mit Login).
+3. Daemon fragt alle 5 s nach (`POST /api/devices/pair/poll`) und bekommt nach der Bestätigung
+   **einmal** sein Token. Der Hub speichert nur dessen SHA-256.
+
+Danach: `Authorization: Bearer <token>` → `CurrentDevice` in einer Route. `GET /api/devices/me`
+sagt dem Gerät, wem es gehört; `DELETE /api/devices/me` koppelt es ab. Im Hub: `GET /api/devices`
+(eigene), `DELETE /api/devices/{id}` (eigene, Admins jedes). Gesperrte Konten sperren ihre Geräte mit.
 
 ## Login und Rollen
 

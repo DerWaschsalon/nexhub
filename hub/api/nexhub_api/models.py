@@ -51,3 +51,35 @@ class Session(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class Device(Base):
+    """Ein gekoppeltes NexBoard (Daemon auf einem PC). Gehört genau einem Konto."""
+
+    __tablename__ = "devices"
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    # SHA-256 des Geräte-Tokens; das Token kennt nur der Daemon
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[str | None] = mapped_column(String(40))  # NexBoard-Version beim letzten Kontakt
+
+
+class DevicePairing(Base):
+    """Ein laufender Kopplungsversuch (RFC 8628): der Daemon fragt mit `device_code` nach,
+    bis jemand im Hub den kurzen `user_code` bestätigt hat. Nach 10 Minuten verfallen."""
+
+    __tablename__ = "device_pairings"
+
+    device_code_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_code: Mapped[str] = mapped_column(String(8), unique=True)  # ohne Bindestrich gespeichert
+    client_name: Mapped[str] = mapped_column(String(64))  # Vorschlag des Daemons
+    client_version: Mapped[str | None] = mapped_column(String(40))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Gesetzt, sobald ein Konto den Code bestätigt hat
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    device_name: Mapped[str | None] = mapped_column(String(64))
+

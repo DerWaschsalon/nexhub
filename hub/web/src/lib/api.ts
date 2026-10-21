@@ -62,4 +62,12 @@ export type Status = {
 	active_sessions: number;
 };
 
+export type Device = {
+	id: number;
+	name: string;
+	created_at: string;
+	last_seen_at: string | null;
+	version: string | null;
+};
+
 export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', member: 'Mitglied' };

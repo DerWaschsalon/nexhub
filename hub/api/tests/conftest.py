@@ -64,7 +64,7 @@ def database_url(tmp_path):
         async def _clean() -> None:
             engine = create_async_engine(url)
             async with engine.begin() as conn:
-                await conn.execute(text("DROP TABLE IF EXISTS sessions, users, alembic_version"))
+                await conn.execute(text("DROP TABLE IF EXISTS device_pairings, devices, sessions, users, alembic_version"))
             await engine.dispose()
         asyncio.run(_clean())
 

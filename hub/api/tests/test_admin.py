@@ -1,3 +1,7 @@
+from alembic.script import ScriptDirectory
+
+from nexhub_api.db import alembic_config
+
 from .conftest import ADMIN, BASE, MEMBER, log_in
 
 ORIGIN = {"origin": BASE}
@@ -26,7 +30,8 @@ def test_kontenliste(as_user):
 
 def test_status(as_user):
     s = as_user(ADMIN).get("/api/admin/status").json()
-    assert s["db_revision"] == "0002" and s["login"] is True and s["member_check"] is True
+    head = ScriptDirectory.from_config(alembic_config("")).get_current_head()
+    assert s["db_revision"] == head and s["login"] is True and s["member_check"] is True
     assert s["accounts"] == 1 and s["active_sessions"] == 1
 
 
