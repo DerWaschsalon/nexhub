@@ -1,14 +1,20 @@
 """Öffentlicher Bereich: alles hier ist ohne Login erreichbar.
 
-Nur herausgeben, was geteilt werden darf. Geteilte Runs kommen später als eigene Route dazu
-(z. B. GET /api/public/runs/{freigabe}), sobald es Runs gibt.
+Nur herausgeben, was geteilt werden darf:
+    GET /api/public/info            ist der Login eingerichtet?
+    GET /api/public/runs/{token}    ein geteilter Run (Teilen-Link /r/<token>)
+
+Geteilte Runs zeigen Eckdaten und Zusammenfassung mit den Namen der Mitspieler, aber kein
+Discord-Konto und nicht die Rohdatei. Suchmaschinen sollen sie nicht aufnehmen.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
+from sqlalchemy import select
 
-from ..deps import SettingsDep
+from ..deps import DB, SettingsDep
+from ..models import Run
 
 router = APIRouter(prefix="/api/public", tags=["öffentlich"])
 
@@ -20,3 +26,29 @@ class Info(BaseModel):
 @router.get("/info")
 async def info(settings: SettingsDep) -> Info:
     return Info(login=settings.discord_configured)
+
+
+class SharedRun(BaseModel):
+    dungeon: str
+    difficulty: str | None
+    start_ms: int
+    end_ms: int
+    complete: bool
+    bosses_total: int
+    bosses_killed: int
+    fights: int
+    hits: int
+    character: str | None
+    summary: dict
+
+
+@router.get("/runs/{token}")
+async def shared_run(token: str, db: DB, response: Response) -> SharedRun:
+    run = await db.scalar(select(Run).where(Run.share_token == token)) if len(token) <= 32 else None
+    if run is None:
+        raise HTTPException(404, "Link ungültig oder zurückgezogen")
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    response.headers["Cache-Control"] = "no-store"
+    return SharedRun(dungeon=run.dungeon, difficulty=run.difficulty, start_ms=run.start_ms, end_ms=run.end_ms,
+                     complete=run.complete, bosses_total=run.bosses_total, bosses_killed=run.bosses_killed,
+                     fights=run.fights, hits=run.hits, character=run.character, summary=run.summary)

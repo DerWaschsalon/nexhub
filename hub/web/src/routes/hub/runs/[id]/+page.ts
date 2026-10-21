@@ -1,6 +1,6 @@
-import { api, type RunDetail } from '#lib/api.ts';
+import { apiLoad, type RunDetail } from '#lib/api.ts';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ fetch, params }) => ({
-	run: await api<RunDetail>(`/api/runs/${params.id}`, undefined, fetch)
+	run: await apiLoad<RunDetail>(`/api/runs/${params.id}`, fetch)
 });

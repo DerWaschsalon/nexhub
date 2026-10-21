@@ -1,4 +1,5 @@
 // Zugriff auf die Hub-API. Cookies gehen automatisch mit, die Seite läuft auf derselben Adresse.
+import { error } from '@sveltejs/kit';
 
 export class ApiError extends Error {
 	constructor(
@@ -22,6 +23,17 @@ export async function api<T>(path: string, init?: RequestInit, f: Fetch = fetch)
 }
 
 export const post = (path: string) => api<void>(path, { method: 'POST' });
+
+/** Für load-Funktionen: Fehler der API werden zu einer Fehlerseite mit Status und Meldung
+ *  (sonst zeigt SvelteKit nur „500 Internal Error“). */
+export async function apiLoad<T>(path: string, f: Fetch): Promise<T> {
+	try {
+		return await api<T>(path, undefined, f);
+	} catch (e) {
+		if (e instanceof ApiError) error(e.status, e.message);
+		throw e;
+	}
+}
 
 /** Wie api(), aber 401 heißt „nicht angemeldet“ statt Fehler. */
 export async function loadMe(f: Fetch = fetch): Promise<Me | null> {
@@ -86,6 +98,21 @@ export type RunSummary = {
 	}[];
 };
 
+/** Was jede Run-Ansicht braucht – im Hub und auf einer geteilten Seite. */
+export type RunCore = {
+	dungeon: string;
+	difficulty: string | null;
+	start_ms: number;
+	end_ms: number;
+	complete: boolean;
+	bosses_total: number;
+	bosses_killed: number;
+	fights: number;
+	hits: number;
+	character: string | null;
+	summary: RunSummary;
+};
+
 export type Run = {
 	id: number;
 	dungeon: string;
@@ -102,6 +129,6 @@ export type Run = {
 	created_at: string;
 };
 
-export type RunDetail = Run & { size: number; can_delete: boolean; summary: RunSummary };
+export type RunDetail = Run & RunCore & { size: number; can_delete: boolean; share_url: string | null };
 
 export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', member: 'Mitglied' };

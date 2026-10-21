@@ -5,15 +5,19 @@
     GET    /api/runs/{id}          Eckdaten und Zusammenfassung
     GET    /api/runs/{id}/nexlog   die Datei, so wie sie hochgeladen wurde
     DELETE /api/runs/{id}          wer hochgeladen hat, oder ein Admin
+    POST   /api/runs/{id}/share    Teilen-Link erzeugen (gleiche Rechte wie Löschen)
+    DELETE /api/runs/{id}/share    Teilen-Link zurückziehen
 
-Alle Angemeldeten (Admins und Mitglieder) sehen alle Runs; Teilen nach außen kommt später.
+Alle Angemeldeten (Admins und Mitglieder) sehen alle Runs. Nach außen nur über einen Teilen-Link;
+die öffentliche Ansicht dazu steht in routes/public.py.
 """
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import logging
-from datetime import datetime
+import secrets
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -108,7 +112,8 @@ class RunOut(BaseModel):
 
 class RunDetail(RunOut):
     size: int
-    can_delete: bool
+    can_delete: bool  # darf löschen und teilen
+    share_url: str | None
     summary: dict
 
 
@@ -133,11 +138,46 @@ async def _get(db: DB, run_id: int) -> tuple[Run, User]:
     return row[0], row[1]
 
 
+def share_url(settings: Settings, run: Run) -> str | None:
+    return f"{settings.hub_base_url}/r/{run.share_token}" if run.share_token else None
+
+
+def _may_manage(run: Run, user: User) -> bool:
+    return run.user_id == user.id or user.role == "admin"
+
+
 @router.get("/{run_id}")
-async def get_run(run_id: int, user: CurrentUser, db: DB) -> RunDetail:
+async def get_run(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> RunDetail:
     run, uploader = await _get(db, run_id)
     return RunDetail(**_out(run, uploader), size=run.size, summary=run.summary,
-                     can_delete=run.user_id == user.id or user.role == "admin")
+                     can_delete=_may_manage(run, user), share_url=share_url(settings, run))
+
+
+class Shared(BaseModel):
+    share_url: str | None
+
+
+@router.post("/{run_id}/share")
+async def share(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> Shared:
+    """Teilen-Link erzeugen; ist schon einer da, bleibt er (zurückziehen und neu erzeugen gibt einen neuen)."""
+    run, _ = await _get(db, run_id)
+    if not _may_manage(run, user):
+        raise HTTPException(403, "Nur wer hochgeladen hat, oder ein Admin")
+    if not run.share_token:
+        run.share_token, run.shared_at = secrets.token_urlsafe(16), datetime.now(UTC)
+        await db.commit()
+        log.info("Run %d geteilt von %s", run.id, user.username)
+    return Shared(share_url=share_url(settings, run))
+
+
+@router.delete("/{run_id}/share")
+async def unshare(run_id: int, user: CurrentUser, db: DB) -> Shared:
+    run, _ = await _get(db, run_id)
+    if not _may_manage(run, user):
+        raise HTTPException(403, "Nur wer hochgeladen hat, oder ein Admin")
+    run.share_token = run.shared_at = None
+    await db.commit()
+    return Shared(share_url=None)
 
 
 @router.get("/{run_id}/nexlog")
@@ -150,7 +190,7 @@ async def download(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep
 @router.delete("/{run_id}", status_code=204)
 async def delete_run(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> Response:
     run, _ = await _get(db, run_id)
-    if run.user_id != user.id and user.role != "admin":
+    if not _may_manage(run, user):
         raise HTTPException(403, "Nur wer hochgeladen hat, oder ein Admin")
     await db.delete(run)
     await db.commit()

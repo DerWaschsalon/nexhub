@@ -109,4 +109,7 @@ class Run(Base):
     character: Mapped[str | None] = mapped_column(String(64))  # wer aufgenommen hat
     summary: Mapped[dict] = mapped_column(JSON)  # analysis.summarize()
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Geteilt: wer den Link /r/<share_token> kennt, sieht den Run ohne Login. None = nicht geteilt
+    share_token: Mapped[str | None] = mapped_column(String(32), unique=True)
+    shared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

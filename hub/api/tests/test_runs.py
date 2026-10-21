@@ -105,3 +105,40 @@ def test_loeschen(client, as_user, tmp_path):
     assert member.delete(f"/api/runs/{run_id}", headers=ORIGIN).status_code == 204
     assert not file.exists() and member.get(f"/api/runs/{run_id}").status_code == 404
     assert admin.delete(f"/api/runs/{other}", headers=ORIGIN).status_code == 204  # Admins dürfen alles
+
+
+def test_teilen_und_zurueckziehen(client, as_user):
+    member, admin = as_user(MEMBER), as_user(ADMIN)
+    run_id = upload(client, pair(client, member), nexlog()).json()["id"]
+    assert member.get(f"/api/runs/{run_id}").json()["share_url"] is None
+
+    url = member.post(f"/api/runs/{run_id}/share", headers=ORIGIN).json()["share_url"]
+    assert url.startswith(f"{BASE}/r/") and member.get(f"/api/runs/{run_id}").json()["share_url"] == url
+    # Nochmal teilen gibt denselben Link
+    assert member.post(f"/api/runs/{run_id}/share", headers=ORIGIN).json()["share_url"] == url
+
+    token = url.rsplit("/", 1)[1]
+    public = client.get(f"/api/public/runs/{token}")  # ohne Login
+    assert public.status_code == 200 and "noindex" in public.headers["x-robots-tag"]
+    body = public.json()
+    assert body["dungeon"] == "Ferocious Horn Den" and body["summary"]["players"][1]["name"] == "Moonlin"
+    assert "uploader" not in body and "id" not in body and "size" not in body
+
+    assert member.delete(f"/api/runs/{run_id}/share", headers=ORIGIN).json() == {"share_url": None}
+    assert client.get(f"/api/public/runs/{token}").status_code == 404
+    # Neu teilen gibt einen neuen Link, der alte bleibt tot
+    new = admin.post(f"/api/runs/{run_id}/share", headers=ORIGIN).json()["share_url"]
+    assert new != url and client.get(f"/api/public/runs/{token}").status_code == 404
+
+
+def test_teilen_nur_hochladende_oder_admins(client, as_user):
+    member, admin = as_user(MEMBER), as_user(ADMIN)
+    run_id = upload(client, pair(client, admin), nexlog()).json()["id"]
+    assert member.post(f"/api/runs/{run_id}/share", headers=ORIGIN).status_code == 403
+    assert member.delete(f"/api/runs/{run_id}/share", headers=ORIGIN).status_code == 403
+    assert client.post(f"/api/runs/{run_id}/share").status_code == 401
+
+
+def test_unbekannter_link(client):
+    assert client.get("/api/public/runs/gibtsnicht").status_code == 404
+    assert client.get("/api/public/runs/" + "x" * 200).status_code == 404

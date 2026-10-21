@@ -5,13 +5,14 @@ Dungeon-Runs dazu, ähnlich Warcraft Logs. Läuft auf dem VPS zusammen mit dem B
 [`infra/`](../infra/)).
 
 **Stand:** Grundgerüst – öffentlicher Bereich, Login, Admin-Seiten für Konten und System,
-Kopplung von NexBoard-Geräten, Runs hochladen und ansehen (Liste, Schaden je Boss und Spieler).
+Kopplung von NexBoard-Geräten, Runs hochladen und ansehen (Liste, Schaden je Boss und Spieler),
+Runs per Link öffentlich teilen.
 
 ## Zwei Bereiche
 
 | Bereich | Web | API | Wer |
 |---|---|---|---|
-| öffentlich | `/`, `/login`, später geteilte Runs | `/api/public/…` | alle |
+| öffentlich | `/`, `/login`, geteilte Runs `/r/<token>` | `/api/public/…` | alle |
 | Hub | `/hub/…` | `/api/…` | angemeldete Admins und Mitglieder |
 | Admin | `/hub/admin/…` | `/api/admin/…` | nur Admins |
 
@@ -81,9 +82,17 @@ Code in `routes/runs.py`:
   aufgelöst). Dieselbe Datei vom selben Konto zählt nur einmal (`duplicate: true`).
 - `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/nexlog`: für alle Angemeldeten.
 - `DELETE /api/runs/{id}`: wer hochgeladen hat, oder ein Admin.
+- Teilen: `POST /api/runs/{id}/share` erzeugt einen Link `/r/<token>` (16 Zufallsbytes),
+  `DELETE …/share` zieht ihn zurück; neu teilen gibt einen neuen Link. Gleiche Rechte wie Löschen.
+  Die öffentliche Ansicht (`GET /api/public/runs/{token}`, `routes/public.py`) zeigt Eckdaten und
+  Zusammenfassung mit Mitspielernamen, aber kein Discord-Konto und nicht die Rohdatei, und bittet
+  Suchmaschinen, sie nicht aufzunehmen (`X-Robots-Tag`, `<meta name="robots">`).
+
+Im Web teilen sich Hub und öffentliche Seite die Ansicht `lib/components/RunView.svelte`.
 
 Noch nicht: mehrere Uploads desselben Runs zusammenführen, Kampf-Details (DPS-Kurve, Skills,
-Buffs aus den Einzeltreffern), Rohdateien nach 90 Tagen löschen, Teilen nach außen.
+Buffs aus den Einzeltreffern), Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
+Domain wirklich öffentlich erreichbar sind: Impressum und Datenschutzerklärung klären.
 
 ## Login und Rollen
 
