@@ -39,6 +39,11 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
 - Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Bot
   `cd bot && python -m pytest -q tests`, Hub `cd hub/api && uv run pytest -q` und
   `cd hub/web && npm run check`, Formate `cd proto && uv run pytest -q`.
-- `main` und `modular` sind die Branches, auf denen laufende NexBoard-Installationen per
-  `update.sh` aktualisieren. Dort keine Force-Pushes und keine Pfadänderungen ohne Absprache,
-  sonst bricht das Update beim nächsten Klick ab oder der Daemon findet seine Dateien nicht.
+- **Ein Arbeitszweig: `main`** (seit 21.10.2026; `monorepo` ist darin aufgegangen und gelöscht).
+  `main` und `modular` sind außerdem die Zweige, auf denen laufende NexBoard-Installationen per
+  `update.sh` aktualisieren (`modular` zieht nur noch nach). Dort keine Force-Pushes und keine
+  Pfadänderungen ohne Absprache, sonst bricht das Update beim nächsten Klick ab oder der Daemon
+  findet seine Dateien nicht. Hub ausrollen: `nexhub-update <wer> main`.
+- Die Symlinks `daemon`, `capture`, `overlay` und `update.sh` an der Wurzel sind Übergänge für
+  NexBoard-Checkouts aus der Zeit vor dem Monorepo (systemd-Unit, uv-Installation und Tray-Knopf
+  zeigen dorthin). Nicht entfernen, solange es solche Installationen gibt.

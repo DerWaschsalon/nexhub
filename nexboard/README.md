@@ -342,6 +342,11 @@ Der Button öffnet ein Konsole-Fenster mit `./update.sh`, von Hand geht es genau
 ./update.sh --a2tools   # zusätzlich A2Tools auf das neueste Release heben (lokal, bis es im Repo nachgezogen ist)
 ```
 
+**Umzug ins Monorepo (Installationen von vor dem 21.10.2026):** Das erste Update holt den neuen
+Stand und meldet dann „Fehlgeschlagen: Submodul capture/a2tools“, weil das alte Skript noch die
+alten Pfade kennt. Einfach noch einmal aktualisieren: Ab dann läuft das neue Skript
+(`nexboard/update.sh`, an der Wurzel als Symlink) und richtet Daemon, Unit und Mitschnitt neu ein.
+
 Muss `deckbar-capture` neu gebaut werden, fragt das Skript per `sudo` nach dem Passwort für die
 Mitschnitt-Rechte. Bei lokalen Änderungen im Repo bricht es ab, statt etwas zu überschreiben.
 Wer das Repo pflegt, zieht ein neues A2Tools-Release mit `git -C capture/a2tools checkout vX.Y.Z`

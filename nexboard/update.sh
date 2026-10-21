@@ -81,10 +81,14 @@ if [[ ! -x $BIN ]] || ! getcap "$BIN" 2>/dev/null | grep -q cap_net_raw || [[ "$
 fi
 
 # ------------------------------------------------------------------ Dienste
-if changed daemon/pyproject.toml daemon/uv.lock; then
+# Neu installieren, wenn sich die Abhängigkeiten geändert haben – oder wenn die Installation nicht
+# zum Repo passt. Das betrifft alte Checkouts nach dem Umzug ins Monorepo: Ihr erstes update.sh
+# zieht den neuen Stand und bricht dann ab, beim zweiten Lauf sieht changed() nichts mehr.
+TOOL_PY="$(uv tool dir 2>/dev/null)/deckbar-daemon/bin/python"
+if changed daemon/pyproject.toml daemon/uv.lock || ! "$TOOL_PY" -c 'import nexproto' 2>/dev/null; then
   uv tool install --force --editable ./daemon >/dev/null || fail "Daemon-Abhängigkeiten installieren"
 fi
-if changed daemon/systemd; then
+if changed daemon/systemd || ! cmp -s daemon/systemd/deckbar.service ~/.config/systemd/user/deckbar.service; then
   cp daemon/systemd/deckbar.service ~/.config/systemd/user/
 fi
 if changed overlay/deckbar-overlay.service overlay/deckbar-overlay.desktop; then
