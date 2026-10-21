@@ -12,7 +12,11 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<RunView run={data.run} fightHref={(f) => `/r/${page.params.token}/kampf/${encodeURIComponent(f)}`} />
+<RunView run={data.run} fightHref={(f) => `/r/${page.params.token}/kampf/${encodeURIComponent(f)}`}>
+	{#snippet actions()}
+		<a class="btn small primary" href="/logs/r/{page.params.token}" data-sveltekit-reload>In NexLogs öffnen</a>
+	{/snippet}
+</RunView>
 
 <p class="dim note">Geteilt über NexHub.</p>
 

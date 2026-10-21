@@ -42,6 +42,8 @@
 
 <RunView {run} fightHref={(f) => `/hub/runs/${run.id}/kampf/${encodeURIComponent(f)}`}>
 	{#snippet actions()}
+		<!-- NexLogs (nexlogs/): ausführliche Log-Ansicht mit Skill-Symbolen, Zeitleisten und Buffs -->
+		<a class="btn small primary" href="/logs/run/{run.id}" data-sveltekit-reload>In NexLogs öffnen</a>
 		<a class="btn small" href="/api/runs/{run.id}/nexlog" download>NexLog herunterladen</a>
 		{#if run.can_delete}
 			{#if !run.share_url}
