@@ -31,13 +31,24 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
 - Firewall `etc/nftables.conf`: eigene Tabelle `inet waschsalon`, rein nur SSH und ICMP.
 - Docker aus download.docker.com mit Compose-Plugin, Logs rotiert (`etc/docker/daemon.json`).
   Läuft im unprivilegierten LXC (overlayfs, cgroup v2). Docker-Updates kommen nicht automatisch.
+- NexHub-Stack unter `/srv/nexhub` (`srv/nexhub/compose.yml`, Projekt `nexhub`):
+  - **Caddy** als einziger Dienst nach außen (80/443). Ohne `HUB_DOMAIN` nur http auf Port 80
+    mit Platzhalterseite; mit Domain holt Caddy das Zertifikat selbst.
+  - **Postgres 18** im internen Netz `db` (kein Weg nach draußen, kein veröffentlichter Port),
+    Daten in `/srv/nexhub/daten/postgres`.
+  - Geheimnisse und Domain nur in `/srv/nexhub/.env` (Rechte 600, Vorlage `env.beispiel`).
+  - Übernehmen nach einem Deploy: `ssh waschsalon 'cd /srv/nexhub && docker compose up -d'`.
+- Sicherung: `nexhub-sicherung.timer` macht nachts um 03:30 UTC ein `pg_dumpall` nach
+  `/srv/nexhub/sicherung` (zstd, 14 Tage). Liegt noch auf demselben Server – Abholen nach
+  außen fehlt.
 
 ## Besonderheiten
 - **Der Anbieter filtert vor dem Server**: von außen ist nur Port 22 erreichbar, alles andere läuft
   in einen Timeout, auch ohne eigene Firewall. Für den Hub müssen 80/443 im Kundenpanel
   freigeschaltet werden.
 - Docker-Ports laufen an der `input`-Kette vorbei (forward/DNAT). Container nur auf `127.0.0.1`
-  veröffentlichen und über einen Reverse-Proxy nach außen geben.
+  veröffentlichen und über einen Reverse-Proxy nach außen geben. Die einzige Ausnahme ist Caddy
+  mit 80/443 – deshalb stehen die beiden Ports nicht in `nftables.conf`.
 - Container, die einen Dienst auf dem Host selbst erreichen wollen, laufen in die `input`-Kette
   und brauchen dort eine Regel.
 - Die `sshd_config` des Anbieters hatte kein `Include /etc/ssh/sshd_config.d/*.conf`. Ohne die

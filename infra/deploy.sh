@@ -69,6 +69,9 @@ fi
 # --no-overwrite-dir: Rechte und Besitzer vorhandener Verzeichnisse (/, /etc, …) bleiben unangetastet
 tar -cf - --owner=root --group=root "${GEAENDERT[@]}" | remote 'tar -C / --no-overwrite-dir -xf -'
 
+if printf '%s\n' "${GEAENDERT[@]}" | grep -q '^etc/systemd/'; then
+  remote 'systemctl daemon-reload'
+fi
 if (( SSH_NEU )); then
   remote 'sshd -t && systemctl restart ssh' ||
     echo "sshd -t schlug fehl – der Timer stellt in 5 Minuten den alten Stand her" >&2
@@ -79,6 +82,9 @@ if (( NFT_NEU )); then
 fi
 remote "waschsalon-lock log $WER 'deploy: ${GEAENDERT[*]}'" >/dev/null 2>&1 || true
 echo "Übertragen: ${GEAENDERT[*]}"
+if printf '%s\n' "${GEAENDERT[@]}" | grep -q '^srv/nexhub/'; then
+  echo "NexHub-Stack geändert – übernehmen mit: ssh $HOST 'cd /srv/nexhub && docker compose up -d'"
+fi
 if (( ${#RISKANT[@]} )); then
   echo "Riskante Änderung (${RISKANT[*]}): in einer NEUEN Verbindung testen, dann innerhalb von"
   echo "5 Minuten bestätigen mit: ssh $HOST systemctl stop waschsalon-rollback.timer"

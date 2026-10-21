@@ -1,0 +1,48 @@
+# NexHub-Stack auf waschsalon, verwaltet in infra/server/srv/nexhub/ (DerWaschsalon/nexhub).
+# Geheimnisse und Domain stehen nur in /srv/nexhub/.env auf dem Server (Vorlage: env.beispiel).
+#
+#   cd /srv/nexhub && docker compose up -d
+#
+# Nach außen geht nur Caddy (80/443). Alles andere hängt an internen Netzen ohne
+# veröffentlichte Ports. Hub und Bot kommen später als weitere Dienste dazu.
+name: nexhub
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      HUB_DOMAIN: ${HUB_DOMAIN:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./daten/caddy/data:/data
+      - ./daten/caddy/config:/config
+    networks: [web]
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexhub
+      POSTGRES_DB: nexhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in /srv/nexhub/.env}
+    volumes:
+      # Ab Postgres 18 liegt PGDATA unter /var/lib/postgresql/18/docker
+      - ./daten/postgres:/var/lib/postgresql
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexhub -d nexhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [db]
+
+networks:
+  web: {}
+  # internal: kein Weg nach draußen, nur Dienste im selben Netz erreichen die Datenbank
+  db:
+    internal: true

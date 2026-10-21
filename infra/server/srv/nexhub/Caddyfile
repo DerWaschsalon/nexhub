@@ -1,0 +1,14 @@
+# Reverse Proxy für NexHub. Ohne HUB_DOMAIN in /srv/nexhub/.env antwortet Caddy nur auf
+# Port 80 ohne HTTPS. Mit Domain holt er das Zertifikat selbst (Ports 80/443 müssen beim
+# Anbieter freigeschaltet sein).
+
+{$HUB_DOMAIN::80} {
+	encode zstd gzip
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	# Platzhalter, bis der Hub läuft; dann: reverse_proxy hub:8000
+	respond "NexHub – im Aufbau" 200
+}

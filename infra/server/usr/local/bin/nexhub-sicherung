@@ -1,0 +1,17 @@
+#!/bin/bash
+# Nächtliche Sicherung der NexHub-Datenbank nach /srv/nexhub/sicherung (14 Tage).
+# Läuft über nexhub-sicherung.timer. Abholen von außen (z. B. Unraid per rsync) ist ein eigener Schritt.
+set -euo pipefail
+ZIEL=/srv/nexhub/sicherung
+TAGE=14
+mkdir -p "$ZIEL"
+chmod 700 "$ZIEL"
+DATEI="$ZIEL/postgres-$(date -u +%Y-%m-%dT%H%M%SZ).sql.zst"
+docker compose -f /srv/nexhub/compose.yml exec -T postgres pg_dumpall -U nexhub --clean --if-exists \
+  | zstd -q -T0 -o "$DATEI.teil"
+# Nur vollständige Sicherungen bekommen ihren Namen; abgebrochene bleiben .teil und fliegen raus
+mv "$DATEI.teil" "$DATEI"
+chmod 600 "$DATEI"
+find "$ZIEL" -name 'postgres-*.sql.zst*' -mtime +"$TAGE" -delete
+find "$ZIEL" -name '*.teil' -mmin +60 -delete
+echo "Sicherung: $DATEI ($(du -h "$DATEI" | cut -f1))"
