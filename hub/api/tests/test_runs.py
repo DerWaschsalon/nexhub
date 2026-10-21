@@ -22,6 +22,9 @@ def fight(n: int, boss_dmg: int = 1_000_000) -> dict:
 
 
 def nexlog(**run) -> bytes:
+    fights = [fight(1), fight(2, boss_dmg=500_000)]
+    for f in fights:
+        f["dungeonId"] = run.get("dungeon_id", f["dungeonId"])
     return pack(NexLog.model_validate({
         "recorder": {"nexboard": "0.6.0"},
         "run": {"dungeon_id": 600123, "dungeon": "Ferocious Horn Den", "difficulty": "Normal",
@@ -29,7 +32,7 @@ def nexlog(**run) -> bytes:
                 "bosses_total": 2, "bosses_killed": 1, **run},
         "you": {"name": "Testheld", "cls": "ranger"},
         "names": {"Mo***n|cleric": "Moonlin"},
-        "fights": [fight(1), fight(2, boss_dmg=500_000)],
+        "fights": fights,
         "hits": {"auto_1": {"fight": "auto_1", "target": 1, "start_ms": 0, "columns": list(HIT_COLUMNS),
                             "flags": {"crit": 1}, "rows": [[0, 1, 0, 1, 10, 0, 1], [5, 2, 0, 2, 5, 0, 0]]}},
     }))
@@ -108,6 +111,17 @@ def test_loeschen(client, as_user, tmp_path):
     assert member.delete(f"/api/runs/{run_id}", headers=ORIGIN).status_code == 204
     assert not file.exists() and member.get(f"/api/runs/{run_id}").status_code == 404
     assert admin.delete(f"/api/runs/{other}", headers=ORIGIN).status_code == 204  # Admins dürfen alles
+
+
+def test_unbekannte_dungeons_mit_namen_aus_nexproto(client, as_user):
+    # Ältere Daemons schicken „Dungeon <ID>“, wenn A2Tools die ID nicht kennt; der Hub ergänzt beim Anzeigen
+    member = as_user(MEMBER)
+    token = pair(client, member)
+    known = upload(client, token, nexlog(dungeon_id=610062, dungeon="Dungeon 610062")).json()["id"]
+    upload(client, token, nexlog(dungeon_id=1, dungeon="Dungeon 1", start_ms=1_792_000_000_000))
+    assert [x["dungeon"] for x in member.get("/api/runs").json()] == ["Shattered Arkanis", "Dungeon 1"]
+    url = member.post(f"/api/runs/{known}/share", headers=ORIGIN).json()["share_url"]
+    assert client.get(f"/api/public/runs/{url.rsplit('/', 1)[1]}").json()["dungeon"] == "Shattered Arkanis"
 
 
 def test_teilen_und_zurueckziehen(client, as_user):

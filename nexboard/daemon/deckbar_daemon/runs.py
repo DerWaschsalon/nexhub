@@ -42,6 +42,11 @@ import yaml
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from pydantic import Field, ValidationError, field_validator
 
+try:  # fehlt das Paket (alte Installation), bleibt es beim Platzhalter „Dungeon <ID>“
+    from nexproto.dungeons import EXTRA_DUNGEONS
+except ImportError:
+    EXTRA_DUNGEONS: dict[int, str] = {}
+
 from .config import _atomic_write, _Strict
 from .dps import a2tools_settings_path
 
@@ -175,7 +180,7 @@ def is_end_boss(mob: int) -> bool:
 
 def dungeon_name(dungeon: int) -> str:
     entry = _i18n("dungeons/en.json").get(str(dungeon)) or {}
-    name = entry.get("name") or f"Dungeon {dungeon}"
+    name = entry.get("name") or EXTRA_DUNGEONS.get(dungeon) or f"Dungeon {dungeon}"
     diff = {"normal": "Normal", "exploration": "Erkundung", "hard": "Schwer"}.get(entry.get("difficulty"))
     return f"{name} ({diff})" if diff else name
 
@@ -185,7 +190,7 @@ def dungeon_parts_en(dungeon: int) -> tuple[str, str | None]:
     Programme (bot.py), damit Meldungen verschiedener Spieler zusammenpassen."""
     entry = _i18n("dungeons/en.json").get(str(dungeon)) or {}
     diff = {"normal": "Normal", "exploration": "Exploration", "hard": "Hard"}.get(entry.get("difficulty"))
-    return entry.get("name") or f"Dungeon {dungeon}", diff
+    return entry.get("name") or EXTRA_DUNGEONS.get(dungeon) or f"Dungeon {dungeon}", diff
 
 
 def boss_name_en(mob: int, fallback: str = "") -> str:

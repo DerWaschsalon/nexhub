@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from nexproto import NexLog, NexLogError, pack, player_name, unpack
+from nexproto import NexLog, NexLogError, dungeon_label, pack, player_name, unpack
 from nexproto.nexlog import HIT_COLUMNS, MAX_PACKED, MAX_UNPACKED
 from nexproto.schema import SCHEMA_DIR, SCHEMAS, render
 
@@ -138,3 +138,9 @@ def test_namen_aufloesen():
     assert player_name(lg, other) == "Moonlin"  # "Mo***n" + jobId 17 (cleric)
     other.jobId = 14
     assert player_name(lg, other) == "Mo***n"  # anderer Klasse: unbekannt, bleibt maskiert
+
+
+def test_dungeon_label_fuellt_nur_den_platzhalter():
+    assert dungeon_label(610062, "Dungeon 610062") == "Shattered Arkanis"
+    assert dungeon_label(610062, "Eigener Name") == "Eigener Name"
+    assert dungeon_label(1, "Dungeon 1") == "Dungeon 1"

@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from nexproto import NexLogError, unpack
+from nexproto import NexLogError, dungeon_label, unpack
 from nexproto.nexlog import MAX_PACKED
 
 from ..analysis import fight_detail, summarize
@@ -119,7 +119,7 @@ class RunDetail(RunOut):
 
 
 def _out(run: Run, uploader: User) -> dict:
-    return dict(id=run.id, dungeon=run.dungeon, difficulty=run.difficulty, start_ms=run.start_ms,
+    return dict(id=run.id, dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty, start_ms=run.start_ms,
                 end_ms=run.end_ms, complete=run.complete, bosses_total=run.bosses_total,
                 bosses_killed=run.bosses_killed, fights=run.fights, hits=run.hits, character=run.character,
                 uploader=uploader.name, created_at=run.created_at)
