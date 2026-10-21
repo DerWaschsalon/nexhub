@@ -10,10 +10,15 @@ dependencies = [
     "fastapi>=0.115",
     "httpx>=0.27",
     "itsdangerous>=2.2",
+    "nexproto",
     "pydantic-settings>=2.7",
     "sqlalchemy[asyncio]>=2.0.30",
     "uvicorn[standard]>=0.30",
 ]
+
+[tool.uv.sources]
+# Gemeinsame Formate (NexLog) aus dem Monorepo, siehe proto/README.md
+nexproto = { path = "../../proto", editable = true }
 
 [dependency-groups]
 dev = ["aiosqlite>=0.20", "pytest>=8"]

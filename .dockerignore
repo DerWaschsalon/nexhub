@@ -1,0 +1,10 @@
+# Baukontext für hub/Dockerfile ist die Repo-Wurzel: nur hub/ und proto/ werden gebraucht
+*
+!hub/
+!proto/
+**/node_modules
+**/.svelte-kit
+**/build
+**/.venv
+**/__pycache__
+**/.pytest_cache

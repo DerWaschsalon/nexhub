@@ -64,7 +64,7 @@ def database_url(tmp_path):
         async def _clean() -> None:
             engine = create_async_engine(url)
             async with engine.begin() as conn:
-                await conn.execute(text("DROP TABLE IF EXISTS device_pairings, devices, sessions, users, alembic_version"))
+                await conn.execute(text("DROP TABLE IF EXISTS runs, device_pairings, devices, sessions, users, alembic_version"))
             await engine.dispose()
         asyncio.run(_clean())
 
@@ -75,13 +75,13 @@ def fake() -> FakeDiscord:
 
 
 @pytest.fixture
-def make_client(database_url, fake):
+def make_client(database_url, fake, tmp_path):
     def _make(**overrides) -> TestClient:
         values = dict(database_url=database_url, hub_base_url=BASE, hub_secret_key="test-geheimnis",
                       discord_client_id="cid", discord_client_secret="csecret",
                       hub_admin_ids=f"{ADMIN}", hub_guild_id=str(GUILD), hub_member_role_id=str(ROLE),
-                      # explizit, sonst greift HUB_WEB_DIR aus der Umgebung (im Image gesetzt)
-                      hub_web_dir=None)
+                      # explizit, sonst greifen HUB_WEB_DIR/HUB_DATA_DIR aus der Umgebung (im Image gesetzt)
+                      hub_web_dir=None, hub_data_dir=str(tmp_path / "data"))
         settings = Settings(**{**values, **overrides})
         app = create_app(settings, http=httpx.AsyncClient(transport=httpx.MockTransport(fake)))
         return TestClient(app, base_url=BASE, follow_redirects=False)

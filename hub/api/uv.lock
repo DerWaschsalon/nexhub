@@ -514,6 +514,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
     { name = "itsdangerous" },
+    { name = "nexproto" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
@@ -532,6 +533,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "itsdangerous", specifier = ">=2.2" },
+    { name = "nexproto", editable = "../../proto" },
     { name = "pydantic-settings", specifier = ">=2.7" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.30" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
@@ -542,6 +544,20 @@ dev = [
     { name = "aiosqlite", specifier = ">=0.20" },
     { name = "pytest", specifier = ">=8" },
 ]
+
+[[package]]
+name = "nexproto"
+version = "0.1.0"
+source = { editable = "../../proto" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.9" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "opentelemetry-api"

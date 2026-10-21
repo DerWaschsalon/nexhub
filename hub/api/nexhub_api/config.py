@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     hub_web_dir: Path | None = None
     # Stand des Codes, setzt das Image beim Bauen (z. B. "monorepo@71b65a2")
     hub_version: str = "dev"
+    # Hochgeladene Dateien (runs/<id>.nexlog.gz); im Container ein eigenes Volume
+    hub_data_dir: Path = Path("data")
 
     @field_validator("hub_admin_ids", mode="before")
     @classmethod

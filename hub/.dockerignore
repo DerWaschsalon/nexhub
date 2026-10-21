@@ -1,6 +1,0 @@
-**/node_modules
-**/.svelte-kit
-web/build
-**/.venv
-**/__pycache__
-**/.pytest_cache

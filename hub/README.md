@@ -5,7 +5,7 @@ Dungeon-Runs dazu, ähnlich Warcraft Logs. Läuft auf dem VPS zusammen mit dem B
 [`infra/`](../infra/)).
 
 **Stand:** Grundgerüst – öffentlicher Bereich, Login, Admin-Seiten für Konten und System,
-Kopplung von NexBoard-Geräten.
+Kopplung von NexBoard-Geräten, Runs hochladen und ansehen (Liste, Schaden je Boss und Spieler).
 
 ## Zwei Bereiche
 
@@ -27,14 +27,15 @@ api/nexhub_api/
   migrations/    Alembic, eine Datei pro Schema-Stand
   deps.py        Bausteine für Routen: DB, CurrentUser, AdminUser, …
   discord.py     Discord-OAuth2
+  analysis.py    Zusammenfassung eines NexLogs (Bosse, Schaden je Spieler)
   logs.py        Logging, Zugriffslog ohne OAuth-Code
-  routes/        ein Modul pro Bereich: auth, account, devices, public, admin
+  routes/        ein Modul pro Bereich: auth, account, devices, runs, public, admin
   main.py        App zusammenbauen, Herkunftsprüfung, Web-Seiten ausliefern
 web/src/
   app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table
   lib/           api.ts (Anfragen + Typen), nav.ts (Menü), components/
   routes/        (public)/ öffentlich, hub/ mit Login, hub/admin/ nur Admins
-Dockerfile       baut web/ und packt es mit der API in ein Image
+Dockerfile       baut web/ und packt es mit der API in ein Image (Kontext: Repo-Wurzel, wegen proto/)
 ```
 
 ## Einen Bereich hinzufügen
@@ -69,6 +70,21 @@ Danach: `Authorization: Bearer <token>` → `CurrentDevice` in einer Route. `GET
 sagt dem Gerät, wem es gehört; `DELETE /api/devices/me` koppelt es ab. Im Hub: `GET /api/devices`
 (eigene), `DELETE /api/devices/{id}` (eigene, Admins jedes). Gesperrte Konten sperren ihre Geräte mit.
 
+## Runs
+
+Gekoppelte NexBoards laden nach jedem Run ein NexLog hoch (Format: [`proto/README.md`](../proto/README.md)),
+Code in `routes/runs.py`:
+
+- `POST /api/runs` (Gerät, Body = gzip-Datei, höchstens 8 MB): prüft mit `nexproto.unpack`, legt die
+  Datei unverändert unter `<HUB_DATA_DIR>/runs/<id>.nexlog.gz` ab und speichert Eckdaten plus eine
+  Zusammenfassung (`analysis.py`: Bosse, Sieg, Schaden und DPS je Spieler, Namen über `names`
+  aufgelöst). Dieselbe Datei vom selben Konto zählt nur einmal (`duplicate: true`).
+- `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/nexlog`: für alle Angemeldeten.
+- `DELETE /api/runs/{id}`: wer hochgeladen hat, oder ein Admin.
+
+Noch nicht: mehrere Uploads desselben Runs zusammenführen, Kampf-Details (DPS-Kurve, Skills,
+Buffs aus den Einzeltreffern), Rohdateien nach 90 Tagen löschen, Teilen nach außen.
+
 ## Login und Rollen
 
 Discord-OAuth2 mit PKCE. Der Hub fragt nur `identify` ab und, wenn eine Mitgliedsrolle eingestellt
@@ -97,7 +113,7 @@ Redirect eingetragen sein, ohne Domain also `http://localhost:8080/api/auth/call
 Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 [`infra/server/srv/nexhub/env.beispiel`](../infra/server/srv/nexhub/env.beispiel)):
 `DATABASE_URL`, `HUB_BASE_URL`, `HUB_SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
-`HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`.
+`HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs).
 
 ## Entwickeln
 

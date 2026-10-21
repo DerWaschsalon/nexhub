@@ -1,27 +1,31 @@
 # NexHub: Web-Oberfläche bauen, dann API + gebaute Seiten in ein Image.
+# Kontext ist die Repo-Wurzel (die API braucht proto/), siehe .dockerignore dort.
 # Bauen auf dem Server: nexhub-update <wer> <branch> (infra/server/usr/local/bin/nexhub-update)
 
 FROM node:24-slim AS web
 WORKDIR /web
-COPY web/package.json web/package-lock.json web/.npmrc ./
+COPY hub/web/package.json hub/web/package-lock.json hub/web/.npmrc ./
 RUN npm ci --no-audit --no-fund
-COPY web/ ./
+COPY hub/web/ ./
 RUN npm run build
 
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
-RUN useradd --system --uid 10001 --home-dir /app nexhub
-WORKDIR /app
+RUN useradd --system --uid 10001 --home-dir /src nexhub && mkdir -p /data && chown nexhub /data
+# Gleiche Ordnerstruktur wie im Repo, damit der Pfad-Verweis ../../proto auch hier passt
+WORKDIR /src/hub/api
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
-COPY api/pyproject.toml api/uv.lock ./
+COPY proto/ /src/proto/
+COPY hub/api/pyproject.toml hub/api/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY api/ ./
+COPY hub/api/ ./
 RUN uv sync --frozen --no-dev
-COPY --from=web /web/build /app/web
+COPY --from=web /web/build /src/web
 
 # Stand des Codes für die System-Seite, z. B. "monorepo@71b65a2" (setzt nexhub-update)
 ARG GIT_REV=dev
-ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 HUB_WEB_DIR=/app/web HUB_VERSION=$GIT_REV
+ENV PATH=/src/hub/api/.venv/bin:$PATH PYTHONUNBUFFERED=1 HUB_WEB_DIR=/src/web HUB_DATA_DIR=/data \
+    HUB_VERSION=$GIT_REV
 USER nexhub
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \

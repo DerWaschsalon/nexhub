@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # SQLite (Tests) vergibt automatische IDs nur für INTEGER PRIMARY KEY
@@ -82,4 +82,31 @@ class DevicePairing(Base):
     # Gesetzt, sobald ein Konto den Code bestätigt hat
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     device_name: Mapped[str | None] = mapped_column(String(64))
+
+
+class Run(Base):
+    """Ein hochgeladener Dungeon-Run. Die Datei (NexLog) liegt unverändert unter
+    `<HUB_DATA_DIR>/runs/<id>.nexlog.gz`; hier stehen Eckdaten und eine Zusammenfassung."""
+
+    __tablename__ = "runs"
+    __table_args__ = (UniqueConstraint("user_id", "sha256"),)  # dieselbe Datei nur einmal je Konto
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    device_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id", ondelete="SET NULL"))
+    sha256: Mapped[str] = mapped_column(String(64))
+    size: Mapped[int] = mapped_column(Integer)  # Bytes, gepackt
+    dungeon_id: Mapped[int] = mapped_column(Integer)
+    dungeon: Mapped[str] = mapped_column(String(120))
+    difficulty: Mapped[str | None] = mapped_column(String(40))
+    start_ms: Mapped[int] = mapped_column(BigInteger, index=True)
+    end_ms: Mapped[int] = mapped_column(BigInteger)
+    complete: Mapped[bool] = mapped_column(Boolean)
+    bosses_total: Mapped[int] = mapped_column(Integer)
+    bosses_killed: Mapped[int] = mapped_column(Integer)
+    fights: Mapped[int] = mapped_column(Integer)
+    hits: Mapped[int] = mapped_column(Integer)
+    character: Mapped[str | None] = mapped_column(String(64))  # wer aufgenommen hat
+    summary: Mapped[dict] = mapped_column(JSON)  # analysis.summarize()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
