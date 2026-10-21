@@ -1,5 +1,5 @@
 #!/bin/bash
-# Hub aus dem öffentlichen Repo bauen und starten.
+# Hub (und mit COMPOSE_PROFILES=bot auch TheWashBot) aus dem öffentlichen Repo bauen und starten.
 #
 #   nexhub-update <wer> [branch]   (Standard: main; <wer> muss die Sperre halten)
 #
@@ -20,7 +20,9 @@ REV=$(git -C "$SRC" rev-parse --short HEAD)
 cd /srv/nexhub
 # Ablage für hochgeladene Runs: der Hub läuft im Container als Nutzer 10001
 install -d -o 10001 -g 10001 -m 750 daten/hub
-GIT_REV="$REF@$REV" docker compose build --pull api
+install -d -m 750 daten/bot
+# Baut alle aktiven Dienste mit build: (api, mit Profil bot auch bot)
+GIT_REV="$REF@$REV" docker compose build --pull
 docker compose up -d
 docker image prune -f >/dev/null
 waschsalon-lock log "$WER" "Hub $REF@$REV gebaut und gestartet"

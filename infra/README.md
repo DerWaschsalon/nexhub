@@ -46,9 +46,30 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
   - Hochgeladene Runs liegen in `/srv/nexhub/daten/hub/runs/` (gehört Nutzer 10001). Die
     nächtliche Sicherung erfasst bisher nur die Datenbank, nicht diese Dateien.
   - Übernehmen nach einem Deploy: `ssh waschsalon 'cd /srv/nexhub && docker compose up -d'`.
+  - **bot**: TheWashBot (`bot/`), gebaut aus demselben Klon. Startet nur mit
+    `COMPOSE_PROFILES=bot` in `.env`, damit er nicht versehentlich parallel zum alten Server mit
+    demselben Discord-Token läuft. Einstellungen in `/srv/nexhub/bot.env` (Vorlage
+    `bot.env.beispiel`), Daten in `/srv/nexhub/daten/bot/`. Keine veröffentlichten Ports: Der Hub
+    spricht ihn über `BOT_CONTROL_URL=http://bot:8790` mit `BOT_CONTROL_KEY` an (Bereich „Bot“),
+    Caddy leitet `/api/aion/*`, `/runs/*`, `/leaderboard/*` (Port 8789) und `/dps/*` (8787) an ihn.
 - Sicherung: `nexhub-sicherung.timer` macht nachts um 03:30 UTC ein `pg_dumpall` nach
   `/srv/nexhub/sicherung` (zstd, 14 Tage). Liegt noch auf demselben Server – Abholen nach
   außen fehlt.
+
+## Bot-Umzug vom alten Server
+
+Der Bot läuft bis zum Umzug weiter auf dem alten Server. Reihenfolge, damit er nie doppelt läuft
+und keine Einstellungen verloren gehen (Sperre halten):
+
+1. `/srv/nexhub/bot.env` aus `bot.env.beispiel` anlegen (Rechte 600), `BOT_CONTROL_KEY` in `.env`
+   setzen (`openssl rand -base64 32 | tr -d '/+='`).
+2. Bot auf dem alten Server stoppen, dessen `data/` komplett nach `/srv/nexhub/daten/bot/`
+   kopieren (`bot.sqlite3` und `runs/` mit den gespeicherten AION-Läufen).
+3. In `.env` `COMPOSE_PROFILES=bot` einkommentieren, `nexhub-update <wer> <branch>`.
+4. Im Hub unter Bot → Übersicht prüfen, ob er verbunden ist. DeckBar-Ziele (AION-API, DPS-Webhook)
+   auf die neue Adresse umstellen, sobald es eine Domain gibt.
+
+Zurück: Profil wieder auskommentieren, `docker compose up -d --remove-orphans`, alten Bot starten.
 
 ## Besonderheiten
 - **Der Anbieter filtert nicht** (21.10. geprüft: SYNs auf 80, 443 und 8081 kommen an `eth0` an,
