@@ -93,6 +93,9 @@ Code in `routes/runs.py`:
   Spieler aus den Einzeltreffern (fehlen sie, gibt es keine Kurve), Skills mit Anteil und Krit-,
   Rücken-, Perfekt- und Doppel-Quote aus der Kampfdatei, Tode.
 
+Die ausführliche Log-Ansicht ist NexLogs (`nexlogs/`, React), die der Hub unter `/logs/` ausliefert
+(`HUB_LOGS_DIR`); sie liest dieselben Routen.
+
 Im Web teilen sich Hub und öffentliche Seite die Ansichten `RunView.svelte` und `FightView.svelte`
 (`lib/components/`). Spieler haben im ganzen Run eine feste Farbe aus einer geprüften Palette
 (`lib/colors.ts`), die Klasse steht als Text daneben.
@@ -128,7 +131,7 @@ Redirect eingetragen sein, ohne Domain also `http://localhost:8080/api/auth/call
 Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 [`infra/server/srv/nexhub/env.beispiel`](../infra/server/srv/nexhub/env.beispiel)):
 `DATABASE_URL`, `HUB_BASE_URL`, `HUB_SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
-`HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs).
+`HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_LOGS_DIR` (NexLogs), `HUB_DATA_DIR` (Ablage der Runs).
 
 ## Entwickeln
 

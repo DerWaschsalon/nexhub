@@ -9,6 +9,14 @@ RUN npm ci --no-audit --no-fund
 COPY hub/web/ ./
 RUN npm run build
 
+# NexLogs (nexlogs/): Log-Ansicht in React, liefert der Hub unter /logs/ aus
+FROM node:24-slim AS logs
+WORKDIR /logs
+COPY nexlogs/package.json nexlogs/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY nexlogs/ ./
+RUN npm run build
+
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 RUN useradd --system --uid 10001 --home-dir /src nexhub && mkdir -p /data && chown nexhub /data
@@ -21,10 +29,11 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY hub/api/ ./
 RUN uv sync --frozen --no-dev
 COPY --from=web /web/build /src/web
+COPY --from=logs /logs/dist /src/logs
 
 # Stand des Codes für die System-Seite, z. B. "monorepo@71b65a2" (setzt nexhub-update)
 ARG GIT_REV=dev
-ENV PATH=/src/hub/api/.venv/bin:$PATH PYTHONUNBUFFERED=1 HUB_WEB_DIR=/src/web HUB_DATA_DIR=/data \
+ENV PATH=/src/hub/api/.venv/bin:$PATH PYTHONUNBUFFERED=1 HUB_WEB_DIR=/src/web HUB_LOGS_DIR=/src/logs HUB_DATA_DIR=/data \
     HUB_VERSION=$GIT_REV
 USER nexhub
 EXPOSE 8000
