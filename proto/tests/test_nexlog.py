@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from nexproto import NexLog, NexLogError, pack, unpack
+from nexproto import NexLog, NexLogError, pack, player_name, unpack
 from nexproto.nexlog import HIT_COLUMNS, MAX_PACKED, MAX_UNPACKED
 from nexproto.schema import SCHEMA_DIR, SCHEMAS, render
 
@@ -129,3 +129,12 @@ def test_schema_dateien_passen_zum_code():
     for name, model in SCHEMAS.items():
         assert (SCHEMA_DIR / name).read_text(encoding="utf-8") == render(model), \
             f"schema/{name} veraltet – uv run python -m nexproto.schema"
+
+
+def test_namen_aufloesen():
+    lg = log()
+    me, other = lg.fights[0].actors
+    assert player_name(lg, me) == "Testheld"  # eigener Name ist nicht maskiert
+    assert player_name(lg, other) == "Moonlin"  # "Mo***n" + jobId 17 (cleric)
+    other.jobId = 14
+    assert player_name(lg, other) == "Mo***n"  # anderer Klasse: unbekannt, bleibt maskiert

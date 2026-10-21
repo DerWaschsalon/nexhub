@@ -31,6 +31,9 @@ MAX_UNPACKED = 32 * 1024 * 1024
 MAX_FIGHTS = 64
 MAX_HITS_PER_FIGHT = 200_000  # gemessen: bis knapp 6 000 in Dungeon-Kämpfen
 HIT_COLUMNS = ("t_ms", "actor", "owner", "skill", "damage", "multi", "flags")
+# jobId der Kampfdateien → Klassen-Schlüssel wie im Daemon (Schlüssel von `names`: "Maske|klasse")
+JOB_CLASSES = {11: "gladiator", 12: "templar", 13: "assassin", 14: "ranger", 15: "sorcerer",
+               16: "spiritmaster", 17: "cleric", 18: "chanter"}
 
 
 class NexLogError(ValueError):
@@ -169,3 +172,11 @@ def unpack(data: bytes) -> NexLog:
 def _first_error(e: ValidationError) -> str:
     err = e.errors()[0]
     return f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
+
+
+def player_name(log: NexLog, actor: A2Actor) -> str:
+    """Anzeigename einer Figur: fremde Namen speichert der Mitschnitt maskiert („Mo***n“),
+    der Daemon schickt die vollen in `names` mit."""
+    if "*" not in actor.nickname:
+        return actor.nickname
+    return log.names.get(f"{actor.nickname}|{JOB_CLASSES.get(actor.jobId, '')}", actor.nickname)
