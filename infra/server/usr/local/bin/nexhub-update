@@ -18,7 +18,7 @@ git -C "$SRC" fetch --quiet origin "$REF"
 git -C "$SRC" checkout --quiet --detach FETCH_HEAD
 REV=$(git -C "$SRC" rev-parse --short HEAD)
 cd /srv/nexhub
-docker compose build --pull api
+GIT_REV="$REF@$REV" docker compose build --pull api
 docker compose up -d
 docker image prune -f >/dev/null
 waschsalon-lock log "$WER" "Hub $REF@$REV gebaut und gestartet"

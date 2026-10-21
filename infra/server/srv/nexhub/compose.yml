@@ -28,7 +28,10 @@ services:
 
   # Hub (API + Web-Oberfläche), gebaut aus src/ (Klon des Repos) mit nexhub-update
   api:
-    build: ./src/hub
+    build:
+      context: ./src/hub
+      args:
+        GIT_REV: ${GIT_REV:-dev}
     image: nexhub-api:lokal
     restart: unless-stopped
     environment:
