@@ -1,7 +1,13 @@
 # NexLogs
 
-Log-Ansicht für AION-2-Runs, ähnlich Warcraft Logs: Rangliste, DPS-Verlauf, Fähigkeiten und Tode je
-Boss. React 19 + TypeScript + Vite, ohne weitere Bibliotheken.
+Log-Ansicht für AION-2-Runs, ähnlich Warcraft Logs: je Boss Rangliste, DPS-Verlauf, Fähigkeiten
+(Krit, Min/Max/Ø, Rücken, Parade, Perfekt, Doppelt, Mehrfachtreffer, Spezialisierungen zum
+Aufklappen), Zeitleiste (Opener, jeder Zauber je Fähigkeit mit Filter, Buffs auf dem Spieler und
+Debuffs auf dem Boss) und Tode. React 19 + TypeScript + Vite, ohne weitere Bibliotheken.
+
+Englisch und Deutsch, umschaltbar oben rechts; Standard Englisch, die Wahl merkt sich der Browser.
+Texte in `src/lib/i18n.tsx`, Namen von Fähigkeiten und Buffs aus den Spieldaten je Sprache
+(`src/lib/names.ts`, erst bei Bedarf geladen).
 
 NexLogs hat kein eigenes Backend. Die Runs lädt NexBoard in den Hub hoch; NexLogs liest sie über
 die Hub-API (`/api/runs`, `/api/runs/{id}`, `/api/runs/{id}/fights/{kampf}`, geteilt:
@@ -21,6 +27,10 @@ schon gesetzt), damit das Login-Cookie des Hubs gilt.
   `src/lib/classes.ts`, Symbole in `public/klassen/` (Herkunft dort in `HERKUNFT.md`).
 - Fähigkeitssymbole kommen vom CDN des Spiels (`assets.playnccdn.com`), Zuordnung Code → Bild wie
   in A2Tools: `src/data/skill_icons.json` plus Regeln in `src/lib/skillIcons.ts`.
+- Namen und Symbole von Fähigkeiten und Buffs: `src/data/skills/`, `src/data/buffs/` (Herkunft in
+  `src/data/HERKUNFT.md`). Ohne Eintrag gilt der Name aus der Kampfdatei, sonst `[Code]`.
+- Was der Hub dafür aus den Kampfdateien liest (Min/Max, Parade, Spezialisierungen, Zeitpunkte,
+  Buff-Abschnitte), steht in `hub/api/nexhub_api/analysis.py` bei `fight_detail`.
 - Im DPS-Verlauf hat jeder Spieler seine Klassenfarbe; ein zweiter Spieler derselben Klasse ist
   gestrichelt.
 

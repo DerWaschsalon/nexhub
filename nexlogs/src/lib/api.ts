@@ -63,7 +63,21 @@ export type FightSkill = {
 	back: number;
 	perfect: number;
 	double: number;
+	parry: number;
+	min: number;
+	max: number;
+	avg: number;
+	multi_hits: number;
+	multi_damage: number;
+	/** aktive Spezialisierungen 1–5 */
+	specs: number[];
+	/** Zeitpunkte der Treffer in ms seit Kampfbeginn */
+	casts: number[];
 };
+
+/** Abschnitt eines Buffs: [start, ende, stapel, wodurch beendet], ms seit Kampfbeginn. */
+export type BuffSegment = [number, number, number, number];
+export type Buff = { actor: number; by: number; id: number; up: number; segments: BuffSegment[] };
 
 export type FightPlayer = Player & { actor: number; skills: FightSkill[] };
 
@@ -78,6 +92,8 @@ export type Fight = {
 	players: FightPlayer[];
 	timeline: { bucket_ms: number; players: { actor: number; damage: number[] }[] } | null;
 	deaths: { name: string; t_ms: number; revived_ms: number | null }[];
+	target: number | null;
+	buffs: Buff[];
 };
 
 /** Quelle eines Runs: eigener Run im Hub (mit Login) oder geteilter Link (ohne Login). */

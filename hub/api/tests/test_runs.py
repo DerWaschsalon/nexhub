@@ -167,6 +167,36 @@ def test_kampf_details(client, as_user):
     assert client.get(f"/api/runs/{run_id}/fights/auto_1").status_code == 401
 
 
+def test_kampf_details_faehigkeiten_und_buffs(client, as_user):
+    """Was die Kampfdatei über die Summen hinaus hat: Min/Max, Parade, Mehrfachtreffer,
+    Spezialisierungen, Zeitpunkte und Buff-Abschnitte."""
+    f = fight(1)
+    f["targetId"] = 900
+    f["details"]["skills"][0].update({"minDmg": 1200, "maxDmg": 90_000, "parry": 2, "multiHitCount": 3,
+                                      "multiHitDamage": 7000, "specs": [True, False, False, True, False],
+                                      "hitTimestamps": [5200, 200, "x", 700]})
+    f["buffs"] = [{"on": 1, "id": 20100, "by": 2, "segs": "-4000,30000,1,0;30000,100000,2,10;kaputt", "up": 100_000},
+                  {"on": 900, "id": 790, "by": 1, "segs": "1000,9000,1,1", "up": 8000},
+                  {"on": 4711, "id": 1, "by": 0, "segs": "0,1,1,1", "up": 1},     # fremde Figur: weg
+                  {"on": [1], "id": 2, "segs": "0,1,1,1"}]                          # kaputt: weg
+    log = nexlog()
+    from nexproto import unpack
+    data = unpack(log).model_dump(mode="json")
+    data["fights"][0] = f
+    member = as_user(MEMBER)
+    run_id = upload(client, pair(client, member), pack(NexLog.model_validate(data))).json()["id"]
+    d = member.get(f"/api/runs/{run_id}/fights/auto_1").json()
+    s = d["players"][0]["skills"][0]
+    assert (s["min"], s["max"], s["avg"], s["parry"], s["multi_hits"], s["multi_damage"]) == \
+        (1200, 90_000, 50_000, 20.0, 3, 7000)
+    assert s["specs"] == [1, 4] and s["casts"] == [200, 700, 5200]
+    assert d["players"][0]["skills"][1]["specs"] == [] and d["players"][0]["skills"][1]["casts"] == []
+    assert d["target"] == 900
+    assert d["buffs"] == [
+        {"actor": 1, "by": 2, "id": 20100, "up": 100_000, "segments": [[-4000, 30000, 1, 0], [30000, 100000, 2, 10]]},
+        {"actor": 900, "by": 1, "id": 790, "up": 8000, "segments": [[1000, 9000, 1, 1]]}]
+
+
 def test_kampf_details_geteilt(client, as_user):
     member = as_user(MEMBER)
     run_id = upload(client, pair(client, member), nexlog()).json()["id"]

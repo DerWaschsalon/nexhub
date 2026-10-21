@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Fight } from '../lib/api.ts';
 import { classColor } from '../lib/classes.ts';
-import { formatCompact, formatDuration, formatNumber } from '../lib/format.ts';
+import { useI18n } from '../lib/i18n.tsx';
+import { formatDuration } from '../lib/time.ts';
 
 // Breite = echte Breite des Containers, damit die Schrift auf dem Handy nicht mitschrumpft
 const H = 260;
@@ -10,6 +11,7 @@ const SMOOTH_S = 5; // gleitender Mittelwert über 5 Sekunden, sonst zackt jeder
 
 /** DPS-Verlauf je Spieler in Klassenfarbe. Zwei Spieler derselben Klasse: der zweite gestrichelt. */
 export function DpsChart({ fight, highlight }: { fight: Fight; highlight: string | null }) {
+	const { t, num, compact } = useI18n();
 	const [hover, setHover] = useState<number | null>(null);
 	const box = useRef<HTMLElement>(null);
 	const [W, setW] = useState(900);
@@ -37,7 +39,7 @@ export function DpsChart({ fight, highlight }: { fight: Fight; highlight: string
 		});
 	}, [fight]);
 
-	if (!series.length) return <p className="dim">Für diesen Kampf gibt es keine Einzeltreffer, deshalb keinen Verlauf.</p>;
+	if (!series.length) return <p className="dim">{t('chart.none')}</p>;
 
 	const n = Math.max(...series.map((s) => s.values.length));
 	const max = Math.max(1, ...series.flatMap((s) => s.values));
@@ -59,12 +61,12 @@ export function DpsChart({ fight, highlight }: { fight: Fight; highlight: string
 
 	return (
 		<figure className="chart" ref={box}>
-			<svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`DPS-Verlauf über ${formatDuration(secs * 1000)}`}
+			<svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('chart.label', { d: formatDuration(secs * 1000) })}
 				onPointerMove={move} onPointerLeave={() => setHover(null)}>
-				{ticks.map((t) => (
-					<g key={t}>
-						<line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} className="grid" />
-						<text x={PAD.l - 8} y={y(t) + 4} textAnchor="end" className="axis">{formatCompact(t)}</text>
+				{ticks.map((v) => (
+					<g key={v}>
+						<line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} className="grid" />
+						<text x={PAD.l - 8} y={y(v) + 4} textAnchor="end" className="axis">{compact(v)}</text>
 					</g>
 				))}
 				{xTicks.map((i) => (
@@ -84,7 +86,7 @@ export function DpsChart({ fight, highlight }: { fight: Fight; highlight: string
 				<div className="tip glass" style={{ left: `${(x(hover) / W) * 100}%` }}>
 					<strong>{formatDuration(hover * fight.timeline!.bucket_ms)}</strong>
 					{hoverRows.map((r) => (
-						<span key={r.name}><i style={{ background: r.color }} />{r.name}<b className="num">{formatNumber(r.v)}</b></span>
+						<span key={r.name}><i style={{ background: r.color }} />{r.name}<b className="num">{num(r.v)}</b></span>
 					))}
 				</div>
 			)}

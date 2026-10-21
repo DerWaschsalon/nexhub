@@ -1,6 +1,6 @@
 import type { Player } from '../lib/api.ts';
 import { classColor } from '../lib/classes.ts';
-import { formatCompact, formatNumber } from '../lib/format.ts';
+import { useI18n } from '../lib/i18n.tsx';
 import { PlayerName } from './ClassBadge.tsx';
 
 /** Rangliste: Balken in Klassenfarbe, längster Balken = meister Schaden. */
@@ -9,6 +9,7 @@ export function RankBars({ players, selected, onSelect }: {
 	selected?: string | null;
 	onSelect?: (name: string) => void;
 }) {
+	const { num, compact, t } = useI18n();
 	const max = players[0]?.damage || 1;
 	const total = players.reduce((s, p) => s + p.damage, 0) || 1;
 	return (
@@ -22,11 +23,11 @@ export function RankBars({ players, selected, onSelect }: {
 						<span className="bar" aria-hidden>
 							<span style={{ width: `${(100 * p.damage) / max}%`, background: color, boxShadow: `0 0 18px -4px ${color}` }} />
 						</span>
-						<span className="value num" title={`${formatNumber(p.damage)} Schaden`}>
-							{formatCompact(p.damage)}
+						<span className="value num" title={`${num(p.damage)} ${t('skills.col.damage')}`}>
+							{compact(p.damage)}
 							<small>{Math.round((100 * p.damage) / total)} %</small>
 						</span>
-						<span className="dps num">{formatNumber(p.dps)}<small>/s</small></span>
+						<span className="dps num">{num(p.dps)}<small>/s</small></span>
 					</>
 				);
 				return (
