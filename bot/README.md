@@ -239,8 +239,10 @@ Discord-Bot-Modul (`daemon/deckbar_daemon/bot.py`) umgesetzt, Einrichtung dort �
    `player` muss zu einem Namen in `players[]` passen, der Rest ist optional) — damit postet der
    Bot zusätzlich einen Link „📊 Analyse" auf eine eigene Seite im Web-Dashboard (`/runs/<id>`,
    kein Login nötig, Optik/Umfang an [AbyssLogs](https://abysslogs.com) angelehnt) mit
-   DPS-über-Zeit-Diagramm, Trefferstatistik (Crit-/Back-Attack-/Perfect-/Double-Rate) und
-   aufklappbarer Skill-Aufschlüsselung pro Spieler (mit Icon, falls aufgelöst). `skill` kann ein
+   DPS-über-Zeit-Diagramm, Trefferstatistik (Crit-/Back-Attack-/Perfect-/Double-Rate),
+   aufklappbarer Skill-Aufschlüsselung pro Spieler (mit Icon, falls aufgelöst) und einer rohen
+   Hit-für-Hit-Tabelle (Zeit/Spieler/Skill/Schaden/Flags, scrollbar, wie AbyssLogs' Zeitleiste —
+   nicht nur die Aggregat-Statistiken). `skill` kann ein
    roher Code oder schon ein Name sein — `skills` (einmal pro Payload, nicht pro Einzeltreffer,
    genau wie AbyssLogs' `timelineIcons`) löst ihn in Name + Icon-URL auf; fehlt ein Eintrag, zeigt
    die Seite einfach den rohen Wert ohne Icon. DeckBars A2Tools-Kern löst Skill-Icons für die

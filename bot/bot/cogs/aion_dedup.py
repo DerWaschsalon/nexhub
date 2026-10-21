@@ -83,8 +83,6 @@ DEFAULT_DELAY = 15
 DURATION_TOLERANCE_S = 20
 START_TOLERANCE_MIN = 1
 API_START_TOLERANCE_MS = 30_000
-
-
 def fmt_num(n: float) -> str:
     n = float(n)
     if n >= 1_000_000:
@@ -96,14 +94,6 @@ def fmt_num(n: float) -> str:
 
 def fmt_dps(n: float) -> str:
     return f"{fmt_num(n)}/s"
-
-
-def bar(value: float, max_value: float, width: int = 10) -> str:
-    """Balkengrafik relativ zum besten Wert in der Gruppe, à la Details!/Raider.io-DPS-Meter."""
-    if max_value <= 0:
-        return "░" * width
-    filled = max(0, min(width, round(width * value / max_value)))
-    return "█" * filled + "░" * (width - filled)
 
 
 # ---- Variante 1: Text-Nachrichten im bestehenden DeckBar-Webhook-Kanal filtern --------------
@@ -461,13 +451,6 @@ def build_run_embed(
     e.add_field(name="Kampfzeit", value=f"{minutes}:{seconds:02d}")
     if image_filename:
         e.set_image(url=f"attachment://{image_filename}")
-    for b in (bosses or [])[:20]:
-        boss_players = b["players"][:10]
-        max_dps = max((p["dps"] for p in boss_players), default=0)
-        boss_lines = [
-            f"**{p['name']}**  `{bar(p['dps'], max_dps, width=8)}`  {fmt_dps(p['dps'])}" for p in boss_players
-        ]
-        e.add_field(name=f"🗡️ {b['name']}", value="\n".join(boss_lines) or "–", inline=False)
     if run_id or guild_id:
         from .dashboard import dashboard_base_url
 
@@ -646,17 +629,29 @@ class AionDedup(commands.Cog):
             cluster.run, len(cluster.reports), bosses, run_id=run_id, guild_id=cluster.guild_id,
             image_filename=image_filename,
         )
-        file = None
+        embeds = [embed]
+        files = []
+        loop = asyncio.get_running_loop()
         if image_filename:
             from .aion_image import render_run_image
 
-            image_buf = await asyncio.get_running_loop().run_in_executor(
+            image_buf = await loop.run_in_executor(
                 None, render_run_image, cluster.run["dungeon"], cluster.run.get("difficulty"), players,
                 cluster.run["bosses_killed"], cluster.run["bosses_total"], cluster.run["fight_ms"],
             )
-            file = discord.File(image_buf, filename=image_filename)
+            files.append(discord.File(image_buf, filename=image_filename))
+        # max. 10 Embeds pro Discord-Nachricht, eines geht an das Haupt-Embed oben
+        for i, b in enumerate((bosses or [])[:9]):
+            from .aion_image import render_boss_image
+
+            boss_buf = await loop.run_in_executor(None, render_boss_image, b["name"], b["players"])
+            boss_filename = f"aion_boss_{i}.png"
+            files.append(discord.File(boss_buf, filename=boss_filename))
+            boss_embed = discord.Embed(title=b["name"], colour=discord.Colour.gold())
+            boss_embed.set_image(url=f"attachment://{boss_filename}")
+            embeds.append(boss_embed)
         try:
-            await channel.send(embed=embed, file=file)
+            await channel.send(embeds=embeds, files=files)
         except discord.HTTPException as e:
             log.warning("AION-API: Posten fehlgeschlagen: %r", e)
 

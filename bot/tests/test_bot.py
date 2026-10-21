@@ -331,13 +331,6 @@ def test_aion_api_merge_and_embed():
     assert fmt_num(8_080) == "8.1k"
     assert fmt_dps(38_000) == "38.0k/s"
 
-    from bot.cogs.aion_dedup import bar
-
-    assert bar(10, 10, width=10) == "█" * 10
-    assert bar(0, 10, width=10) == "░" * 10
-    assert bar(5, 10, width=10) == "█" * 5 + "░" * 5
-    assert bar(5, 0, width=10) == "░" * 10  # kein Höchstwert -> leer statt Division durch 0
-
     base = {"dungeon": "Ferocious Horn Den", "bosses_total": 3, "bosses_killed": 3,
             "start_ms": 1_760_445_123_000, "fight_ms": 350_000,
             "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000}]}
@@ -690,6 +683,33 @@ def test_dashboard_render_fight_section():
     assert "Fireball" in html2  # Skill-Aufschlüsselung mit aufgelöstem Namen
     assert "b1" in html2  # Buff ohne Lookup-Eintrag -> roher Wert
     assert spec2 is not None and spec2[0] == "chart1"
+    assert "timeline-scroll" in html2  # rohe Hit-für-Hit-Tabelle (AbyssLogs-Stil) ist mit drin
+    assert "flag-crit" in html2
+
+
+def test_dashboard_render_timeline_table():
+    from bot.cogs.dashboard import render_timeline_table
+
+    skills = {"s1": {"name": "Fireball", "icon": "https://cdn.example.com/fireball.png"}}
+    timeline = [
+        {"t_ms": 65_000, "player": "ReZero", "skill": "s1", "damage": 41200,
+         "crit": True, "back": True, "perfect": False, "double": False},
+        {"t_ms": 1_000, "player": "Gamunex", "skill": "unknown_code", "damage": 9000},
+    ]
+    html = render_timeline_table(timeline, skills)
+    assert "1:05" in html  # 65_000 ms -> 1:05, sortiert nach t_ms (hier schon absteigend eingegeben)
+    assert "0:01" in html
+    assert "Fireball" in html and "fireball.png" in html
+    assert "unknown_code" in html  # kein Lookup-Treffer -> roher Code statt Absturz
+    assert 'class="flag flag-crit"' in html and 'class="flag flag-back"' in html
+    assert "flag-perfect" not in html  # nur gesetzte Flags werden angezeigt
+    assert "41,200" in html
+
+    # Schutzgrenze: mehr als `limit` Treffer werden abgeschnitten, mit Hinweistext
+    many = [{"t_ms": i * 100, "player": "A", "skill": "s1", "damage": 1} for i in range(10)]
+    truncated_html = render_timeline_table(many, skills, limit=3)
+    assert truncated_html.count("<tr>") == 4  # 1 Kopfzeile + 3 Datenzeilen (Limit)
+    assert "ersten 3 von 10" in truncated_html
 
 
 def test_dashboard_run_page_validates_id_and_404():
@@ -816,7 +836,16 @@ def test_aion_api_boss_dps():
 
     embed = build_run_embed(base, reporters=2, bosses=bosses)
     field_names = [f.name for f in embed.fields]
-    assert "🗡️ Boss 1" in field_names and "🗡️ Boss 2" in field_names
+    assert "🗡️ Boss 1" not in field_names  # Boss-DPS ist jetzt ein Bild, kein Text-Feld mehr
+
+    from PIL import Image
+
+    from bot.cogs.aion_image import WIDTH, render_boss_image
+
+    boss_buf = render_boss_image(bosses[0]["name"], bosses[0]["players"])
+    boss_image = Image.open(boss_buf)
+    assert boss_image.format == "PNG"
+    assert boss_image.size[0] == WIDTH
 
 
 def test_aion_parse_and_match():

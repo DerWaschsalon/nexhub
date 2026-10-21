@@ -254,6 +254,26 @@ Rangkarte des Levelsystems (gleiche DejaVu-Schrift, gleiches Pillow-Fallback-Mus
 Schriftdatei mal fehlt). Gerendert in `run_in_executor` (Bild-Erstellung blockiert sonst den
 Event-Loop), als `discord.File` zusammen mit dem Embed gesendet (`e.set_image(url="attachment://
 aion_run.png")`). `build_run_embed()` braucht dafür kein `players`-Argument mehr (unbenutzt
-geworden, Signatur entsprechend verschlankt) — die Boss-spezifischen DPS-Zeilen (`🗡️ <Boss>`-Felder)
-bleiben weiterhin Text, da das Bild nur die Gesamt-Rangliste abdeckt. Die „📊 Analyse"-Verlinkung
-(Zeitleiste + Bestenliste) steht unverändert als Text im Embed. 65 Tests grün.
+geworden, Signatur entsprechend verschlankt). Die „📊 Analyse"-Verlinkung (Zeitleiste + Bestenliste)
+steht unverändert als Text im Embed. 65 Tests grün.
+
+**Update 2026-10-21, Folgewunsch nach dem ersten Live-Test:** Boss-DPS jetzt ebenfalls als Bild
+statt Text — `render_boss_image()` (neu in `aion_image.py`, teilt sich `_draw_rows()` mit
+`render_run_image()`) rendert pro Boss ein eigenes Balkendiagramm. Discord erlaubt max. 10 Embeds
+pro Nachricht, daher ein Embed pro Boss (Titel = Bossname, Bild über `attachment://aion_boss_<i>
+.png`) zusätzlich zum Haupt-Embed, auf die ersten 9 Bosse begrenzt. Die alten `🗡️ <Boss>`-Text-
+Felder und die jetzt ungenutzte `bar()`-Textbalken-Funktion sind entfernt. 65 Tests grün (einer
+ersetzt, einer neu für `render_boss_image()`).
+
+## Analyse-Seite: rohe Hit-für-Hit-Tabelle (2026-10-21)
+
+Auf Wunsch nachgezogen: bisher zeigte `/runs/<id>` nur Aggregat-Statistiken (DPS-Diagramm,
+Crit-/Back-/Perfect-/Double-Rate, Skill-/Buff-Aufschlüsselung je Spieler), nicht aber die
+Einzeltreffer selbst — das Herzstück von AbyssLogs' Zeitleiste fehlte. Neu: `render_timeline_table()`
+in `bot/cogs/dashboard.py` baut daraus eine scrollbare Tabelle (Zeit, Spieler, Skill mit Icon,
+Schaden, Flags als farbige Badges für Crit/Back/Perfect/Double), sortiert nach `t_ms`. In
+`render_fight_section()` eingehängt — erscheint also automatisch sowohl beim Hauptkampf als auch
+bei jedem einzelnen „Versuch" (teilt sich den Renderer). Schutzgrenze `limit=3000` Zeilen gegen
+pathologisch lange Mitschnitte (reine Absicherung, keine normale UX-Grenze — AbyssLogs selbst zeigt
+ebenfalls die volle Liste). Aufklappbar per `<details>`, damit die Seite bei kurzen Läufen nicht
+sofort von einer langen Tabelle dominiert wird. 66 Tests grün.

@@ -221,6 +221,16 @@ details .bar-row { padding: 4px 0; }
 .section h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--dim); text-transform: uppercase;
              letter-spacing: 0.6px; }
 
+.timeline-scroll { max-height: 420px; overflow-y: auto; border: 1px solid var(--line); border-radius: 9px; }
+.timeline-scroll table { font-size: 12.5px; }
+.timeline-scroll thead th { position: sticky; top: 0; background: #11131f; z-index: 1; }
+.flag { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 99px;
+        margin-right: 4px; white-space: nowrap; }
+.flag-crit { background: rgba(255, 159, 10, 0.18); color: #ffb648; }
+.flag-back { background: rgba(94, 200, 255, 0.18); color: #5ec8ff; }
+.flag-perfect { background: rgba(191, 90, 242, 0.18); color: #d08bff; }
+.flag-double { background: rgba(48, 209, 88, 0.18); color: #6ee395; }
+
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } }
 
@@ -345,6 +355,46 @@ def role_can_view(channel, role: discord.Role, everyone: discord.Role) -> bool:
     return bool(base & VIEW)
 
 
+def render_timeline_table(timeline: list[dict], skills_map: dict, limit: int = 3000) -> str:
+    """Rohe Hit-für-Hit-Tabelle wie bei AbyssLogs — jeder Einzeltreffer mit Zeit, Spieler, Skill,
+    Schaden und Flags, nicht nur die Aggregat-Statistiken. `limit` ist eine reine Schutzgrenze
+    gegen pathologisch lange Mitschnitte, keine normale UX-Grenze."""
+    rows = sorted(timeline, key=lambda ev: ev.get("t_ms") or 0)
+    truncated = len(rows) > limit
+    rows = rows[:limit]
+    body_parts = []
+    for ev in rows:
+        t_ms = ev.get("t_ms") or 0
+        minutes, seconds = divmod(round(t_ms / 1000), 60)
+        skill_key = ev.get("skill")
+        meta = (skills_map.get(skill_key) or {}) if skill_key else {}
+        skill_name = meta.get("name") or skill_key or "–"
+        icon = skill_icon_html(meta.get("icon"))
+        flags = []
+        if ev.get("crit"):
+            flags.append('<span class="flag flag-crit">Crit</span>')
+        if ev.get("back"):
+            flags.append('<span class="flag flag-back">Back</span>')
+        if ev.get("perfect"):
+            flags.append('<span class="flag flag-perfect">Perfect</span>')
+        if ev.get("double"):
+            flags.append('<span class="flag flag-double">Double</span>')
+        damage = ev.get("damage")
+        damage_text = f"{damage:,.0f}" if isinstance(damage, (int, float)) else "–"
+        body_parts.append(
+            f"<tr><td>{minutes}:{seconds:02d}</td><td>{esc(ev.get('player') or '–')}</td>"
+            f"<td>{icon}{esc(skill_name)}</td><td>{damage_text}</td><td>{''.join(flags)}</td></tr>"
+        )
+    note = (
+        f'<p class="bar-meta">Zeigt die ersten {limit:,} von {len(timeline):,} Treffern.</p>'
+        if truncated else ""
+    )
+    return (
+        '<div class="timeline-scroll"><table><thead><tr><th>Zeit</th><th>Spieler</th><th>Skill</th>'
+        f'<th>Schaden</th><th>Flags</th></tr></thead><tbody>{"".join(body_parts)}</tbody></table></div>{note}'
+    )
+
+
 def render_fight_section(
     players: list[dict], timeline: list[dict], skills_map: dict, canvas_id: str,
 ) -> tuple[str, dict | None]:
@@ -393,11 +443,13 @@ def render_fight_section(
             ) + "</details>"
             for name, buff_list in sorted(buffs.items()) if buff_list
         )
+        timeline_table = render_timeline_table(timeline, skills_map)
         html += f"""
 <canvas id="{canvas_id}" height="220"></canvas>
 <table><tr><th>Spieler</th><th>Treffer</th><th>Crit</th><th>Back-Attack</th><th>Perfect</th><th>Double</th></tr>{stat_rows}</table>
 {f'<div class="section"><h3>Skills</h3>{skill_blocks}</div>' if skill_blocks else ''}
-{f'<div class="section"><h3>Buffs/Debuffs</h3>{buff_blocks}</div>' if buff_blocks else ''}"""
+{f'<div class="section"><h3>Buffs/Debuffs</h3>{buff_blocks}</div>' if buff_blocks else ''}
+<div class="section"><h3>Zeitleiste</h3><details><summary>Alle Treffer ({len(timeline):,})</summary>{timeline_table}</details></div>"""
         chart_spec = (canvas_id, "line", bucket_dps(timeline, fight_ms), "Sekunden")
     return html, chart_spec
 
