@@ -1,3 +1,5 @@
 [submodule "capture/a2tools"]
 	path = nexboard/capture/a2tools
 	url = https://github.com/taengu/A2Tools-DPS-Meter.git
+	# build.sh wendet capture/patches/ an; das soll nicht als Änderung zählen
+	ignore = dirty

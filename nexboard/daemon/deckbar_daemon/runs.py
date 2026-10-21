@@ -954,10 +954,13 @@ class DungeonRuns:
             entries = list(os.scandir(self.history_dir()))
         except OSError:
             return 0
+        # Einzeltreffer liegen daneben in hits/<id>.json (deckbar-capture) und gehen mit
+        hits_dir = self.history_dir().parent / "hits"
         for e in entries:
             try:
                 if e.name.endswith(".json") and e.stat().st_mtime < cutoff:
                     os.unlink(e.path)
+                    (hits_dir / e.name).unlink(missing_ok=True)
                     self.mtimes.pop(e.name, None)
                     n += 1
             except OSError:

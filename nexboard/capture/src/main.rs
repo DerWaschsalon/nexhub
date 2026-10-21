@@ -19,7 +19,8 @@
 //! enthält `view` (Zeilen wie im Stream-Overlay, siehe view.rs) und nach `{"cmd":"view","full":true}`
 //! zusätzlich `data` (DpsData des Meters mit Skill-Aufschlüsselung, bis ~100 KB).
 //! Kampf-History: alle 30 s, vor jedem Zurücksetzen der Kampfdaten (Zonenwechsel …) und beim
-//! Beenden, als `<history-dir>/history/<id>.json` im Format des Meters.
+//! Beenden, als `<history-dir>/history/<id>.json` im Format des Meters, dazu die Einzeltreffer
+//! als `<history-dir>/hits/<id>.json` (hits.rs).
 //!
 //! Rechte: Mitschneiden braucht `cap_net_raw` (`sudo setcap cap_net_raw=ep deckbar-capture`),
 //! root nicht. Pakete wertet der Kern nur aus, solange AION2.exe läuft.
@@ -48,6 +49,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
+mod hits;
 mod pcap;
 mod view;
 
@@ -124,6 +126,7 @@ struct Core {
     npcs: Arc<NpcLookup>,
     ping: Arc<PingTracker>,
     history: FightHistoryManager,
+    hits: Arc<hits::HitLog>,
     save_lock: Mutex<()>,
     data_dir: PathBuf,
     dot_ids: HashSet<i32>,
@@ -157,6 +160,7 @@ impl Core {
             npcs,
             ping,
             history: FightHistoryManager::new(args.history_dir.clone()),
+            hits: Arc::new(hits::HitLog::new(&args.history_dir)),
             save_lock: Mutex::new(()),
             data_dir: args.data_dir.clone(),
             dot_ids,
@@ -173,6 +177,9 @@ impl Core {
                 core.save(true);
             }
         });
+        // Jeden Treffer mit eigenem Schaden mitschreiben (hits.rs)
+        let hits = core.hits.clone();
+        core.storage.set_on_hit(move |packet| hits.record(packet));
         core
     }
 
@@ -196,10 +203,14 @@ impl Core {
             }
         };
         let mut ids = Vec::new();
+        let summons = self.storage.get_summon_data();
         for record in &records {
             match self.history.save_fight(record) {
                 Ok(()) => ids.push(record.id.clone()),
                 Err(e) => warn!("Kampf {} nicht gespeichert: {e}", record.id),
+            }
+            if let Err(e) = self.hits.save_fight(record, &summons, &self.skills) {
+                warn!("Treffer von Kampf {} nicht gespeichert: {e}", record.id);
             }
         }
         if !ids.is_empty() {
@@ -255,6 +266,7 @@ impl Core {
                 }
                 let _saving = self.save_lock.lock();
                 self.history.delete_fight(id)?;
+                self.hits.delete_fight(id);
                 Ok(Value::Null)
             }
             "capture_status" => {

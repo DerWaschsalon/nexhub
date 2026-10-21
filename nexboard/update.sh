@@ -49,6 +49,11 @@ SUB=capture/a2tools
 newer() { [[ -n $1 && $1 != "$2" && $(printf '%s\n%s\n' "$2" "$1" | sort -V | tail -1) == "$1" ]]; }
 # Ein vorher lokal angehobener Stand (--a2tools) bleibt, solange er neuer ist als der des Repos
 LOCAL_A2=$(git -C "$SUB" describe --tags --exact-match 2>/dev/null || true)
+# Eigene Patches (capture/patches) zurücknehmen, sonst scheitert das Auschecken eines neuen
+# Stands; capture/build.sh wendet sie beim nächsten Bauen wieder an
+for p in capture/patches/*.patch; do
+  [[ -e $SUB/.git ]] && git -C "$SUB" apply --reverse --quiet "../patches/${p##*/}" 2>/dev/null || true
+done
 git submodule update --init --quiet "$SUB" || fail "Submodul $SUB"
 REPO_A2=$(git -C "$SUB" describe --tags --abbrev=0)
 if newer "$LOCAL_A2" "$REPO_A2"; then

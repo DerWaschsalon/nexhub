@@ -323,6 +323,11 @@ def test_cleanup_only_own_history(tmp_path):
         p.write_text("{}")
         t = time.time() - age * 86400
         os.utime(p, (t, t))
+    hits = tmp_path / "hits"  # Einzeltreffer von deckbar-capture neben history/
+    hits.mkdir()
+    (hits / "old.json").write_text("{}")
+    (hits / "new.json").write_text("{}")
     assert runs._cleanup() == 0 and old.exists()  # A2Tools-History: nie löschen
     runs.own_history = lambda: True
     assert runs._cleanup() == 1 and not old.exists() and new.exists()
+    assert not (hits / "old.json").exists() and (hits / "new.json").exists()

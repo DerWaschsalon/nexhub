@@ -201,7 +201,11 @@ die Online-Funktionen des Meters: kein Konto, keine Uploads, keine Update-Abfrag
    inzwischen selbst weggewischt hat).
 
 Die Liste zeigt die Top N nach DPS am aktuellen Ziel (Bosse zuerst) plus einen selbst; im
-Dungeon ist das die Gruppe. Kampf-History im Format des Meters: `~/.local/share/deckbar/aion2/history/`.
+Dungeon ist das die Gruppe. Kampf-History im Format des Meters: `~/.local/share/deckbar/aion2/history/`,
+daneben in `hits/` jeder einzelne Treffer mit eigenem Schaden und Merkmalen (für den Hub, Format in
+[`proto/README.md`](../proto/README.md)). Dafür meldet ein kleiner Patch am Kern
+(`capture/patches/`) jeden Treffer; `capture/build.sh` wendet ihn an, `update.sh` nimmt ihn vor
+einem A2Tools-Update zurück. Passt er nach einem Update nicht mehr, bricht der Build mit Hinweis ab.
 
 `deckbar-capture` spricht Zeilen-JSON über stdin/stdout (Format in `capture/src/main.rs`) und lässt
 sich zum Testen auch allein starten. `--save-packets DIR` zeichnet den Mitschnitt auf,
