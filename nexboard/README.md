@@ -113,6 +113,7 @@ System oder lassen sich umschalten, die Seite passt sich auch an schmale Fenster
 | AION 2 · Overlay | Overlay-Programm steuern, Widgets, Event-Timer | DPS-Mitschnitt |
 | AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | DPS-Mitschnitt |
 | Discord-Bot | Gruppen-DPS und Run-API eines Bots | DPS-Mitschnitt |
+| NexHub | Dieses NexBoard mit einem Konto im NexHub koppeln | – |
 | Updates | Stand von Repo und A2Tools-Kern, Aktualisieren | – |
 
 Unter **System → Module** wird jedes Modul ein- oder ausgeschaltet, sofort und ohne Neustart.
@@ -306,6 +307,18 @@ einschalten. Einstellungen in `~/.config/deckbar/bot.yaml` (Modus 600).
   Meldungen verschiedener Spieler zum selben Run zusammenführen kann.
 
 Beide Wege lassen sich mit „Letzten Kampf senden“ bzw. „Letzten Run senden“ prüfen.
+
+## NexHub
+
+Das Modul **NexHub** verbindet das NexBoard mit einem Konto auf der Hub-Website (Ordner
+[`hub/`](../hub/) im Repo). Kopplung wie beim Fernseher: Hub-Adresse eintragen, „Koppeln“ zeigt
+einen Code wie `BCDF-GHJK` mit Link, im Hub unter „Geräte“ bestätigen, fertig. NexBoard merkt die
+Bestätigung von selbst und bekommt ein eigenes Geräte-Token (`~/.config/deckbar/hub.yaml`,
+Rechte 600). Im Hub lässt sich das Gerät jederzeit entfernen, in NexBoard abkoppeln.
+
+Ohne `https` nimmt NexBoard nur `localhost` als Adresse an, etwa über einen SSH-Tunnel
+(`http://localhost:8080`), damit das Token nie unverschlüsselt durchs Netz geht. Hochgeladen wird
+noch nichts; das kommt mit den Runs.
 
 ## Updates
 

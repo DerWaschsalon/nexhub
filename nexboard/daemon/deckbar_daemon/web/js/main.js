@@ -9,10 +9,11 @@ import dps from "./modules/aion2-dps.js";
 import overlay from "./modules/aion2-overlay.js";
 import runs from "./modules/aion2-runs.js";
 import bot from "./modules/discord-bot.js";
+import hub from "./modules/hub.js";
 import updates from "./modules/updates.js";
 
 export const BRAND = "NexBoard";
-const UI = { deck, "aion2.dps": dps, "aion2.overlay": overlay, "aion2.runs": runs, "discord.bot": bot, updates };
+const UI = { deck, "aion2.dps": dps, "aion2.overlay": overlay, "aion2.runs": runs, "discord.bot": bot, hub, updates };
 const SYSTEM = [
   { id: "modules", name: "Module", icon: "puzzle" },
   { id: "settings", name: "Einstellungen", icon: "cog" },
@@ -146,7 +147,7 @@ function dashboard(ctx) {
   };
   let frame = 0;
   const soon = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; draw(); }); };
-  for (const t of ["hello", "modules", "devices", "dps", "runs", "updates", "bot", "overlay", "settings", "online"]) ctx.onUnmount(on(t, soon));
+  for (const t of ["hello", "modules", "devices", "dps", "runs", "updates", "bot", "hub", "overlay", "settings", "online"]) ctx.onUnmount(on(t, soon));
   // State-Diffs (im Kampf 2×/s) betreffen hier nur die DPS-Kachel: nur diese, höchstens 1×/s
   const slow = throttle(soon, 1000);
   ctx.onUnmount(on("state", (v) => { if (dpsDiff(v)) slow(); }));
@@ -305,7 +306,7 @@ async function init() {
   on("online", () => { renderConn(); renderBanners(); });
   on("layout_error", renderBanners);
   on("layout", renderBanners);
-  for (const t of ["dps", "runs", "updates", "bot", "overlay", "devices"]) on(t, renderNav);
+  for (const t of ["dps", "runs", "updates", "bot", "hub", "overlay", "devices"]) on(t, renderNav);
   // Erststand per REST (sofort sichtbar), danach live über den WebSocket
   try {
     const [modules, st] = await Promise.all([api("GET", "/api/modules"), api("GET", "/api/status")]);

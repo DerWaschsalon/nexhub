@@ -22,6 +22,7 @@ from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, bin_chunks, chunks
 from .background import UPLOAD_MAX, Background, save_upload
 from .bot import DiscordBot
+from .hub import Hub, HubError
 from .capture import aion2_running, history_root
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout, save_settings
@@ -131,6 +132,8 @@ class NexBoard:
         self.bot.listeners.append(self._bot_changed)
         self.dps.fight_listeners.append(self.bot.on_fight)
         self.runs.run_listeners.append(self.bot.on_run)
+        self.hub = Hub(config_dir)
+        self.hub.listeners.append(self._hub_changed)
         # Nur der Daemon mit der echten Konfiguration steuert den Overlay-Dienst (nicht Testinstanzen)
         self.real_config = config_dir.resolve() == default_config_dir().resolve()
         self.overlay = Overlay(config_dir, manage_unit=self.real_config)
@@ -172,6 +175,7 @@ class NexBoard:
         m.register("aion2.runs", self.runs.watch, status=self._runs_status)
         m.register("aion2.overlay", self.overlay.watch, hook=self.overlay.on_module, status=self._overlay_status)
         m.register("discord.bot", hook=self._bot_toggled, status=self._bot_status)
+        m.register("hub", self.hub.watch, hook=self._hub_toggled, status=self._hub_status)
         m.register("updates", self.updates.watch, status=self._updates_status)
 
     async def _announce(self) -> None:
@@ -207,6 +211,11 @@ class NexBoard:
         if not on:
             await self.bot.close()
 
+    async def _hub_toggled(self, on: bool) -> None:
+        self.hub.enabled = on
+        if not on:
+            await self.hub.close()
+
     def _deck_status(self) -> dict:
         return {"devices": len(self.devices), "pages": len(self.layout.pages),
                 "items": sum(len(p.items) for p in self.layout.pages), "error": bool(self.layout_error)}
@@ -229,6 +238,9 @@ class NexBoard:
         s = self.bot.settings
         return {"dps": bool(s.dps_enabled and s.dps_url), "runs": bool(s.runs_enabled and s.runs_url and s.runs_token),
                 "result": self.bot.result}
+
+    def _hub_status(self) -> dict:
+        return {"status": self.hub.status, "owner": (self.hub.account or {}).get("owner")}
 
     def _updates_status(self) -> dict:
         u = self.updates.state
@@ -395,6 +407,9 @@ class NexBoard:
 
     async def _bot_changed(self) -> None:
         await self._broadcast_ui({"type": "bot", "bot": self.bot.info()})
+
+    async def _hub_changed(self) -> None:
+        await self._broadcast_ui({"type": "hub", "hub": self.hub.info()})
 
     async def _overlay_changed(self) -> None:
         await self._broadcast_ui({"type": "overlay", "overlay": self.overlay.info()})
@@ -617,6 +632,7 @@ class NexBoard:
             "updates": self.updates.info(),
             "modules": self.modules.info(),
             "bot": self.bot.info(),
+            "hub": self.hub.info(),
             "overlay": self.overlay.info(),
             "settings": self.settings_info(),
         }, ensure_ascii=False))
@@ -884,6 +900,42 @@ class NexBoard:
             return web.json_response({"error": text}, status=502 if "antwortet" in text or ":" in text else 400)
         return web.json_response({"ok": True, "text": text, **self.bot.info()})
 
+    # ---------------------------------------------------------------- NexHub
+    async def api_get_hub(self, request: web.Request) -> web.Response:
+        return web.json_response(self.hub.info())
+
+    async def api_put_hub(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "kein JSON-Objekt"}, status=400)
+        try:
+            self.hub.update(data)
+        except ValidationError as e:
+            return web.json_response({"error": _validation_text(e)}, status=422)
+        await self._hub_changed()
+        return web.json_response({"ok": True, **self.hub.info()})
+
+    async def api_hub_action(self, request: web.Request) -> web.Response:
+        """pair: Code holen · cancel: Kopplung abbrechen · unpair: abkoppeln · check: Stand prüfen"""
+        if not self.modules.on("hub"):
+            return web.json_response({"error": "Modul NexHub ist aus"}, status=409)
+        action = request.match_info["action"]
+        try:
+            if action == "pair":
+                await self.hub.start_pairing()
+            elif action == "cancel":
+                await self.hub.cancel_pairing()
+            elif action == "unpair":
+                await self.hub.unpair()
+            else:
+                await self.hub.check()
+        except HubError as e:
+            return web.json_response({"error": str(e)}, status=502)
+        return web.json_response({"ok": True, **self.hub.info()})
+
     # ---------------------------------------------------------------- Overlay
     async def api_get_overlay(self, request: web.Request) -> web.Response:
         if self.modules.on("aion2.overlay"):
@@ -977,6 +1029,9 @@ def build_app(deck: NexBoard) -> web.Application:
     app.router.add_get("/api/bot", deck.api_get_bot)
     app.router.add_put("/api/bot", deck.api_put_bot)
     app.router.add_post("/api/bot/test/{kind:dps|runs}", deck.api_bot_test)
+    app.router.add_get("/api/hub", deck.api_get_hub)
+    app.router.add_put("/api/hub", deck.api_put_hub)
+    app.router.add_post("/api/hub/{action:pair|cancel|unpair|check}", deck.api_hub_action)
     app.router.add_get("/api/overlay", deck.api_get_overlay)
     app.router.add_put("/api/overlay", deck.api_put_overlay)
     app.router.add_post("/api/overlay/command", deck.api_overlay_command)
@@ -986,6 +1041,7 @@ def build_app(deck: NexBoard) -> web.Application:
     async def cleanup(_app: web.Application) -> None:
         await deck.art.close()
         await deck.bot.close()
+        await deck.hub.close()
 
     app.on_cleanup.append(cleanup)
     return app

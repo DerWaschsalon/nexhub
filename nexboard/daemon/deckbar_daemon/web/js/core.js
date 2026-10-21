@@ -71,6 +71,7 @@ export const S = {
   runs: null,
   updates: null,
   bot: null,
+  hub: null,
   overlay: null,
   settings: null,
 };
@@ -96,7 +97,7 @@ export function connectLive() {
       case "hello":
         Object.assign(S, {
           online: true, modules: msg.modules, state: msg.state, devices: msg.devices, status: msg.status,
-          dps: msg.dps, runs: msg.runs, updates: msg.updates, bot: msg.bot, overlay: msg.overlay, settings: msg.settings,
+          dps: msg.dps, runs: msg.runs, updates: msg.updates, bot: msg.bot, hub: msg.hub, overlay: msg.overlay, settings: msg.settings,
           layoutError: msg.error,
         });
         emit("hello", msg);
@@ -114,6 +115,7 @@ export function connectLive() {
       case "runs": S.runs = msg.runs; emit("runs", msg.runs); break;
       case "updates": S.updates = msg.updates; emit("updates", msg.updates); break;
       case "bot": S.bot = msg.bot; emit("bot", msg.bot); break;
+      case "hub": S.hub = msg.hub; emit("hub", msg.hub); break;
       case "overlay": S.overlay = msg.overlay; emit("overlay", msg.overlay); break;
       case "modules": S.modules = msg.modules; emit("modules", msg.modules); break;
       case "settings": S.settings = msg.settings; emit("settings", msg.settings); break;

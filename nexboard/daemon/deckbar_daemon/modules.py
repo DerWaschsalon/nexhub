@@ -76,6 +76,12 @@ MODULES: tuple[ModuleInfo, ...] = (
         requires=("aion2.dps",), tags=("Discord", "Gruppe"),
     ),
     ModuleInfo(
+        "hub", "NexHub", "community", "link-variant",
+        "Verbindet die NexBoard mit deinem Konto im NexHub, der Website der Gilde. Später lädt sie "
+        "dorthin deine Dungeon-Runs hoch.",
+        tags=("Hub", "Online"),
+    ),
+    ModuleInfo(
         "updates", "Updates", "system", "update",
         "Prüft täglich auf neue Versionen und neue Releases des A2Tools-Kerns, Installation mit "
         "einem Klick.",
