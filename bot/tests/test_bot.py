@@ -363,10 +363,12 @@ def test_aion_api_merge_and_embed():
     assert [p["name"] for p in players] == ["ReZero", "Gamunex", "Haze"]
     assert players[0]["damage"] == 13_290_000  # der höhere der beiden gemeldeten Werte
 
-    embed = build_run_embed(base, players, reporters=2)
+    embed = build_run_embed(base, reporters=2)
     assert "Ferocious Horn Den" in embed.title
-    assert "🥇 **ReZero**" in embed.description
     assert "2 DeckBar-Meldung" in embed.footer.text
+
+    embed_with_image = build_run_embed(base, reporters=2, image_filename="aion_run.png")
+    assert embed_with_image.image.url == "attachment://aion_run.png"
 
 
 def test_aion_timeline_validation_and_best_pick():
@@ -812,7 +814,7 @@ def test_aion_api_boss_dps():
     assert {p["name"] for p in bosses[0]["players"]} == {"ReZero", "Gamunex"}
     assert bosses[1]["players"][0]["damage"] == 9_500_000
 
-    embed = build_run_embed(base, base["players"], reporters=2, bosses=bosses)
+    embed = build_run_embed(base, reporters=2, bosses=bosses)
     field_names = [f.name for f in embed.fields]
     assert "🗡️ Boss 1" in field_names and "🗡️ Boss 2" in field_names
 
@@ -1548,6 +1550,36 @@ def test_rank_card_renders_valid_png():
     # xp_needed=0 (Edge-Case) darf nicht durch Null teilen
     buf2 = render_rank_card(fake_avatar.getvalue(), "TestUser", level=0, rank=1, xp_into_level=0, xp_needed=0)
     assert Image.open(buf2).size == (WIDTH, HEIGHT)
+
+
+def test_aion_run_image_renders_valid_png():
+    from PIL import Image
+
+    from bot.cogs.aion_image import WIDTH, render_run_image
+
+    players = [
+        {"name": "ReZero", "damage": 13_290_000, "dps": 38_000},
+        {"name": "Gamunex", "damage": 8_000_000, "dps": 23_000},
+        {"name": "Haze", "damage": 5_080_000, "dps": 14_500},
+    ]
+    buf = render_run_image("Ferocious Horn Den", "Normal", players, bosses_killed=3, bosses_total=3, fight_ms=350_000)
+    image = Image.open(buf)
+    assert image.format == "PNG"
+    assert image.size[0] == WIDTH
+
+    # keine Spieler (Edge-Case) darf nicht crashen oder durch Null teilen
+    empty_buf = render_run_image("Fire Temple", None, [], bosses_killed=0, bosses_total=1, fight_ms=0)
+    assert Image.open(empty_buf).size[0] == WIDTH
+
+    # mehr als MAX_ROWS Spieler -> Bild bleibt begrenzt hoch (keine endlose Liste pro Spieler)
+    from bot.cogs.aion_image import MAX_ROWS
+
+    many_players = [{"name": f"P{i}", "damage": 1000 - i, "dps": 10} for i in range(30)]
+    many_buf = render_run_image("Fire Temple", None, many_players, bosses_killed=1, bosses_total=1, fight_ms=60_000)
+    ten_players_buf = render_run_image(
+        "Fire Temple", None, many_players[:MAX_ROWS], bosses_killed=1, bosses_total=1, fight_ms=60_000,
+    )
+    assert Image.open(many_buf).size[1] == Image.open(ten_players_buf).size[1]
 
 
 def test_server_cpu_and_memory_calculations():

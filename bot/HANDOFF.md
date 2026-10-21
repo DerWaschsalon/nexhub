@@ -245,3 +245,15 @@ Weiter Richtung AbyssLogs-Parität ausgebaut (auf Wunsch: „alles so aufbauen w
   Versuch standardmäßig aufgeklappt.
 - Alle drei Felder sind wie gewohnt optional und unabhängig voneinander nutzbar, keines ist
   Voraussetzung für die anderen. 64 Tests grün (`python3 -m pytest -q tests`), kein Regressionen.
+
+## AION-Run-Post als Bild statt Text-Balken (2026-10-21)
+
+Auf Wunsch: der Discord-Post zum Lauf zeigt die Gesamt-Rangliste jetzt als PNG-Balkendiagramm
+(`bot/cogs/aion_image.py`, `render_run_image()`) statt als Text-Zeilen im Embed — analog zur
+Rangkarte des Levelsystems (gleiche DejaVu-Schrift, gleiches Pillow-Fallback-Muster, falls die
+Schriftdatei mal fehlt). Gerendert in `run_in_executor` (Bild-Erstellung blockiert sonst den
+Event-Loop), als `discord.File` zusammen mit dem Embed gesendet (`e.set_image(url="attachment://
+aion_run.png")`). `build_run_embed()` braucht dafür kein `players`-Argument mehr (unbenutzt
+geworden, Signatur entsprechend verschlankt) — die Boss-spezifischen DPS-Zeilen (`🗡️ <Boss>`-Felder)
+bleiben weiterhin Text, da das Bild nur die Gesamt-Rangliste abdeckt. Die „📊 Analyse"-Verlinkung
+(Zeitleiste + Bestenliste) steht unverändert als Text im Embed. 65 Tests grün.

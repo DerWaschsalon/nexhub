@@ -83,7 +83,6 @@ DEFAULT_DELAY = 15
 DURATION_TOLERANCE_S = 20
 START_TOLERANCE_MIN = 1
 API_START_TOLERANCE_MS = 30_000
-MEDALS = ["🥇", "🥈", "🥉"]
 
 
 def fmt_num(n: float) -> str:
@@ -452,21 +451,16 @@ def runs_dir(db) -> Path:
 
 
 def build_run_embed(
-    run: dict, players: list[dict], reporters: int, bosses: list[dict] | None = None, run_id: str | None = None,
-    guild_id: int | None = None,
+    run: dict, reporters: int, bosses: list[dict] | None = None, run_id: str | None = None,
+    guild_id: int | None = None, image_filename: str | None = None,
 ) -> discord.Embed:
     title = f"⚔️ {run['dungeon']}" + (f" ({run['difficulty']})" if run.get("difficulty") else "")
-    max_damage = players[0]["damage"] if players else 0
-    lines = []
-    for i, p in enumerate(players[:15]):
-        rank = MEDALS[i] if i < len(MEDALS) else f"{i + 1}."
-        lines.append(
-            f"{rank} **{p['name']}**  `{bar(p['damage'], max_damage)}`  {fmt_num(p['damage'])}  {fmt_dps(p['dps'])}"
-        )
     minutes, seconds = divmod(round(run["fight_ms"] / 1000), 60)
-    e = discord.Embed(title=title, colour=discord.Colour.gold(), description="\n".join(lines))
+    e = discord.Embed(title=title, colour=discord.Colour.gold())
     e.add_field(name="Bosse", value=f"{run['bosses_killed']}/{run['bosses_total']} besiegt")
     e.add_field(name="Kampfzeit", value=f"{minutes}:{seconds:02d}")
+    if image_filename:
+        e.set_image(url=f"attachment://{image_filename}")
     for b in (bosses or [])[:20]:
         boss_players = b["players"][:10]
         max_dps = max((p["dps"] for p in boss_players), default=0)
@@ -647,9 +641,22 @@ class AionDedup(commands.Cog):
             if (timeline or attempts) else None
         if bosses:
             await self._update_leaderboard(cluster.guild_id, bosses, players_meta, run_id)
-        embed = build_run_embed(cluster.run, players, len(cluster.reports), bosses, run_id=run_id, guild_id=cluster.guild_id)
+        image_filename = "aion_run.png" if players else None
+        embed = build_run_embed(
+            cluster.run, len(cluster.reports), bosses, run_id=run_id, guild_id=cluster.guild_id,
+            image_filename=image_filename,
+        )
+        file = None
+        if image_filename:
+            from .aion_image import render_run_image
+
+            image_buf = await asyncio.get_running_loop().run_in_executor(
+                None, render_run_image, cluster.run["dungeon"], cluster.run.get("difficulty"), players,
+                cluster.run["bosses_killed"], cluster.run["bosses_total"], cluster.run["fight_ms"],
+            )
+            file = discord.File(image_buf, filename=image_filename)
         try:
-            await channel.send(embed=embed)
+            await channel.send(embed=embed, file=file)
         except discord.HTTPException as e:
             log.warning("AION-API: Posten fehlgeschlagen: %r", e)
 
