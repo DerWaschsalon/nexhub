@@ -203,7 +203,7 @@
       "properties": {
         "event": { "enum": ["button_press", "long_press", "slider_change", "page_change"] },
         "item": { "$ref": "#/$defs/id" },
-        "part": { "enum": ["prev", "toggle", "next"] },
+        "part": { "enum": ["prev", "toggle", "next", "reset"] },
         "page": { "$ref": "#/$defs/id" },
         "value": { "type": "integer" },
         "final": { "type": "boolean" }

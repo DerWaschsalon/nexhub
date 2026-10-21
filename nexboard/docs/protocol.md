@@ -73,7 +73,7 @@ USB gibt es nur Textzeilen.
 | `page_change`   | `page`            | Gerät hat die Seite gewechselt (Wischen / Nav-Button)  |
 
 Optional ist `part`, damit Kacheln mit mehreren Schaltflächen unterscheiden können,
-welche gemeint war (für `media`: `prev` | `toggle` | `next`).
+welche gemeint war (für `media`: `prev` | `toggle` | `next`, für `dps`: `reset`).
 
 ```json
 {"v":1,"type":"event","event":"slider_change","item":"vol","value":42,"final":false}
@@ -140,7 +140,7 @@ Items, die nicht mehr passen, werden nicht angezeigt.
 | `toggle` | wie button; aktiv, wenn `state[bind]` truthy ist  | `button_press`, `long_press`    |
 | `slider` | Kachel füllt sich mit Wert; relatives Ziehen      | `slider_change`, `long_press`   |
 | `media`  | Titel/Interpret aus `state.track`, ab h ≥ 2 mit ⏮ ⏯ ⏭ | `button_press` (+ `part`)    |
-| `dps`    | DPS-Rangliste aus `state.dps` (AION 2), Balken in Klassenfarbe | –                |
+| `dps`    | DPS-Rangliste aus `state.dps` (AION 2), Balken in Klassenfarbe, ab h ≥ 2 Reset-Knopf mittig in der Kopfzeile | `button_press` (`part: reset`) |
 
 **Felder**
 

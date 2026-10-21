@@ -211,6 +211,16 @@ class NexBoard:
             self.state.update(dps=None, dps_active=False)
             await self._dps_changed()
 
+    async def _dps_reset(self) -> None:
+        """Reset-Knopf der DPS-Kachel: wie der Reset im Meter (Kampf speichern, neu zählen)."""
+        if self.dps.settings.source != "capture":
+            log.warning("DPS-Reset geht nur mit eigenem Mitschnitt (Quelle %s)", self.dps.settings.source)
+            return
+        try:
+            await self.dps.capture.request("reset")
+        except (RuntimeError, TimeoutError) as e:
+            log.warning("DPS-Reset fehlgeschlagen: %s", e)
+
     async def _bot_toggled(self, on: bool) -> None:
         self.bot.enabled = on
         if not on:
@@ -501,6 +511,9 @@ class NexBoard:
             return "value muss eine Ganzzahl sein"
         part = msg.get("part")
         log.debug("%s: %s %s value=%s part=%s", source, event, item_id, value, part)
+        if item.type == "dps" and event == "button_press" and part == "reset":
+            await self._dps_reset()
+            return None
         await self.executor.on_event(item, event, value, part)
         return None
 

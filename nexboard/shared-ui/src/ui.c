@@ -1140,8 +1140,11 @@ static void build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *
         v->target = text_label(o, &db_font_small, "AION 2");
         lv_obj_add_style(v->target, &db_theme.text_dim, 0);
         lv_label_set_long_mode(v->target, LV_LABEL_LONG_DOT);
-        lv_obj_set_size(v->target, w - 2 * px - 120, ls);
+        lv_obj_set_size(v->target, w / 2 - px - 20, ls); /* endet vor dem Reset-Knopf */
         lv_obj_set_pos(v->target, px + 2, y);
+        /* kleiner Knopf mittig in der Kopfzeile: Meter zurücksetzen */
+        lv_obj_t *reset = lv_obj_get_parent(mini_button(o, t, deckbar_icon_glyph("restart"), "reset", 24));
+        lv_obj_align(reset, LV_ALIGN_TOP_MID, 0, y - 5);
         y += ls + 3;
         v->hp_w = w - 2 * px;
         v->hp_track = plain_obj(o);
