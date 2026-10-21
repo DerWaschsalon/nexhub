@@ -1715,3 +1715,56 @@ def test_youtube_validate_source_rejects_non_channel_ids():
             await provider.validate_source("@nicht-die-kanal-id")
 
     run(go())
+
+
+def test_aion_hub_link():
+    """Der NexHub meldet einen Run: Link an den wartenden Post, sonst nachträglich an den geposteten."""
+    import time
+
+    from bot.cogs.aion_dedup import AionDedup, ApiCluster, build_run_embed, same_run_start, with_hub_link
+
+    base = {"dungeon": "Fire Temple", "bosses_total": 4, "bosses_killed": 4,
+            "start_ms": 1_792_616_000_000, "fight_ms": 300_000,
+            "players": [{"name": "Navonex", "damage": 9_000_000, "dps": 30_000}]}
+    url = "https://hub.example.com/hub/runs/7"
+    assert same_run_start(base, "Fire Temple", base["start_ms"] + 5_000)
+    assert not same_run_start(base, "Fire Temple", base["start_ms"] + 10 * 60_000)
+    assert not same_run_start(base, "Draupnir", base["start_ms"])
+
+    # Neuer Post mit Link: steht vorn im Analyse-Feld
+    embed = build_run_embed(base, reporters=1, guild_id=1, bosses=[{"name": "B"}], hub_url=url)
+    field = next(f for f in embed.fields if f.name == "📊 Analyse")
+    assert field.value.startswith(f"[Im NexHub ansehen]({url})") and "Bestenliste" in field.value
+    # Nachträglich: Link vorn ergänzen, doppelt nie
+    later = with_hub_link(build_run_embed(base, reporters=1, guild_id=1, bosses=[{"name": "B"}]), url)
+    assert [f.value for f in later.fields if f.name == "📊 Analyse"][0].startswith("[Im NexHub ansehen]")
+    assert with_hub_link(later, url).fields[-1].value.count("NexHub") == 1
+    # Ohne Analyse-Feld bekommt der Post eins
+    bare = with_hub_link(build_run_embed(base, reporters=1), url)
+    assert bare.fields[-1].value == f"[Im NexHub ansehen]({url})"
+
+    cog = AionDedup.__new__(AionDedup)  # ohne Bot/DB/Loop: attach_hub_link braucht nur die Listen
+    cog.api_pending, cog.api_posted = {}, []
+
+    cluster = ApiCluster(base, guild_id=1)
+    cog.api_pending[1] = [cluster]
+    assert run(cog.attach_hub_link("Fire Temple", base["start_ms"] + 2_000, url)) == "pending"
+    assert cluster.hub_url == url
+    # Zweiter Uploader (anderes NexBoard): der erste Link bleibt
+    assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url + "8")) == "pending"
+    assert cluster.hub_url == url
+
+    class Message:
+        def __init__(self):
+            self.embeds = [build_run_embed(base, reporters=1)]
+            self.edited = None
+
+        async def edit(self, embeds):
+            self.edited = embeds
+
+    cog.api_pending = {}
+    msg = Message()
+    cog.api_posted = [(time.time(), base, msg)]
+    assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "edited"
+    assert msg.edited[0].fields[-1].value == f"[Im NexHub ansehen]({url})"
+    assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "unknown"  # nur einmal ergänzen

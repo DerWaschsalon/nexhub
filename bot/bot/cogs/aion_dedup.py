@@ -442,7 +442,7 @@ def runs_dir(db) -> Path:
 
 def build_run_embed(
     run: dict, reporters: int, bosses: list[dict] | None = None, run_id: str | None = None,
-    guild_id: int | None = None, image_filename: str | None = None,
+    guild_id: int | None = None, image_filename: str | None = None, hub_url: str | None = None,
 ) -> discord.Embed:
     title = f"⚔️ {run['dungeon']}" + (f" ({run['difficulty']})" if run.get("difficulty") else "")
     minutes, seconds = divmod(round(run["fight_ms"] / 1000), 60)
@@ -451,18 +451,42 @@ def build_run_embed(
     e.add_field(name="Kampfzeit", value=f"{minutes}:{seconds:02d}")
     if image_filename:
         e.set_image(url=f"attachment://{image_filename}")
-    if run_id or guild_id:
+    if run_id or guild_id or hub_url:
         from .dashboard import dashboard_base_url
 
         base = dashboard_base_url()
-        links = []
+        links = [hub_link(hub_url)] if hub_url else []
         if run_id:
             links.append(f"[Zeitleiste ansehen]({base}/runs/{run_id})")
         if guild_id and bosses:
             links.append(f"[Bestenliste]({base}/leaderboard/{guild_id})")
-        e.add_field(name="📊 Analyse", value=" · ".join(links), inline=False)
+        e.add_field(name=ANALYSIS_FIELD, value=" · ".join(links), inline=False)
     e.set_footer(text=f"AION-2 · {reporters} DeckBar-Meldung(en) zusammengeführt")
     return e
+
+
+ANALYSIS_FIELD = "📊 Analyse"
+HUB_LINK_TEXT = "Im NexHub ansehen"
+POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
+
+
+def hub_link(url: str) -> str:
+    return f"[{HUB_LINK_TEXT}]({url})"
+
+
+def with_hub_link(embed: discord.Embed, url: str) -> discord.Embed:
+    """Link zum Run im NexHub vorn ins Analyse-Feld (oder als neues Feld), nur einmal."""
+    for i, f in enumerate(embed.fields):
+        if f.name == ANALYSIS_FIELD:
+            if HUB_LINK_TEXT not in (f.value or ""):
+                embed.set_field_at(i, name=f.name, value=f"{hub_link(url)} · {f.value}", inline=False)
+            return embed
+    return embed.add_field(name=ANALYSIS_FIELD, value=hub_link(url), inline=False)
+
+
+def same_run_start(run: dict, dungeon: str, start_ms: int) -> bool:
+    """Meldet der Hub denselben Lauf? Gleicher Dungeon, Start in der Toleranz wie bei Mehrfachmeldungen."""
+    return run["dungeon"] == dungeon and abs(run["start_ms"] - start_ms) <= API_START_TOLERANCE_MS
 
 
 class ApiCluster:
@@ -471,6 +495,7 @@ class ApiCluster:
         self.guild_id = guild_id
         self.reports: list[dict] = [run]
         self.task: asyncio.Task | None = None
+        self.hub_url: str | None = None  # vom NexHub gemeldet (attach_hub_link), sobald hochgeladen
 
 
 RUN_RETENTION_DAYS = 30
@@ -482,6 +507,7 @@ class AionDedup(commands.Cog):
         self.db = bot.db
         self.pending: dict[int, list[Cluster]] = {}  # guild_id -> offene Text-Cluster
         self.api_pending: dict[int, list[ApiCluster]] = {}  # guild_id -> offene API-Cluster
+        self.api_posted: list[tuple[float, dict, discord.Message]] = []  # (gepostet, Lauf, Nachricht)
         self.cleanup_runs.start()
 
     def cog_unload(self):
@@ -627,7 +653,7 @@ class AionDedup(commands.Cog):
         image_filename = "aion_run.png" if players else None
         embed = build_run_embed(
             cluster.run, len(cluster.reports), bosses, run_id=run_id, guild_id=cluster.guild_id,
-            image_filename=image_filename,
+            image_filename=image_filename, hub_url=cluster.hub_url,
         )
         embeds = [embed]
         files = []
@@ -651,9 +677,34 @@ class AionDedup(commands.Cog):
             boss_embed.set_image(url=f"attachment://{boss_filename}")
             embeds.append(boss_embed)
         try:
-            await channel.send(embeds=embeds, files=files)
+            message = await channel.send(embeds=embeds, files=files)
         except discord.HTTPException as e:
             log.warning("AION-API: Posten fehlgeschlagen: %r", e)
+            return
+        if not cluster.hub_url:  # Link kommt vielleicht noch (attach_hub_link)
+            now = time.time()
+            self.api_posted = [p for p in self.api_posted if now - p[0] < POSTED_KEEP_S][-49:]
+            self.api_posted.append((now, cluster.run, message))
+
+    async def attach_hub_link(self, dungeon: str, start_ms: int, url: str) -> str:
+        """Der NexHub meldet einen hochgeladenen Run: Link an den wartenden Post hängen oder den schon
+        geposteten nachträglich ergänzen. Antwort: pending, edited oder unknown."""
+        for clusters in self.api_pending.values():
+            for c in clusters:
+                if same_run_start(c.run, dungeon, start_ms):
+                    c.hub_url = c.hub_url or url
+                    return "pending"
+        now = time.time()
+        for entry in reversed(self.api_posted):
+            posted, run, message = entry
+            if now - posted < POSTED_KEEP_S and same_run_start(run, dungeon, start_ms):
+                self.api_posted.remove(entry)
+                embeds = list(message.embeds)
+                if embeds:
+                    embeds[0] = with_hub_link(embeds[0], url)
+                    await message.edit(embeds=embeds)
+                return "edited"
+        return "unknown"
 
     async def _update_leaderboard(
         self, guild_id: int, bosses: list[dict], players_meta: list[dict] | None, run_id: str | None,
