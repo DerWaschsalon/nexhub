@@ -9,6 +9,5 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 	}
-	# Platzhalter, bis der Hub läuft; dann: reverse_proxy hub:8000
-	respond "NexHub – im Aufbau" 200
+	reverse_proxy api:8000
 }

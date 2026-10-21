@@ -3,18 +3,20 @@
 #
 #   cd /srv/nexhub && docker compose up -d
 #
-# Nach außen geht nur Caddy (80/443). Alles andere hängt an internen Netzen ohne
-# veröffentlichte Ports. Hub und Bot kommen später als weitere Dienste dazu.
+# Nach außen geht nur Caddy (80/443, ohne Domain nur auf 127.0.0.1). Alles andere hängt an internen Netzen ohne
+# veröffentlichte Ports. Der Bot kommt später als weiterer Dienst dazu.
 name: nexhub
 
 services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    # HUB_BIND leer = nur 127.0.0.1 (Zugang per SSH-Tunnel). Erst mit Domain und HTTPS auf
+    # HUB_BIND=0.0.0.0 stellen, sonst liefe der Login unverschlüsselt durchs Netz.
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      - "${HUB_BIND:-127.0.0.1}:80:80"
+      - "${HUB_BIND:-127.0.0.1}:443:443"
+      - "${HUB_BIND:-127.0.0.1}:443:443/udp"
     environment:
       # Leer in .env heißt: nur http auf Port 80 (Caddy ersetzt leere Variablen nicht selbst)
       HUB_DOMAIN: ${HUB_DOMAIN:-:80}
@@ -23,6 +25,27 @@ services:
       - ./daten/caddy/data:/data
       - ./daten/caddy/config:/config
     networks: [web]
+
+  # Hub (API + Web-Oberfläche), gebaut aus src/ (Klon des Repos) mit nexhub-update
+  api:
+    build: ./src/hub
+    image: nexhub-api:lokal
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nexhub:${POSTGRES_PASSWORD}@postgres/nexhub
+      # Muss zur Adresse im Browser passen; ohne Domain per SSH-Tunnel auf localhost:8080
+      HUB_BASE_URL: ${HUB_BASE_URL:-http://localhost:8080}
+      HUB_SECRET_KEY: ${HUB_SECRET_KEY:?HUB_SECRET_KEY fehlt in /srv/nexhub/.env}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      HUB_ADMIN_IDS: ${HUB_ADMIN_IDS:-}
+      HUB_GUILD_ID: ${HUB_GUILD_ID:-}
+      HUB_MEMBER_ROLE_ID: ${HUB_MEMBER_ROLE_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # web: Caddy davor und Weg nach draußen (Discord); db: Datenbank
+    networks: [web, db]
 
   postgres:
     image: postgres:18

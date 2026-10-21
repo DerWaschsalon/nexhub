@@ -1,0 +1,25 @@
+#!/bin/bash
+# Hub aus dem öffentlichen Repo bauen und starten.
+#
+#   nexhub-update <wer> [branch]   (Standard: main; <wer> muss die Sperre halten)
+#
+# Der Klon liegt in /srv/nexhub/src und wird nur von diesem Skript verändert.
+set -euo pipefail
+WER=${1:?Aufruf: nexhub-update <wer> [branch]}
+REF=${2:-main}
+SRC=/srv/nexhub/src
+INHABER=$(cut -d'|' -f1 /srv/waschsalon/LOCK 2>/dev/null || true)
+if [[ $INHABER != "$WER" ]]; then
+  echo "Abbruch: Sperre hält '${INHABER:-niemand}', nicht $WER. Erst: waschsalon-lock holen $WER <wofür>" >&2
+  exit 1
+fi
+[[ -d $SRC/.git ]] || git clone --quiet https://github.com/DerWaschsalon/nexhub.git "$SRC"
+git -C "$SRC" fetch --quiet origin "$REF"
+git -C "$SRC" checkout --quiet --detach FETCH_HEAD
+REV=$(git -C "$SRC" rev-parse --short HEAD)
+cd /srv/nexhub
+docker compose build --pull api
+docker compose up -d
+docker image prune -f >/dev/null
+waschsalon-lock log "$WER" "Hub $REF@$REV gebaut und gestartet"
+echo "Hub $REF@$REV läuft."

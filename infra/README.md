@@ -32,20 +32,27 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
 - Docker aus download.docker.com mit Compose-Plugin, Logs rotiert (`etc/docker/daemon.json`).
   Läuft im unprivilegierten LXC (overlayfs, cgroup v2). Docker-Updates kommen nicht automatisch.
 - NexHub-Stack unter `/srv/nexhub` (`srv/nexhub/compose.yml`, Projekt `nexhub`):
-  - **Caddy** als einziger Dienst nach außen (80/443). Ohne `HUB_DOMAIN` nur http auf Port 80
-    mit Platzhalterseite; mit Domain holt Caddy das Zertifikat selbst.
+  - **Caddy** als einziger Dienst nach außen (80/443). Solange es keine Domain gibt, lauscht er
+    nur auf `127.0.0.1` (Zugang per SSH-Tunnel), weil es ohne Domain kein HTTPS gibt. Mit Domain
+    in `.env`: `HUB_DOMAIN=<domain>`, `HUB_BIND=0.0.0.0`, `HUB_BASE_URL=https://<domain>`, dann
+    holt Caddy das Zertifikat selbst.
   - **Postgres 18** im internen Netz `db` (kein Weg nach draußen, kein veröffentlichter Port),
     Daten in `/srv/nexhub/daten/postgres`.
   - Geheimnisse und Domain nur in `/srv/nexhub/.env` (Rechte 600, Vorlage `env.beispiel`).
+  - **api**: der Hub (`hub/`), gebaut auf dem Server aus einem Klon in `/srv/nexhub/src`:
+    `ssh waschsalon nexhub-update claude-gamunex <branch>` (Sperre nötig). Caddy leitet alles an
+    ihn weiter. Ohne Domain erreichbar per Tunnel: `ssh -L 8080:127.0.0.1:80 waschsalon`, dann
+    http://localhost:8080.
   - Übernehmen nach einem Deploy: `ssh waschsalon 'cd /srv/nexhub && docker compose up -d'`.
 - Sicherung: `nexhub-sicherung.timer` macht nachts um 03:30 UTC ein `pg_dumpall` nach
   `/srv/nexhub/sicherung` (zstd, 14 Tage). Liegt noch auf demselben Server – Abholen nach
   außen fehlt.
 
 ## Besonderheiten
-- **Der Anbieter filtert vor dem Server**: von außen ist nur Port 22 erreichbar, alles andere läuft
-  in einen Timeout, auch ohne eigene Firewall. Für den Hub müssen 80/443 im Kundenpanel
-  freigeschaltet werden.
+- **Der Anbieter filtert nicht** (21.10. geprüft: SYNs auf 80, 443 und 8081 kommen an `eth0` an,
+  Caddy war auf 80 von außen erreichbar). Die frühere Annahme „nur 22 offen“ entstand, als dort
+  nichts lauschte. Was nicht nach außen soll, muss also selbst gesperrt oder auf `127.0.0.1`
+  gebunden werden. Das Kundenpanel kann nur neu starten.
 - Docker-Ports laufen an der `input`-Kette vorbei (forward/DNAT). Container nur auf `127.0.0.1`
   veröffentlichen und über einen Reverse-Proxy nach außen geben. Die einzige Ausnahme ist Caddy
   mit 80/443 – deshalb stehen die beiden Ports nicht in `nftables.conf`.
