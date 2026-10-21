@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
@@ -28,8 +29,12 @@ class FakeDiscord:
         self.roles: dict[int, list[int]] = {MEMBER: [ROLE], STRANGER: [123]}
         self.calls: list[str] = []
         self.token_status = 200
+        # Steuer-API von TheWashBot (BOT_CONTROL_URL=http://bot:8790), siehe test_bot.py
+        self.bot: Callable[[httpx.Request], httpx.Response] = lambda request: httpx.Response(404)
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.host == "bot":
+            return self.bot(request)
         path = request.url.path.removeprefix("/api/v10")
         self.calls.append(f"{request.method} {path}")
         if path == "/oauth2/token":

@@ -100,6 +100,28 @@ Im Web teilen sich Hub und öffentliche Seite die Ansichten `RunView.svelte` und
 Noch nicht: mehrere Uploads desselben Runs zusammenführen, Buffs, Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
 Domain wirklich öffentlich erreichbar sind: Impressum und Datenschutzerklärung klären.
 
+## Bot
+
+Der Bereich „Bot“ (`/hub/admin/bot/…`, nur Admins) steuert TheWashBot und ersetzt dessen altes
+Web-Dashboard. Der Bot läuft als eigener Dienst; der Hub fragt seine Steuer-API
+(`bot/bot/cogs/control.py`) im internen Docker-Netz, Code in `routes/bot.py`:
+
+- `/api/admin/bot/<pfad>` → `<BOT_CONTROL_URL>/control/<pfad>` mit `Authorization: Bearer
+  <BOT_CONTROL_KEY>`. Prüfen, speichern und Discord-Rechte setzen macht der Bot; der Hub prüft nur
+  die Admin-Rolle und die Herkunft (wie überall bei ändernden Anfragen). Der Name des Admins geht
+  als `X-Hub-User` mit und landet im Discord-Audit-Log.
+- Lehnt der Bot den Schlüssel ab, antwortet der Hub mit 502 statt 401, damit die Web-Oberfläche
+  den Admin nicht für abgemeldet hält. Nicht erreichbar: 502, keine Antwort: 504, nicht
+  eingestellt: 503.
+- Die Formular-Bereiche (Allgemein, Automod, Verwarnungen, Tickets, Community, Levelsystem,
+  DPS-Webhook, AION 2) beschreibt der Bot selbst: `GET …/sections` liefert Felder mit Typ,
+  Beschriftung, Hinweis und Wert, `PUT …/sections/<id>` speichert. Im Web zeichnet
+  `BotSection.svelte` daraus das Formular. Ein neues Feld braucht also nur einen Eintrag in
+  `SECTIONS` im Bot.
+- Eigene Seiten haben, was kein einfaches Formular ist: Verifizierung, Level-Belohnungen,
+  Ankündigungen, eigene Befehle, Benachrichtigungen, Sichtbarkeit (Rolle × Kanal).
+- Discord-IDs sind überall Strings, als Zahl verlöre JavaScript die letzten Stellen.
+
 ## Login und Rollen
 
 Discord-OAuth2 mit PKCE. Der Hub fragt nur `identify` ab und, wenn eine Mitgliedsrolle eingestellt
@@ -128,7 +150,8 @@ Redirect eingetragen sein, ohne Domain also `http://localhost:8080/api/auth/call
 Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 [`infra/server/srv/nexhub/env.beispiel`](../infra/server/srv/nexhub/env.beispiel)):
 `DATABASE_URL`, `HUB_BASE_URL`, `HUB_SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
-`HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs).
+`HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs),
+`BOT_CONTROL_URL` und `BOT_CONTROL_KEY` (Bereich „Bot“, siehe oben).
 
 ## Entwickeln
 
