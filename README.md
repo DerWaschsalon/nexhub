@@ -6,7 +6,7 @@ Alles rund um NexBoard und den Waschsalon-Discord an einem Ort.
 |---|---|---|
 | [`nexboard/`](nexboard/) | NexBoard: Touch-Leiste (ESP32-S3), Python-Daemon, Overlay, AION-2-Mitschnitt | läuft |
 | [`bot/`](bot/) | TheWashBot: Discord-Bot (Musik, Rollen, Moderation, AION-2-Runs, Dashboard) | läuft |
-| [`hub/`](hub/) | NexHub-Website: Discord-Login, Gerätekopplung, Log-Uploads | geplant |
+| [`hub/`](hub/) | NexHub-Website: Discord-Login, Gerätekopplung, Log-Uploads | Grundgerüst |
 | [`proto/`](proto/) | `nexproto`: gemeinsame Schemas für Board, Hub und Bot | geplant |
 | [`planner/`](planner/) | Daevanion-Planner | kommt noch |
 | [`infra/`](infra/) | Konfiguration des VPS waschsalon, Deploy und Sperre | im Aufbau |

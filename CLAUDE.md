@@ -37,7 +37,8 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
 - Aufbau: `nexboard/` (Touch-Leiste, Daemon, Overlay), `bot/` (TheWashBot), `hub/`, `proto/`,
   `planner/`, `infra/` (VPS). Jeder Teil hat eine eigene README mit Tests.
 - Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Bot
-  `cd bot && python -m pytest -q tests`.
+  `cd bot && python -m pytest -q tests`, Hub `cd hub/api && uv run pytest -q` und
+  `cd hub/web && npm run check`.
 - `main` und `modular` sind die Branches, auf denen laufende NexBoard-Installationen per
   `update.sh` aktualisieren. Dort keine Force-Pushes und keine Pfadänderungen ohne Absprache,
   sonst bricht das Update beim nächsten Klick ab oder der Daemon findet seine Dateien nicht.
