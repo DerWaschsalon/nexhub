@@ -29,7 +29,8 @@ services:
   # Hub (API + Web-Oberfläche), gebaut aus src/ (Klon des Repos) mit nexhub-update
   api:
     build:
-      context: ./src/hub
+      context: ./src
+      dockerfile: hub/Dockerfile
       args:
         GIT_REV: ${GIT_REV:-dev}
     image: nexhub-api:lokal
@@ -44,6 +45,9 @@ services:
       HUB_ADMIN_IDS: ${HUB_ADMIN_IDS:-}
       HUB_GUILD_ID: ${HUB_GUILD_ID:-}
       HUB_MEMBER_ROLE_ID: ${HUB_MEMBER_ROLE_ID:-}
+    volumes:
+      # Hochgeladene Runs (NexLog-Dateien); gehört dem Container-Nutzer 10001
+      - ./daten/hub:/data
     depends_on:
       postgres:
         condition: service_healthy

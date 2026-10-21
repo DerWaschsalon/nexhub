@@ -43,6 +43,8 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
     `ssh waschsalon nexhub-update claude-gamunex <branch>` (Sperre nötig). Caddy leitet alles an
     ihn weiter. Ohne Domain erreichbar per Tunnel: `ssh -L 8080:127.0.0.1:80 waschsalon`, dann
     http://localhost:8080.
+  - Hochgeladene Runs liegen in `/srv/nexhub/daten/hub/runs/` (gehört Nutzer 10001). Die
+    nächtliche Sicherung erfasst bisher nur die Datenbank, nicht diese Dateien.
   - Übernehmen nach einem Deploy: `ssh waschsalon 'cd /srv/nexhub && docker compose up -d'`.
 - Sicherung: `nexhub-sicherung.timer` macht nachts um 03:30 UTC ein `pg_dumpall` nach
   `/srv/nexhub/sicherung` (zstd, 14 Tage). Liegt noch auf demselben Server – Abholen nach

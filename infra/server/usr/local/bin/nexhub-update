@@ -18,6 +18,8 @@ git -C "$SRC" fetch --quiet origin "$REF"
 git -C "$SRC" checkout --quiet --detach FETCH_HEAD
 REV=$(git -C "$SRC" rev-parse --short HEAD)
 cd /srv/nexhub
+# Ablage für hochgeladene Runs: der Hub läuft im Container als Nutzer 10001
+install -d -o 10001 -g 10001 -m 750 daten/hub
 GIT_REV="$REF@$REV" docker compose build --pull api
 docker compose up -d
 docker image prune -f >/dev/null
