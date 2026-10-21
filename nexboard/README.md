@@ -317,8 +317,15 @@ Bestätigung von selbst und bekommt ein eigenes Geräte-Token (`~/.config/deckba
 Rechte 600). Im Hub lässt sich das Gerät jederzeit entfernen, in NexBoard abkoppeln.
 
 Ohne `https` nimmt NexBoard nur `localhost` als Adresse an, etwa über einen SSH-Tunnel
-(`http://localhost:8080`), damit das Token nie unverschlüsselt durchs Netz geht. Hochgeladen wird
-noch nichts; das kommt mit den Runs.
+(`http://localhost:8080`), damit das Token nie unverschlüsselt durchs Netz geht.
+
+**Runs hochladen** ist ein eigener Schalter (aus, fragt beim Einschalten nach): Nach jedem Run, den
+das Modul „AION 2 · Dungeon-Runs“ erkennt, packt NexBoard Kampfdateien und Einzeltreffer als
+NexLog ([`proto/`](../proto/)) in den Postausgang `~/.local/share/deckbar/outbox/` und lädt ihn
+hoch, sobald der Hub erreichbar ist. Ohne Netz bleibt er liegen (höchstens 500 MB, älteste zuerst
+weg) und geht beim nächsten Versuch raus. Vom Hub abgelehnte Dateien landen in `outbox/abgelehnt/`.
+Der Daemon braucht dafür das Paket `nexproto` aus dem Repo: nach dem Umstieg einmal
+`uv tool install --force --editable ./daemon`.
 
 ## Updates
 

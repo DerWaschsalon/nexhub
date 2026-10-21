@@ -6,6 +6,7 @@ license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.10",
+    "nexproto",
     "pillow>=11",
     "pydantic>=2.9",
     "pyserial>=3.5",
@@ -15,6 +16,10 @@ dependencies = [
 
 [project.scripts]
 deckbar-daemon = "deckbar_daemon.__main__:main"
+
+[tool.uv.sources]
+# Gemeinsame Formate (NexLog) aus dem Monorepo, siehe proto/README.md
+nexproto = { path = "../../proto", editable = true }
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=0.24", "jsonschema>=4"]

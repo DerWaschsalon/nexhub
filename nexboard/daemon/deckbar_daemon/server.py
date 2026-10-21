@@ -134,6 +134,11 @@ class NexBoard:
         self.runs.run_listeners.append(self.bot.on_run)
         self.hub = Hub(config_dir)
         self.hub.listeners.append(self._hub_changed)
+        self.hub.history_dir = self._history_dir
+        self.hub.language = lambda: self.dps.settings.lang
+        self.hub.capture_build = self._capture_build
+        self.dps.fight_listeners.append(self.hub.on_fight)
+        self.runs.run_listeners.append(self.hub.on_run)
         # Nur der Daemon mit der echten Konfiguration steuert den Overlay-Dienst (nicht Testinstanzen)
         self.real_config = config_dir.resolve() == default_config_dir().resolve()
         self.overlay = Overlay(config_dir, manage_unit=self.real_config)
@@ -256,6 +261,14 @@ class NexBoard:
     async def _capture_event(self, event: str, payload) -> None:
         if event == "fights_saved":
             self.runs.wake()
+
+    @staticmethod
+    def _capture_build() -> str | None:
+        """Build-Kennung von deckbar-capture (schreibt update.sh), für `recorder.capture` im NexLog."""
+        try:
+            return (history_root().parent / "capture-build-id").read_text().strip()[:80] or None
+        except OSError:
+            return None
 
     def _history_dir(self) -> Path:
         if self.dps.settings.source == "capture":
