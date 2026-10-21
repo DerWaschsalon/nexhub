@@ -10,7 +10,6 @@ from discord import app_commands
 from discord.ext import commands
 
 from .cleanup import Confirm
-from .dps import ensure_webhook, webhook_url
 from ..errors import UserError
 
 log = logging.getLogger(__name__)
@@ -306,33 +305,9 @@ class TempVoiceView(discord.ui.View):
         self.add_item(BackButton(panel))
 
 
-class DpsWebhookSelect(discord.ui.ChannelSelect):
-    def __init__(self, panel: "SettingsPanel"):
-        super().__init__(placeholder="Kanal für DeckBar-Gruppen-DPS wählen …", channel_types=[discord.ChannelType.text],
-                         row=0, custom_id="setup:select:dps_webhook")
-        self.panel = panel
-
-    async def callback(self, interaction: discord.Interaction):
-        channel = self.values[0]
-        token = await ensure_webhook(self.panel.cog.db, interaction.guild_id, channel.id)
-        await interaction.response.edit_message(embed=self.panel.embed(), view=self.panel)
-        await interaction.followup.send(
-            f"Gruppen-DPS geht jetzt nach {channel.mention}.\n\nURL für die DeckBar-Einstellungen:\n"
-            f"`{webhook_url(token)}`\n\nGeheim halten — wer die URL hat, kann hier posten.",
-            ephemeral=True,
-        )
-
-
-class DpsWebhookView(discord.ui.View):
-    def __init__(self, panel: "SettingsPanel"):
-        super().__init__(timeout=None if panel.persistent else 180)
-        self.add_item(DpsWebhookSelect(panel))
-        self.add_item(BackButton(panel))
-
-
 class AionSelect(discord.ui.ChannelSelect):
     def __init__(self, panel: "SettingsPanel"):
-        super().__init__(placeholder="Kanal für AION-2-Duplikatfilter wählen …", channel_types=[discord.ChannelType.text],
+        super().__init__(placeholder="Kanal für die AION-2-Posts wählen …", channel_types=[discord.ChannelType.text],
                          row=0, custom_id="setup:select:aion")
         self.panel = panel
 
@@ -341,7 +316,7 @@ class AionSelect(discord.ui.ChannelSelect):
         await self.panel.cog.db.set(interaction.guild_id, "aion_channel", channel.id)
         await interaction.response.edit_message(embed=self.panel.embed(), view=AionView(self.panel))
         await interaction.followup.send(
-            f"AION-2-Duplikatfilter läuft jetzt für {channel.mention}.", ephemeral=True,
+            f"AION-2-Posts gehen jetzt nach {channel.mention}.", ephemeral=True,
         )
 
 
@@ -361,16 +336,15 @@ class AionTokenButton(discord.ui.Button):
             await db.set(interaction.guild_id, "aion_api_token", token)
         aion_cog = self.panel.cog.bot.get_cog("AionDedup")
         await interaction.response.send_message(
-            f"API-Variante (braucht eine DeckBar-Änderung):\n`POST {aion_cog.api_url()}`\n"
-            f"`Authorization: Bearer {token}`\n\nGeheim halten. Für einen neuen Token (macht den "
-            "alten ungültig): `/aion token:True`.",
+            f"Im NexBoard unter Discord-Bot eintragen:\n`{aion_cog.api_url()}`\nToken: `{token}`\n\n"
+            "Geheim halten. Für einen neuen Token (macht den alten ungültig): `/aion token:True`.",
             ephemeral=True,
         )
 
 
 class AionOffButton(discord.ui.Button):
     def __init__(self, panel: "SettingsPanel"):
-        super().__init__(label="AION-Filter aus", emoji="✖️", style=discord.ButtonStyle.danger,
+        super().__init__(label="AION-Posts aus", emoji="✖️", style=discord.ButtonStyle.danger,
                          row=1, custom_id="setup:aion_off")
         self.panel = panel
 
@@ -494,25 +468,6 @@ class WarnView(discord.ui.View):
         self.add_item(WarnActionButton(panel, "kick", "Kick"))
         self.add_item(WarnActionButton(panel, "ban", "Ban"))
         self.add_item(WarnOffButton(panel))
-        self.add_item(BackButton(panel))
-
-
-class DashboardRoleSelect(discord.ui.RoleSelect):
-    def __init__(self, panel: "SettingsPanel"):
-        super().__init__(placeholder="Rolle mit Dashboard-Zugriff wählen …", row=0,
-                         custom_id="setup:select:dashboard_role")
-        self.panel = panel
-
-    async def callback(self, interaction: discord.Interaction):
-        await self.panel.cog.db.set(interaction.guild_id, "dashboard_admin_role", self.values[0].id)
-        await interaction.response.edit_message(embed=self.panel.embed(), view=self.panel)
-
-
-class DashboardRoleView(discord.ui.View):
-    def __init__(self, panel: "SettingsPanel"):
-        super().__init__(timeout=None if panel.persistent else 180)
-        self.add_item(DashboardRoleSelect(panel))
-        self.add_item(ClearButton("Nur „Server verwalten“", "dashboard_admin_role", panel))
         self.add_item(BackButton(panel))
 
 
@@ -1005,12 +960,7 @@ class SettingsPanel(discord.ui.View):
     async def antispam(self, interaction: discord.Interaction, _button: discord.ui.Button):
         await interaction.response.edit_message(view=AntispamView(self))
 
-    @discord.ui.button(label="DPS-Webhook", emoji="⚔️", style=discord.ButtonStyle.secondary, row=2,
-                       custom_id="setup:open:dps_webhook")
-    async def dps_webhook(self, interaction: discord.Interaction, _button: discord.ui.Button):
-        await interaction.response.edit_message(view=DpsWebhookView(self))
-
-    @discord.ui.button(label="AION-2-Filter", emoji="🗡️", style=discord.ButtonStyle.secondary, row=2,
+    @discord.ui.button(label="AION 2", emoji="🗡️", style=discord.ButtonStyle.secondary, row=2,
                        custom_id="setup:open:aion")
     async def aion(self, interaction: discord.Interaction, _button: discord.ui.Button):
         await interaction.response.edit_message(view=AionView(self))
@@ -1034,11 +984,6 @@ class SettingsPanel(discord.ui.View):
                        custom_id="setup:open:warn")
     async def warn_settings(self, interaction: discord.Interaction, _button: discord.ui.Button):
         await interaction.response.edit_message(view=WarnView(self))
-
-    @discord.ui.button(label="Dashboard", emoji="🖥️", style=discord.ButtonStyle.secondary, row=3,
-                       custom_id="setup:open:dashboard_role")
-    async def dashboard_role(self, interaction: discord.Interaction, _button: discord.ui.Button):
-        await interaction.response.edit_message(view=DashboardRoleView(self))
 
     @discord.ui.button(label="Verifizierung", emoji="🔒", style=discord.ButtonStyle.secondary, row=3,
                        custom_id="setup:open:verify")
@@ -1106,15 +1051,12 @@ class Setup(commands.GroupCog, group_name="setup", group_description="Einstellun
         e.add_field(name="DJ-Rolle", value=fmt_role(guild, db.get_int(guild.id, "dj_role")))
         e.add_field(name="Spamschutz", value="an" if db.get_bool(guild.id, "antispam", True) else "aus")
         e.add_field(name="Einladungslinks", value="erlaubt" if db.get_bool(guild.id, "allow_invites") else "werden gelöscht")
-        e.add_field(name="DPS-Webhook (DeckBar)", value=fmt_channel(guild, db.get_int(guild.id, "dps_webhook_channel")))
-        e.add_field(name="AION-2-Duplikatfilter", value=fmt_channel(guild, db.get_int(guild.id, "aion_channel")))
+        e.add_field(name="AION-2-Posts", value=fmt_channel(guild, db.get_int(guild.id, "aion_channel")))
         ticket_roles = [fmt_role(guild, i) for i in db.get_ids(guild.id, "ticket_team_roles")]
         e.add_field(name="Ticket-Team-Rollen", value=", ".join(ticket_roles) if ticket_roles else "–")
         schwelle = db.get_int(guild.id, "warn_threshold")
         aktion = db.get(guild.id, "warn_action")
         e.add_field(name="Automatische Strafe", value=f"ab {schwelle} Verwarnungen: {aktion}" if schwelle else "aus")
-        dashboard_role = db.get_int(guild.id, "dashboard_admin_role")
-        e.add_field(name="Dashboard-Zugriff", value=fmt_role(guild, dashboard_role) if dashboard_role else "nur „Server verwalten“")
         verify_active = db.get_bool(guild.id, "verify_active")
         e.add_field(name="Verifizierung",
                     value=f"an – {fmt_channel(guild, db.get_int(guild.id, 'verify_channel'))}" if verify_active else "aus")
@@ -1283,15 +1225,6 @@ class Setup(commands.GroupCog, group_name="setup", group_description="Einstellun
             "Panel mit `/ticket-panel` posten.", ephemeral=True,
         )
 
-    @app_commands.command(name="dashboard", description="Wer darf das Web-Dashboard öffnen (leer lassen = nur „Server verwalten“)")
-    @app_commands.describe(rolle="Rolle mit Zugriff aufs Dashboard; leer = Rolle entfernen (Fallback: „Server verwalten“)")
-    async def dashboard_settings(self, interaction: discord.Interaction, rolle: discord.Role | None = None):
-        await self.db.set(interaction.guild_id, "dashboard_admin_role", rolle and rolle.id)
-        await interaction.response.send_message(
-            f"Dashboard-Zugriff: {rolle.mention}." if rolle else
-            "Dashboard-Zugriff: nur noch Leute mit „Server verwalten“.", ephemeral=True,
-        )
-
     @app_commands.command(name="temp-voice", description="„Join to create“-Kanal anlegen oder festlegen")
     @app_commands.describe(kanal="Vorhandener Sprachkanal; leer lassen = neuen anlegen", aus="Funktion abschalten")
     async def tempvoice(
@@ -1373,15 +1306,6 @@ class Setup(commands.GroupCog, group_name="setup", group_description="Einstellun
         embed.description = text.replace("\\n", "\n")
         await message.edit(embed=embed)
         await interaction.response.send_message(f"Regeln-Text in {channel.mention} aktualisiert.", ephemeral=True)
-
-    @app_commands.command(name="dps-webhook", description="Kanal für DeckBar-Gruppen-DPS festlegen")
-    @app_commands.describe(kanal="Kanal, in den die Gruppen-DPS nach jedem Kampf gepostet wird")
-    async def dps_webhook_cmd(self, interaction: discord.Interaction, kanal: discord.TextChannel):
-        token = await ensure_webhook(self.db, interaction.guild_id, kanal.id)
-        await interaction.response.send_message(
-            f"Gruppen-DPS geht jetzt nach {kanal.mention}.\n\nURL für die DeckBar-Einstellungen:\n"
-            f"`{webhook_url(token)}`\n\nGeheim halten — wer die URL hat, kann hier posten.", ephemeral=True,
-        )
 
     @app_commands.command(name="bump", description="Erinnerung, wenn der Disboard-Server-Bump wieder möglich ist (alle 2 Std.)")
     @app_commands.describe(

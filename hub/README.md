@@ -157,10 +157,12 @@ Web-Dashboard. Der Bot läuft als eigener Dienst; der Hub fragt seine Steuer-API
   den Admin nicht für abgemeldet hält. Nicht erreichbar: 502, keine Antwort: 504, nicht
   eingestellt: 503.
 - Die Formular-Bereiche (Allgemein, Automod, Verwarnungen, Tickets, Community, Levelsystem,
-  DPS-Webhook, AION 2) beschreibt der Bot selbst: `GET …/sections` liefert Felder mit Typ,
+  AION 2) beschreibt der Bot selbst: `GET …/sections` liefert Felder mit Typ,
   Beschriftung, Hinweis und Wert, `PUT …/sections/<id>` speichert. Im Web zeichnet
   `BotSection.svelte` daraus das Formular. Ein neues Feld braucht also nur einen Eintrag in
   `SECTIONS` im Bot.
+- `POST …/run-link` (vom Hub selbst, nicht durchgereicht): Nach einem neuen Upload mit Kill meldet
+  `routes/runs.py` Dungeon, Start und Link, der Bot hängt „Im NexHub ansehen“ an den Discord-Post.
 - Eigene Seiten haben, was kein einfaches Formular ist: Verifizierung, Level-Belohnungen,
   Ankündigungen, eigene Befehle, Benachrichtigungen, Sichtbarkeit (Rolle × Kanal).
 - Discord-IDs sind überall Strings, als Zahl verlöre JavaScript die letzten Stellen.

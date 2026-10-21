@@ -1,5 +1,11 @@
 # Übergabe: Stand und nächste Schritte
 
+> **Stand 2026-10-22:** Gruppen-DPS-Webhook (`dps.py`, Port 8787), das eigene Web-Dashboard
+> (`dashboard.py`, Discord-Login), die Analyse-Seite `/runs/<id>` mit Zeitleiste und der
+> Nachrichten-Duplikatfilter (Variante 1) sind entfernt. Geblieben: AION-API, Run-Posts mit
+> Bildern, Bestenliste und Link in den NexHub (`aion_dedup.py`), Einstellungen über den NexHub
+> (`control.py`). Die Abschnitte unten beschreiben teils den alten Stand.
+
 Für Claude Code auf dem Server. Bitte zuerst README.md und diese Datei lesen.
 
 ## Fertig und getestet (offline, noch nicht gegen echten Discord-Server)

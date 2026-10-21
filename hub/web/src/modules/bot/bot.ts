@@ -13,7 +13,6 @@ export const BOT_NAV: BotNavItem[] = [
 	{ slug: 'level', label: 'Levelsystem' },
 	{ slug: 'ankuendigungen', label: 'Ankündigungen' },
 	{ slug: 'befehle', label: 'Eigene Befehle' },
-	{ slug: 'dps', label: 'DPS-Webhook' },
 	{ slug: 'aion', label: 'AION 2' },
 	{ slug: 'benachrichtigungen', label: 'Benachrichtigungen' },
 	{ slug: 'sichtbarkeit', label: 'Sichtbarkeit' }
