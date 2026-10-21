@@ -1,0 +1,269 @@
+{
+  "$defs": {
+    "A2Actor": {
+      "additionalProperties": true,
+      "properties": {
+        "actorId": {
+          "title": "Actorid",
+          "type": "integer"
+        },
+        "nickname": {
+          "title": "Nickname",
+          "type": "string"
+        },
+        "jobId": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Jobid"
+        }
+      },
+      "required": [
+        "actorId",
+        "nickname"
+      ],
+      "title": "A2Actor",
+      "type": "object"
+    },
+    "A2Fight": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "title": "Id",
+          "type": "string"
+        },
+        "bossName": {
+          "title": "Bossname",
+          "type": "string"
+        },
+        "mobCode": {
+          "title": "Mobcode",
+          "type": "integer"
+        },
+        "dungeonId": {
+          "title": "Dungeonid",
+          "type": "integer"
+        },
+        "startTimeMs": {
+          "title": "Starttimems",
+          "type": "integer"
+        },
+        "durationMs": {
+          "minimum": 0,
+          "title": "Durationms",
+          "type": "integer"
+        },
+        "actors": {
+          "items": {
+            "$ref": "#/$defs/A2Actor"
+          },
+          "title": "Actors",
+          "type": "array"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "bossName",
+        "mobCode",
+        "dungeonId",
+        "startTimeMs",
+        "durationMs",
+        "actors",
+        "details"
+      ],
+      "title": "A2Fight",
+      "type": "object"
+    },
+    "Character": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "title": "Name",
+          "type": "string"
+        },
+        "cls": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cls"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Character",
+      "type": "object"
+    },
+    "Recorder": {
+      "additionalProperties": false,
+      "properties": {
+        "nexboard": {
+          "maxLength": 40,
+          "title": "Nexboard",
+          "type": "string"
+        },
+        "capture": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capture"
+        },
+        "language": {
+          "default": "en",
+          "maxLength": 8,
+          "title": "Language",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nexboard"
+      ],
+      "title": "Recorder",
+      "type": "object"
+    },
+    "RunInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "dungeon_id": {
+          "title": "Dungeon Id",
+          "type": "integer"
+        },
+        "dungeon": {
+          "maxLength": 120,
+          "title": "Dungeon",
+          "type": "string"
+        },
+        "difficulty": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Difficulty"
+        },
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "end_ms": {
+          "title": "End Ms",
+          "type": "integer"
+        },
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "bosses_total": {
+          "minimum": 0,
+          "title": "Bosses Total",
+          "type": "integer"
+        },
+        "bosses_killed": {
+          "minimum": 0,
+          "title": "Bosses Killed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dungeon_id",
+        "dungeon",
+        "start_ms",
+        "end_ms",
+        "complete",
+        "bosses_total",
+        "bosses_killed"
+      ],
+      "title": "RunInfo",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "const": "nexlog",
+      "default": "nexlog",
+      "title": "Format",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "recorder": {
+      "$ref": "#/$defs/Recorder"
+    },
+    "run": {
+      "$ref": "#/$defs/RunInfo"
+    },
+    "you": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Character"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "names": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 500,
+      "title": "Names",
+      "type": "object"
+    },
+    "fights": {
+      "items": {
+        "$ref": "#/$defs/A2Fight"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Fights",
+      "type": "array"
+    }
+  },
+  "required": [
+    "recorder",
+    "run",
+    "fights"
+  ],
+  "title": "NexLog",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
