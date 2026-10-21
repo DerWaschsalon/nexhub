@@ -1,24 +1,18 @@
-// Unterseiten des Bereichs „Bot“. Bereiche mit `section` sind reine Formulare aus dem Schema
-// des Bots (Route [bereich]); die anderen haben eine eigene Seite.
-export type BotNavItem = { slug: string; label: string };
+import type { BotNavItem } from './api.ts';
 
-export const BOT_NAV: BotNavItem[] = [
-	{ slug: '', label: 'Übersicht' },
-	{ slug: 'allgemein', label: 'Allgemein' },
-	{ slug: 'verifizierung', label: 'Verifizierung' },
-	{ slug: 'automod', label: 'Automod' },
-	{ slug: 'verwarnungen', label: 'Verwarnungen' },
-	{ slug: 'tickets', label: 'Tickets' },
-	{ slug: 'community', label: 'Community' },
-	{ slug: 'level', label: 'Levelsystem' },
-	{ slug: 'ankuendigungen', label: 'Ankündigungen' },
-	{ slug: 'befehle', label: 'Eigene Befehle' },
-	{ slug: 'aion', label: 'AION 2' },
-	{ slug: 'benachrichtigungen', label: 'Benachrichtigungen' },
-	{ slug: 'sichtbarkeit', label: 'Sichtbarkeit' }
-];
-
+// Das Menü des Bereichs „Bot“ kommt vom Bot selbst (/control/pages), Reihenfolge nach Gruppe und order.
 export const botHref = (slug: string) => (slug ? `/hub/admin/bot/${slug}` : '/hub/admin/bot');
+
+/** Menüeinträge nach Gruppe, Reihenfolge wie vom Bot geliefert. */
+export function navGroups(items: BotNavItem[]): { name: string; items: BotNavItem[] }[] {
+	const out: { name: string; items: BotNavItem[] }[] = [];
+	for (const it of items) {
+		const last = out.at(-1);
+		if (last && last.name === it.group) last.items.push(it);
+		else out.push({ name: it.group, items: [it] });
+	}
+	return out;
+}
 
 /** "3 Tg. 4 Std." / "5 Std. 12 Min." / "8 Min." */
 export function formatUptime(s: number): string {

@@ -14,6 +14,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from ..errors import UserError
+from ..hubpages import Action, Column, Field, Page, Table, user_label
 
 log = logging.getLogger(__name__)
 TZ = ZoneInfo("Europe/Berlin")
@@ -100,6 +101,40 @@ class Birthdays(commands.Cog):
             except discord.HTTPException as ex:
                 log.warning("Geburtstagsgruß %s: %r", guild_id, ex)
 
+    # ---- NexHub ----
+
+    def hub_pages(self) -> list[Page]:
+        return [Page("geburtstage", "Geburtstage", "Community", (
+            Table("birthdays", "Geburtstage", (Column("user", "Mitglied"), Column("date", "Datum")), self._hub_rows,
+                  create=Action("set", "Eintragen", self._hub_set, (
+                      Field("member", "member", "Mitglied", required=True),
+                      Field("day", "int", "Tag", default=1, min=1, max=31),
+                      Field("month", "int", "Monat", default=1, min=1, max=12),
+                  ), submit="Speichern"),
+                  actions=(Action("delete", "Löschen", self._hub_delete, confirm="Geburtstag löschen?", danger=True),),
+                  empty="Noch keine Geburtstage eingetragen."),
+        ), "Gratuliert wird um 9 Uhr im Kanal aus „Community“. Mitglieder tragen sich mit /geburtstag-setzen ein.",
+            order=50)]
+
+    async def _hub_rows(self, ctx) -> list[dict]:
+        rows = await self.db.fetchall("SELECT * FROM birthdays WHERE guild_id=? ORDER BY month, day", (ctx.guild.id,))
+        return [{"id": str(r["user_id"]), "user": user_label(ctx.guild, r["user_id"]),
+                 "date": f"{r['day']:02}.{r['month']:02}."} for r in rows]
+
+    async def _hub_set(self, ctx, v, _item):
+        try:
+            datetime(2024, v["month"], v["day"])  # Schaltjahr: 29.2. ist erlaubt
+        except ValueError:
+            raise UserError("Dieses Datum gibt es nicht.")
+        await self.db.execute(
+            "INSERT INTO birthdays (guild_id, user_id, day, month) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(guild_id, user_id) DO UPDATE SET day=excluded.day, month=excluded.month",
+            (ctx.guild.id, v["member"].id, v["day"], v["month"]))
+        return f"Geburtstag von {v['member'].display_name} eingetragen."
+
+    async def _hub_delete(self, ctx, _v, item):
+        await self.db.execute("DELETE FROM birthdays WHERE guild_id=? AND user_id=?", (ctx.guild.id, int(item or 0)))
+        return "Gelöscht."
 
 async def setup(bot):
     await bot.add_cog(Birthdays(bot))

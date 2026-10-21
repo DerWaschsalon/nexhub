@@ -18,6 +18,7 @@ from discord.ext import commands
 
 from .cleanup import Confirm
 from ..errors import UserError
+from ..hubpages import Action, Actions, Column, Page, Status, Table
 from ..serverstatus import build_recreate_config, cpu_percent_from_samples, fmt_bytes, format_uptime, parse_meminfo, ram_usage_kb
 
 log = logging.getLogger(__name__)
@@ -79,34 +80,97 @@ def self_update_sync(client, container_name: str, image_ref: str) -> None:
     client.api.stop(container_name, timeout=10)
 
 
+async def host_stats() -> dict:
+    cpu = await read_cpu_percent()
+    with open("/proc/meminfo") as f:
+        used_kb, total_kb = ram_usage_kb(parse_meminfo(f.read()))
+    with open("/proc/uptime") as f:
+        uptime = float(f.readline().split()[0])
+    disk = shutil.disk_usage("/data" if os.path.isdir("/data") else "/")
+    return {"cpu": cpu, "ram": (used_kb * 1024, total_kb * 1024), "uptime": uptime, "disk": (disk.used, disk.total)}
+
+
+def docker_available() -> bool:
+    return os.path.exists("/var/run/docker.sock")
+
+
+def list_containers(client) -> list[tuple[str, str, str]]:
+    return [(c.name, c.status, (c.image.tags[0] if c.image.tags else c.image.short_id))
+            for c in client.containers.list(all=True)]
+
+
 class Server(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    # ---- NexHub ----
+
+    def hub_pages(self) -> list[Page]:
+        blocks: list = [Status("host", "Server", self._hub_status,
+                               description="Werte des Rechners, auf dem der Bot läuft.")]
+        if docker_available():
+            blocks.append(Table("containers", "Container", (
+                Column("name", "Name"), Column("image", "Image"), Column("state", "Status", "badge"),
+            ), self._hub_containers, actions=(
+                Action("restart", "Neu starten", self._hub_restart, confirm="Container neu starten?", danger=True),
+            ), empty="Keine Container gefunden."))
+            blocks.append(Actions("update", "Bot aktualisieren", (
+                Action("self_update", "Neuestes Image holen und neu starten", self._hub_update, danger=True,
+                       confirm="Bot jetzt aktualisieren? Er ist dabei kurz offline."),
+            ), f"Zieht {SELF_UPDATE_IMAGE}. Auf dem VPS rollt nexhub-update den Bot aus, dort nicht nötig."))
+        return [Page("server", "Server-Status", "System", tuple(blocks), order=10)]
+
+    async def _hub_status(self, ctx) -> list[dict]:
+        st = await host_stats()
+        bot = self.bot
+        items = [
+            {"label": "CPU", "value": f"{st['cpu']:.0f} %"},
+            {"label": "RAM", "value": f"{fmt_bytes(st['ram'][0])} / {fmt_bytes(st['ram'][1])}"},
+            {"label": "Festplatte", "value": f"{fmt_bytes(st['disk'][0])} / {fmt_bytes(st['disk'][1])}"},
+            {"label": "Rechner läuft seit", "value": format_uptime(st["uptime"])},
+            {"label": "Discord-Latenz", "value": f"{round(bot.latency * 1000)} ms" if bot.latency == bot.latency else "–"},
+            {"label": "Version", "value": os.getenv("GIT_REV", "dev")},
+        ]
+        if not docker_available():
+            items.append({"label": "Container", "value": "kein Docker-Socket eingebunden"})
+        return items
+
+    async def _hub_containers(self, ctx) -> list[dict]:
+        client = _docker_client()
+        rows = await asyncio.get_running_loop().run_in_executor(None, list_containers, client)
+        return [{"id": name, "name": name, "image": image, "state": status,
+                 "state_tone": "ok" if status == "running" else "danger"} for name, status, image in rows]
+
+    async def _hub_restart(self, ctx, _v, item):
+        client = _docker_client()
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, lambda: client.containers.get(item).restart(timeout=10))
+        except Exception as ex:
+            raise UserError(f"Neustart fehlgeschlagen: {ex}")
+        return f"{item} neu gestartet."
+
+    async def _hub_update(self, ctx, _v, _item):
+        client = _docker_client()
+        name = os.getenv("SELF_CONTAINER_NAME", "thewashbot").strip()
+        fut = asyncio.get_running_loop().run_in_executor(None, self_update_sync, client, name, SELF_UPDATE_IMAGE)
+        fut.add_done_callback(lambda f: f.exception() and log.error("Selbst-Update fehlgeschlagen: %r", f.exception()))
+        return "Update läuft, der Bot ist gleich kurz offline."
 
     @app_commands.command(name="server", description="Server-Status: CPU/RAM/Uptime/Festplatte, laufende Container")
     async def status(self, interaction: discord.Interaction):
         require_owner(interaction)
         await interaction.response.defer(ephemeral=True)
-        cpu = await read_cpu_percent()
-        with open("/proc/meminfo") as f:
-            used_kb, total_kb = ram_usage_kb(parse_meminfo(f.read()))
-        with open("/proc/uptime") as f:
-            uptime = float(f.readline().split()[0])
-        disk = shutil.disk_usage("/data")
+        st = await host_stats()
 
         e = discord.Embed(title="🖥️ Server-Status", colour=discord.Colour.blurple())
-        e.add_field(name="CPU", value=f"{cpu:.0f}%")
-        e.add_field(name="RAM", value=f"{fmt_bytes(used_kb * 1024)} / {fmt_bytes(total_kb * 1024)}")
-        e.add_field(name="Uptime", value=format_uptime(uptime))
-        e.add_field(name="Festplatte (/data)", value=f"{fmt_bytes(disk.used)} / {fmt_bytes(disk.total)}")
+        e.add_field(name="CPU", value=f"{st['cpu']:.0f}%")
+        e.add_field(name="RAM", value=f"{fmt_bytes(st['ram'][0])} / {fmt_bytes(st['ram'][1])}")
+        e.add_field(name="Uptime", value=format_uptime(st["uptime"]))
+        e.add_field(name="Festplatte (/data)", value=f"{fmt_bytes(st['disk'][0])} / {fmt_bytes(st['disk'][1])}")
 
         try:
             client = _docker_client()
-            containers = await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: [(c.name, c.status, (c.image.tags[0] if c.image.tags else c.image.short_id))
-                        for c in client.containers.list(all=True)],
-            )
+            containers = await asyncio.get_running_loop().run_in_executor(None, list_containers, client)
             lines = [f"{'🟢' if status == 'running' else '🔴'} **{name}** ({image}) – {status}"
                     for name, status, image in containers]
             e.add_field(name=f"Container ({len(containers)})", value="\n".join(lines)[:1024] or "–", inline=False)

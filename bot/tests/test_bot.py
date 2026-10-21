@@ -16,12 +16,39 @@ def run(coro):
     return asyncio.run(coro)
 
 
+def check_hub_pages(pages):
+    """Menü des Hubs: jede Seite einmal, Formulare zeigen auf echte Bereiche, Aktionen sind auffindbar."""
+    from bot.cogs.control import SECTIONS
+    from bot.hubpages import GROUPS, Actions, Form, Status, Table
+
+    ids = [p.id for p in pages]
+    assert len(ids) == len(set(ids)), ids
+    for want in ("", "allgemein", "giveaways", "server", "moderation", "musik", "benachrichtigungen",
+                 "erinnerungen", "geburtstage", "aion"):
+        assert want in ids, want
+    for p in pages:
+        assert p.group in GROUPS, (p.id, p.group)
+        assert p.custom or p.blocks, p.id
+        block_ids = [getattr(b, "id", None) or b.section for b in p.blocks]
+        assert len(block_ids) == len(set(block_ids)), (p.id, block_ids)
+        for b in p.blocks:
+            if isinstance(b, Form):
+                assert b.section in SECTIONS, (p.id, b.section)
+                continue
+            actions = [*b.actions] + ([b.create] if isinstance(b, Table) and b.create else [])
+            assert isinstance(b, (Table, Status, Actions))
+            for a in actions:
+                assert p.action(b.id, a.id) is a
+                assert len({f.key for f in a.fields}) == len(a.fields), (p.id, a.id)
+
+
 def test_all_commands_register():
     async def go():
         with tempfile.TemporaryDirectory() as d:
             bot = Bot(Database(Path(d) / "t.sqlite3"), sync=False)
             await bot.setup_hook()
             names = sorted(c.qualified_name for c in bot.tree.walk_commands())
+            pages = bot.get_cog("Control").all_pages()
             # Reminders.check_due und Notifications.poll_feeds scheitern hier erwartbar an
             # wait_until_ready() (kein echtes Login in diesem Test) — Tasks sauber abwarten statt
             # "exception was never retrieved".
@@ -40,8 +67,9 @@ def test_all_commands_register():
             await bot.get_cog("Notifications").manager.close()
             await bot.db.close()
             await bot.get_cog("Music").session.close()
-            return names
-    names = run(go())
+            return names, pages
+    names, pages = run(go())
+    check_hub_pages(pages)
     for expected in ["play", "radio", "skip", "stop", "warteschlange", "lautstaerke", "wiederholen",
                      "setup log-kanal", "setup temp-voice", "setup panel", "setup management-kanal",
                      "setup verifizierung", "setup regeln-text", "setup verwarnungen", "rollen-panel", "timeout",
@@ -1244,3 +1272,87 @@ def test_aion_hub_link(monkeypatch):
     assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "edited"
     assert msg.edited[0].fields[-1].value == f"[Im NexHub ansehen]({url})"
     assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "unknown"  # nur einmal ergänzen
+
+
+def test_hub_action_values():
+    """Werte aus dem Hub: Pflichtfelder, Grenzen, Auswahl und ausgeblendete Felder (show_if)."""
+    import discord
+
+    from bot.hubpages import ApiError, Field, action_values
+
+    class Ch:
+        def __init__(self, cid, kind):
+            self.id, self.type, self.name = cid, kind, f"k{cid}"
+
+    class Guild:
+        channels = {1: Ch(1, discord.ChannelType.text), 2: Ch(2, discord.ChannelType.voice)}
+        members = {5: "Mitglied 5"}
+
+        def get_channel(self, i):
+            return self.channels.get(i)
+
+        def get_member(self, i):
+            return self.members.get(i)
+
+        def get_role(self, i):
+            return None
+
+    g = Guild()
+    fields = (
+        Field("kind", "choice", "Dienst", default="a", options=(("a", "A"), ("b", "B"))),
+        Field("src_a", "text", "Quelle A", required=True, show_if=("kind", ("a",))),
+        Field("src_b", "text", "Quelle B", required=True, show_if=("kind", ("b",))),
+        Field("ev", "multi", "Ereignisse", options=("x", "y")),
+        Field("n", "int", "Anzahl", default=1, min=1, max=3),
+        Field("ch", "channel", "Kanal"),
+        Field("who", "member", "Mitglied"),
+    )
+    v = action_values(g, fields, {"kind": "a", "src_a": " repo ", "ev": ["y", "y"], "n": 2, "ch": "1", "who": "5"})
+    assert v["src_a"] == "repo" and "src_b" not in v and v["ev"] == ["y"] and v["n"] == 2
+    assert v["ch"] is g.channels[1] and v["who"] == "Mitglied 5"
+    assert action_values(g, fields, {"kind": "a", "src_a": "r"})["n"] == 1  # Standardwert
+    for bad in ({"kind": "b", "src_a": "r"},           # src_b ist Pflicht, src_a zählt nicht
+                {"kind": "c", "src_a": "r"},           # unbekannte Auswahl
+                {"kind": "a", "src_a": "r", "n": 4},   # über max
+                {"kind": "a", "src_a": "r", "ev": ["z"]},
+                {"kind": "a", "src_a": "r", "ch": "2"},  # Sprachkanal statt Textkanal
+                {"kind": "a", "src_a": "r", "who": "9"}):
+        with pytest.raises(ApiError):
+            action_values(g, fields, bad)
+
+
+def test_hub_giveaway_page():
+    """Giveaway-Seite: Zeilen aus der DB, Schalter für die Aktionen je Zeile."""
+    from bot.cogs.giveaways import Giveaways
+    from bot.hubpages import Ctx, page_out
+
+    class Guild:
+        id = 1
+        me = None
+
+        def get_channel(self, i):
+            return None
+
+        def get_member(self, i):
+            return None
+
+    async def go():
+        with tempfile.TemporaryDirectory() as d:
+            db = Database(Path(d) / "t.sqlite3")
+            await db.connect()
+            cog = Giveaways.__new__(Giveaways)
+            cog.db, cog.bot = db, None
+            await db.execute("INSERT INTO giveaways VALUES (11, 1, 5, 7, 'Nitro', 1, 2000000000, 0)")
+            await db.execute("INSERT INTO giveaways VALUES (12, 1, 5, 7, 'Alt', 2, 1000, 1)")
+            await db.execute("INSERT INTO giveaway_entries VALUES (11, 3)")
+            out = await page_out(Ctx(None, Guild()), cog.hub_pages()[0], lambda s: {})
+            await db.close()
+            return out
+
+    out = run(go())
+    table = out["blocks"][0]
+    assert table["type"] == "table" and table["create"]["id"] == "create"
+    first, second = table["rows"]
+    assert (first["prize"], first["entries"], first["active"]) == ("Nitro", 1, True)
+    assert (second["prize"], second["ended"], second["state"]) == ("Alt", True, "beendet")
+    assert {a["id"]: a["when"] for a in table["actions"]} == {"end": "active", "reroll": "ended", "delete": ""}

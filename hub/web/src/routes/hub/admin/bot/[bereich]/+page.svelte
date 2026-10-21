@@ -1,17 +1,12 @@
 <script lang="ts">
-	import BotSection from '#modules/bot/BotSection.svelte';
+	import BotPage from '#modules/bot/BotPage.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
 
-<p class="dim lead">{data.section.description}</p>
-{#key data.section.id}
-	<BotSection section={data.section} guild={data.guild!} />
-{/key}
+<svelte:head><title>{data.page.title} · Bot · NexHub</title></svelte:head>
 
-<style>
-	.lead {
-		margin: -6px 4px 16px;
-	}
-</style>
+{#key data.page.id}
+	<BotPage page={data.page} guild={data.guild!} />
+{/key}

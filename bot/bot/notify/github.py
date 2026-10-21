@@ -19,6 +19,7 @@ import aiohttp
 import discord
 
 from .base import Notification, Provider, ProviderError
+from ..hubpages import Field
 
 log = logging.getLogger(__name__)
 API = "https://api.github.com"
@@ -94,6 +95,22 @@ class GitHubProvider(Provider):
     source_label = "Repository"
     source_example = "Navonex/thewashbot"
     source_help = "Format: Besitzer/Repo, z. B. Navonex/thewashbot"
+    filter_fields = (
+        Field("labels", "text", "Nur Issues/PRs mit Label", hint="Durch Komma getrennt, leer = alle"),
+        Field("author", "text", "Nur von diesem GitHub-Nutzer"),
+        Field("prereleases", "bool", "Vorab-Releases melden", default=True),
+    )
+
+    def filters_from(self, values: dict) -> dict:
+        out: dict = {}
+        labels = [x.strip().lower() for x in (values.get("labels") or "").split(",") if x.strip()]
+        if labels:
+            out["labels"] = labels
+        if values.get("author"):
+            out["author"] = values["author"].strip()
+        if values.get("prereleases") is False:
+            out["prereleases"] = False
+        return out
 
     def __init__(self) -> None:
         self._session: aiohttp.ClientSession | None = None

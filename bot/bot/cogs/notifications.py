@@ -19,7 +19,9 @@ from dataclasses import dataclass, field
 import discord
 from discord.ext import commands, tasks
 
+from ..errors import UserError
 from ..notify.base import ProviderError
+from ..hubpages import Action, Actions, Column, Field, Page, Table, channel_label
 from ..notify.manager import PROVIDERS, NotificationManager
 
 log = logging.getLogger(__name__)
@@ -550,6 +552,102 @@ class Notifications(commands.Cog):
     @poll_feeds.before_loop
     async def before_poll_feeds(self):
         await self.bot.wait_until_ready()
+
+    # ---- NexHub ----
+
+    def hub_pages(self) -> list[Page]:
+        fields = [Field("kind", "choice", "Dienst", default=next(iter(PROVIDERS)),
+                        options=tuple((k, p.label) for k, p in PROVIDERS.items()))]
+        for key, p in PROVIDERS.items():
+            when = ("kind", (key,))
+            fields.append(Field(f"source_{key}", "text", p.source_label, hint=p.source_help, required=True, show_if=when))
+            fields.append(Field(f"events_{key}", "multi", "Ereignisse", options=tuple(p.events.items()),
+                                default=list(p.events)[:1], required=True, show_if=when))
+            fields.extend(Field(f"filter_{key}_{f.key}", f.kind, f.label, hint=f.hint, default=f.default, show_if=when)
+                          for f in p.filter_fields)
+        fields.append(Field("channel", "channel", "Kanal", required=True))
+        return [Page("benachrichtigungen", "GitHub & YouTube", "Benachrichtigungen", (
+            Table("feeds", "Benachrichtigungen", (
+                Column("service", "Dienst"), Column("source", "Quelle"), Column("events", "Ereignisse"),
+                Column("channel", "Kanal"), Column("state", "Status", "badge"),
+            ), self._hub_feeds,
+                create=Action("create", "Neue Benachrichtigung", self._hub_create, tuple(fields), submit="Anlegen"),
+                actions=(
+                    Action("pause", "Pausieren", self._hub_toggle, when="enabled"),
+                    Action("resume", "Fortsetzen", self._hub_toggle, when="disabled"),
+                    Action("test", "Test senden", self._hub_test),
+                    Action("delete", "Löschen", self._hub_delete, confirm="Benachrichtigung löschen?", danger=True),
+                ), empty="Noch keine Benachrichtigungen."),
+            Actions("pruefen", "Jetzt prüfen", (Action("check", "Alle aktiven jetzt abfragen", self._hub_check),),
+                    f"Sonst fragt der Bot alle {POLL_MINUTES} Minuten nach."),
+        ), "Neue Releases, Issues, Pull Requests, Commits oder Videos in einen Kanal posten.", order=10)]
+
+    async def _hub_feeds(self, ctx) -> list[dict]:
+        rows = await self.db.fetchall("SELECT * FROM feeds WHERE guild_id=? ORDER BY id", (ctx.guild.id,))
+        out = []
+        for f in rows:
+            p = PROVIDERS.get(f["kind"])
+            events = json.loads(f["events"] or "[]")
+            state, tone = ("Fehler", "danger") if f["error"] else (("aktiv", "ok") if f["enabled"] else ("pausiert", "warn"))
+            out.append({"id": str(f["id"]), "service": p.label if p else f["kind"], "source": f["source"],
+                        "events": ", ".join(p.events.get(e, e) if p else e for e in events),
+                        "channel": channel_label(ctx.guild, f["channel_id"]), "state": state, "state_tone": tone,
+                        "error": f["error"], "enabled": bool(f["enabled"]), "disabled": not f["enabled"]})
+        return out
+
+    async def _hub_feed(self, ctx, item):
+        feed = await self.db.fetchone("SELECT * FROM feeds WHERE id=? AND guild_id=?", (int(item or 0), ctx.guild.id))
+        if not feed:
+            raise UserError("Die Benachrichtigung gibt es nicht mehr.")
+        return feed
+
+    async def _hub_create(self, ctx, v, _item):
+        kind = v["kind"]
+        p = PROVIDERS[kind]
+        try:
+            source = await p.validate_source(v[f"source_{kind}"])
+        except ProviderError as e:
+            raise UserError(str(e))
+        filters = p.filters_from({f.key: v.get(f"filter_{kind}_{f.key}") for f in p.filter_fields})
+        feed_id = await self.db.execute(
+            "INSERT INTO feeds (guild_id, channel_id, kind, source, events, filters, enabled, state) "
+            "VALUES (?, ?, ?, ?, ?, ?, 1, '{}')",
+            (ctx.guild.id, v["channel"].id, kind, source, json.dumps(v[f"events_{kind}"]), json.dumps(filters)),
+        )
+        feed = await self.db.fetchone("SELECT * FROM feeds WHERE id=?", (feed_id,))
+        await self.manager.poll_feed(feed, self.bot)  # stiller Abgleich: Bestehendes gilt nicht als neu
+        return f"{p.label}: {source} geht jetzt nach #{v['channel'].name}."
+
+    async def _hub_toggle(self, ctx, _v, item):
+        feed = await self._hub_feed(ctx, item)
+        await self.db.execute("UPDATE feeds SET enabled=?, error=NULL WHERE id=?", (0 if feed["enabled"] else 1, feed["id"]))
+        return "Pausiert." if feed["enabled"] else "Läuft wieder."
+
+    async def _hub_test(self, ctx, _v, item):
+        feed = await self._hub_feed(ctx, item)
+        provider = PROVIDERS.get(feed["kind"])
+        channel = ctx.guild.get_channel(feed["channel_id"])
+        if provider is None or channel is None:
+            raise UserError("Dienst oder Ziel-Kanal gibt es nicht mehr.")
+        try:
+            n = await provider.test_notification(feed["source"], json.loads(feed["events"] or "[]"))
+        except ProviderError as e:
+            raise UserError(str(e))
+        n.embed.add_field(name="🧪 Hinweis", value="Dies ist eine Testbenachrichtigung von TheWashbot.", inline=False)
+        await channel.send(embed=n.embed)
+        return f"Test in #{channel.name} gesendet."
+
+    async def _hub_delete(self, ctx, _v, item):
+        feed = await self._hub_feed(ctx, item)
+        await self.db.execute("DELETE FROM feeds WHERE id=?", (feed["id"],))
+        return "Gelöscht."
+
+    async def _hub_check(self, ctx, _v, _item):
+        feeds = await self.db.fetchall("SELECT * FROM feeds WHERE guild_id=? AND enabled=1", (ctx.guild.id,))
+        posted = 0
+        for feed in feeds:
+            posted += len(await self.manager.poll_feed(feed, self.bot) or [])
+        return f"{len(feeds)} geprüft, {posted} neue Meldung(en) gepostet."
 
 
 async def setup(bot):
