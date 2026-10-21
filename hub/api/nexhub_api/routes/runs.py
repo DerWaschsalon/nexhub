@@ -11,6 +11,9 @@
 
 Alle Angemeldeten (Admins und Mitglieder) sehen alle Runs. Nach außen nur über einen Teilen-Link;
 die öffentliche Ansicht dazu steht in routes/public.py.
+
+Nach einem neuen Upload mit besiegtem Boss meldet der Hub den Link an TheWashBot (`tell_bot`), damit der
+Discord-Post zum Lauf auf den Run im Hub zeigt.
 """
 from __future__ import annotations
 
@@ -21,7 +24,8 @@ import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request, Response
+import httpx
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -61,9 +65,22 @@ class Uploaded(BaseModel):
     duplicate: bool
 
 
+async def tell_bot(http: httpx.AsyncClient, settings: Settings, payload: dict) -> None:
+    """Neuer Run → TheWashBot hängt den Link an seinen Discord-Post (bot/bot/cogs/control.py, run-link).
+    Läuft nach der Antwort; ein Fehler hier darf den Upload nicht stören."""
+    try:
+        r = await http.post(f"{settings.bot_control_url}/control/run-link", json=payload, timeout=10,
+                            headers={"Authorization": f"Bearer {settings.bot_control_key}"})
+    except httpx.HTTPError as e:
+        log.warning("Bot nicht erreichbar, kein Link im Discord-Post: %s", e)
+        return
+    if r.status_code != 200:
+        log.warning("Bot lehnt den Run-Link ab (%d): %s", r.status_code, r.text[:200])
+
+
 @router.post("", status_code=201)
 async def upload(request: Request, device: CurrentDevice, db: DB, settings: SettingsDep,
-                 response: Response) -> Uploaded:
+                 response: Response, background: BackgroundTasks) -> Uploaded:
     data = await _read_body(request)
     digest = hashlib.sha256(data).hexdigest()
     existing = await db.scalar(select(Run).where(Run.user_id == device.user_id, Run.sha256 == digest))
@@ -92,7 +109,11 @@ async def upload(request: Request, device: CurrentDevice, db: DB, settings: Sett
     tmp.replace(path)
     await db.commit()
     log.info("Run %d: %s von Gerät %d (%d Kämpfe, %d KB)", run.id, r.dungeon, device.id, run.fights, len(data) // 1024)
-    return Uploaded(id=run.id, url=f"{settings.hub_base_url}/hub/runs/{run.id}", duplicate=False)
+    url = f"{settings.hub_base_url}/hub/runs/{run.id}"
+    if settings.bot_configured and r.bosses_killed:
+        background.add_task(tell_bot, request.app.state.http, settings,
+                            {"dungeon": r.dungeon, "start_ms": r.start_ms, "url": url})
+    return Uploaded(id=run.id, url=url, duplicate=False)
 
 
 class RunOut(BaseModel):

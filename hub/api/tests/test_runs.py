@@ -219,3 +219,45 @@ def test_kampf_details_geteilt(client, as_user):
     assert r.status_code == 200 and r.json()["players"][0]["name"] == "Testheld" and "noindex" in r.headers["x-robots-tag"]
     member.delete(f"/api/runs/{run_id}/share", headers=ORIGIN)
     assert client.get(f"/api/public/runs/{token}/fights/auto_1").status_code == 404
+
+
+def test_meldet_neuen_run_an_den_bot(make_client, fake, as_user):
+    import json
+
+    import httpx
+
+    from .test_bot import BOT
+
+    seen: list[httpx.Request] = []
+
+    def bot(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"result": "pending"})
+
+    fake.bot = bot
+    with make_client(**BOT) as c:
+        token = pair(c, as_user(MEMBER))
+        r = upload(c, token, nexlog())
+        assert r.status_code == 201
+        assert len(seen) == 1 and seen[0].url.path == "/control/run-link"
+        assert seen[0].headers["authorization"] == "Bearer " + "s" * 32
+        assert json.loads(seen[0].content) == {"dungeon": "Ferocious Horn Den", "start_ms": 1_792_000_300_000,
+                                              "url": r.json()["url"]}
+        # Dieselbe Datei noch einmal: kein zweiter Link
+        assert upload(c, token, nexlog()).status_code == 200 and len(seen) == 1
+        # Ohne besiegten Boss postet der Bot nichts, also auch kein Link
+        assert upload(c, token, nexlog(bosses_killed=0)).status_code == 201 and len(seen) == 1
+
+
+def test_bot_fehler_stoert_upload_nicht(make_client, fake, as_user):
+    import httpx
+
+    from .test_bot import BOT
+
+    def bot(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("weg")
+
+    fake.bot = bot
+    with make_client(**BOT) as c:
+        token = pair(c, as_user(MEMBER))
+        assert upload(c, token, nexlog()).status_code == 201

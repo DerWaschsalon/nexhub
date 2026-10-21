@@ -300,6 +300,7 @@ class Control(commands.Cog):
         r.add_delete("/control/notifications/{id}", self.notification_delete)
         r.add_get("/control/matrix", self.matrix)
         r.add_put("/control/matrix", self.matrix_set)
+        r.add_post("/control/run-link", self.run_link)
         return app
 
     async def cog_load(self) -> None:
@@ -664,6 +665,23 @@ class Control(commands.Cog):
             raise ApiError(400, "allow: ja/nein erwartet")
         await channel.set_permissions(role, view_channel=data["allow"], reason=self.reason(request))
         return matrix(guild)
+
+    # ---- Runs aus dem Hub ---------------------------------------------------------------------
+
+    async def run_link(self, request: web.Request) -> dict:
+        """Der Hub hat einen Run gespeichert: Link an den passenden AION-Post (aion_dedup.attach_hub_link)."""
+        data = await self.body(request)
+        dungeon, start_ms, url = data.get("dungeon"), data.get("start_ms"), data.get("url")
+        if not isinstance(dungeon, str) or not dungeon.strip():
+            raise ApiError(400, "dungeon fehlt")
+        if not isinstance(start_ms, int) or isinstance(start_ms, bool):
+            raise ApiError(400, "start_ms fehlt")
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
+            raise ApiError(400, "url fehlt oder ungültig")
+        aion = self.bot.get_cog("AionDedup")
+        if aion is None:
+            raise ApiError(503, "AION-Modul ist nicht geladen")
+        return {"result": await aion.attach_hub_link(dungeon.strip(), start_ms, url)}
 
 
 async def setup(bot) -> None:
