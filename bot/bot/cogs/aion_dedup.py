@@ -1,88 +1,57 @@
-"""AION-2: mehrere DeckBar-Posts vom selben Dungeon-Lauf zu einem zusammenfassen.
+"""AION-2: Dungeon-Läufe aus dem NexBoard zu einem Discord-Post zusammenfassen.
 
-Zwei unabhängige Wege, je nachdem ob DeckBar selbst geändert wurde:
+Das NexBoard (nexboard/daemon/deckbar_daemon/bot.py, `run_payload`) schickt nach jedem beendeten
+Run `POST /api/aion/fight` mit dem Token aus `/aion` (Bearer). Melden mehrere Mitspieler denselben
+Lauf (gleicher Dungeon, ähnliche Startzeit/Dauer), wartet der Bot kurz, führt die Meldungen zu
+einer Rangliste zusammen und postet genau einmal: Embed mit Rangliste als Bild und je Boss ein
+Bild. Der NexHub meldet danach den Link zum Run (`attach_hub_link`, über control.py), der kommt
+vorn ins Feld „📊 Analyse“, daneben die Bestenliste je Boss (`/leaderboard/<guild_id>`).
 
-1. **Nachrichten-Filter** (kein DeckBar-Eingriff nötig): DeckBar postet weiterhin unverändert
-   über seinen eigenen Discord-Webhook (github.com/gamunex/deckbar,
-   `daemon/deckbar_daemon/runs.py`, `run_message`/`post_discord`). Dieser Cog beobachtet den per
-   `/aion kanal:` festgelegten Kanal, erkennt mehrere Nachrichten vom selben Lauf (Dungeon,
-   Boss-Anzahl, ähnliche Dauer/Startzeit aus dem Text) und löscht alle außer der zuerst
-   angekommenen. Format-Beispiel:
-       **Ferocious Horn Den** – 3/3 Bosse besiegt, Kampfzeit 5:50 (15:42–15:48)
-   Spielernamen stehen hier nur im angehängten Bild, nicht im Text — kein Namens-Filter möglich.
+Erwarteter Payload (ein POST pro abgeschlossenem Lauf, eine Zeile pro Spieler):
+    {
+      "dungeon": "Ferocious Horn Den", "difficulty": "Normal",
+      "bosses_total": 3, "bosses_killed": 3,
+      "start_ms": 1760445123000, "fight_ms": 350000,
+      "players": [{"name": "ReZero", "cls": "ranger", "damage": 13290000, "dps": 38000}, …],
+      "bosses": [                                          # optional, für DPS pro Boss
+        {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 4200000, "dps": 41000}, …]},
+        …
+      ]
+    }
 
-2. **API** (braucht eine Änderung an DeckBar, die an gamunex geht): `POST /api/aion/fight` auf
-   diesem Server (Port 8789, siehe `bot/cogs/dashboard.py`) nimmt strukturierte Lauf-Daten mit
-   echten Spielernamen/Schaden entgegen, merged mehrere Meldungen desselben Laufs zu einer
-   Rangliste und postet genau einmal ein eigenes Embed. Schutz über einen gemeinsamen Token
-   (`/aion token`), da der Endpunkt über Cloudflare öffentlich erreichbar ist.
-
-   Erwarteter Payload (ein POST pro abgeschlossenem Lauf, eine Zeile pro Spieler):
-       {
-         "dungeon": "Ferocious Horn Den", "difficulty": "Normal",
-         "bosses_total": 3, "bosses_killed": 3,
-         "start_ms": 1760445123000, "fight_ms": 350000,
-         "players": [{"name": "ReZero", "damage": 13290000, "dps": 38000}, …],
-         "bosses": [                                          # optional, für DPS pro Boss
-           {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 4200000, "dps": 41000}, …]},
-           …
-         ],
-         "timeline": [                                        # optional, für die Analyse-Seite
-           {"t_ms": 1234, "player": "ReZero", "skill": "Arrow of Reckoning",
-            "damage": 41200, "crit": true, "back": false, "perfect": false, "double": false},
-           …
-         ],
-         "players_meta": [                                    # optional, Klasse/Ausrüstung
-           {"name": "ReZero", "class": "Ranger", "gear_score": 2850, "combat_power": 12500}, …
-         ],
-         "boss_hp": [                                          # optional, für die HP-Kurve
-           {"t_ms": 0, "hp_pct": 100.0}, {"t_ms": 5000, "hp_pct": 92.3}, …
-         ],
-         "heals": [                                            # optional, Heilungs-Übersicht
-           {"t_ms": 1234, "player": "Priest1", "target": "ReZero", "amount": 8200}, …
-         ]
-       }
-
-   Mit `timeline` postet der Bot zusätzlich einen Link auf eine eigene Analyse-Seite
-   (`/runs/<id>` im Web-Dashboard, siehe `bot/cogs/dashboard.py`, Optik/Umfang an AbyssLogs
-   angelehnt) mit Skill-Aufschlüsselung pro Spieler, DPS-über-Zeit-Diagramm, Trefferstatistik
-   (Crit-/Back-Attack-/Perfect-/Double-Rate), und — soweit mitgeschickt — Klasse/Ausrüstung,
-   Boss-HP-Kurve (Berserk-Zeitpunkt) und Heilungsübersicht. Ohne `timeline` nur die Rangliste wie
-   bisher. `player` muss zu einem Namen in `players[]` passen; `skill`/`crit`/`back`/`perfect`/
-   `double` sowie die drei weiteren Felder sind alle optional und unabhängig voneinander nutzbar.
-   `skill` idealerweise schon als lesbarer Name (wie `boss_name_en`/`dungeon_parts_en` bei den
-   anderen Feldern), nicht als Zahlencode — ohne eigene Skill-Datenbank kann der Bot Codes nicht
-   auflösen. Kommen mehrere Meldungen für denselben Lauf (mehrere Mitspieler), wird jeweils die
-   Liste mit den meisten Einträgen genommen, nicht mehrere unabhängige Mitschnitte
-   event-genau zusammengeführt.
+Der Webserver (Port 8789, `AION_PORT`) liefert nur diese zwei Pfade; Caddy gibt sie nach außen
+(infra/server/srv/nexhub/Caddyfile). Öffentliche Adresse für Links: `AION_PUBLIC_URL`.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
+import html
 import logging
 import os
-import re
 import secrets
 import time
-from pathlib import Path
 
 import discord
 from aiohttp import web
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 log = logging.getLogger(__name__)
 
-RUN_RE = re.compile(
-    r"^\*\*(?P<dungeon>.+?)\*\*\s+–\s+(?P<kills>\d+)/(?P<total>\d+)\s+(?:Boss|Bosse)\s+besiegt,\s+"
-    r"Kampfzeit\s+(?P<dmin>\d+):(?P<dsec>\d{2})\s+\((?P<start>\d{1,2}:\d{2})–(?P<end>\d{1,2}:\d{2})\)"
-)
+DEFAULT_PORT = 8789
 DEFAULT_DELAY = 15
 DURATION_TOLERANCE_S = 20
-START_TOLERANCE_MIN = 1
 API_START_TOLERANCE_MS = 30_000
+ANALYSIS_FIELD = "📊 Analyse"
+HUB_LINK_TEXT = "Im NexHub ansehen"
+POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
+
+
+def public_url() -> str:
+    return os.getenv("AION_PUBLIC_URL", "").strip().rstrip("/")
+
+
 def fmt_num(n: float) -> str:
     n = float(n)
     if n >= 1_000_000:
@@ -96,42 +65,15 @@ def fmt_dps(n: float) -> str:
     return f"{fmt_num(n)}/s"
 
 
-# ---- Variante 1: Text-Nachrichten im bestehenden DeckBar-Webhook-Kanal filtern --------------
-
-
-def parse_run(content: str) -> dict | None:
-    m = RUN_RE.match(content.strip())
-    if not m:
-        return None
-    hh, mm = m["start"].split(":")
-    start_min = int(hh) * 60 + int(mm)
-    return {
-        "dungeon": m["dungeon"], "kills": int(m["kills"]), "total": int(m["total"]),
-        "duration_s": int(m["dmin"]) * 60 + int(m["dsec"]), "start_min": start_min,
-    }
-
-
-def same_run(a: dict, b: dict) -> bool:
-    if a["dungeon"] != b["dungeon"] or a["kills"] != b["kills"] or a["total"] != b["total"]:
-        return False
-    if abs(a["duration_s"] - b["duration_s"]) > DURATION_TOLERANCE_S:
-        return False
-    # Minuten-Rollover (z. B. 23:59 vs. 00:01) über den Tagesrand ignorieren wir bewusst — ein
-    # Dungeon-Lauf, der genau um Mitternacht beginnt, ist selten genug, das in Kauf zu nehmen.
-    if abs(a["start_min"] - b["start_min"]) > START_TOLERANCE_MIN:
-        return False
-    return True
-
-
-class Cluster:
-    def __init__(self, run: dict, keeper: discord.Message):
-        self.run = run
-        self.keeper = keeper
-        self.duplicates: list[discord.Message] = []
-        self.task: asyncio.Task | None = None
-
-
-# ---- Variante 2: strukturierte API --------------------------------------------------------
+def _bad_players(players, prefix: str) -> str | None:
+    if not isinstance(players, list) or not players:
+        return f"{prefix} fehlt oder ist leer"
+    for p in players:
+        if not isinstance(p, dict) or not isinstance(p.get("name"), str) or not p["name"].strip():
+            return f"{prefix}[].name fehlt"
+        if not isinstance(p.get("damage"), (int, float)):
+            return f"{prefix}[].damage fehlt oder ist keine Zahl"
+    return None
 
 
 def validate_fight_payload(data: dict) -> str | None:
@@ -141,14 +83,8 @@ def validate_fight_payload(data: dict) -> str | None:
     for key in ("bosses_total", "bosses_killed", "start_ms", "fight_ms"):
         if not isinstance(data.get(key), (int, float)):
             return f"{key} fehlt oder ist keine Zahl"
-    players = data.get("players")
-    if not isinstance(players, list) or not players:
-        return "players fehlt oder ist leer"
-    for p in players:
-        if not isinstance(p, dict) or not isinstance(p.get("name"), str) or not p["name"].strip():
-            return "players[].name fehlt"
-        if not isinstance(p.get("damage"), (int, float)):
-            return "players[].damage fehlt oder ist keine Zahl"
+    if error := _bad_players(data.get("players"), "players"):
+        return error
     bosses = data.get("bosses")
     if bosses is not None:
         if not isinstance(bosses, list):
@@ -156,76 +92,8 @@ def validate_fight_payload(data: dict) -> str | None:
         for b in bosses:
             if not isinstance(b, dict) or not isinstance(b.get("name"), str) or not b["name"].strip():
                 return "bosses[].name fehlt"
-            boss_players = b.get("players")
-            if not isinstance(boss_players, list) or not boss_players:
-                return "bosses[].players fehlt oder ist leer"
-            for p in boss_players:
-                if not isinstance(p, dict) or not isinstance(p.get("name"), str) or not p["name"].strip():
-                    return "bosses[].players[].name fehlt"
-                if not isinstance(p.get("damage"), (int, float)):
-                    return "bosses[].players[].damage fehlt oder ist keine Zahl"
-    timeline = data.get("timeline")
-    if timeline is not None:
-        if not isinstance(timeline, list):
-            return "timeline muss eine Liste sein"
-        for ev in timeline:
-            if not isinstance(ev, dict) or not isinstance(ev.get("t_ms"), (int, float)):
-                return "timeline[].t_ms fehlt oder ist keine Zahl"
-            if not isinstance(ev.get("player"), str) or not ev["player"].strip():
-                return "timeline[].player fehlt"
-            if not isinstance(ev.get("damage"), (int, float)):
-                return "timeline[].damage fehlt oder ist keine Zahl"
-            buffs = ev.get("buffs")
-            if buffs is not None and not isinstance(buffs, list):
-                return "timeline[].buffs muss eine Liste sein"
-    players_meta = data.get("players_meta")
-    if players_meta is not None:
-        if not isinstance(players_meta, list):
-            return "players_meta muss eine Liste sein"
-        for pm in players_meta:
-            if not isinstance(pm, dict) or not isinstance(pm.get("name"), str) or not pm["name"].strip():
-                return "players_meta[].name fehlt"
-    boss_hp = data.get("boss_hp")
-    if boss_hp is not None:
-        if not isinstance(boss_hp, list):
-            return "boss_hp muss eine Liste sein"
-        for s in boss_hp:
-            if not isinstance(s, dict) or not isinstance(s.get("t_ms"), (int, float)):
-                return "boss_hp[].t_ms fehlt oder ist keine Zahl"
-            if not isinstance(s.get("hp_pct"), (int, float)):
-                return "boss_hp[].hp_pct fehlt oder ist keine Zahl"
-    heals = data.get("heals")
-    if heals is not None:
-        if not isinstance(heals, list):
-            return "heals muss eine Liste sein"
-        for h in heals:
-            if not isinstance(h, dict) or not isinstance(h.get("t_ms"), (int, float)):
-                return "heals[].t_ms fehlt oder ist keine Zahl"
-            if not isinstance(h.get("player"), str) or not h["player"].strip():
-                return "heals[].player fehlt"
-            if not isinstance(h.get("amount"), (int, float)):
-                return "heals[].amount fehlt oder ist keine Zahl"
-    skills = data.get("skills")
-    if skills is not None:
-        if not isinstance(skills, dict):
-            return "skills muss ein Objekt sein (Skill-Schlüssel -> {name, icon})"
-        for meta in skills.values():
-            if not isinstance(meta, dict):
-                return "skills[].* muss ein Objekt sein"
-    attempts = data.get("attempts")
-    if attempts is not None:
-        if not isinstance(attempts, list):
-            return "attempts muss eine Liste sein"
-        for a in attempts:
-            if not isinstance(a, dict) or not isinstance(a.get("label"), str) or not a["label"].strip():
-                return "attempts[].label fehlt"
-            if not isinstance(a.get("players"), list) or not a["players"]:
-                return "attempts[].players fehlt oder ist leer"
-            for p in a["players"]:
-                if not isinstance(p, dict) or not isinstance(p.get("name"), str) or not p["name"].strip():
-                    return "attempts[].players[].name fehlt"
-                if not isinstance(p.get("damage"), (int, float)):
-                    return "attempts[].players[].damage fehlt oder ist keine Zahl"
+            if error := _bad_players(b.get("players"), "bosses[].players"):
+                return error
     return None
 
 
@@ -239,6 +107,11 @@ def same_api_run(a: dict, b: dict) -> bool:
     return True
 
 
+def same_run_start(run: dict, dungeon: str, start_ms: int) -> bool:
+    """Meldet der Hub denselben Lauf? Gleicher Dungeon, Start in der Toleranz wie bei Mehrfachmeldungen."""
+    return run["dungeon"] == dungeon and abs(run["start_ms"] - start_ms) <= API_START_TOLERANCE_MS
+
+
 def merge_players(reports: list[dict]) -> list[dict]:
     """Ein Eintrag pro Spielername, über alle Meldungen desselben Laufs — bei Abweichungen
     (unterschiedliche lokale Mitschnitte) gewinnt der höhere Schadenswert."""
@@ -248,7 +121,8 @@ def merge_players(reports: list[dict]) -> list[dict]:
             name = p["name"].strip()
             cur = best.get(name)
             if cur is None or p["damage"] > cur["damage"]:
-                best[name] = {"name": name, "damage": p["damage"], "dps": p.get("dps") or 0}
+                best[name] = {"name": name, "cls": p.get("cls") or (cur or {}).get("cls"),
+                              "damage": p["damage"], "dps": p.get("dps") or 0}
     return sorted(best.values(), key=lambda p: -p["damage"])
 
 
@@ -266,208 +140,15 @@ def merge_bosses(reports: list[dict]) -> list[dict]:
     return [{"name": name, "players": merge_players(per_boss[name])} for name in order]
 
 
-def pick_best_list(reports: list[dict], key: str) -> list[dict] | None:
-    """Für `timeline`/`players_meta`/`boss_hp`/`heals`: jede Meldung sieht (je nach
-    deckbar-capture) im Prinzip dieselben Rohdaten der ganzen Gruppe — nimmt die Liste mit den
-    meisten Einträgen, statt zu versuchen, mehrere unabhängige Mitschnitte event-genau
-    zusammenzuführen."""
-    best: list[dict] | None = None
-    for report in reports:
-        values = report.get(key)
-        if isinstance(values, list) and (best is None or len(values) > len(best)):
-            best = values
-    return best
-
-
-def pick_best_timeline(reports: list[dict]) -> list[dict] | None:
-    return pick_best_list(reports, "timeline")
-
-
-def bucket_dps(timeline: list[dict], fight_ms: int, buckets: int = 60) -> dict:
-    """Schaden pro Spieler in `buckets` gleich großen Zeitfenstern über die Kampfdauer, fürs
-    DPS-über-Zeit-Diagramm auf der Analyse-Seite (`/runs/<id>` im Dashboard)."""
-    buckets = max(1, buckets)
-    bucket_ms = max(1.0, fight_ms / buckets)
-    labels_s = [round((i + 1) * bucket_ms / 1000, 1) for i in range(buckets)]
-    totals: dict[str, list[float]] = {}
-    for ev in timeline:
-        name = ev.get("player")
-        if not name:
-            continue
-        idx = min(buckets - 1, max(0, int(ev.get("t_ms", 0) // bucket_ms)))
-        totals.setdefault(name, [0.0] * buckets)[idx] += float(ev.get("damage") or 0)
-    bucket_s = bucket_ms / 1000
-    series = {name: [round(v / bucket_s, 1) for v in values] for name, values in totals.items()}
-    return {"labels_s": labels_s, "series": series}
-
-
-def boss_hp_series(boss_hp: list[dict]) -> dict:
-    """`boss_hp`-Samples fürs HP-über-Zeit-Diagramm (Berserk-/Enrage-Zeitpunkt erkennbar an
-    einem Sprung in der Abnahme-Geschwindigkeit)."""
-    ordered = sorted(boss_hp, key=lambda s: s.get("t_ms", 0))
-    return {
-        "labels_s": [round(s.get("t_ms", 0) / 1000, 1) for s in ordered],
-        "values": [round(float(s.get("hp_pct") or 0), 1) for s in ordered],
-    }
-
-
-def heals_summary(heals: list[dict]) -> list[dict]:
-    """Pro Heiler: Gesamtheilung und Anzahl Heilungen, absteigend — für die Heilungsübersicht."""
-    per_player: dict[str, dict] = {}
-    for h in heals:
-        name = h.get("player")
-        if not name:
-            continue
-        s = per_player.setdefault(name, {"name": name, "heals": 0, "amount": 0.0})
-        s["heals"] += 1
-        s["amount"] += float(h.get("amount") or 0)
-    return sorted(per_player.values(), key=lambda s: -s["amount"])
-
-
-def timeline_stats(timeline: list[dict]) -> dict[str, dict]:
-    """Pro Spieler: Trefferzahl, Crit-/Back-Attack-/Perfect-/Double-Rate, Gesamtschaden aus der
-    Zeitleiste — unabhängig von den schon gemeldeten players[]-Summen, direkt aus den
-    Einzelereignissen."""
-    stats: dict[str, dict] = {}
-    for ev in timeline:
-        name = ev.get("player")
-        if not name:
-            continue
-        s = stats.setdefault(name, {"hits": 0, "crits": 0, "backs": 0, "perfects": 0, "doubles": 0, "damage": 0.0})
-        s["hits"] += 1
-        s["crits"] += 1 if ev.get("crit") else 0
-        s["backs"] += 1 if ev.get("back") else 0
-        s["perfects"] += 1 if ev.get("perfect") else 0
-        s["doubles"] += 1 if ev.get("double") else 0
-        s["damage"] += float(ev.get("damage") or 0)
-    for s in stats.values():
-        for flag, key in (("crit", "crits"), ("back", "backs"), ("perfect", "perfects"), ("double", "doubles")):
-            s[f"{flag}_pct"] = round(100 * s[key] / s["hits"], 1) if s["hits"] else 0.0
-    return stats
-
-
-def skill_breakdown(timeline: list[dict], skills: dict[str, dict] | None = None, top: int = 8) -> dict[str, list[dict]]:
-    """Pro Spieler die Top-`top`-Skills nach Gesamtschaden (Name, Icon, Treffer, Schaden, Anteil
-    an dessen Gesamtschaden) — die Skill-Aufschlüsselung, die auf der Analyse-Seite angezeigt
-    wird. `skills` löst den rohen `timeline[].skill`-Schlüssel (Code oder schon ein Name) in Name
-    + Icon-URL auf (AbyssLogs-Stil: eine Lookup-Tabelle statt Name/Icon pro Einzelereignis) —
-    fehlt ein Schlüssel darin, wird der rohe Wert selbst als Name angezeigt."""
-    skills = skills or {}
-    per_player: dict[str, dict[str, dict]] = {}
-    for ev in timeline:
-        name = ev.get("player")
-        if not name:
-            continue
-        key = str(ev.get("skill") or "–")
-        bucket = per_player.setdefault(name, {})
-        s = bucket.setdefault(key, {"key": key, "hits": 0, "damage": 0.0})
-        s["hits"] += 1
-        s["damage"] += float(ev.get("damage") or 0)
-    result: dict[str, list[dict]] = {}
-    for name, bucket in per_player.items():
-        total = sum(s["damage"] for s in bucket.values()) or 1.0
-        ordered = sorted(bucket.values(), key=lambda s: -s["damage"])[:top]
-        for s in ordered:
-            s["pct"] = round(100 * s["damage"] / total, 1)
-            meta = skills.get(s["key"]) or {}
-            s["skill"] = meta.get("name") or s["key"]
-            s["icon"] = meta.get("icon")
-        result[name] = ordered
-    return result
-
-
-def buff_uptime(timeline: list[dict], skills: dict[str, dict] | None = None, top: int = 10) -> dict[str, list[dict]]:
-    """Pro Spieler die Top-`top`-Buffs/Debuffs nach Anwesenheits-Rate: an wie viel % der eigenen
-    Treffer dieser Buff aktiv war (`timeline[].buffs`, optionale Liste von Skill-Codes/-Namen je
-    Treffer — anders als `buffSpans` bei AbyssLogs keine durchgehende Zeitspanne, sondern nur die
-    Stichprobe „war es bei diesem Treffer aktiv“, daher eine Rate statt einer echten Uptime-Zeit).
-    `skills` löst Codes in Name + Icon auf, wie bei `skill_breakdown`."""
-    skills = skills or {}
-    hits_per_player: dict[str, int] = {}
-    presence: dict[str, dict[str, int]] = {}
-    for ev in timeline:
-        name = ev.get("player")
-        if not name:
-            continue
-        hits_per_player[name] = hits_per_player.get(name, 0) + 1
-        for buff_key in ev.get("buffs") or []:
-            bucket = presence.setdefault(name, {})
-            bucket[buff_key] = bucket.get(buff_key, 0) + 1
-    result: dict[str, list[dict]] = {}
-    for name, buffs in presence.items():
-        hits = hits_per_player.get(name) or 1
-        ordered = sorted(buffs.items(), key=lambda kv: -kv[1])[:top]
-        rows = []
-        for key, count in ordered:
-            meta = skills.get(key) or {}
-            rows.append({
-                "key": key, "buff": meta.get("name") or key, "icon": meta.get("icon"),
-                "pct": round(100 * count / hits, 1),
-            })
-        result[name] = rows
-    return result
-
-
-def leaderboard_rows(bosses: list[dict], players_meta: list[dict] | None) -> list[dict]:
+def leaderboard_rows(bosses: list[dict], players: list[dict]) -> list[dict]:
     """Pro Boss und Spieler eine Zeile (Schaden, DPS, Klasse falls bekannt) — Kandidaten fürs
     Upsert in `aion_leaderboard` (dort gewinnt dann nur, wer den bisherigen Bestwert übertrifft)."""
-    class_by_name = {m["name"]: m.get("class") for m in (players_meta or [])}
-    rows = []
-    for b in bosses:
-        for p in b.get("players") or []:
-            rows.append({
-                "boss": b["name"], "player": p["name"], "class": class_by_name.get(p["name"]),
-                "damage": p["damage"], "dps": p.get("dps") or 0,
-            })
-    return rows
-
-
-def merge_skill_maps(reports: list[dict]) -> dict[str, dict]:
-    """Vereint die `skills`-Lookup-Tabellen aller Meldungen (anders als bei den Listen-Feldern
-    sinnvoll zu vereinen statt nur die größte zu nehmen — unterschiedliche Mitschnitte können
-    unterschiedliche Skills aufgelöst haben)."""
-    merged: dict[str, dict] = {}
-    for report in reports:
-        s = report.get("skills")
-        if isinstance(s, dict):
-            merged.update(s)
-    return merged
-
-
-def runs_dir(db) -> Path:
-    d = db.path.parent / "runs"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
-def build_run_embed(
-    run: dict, reporters: int, bosses: list[dict] | None = None, run_id: str | None = None,
-    guild_id: int | None = None, image_filename: str | None = None, hub_url: str | None = None,
-) -> discord.Embed:
-    title = f"⚔️ {run['dungeon']}" + (f" ({run['difficulty']})" if run.get("difficulty") else "")
-    minutes, seconds = divmod(round(run["fight_ms"] / 1000), 60)
-    e = discord.Embed(title=title, colour=discord.Colour.gold())
-    e.add_field(name="Bosse", value=f"{run['bosses_killed']}/{run['bosses_total']} besiegt")
-    e.add_field(name="Kampfzeit", value=f"{minutes}:{seconds:02d}")
-    if image_filename:
-        e.set_image(url=f"attachment://{image_filename}")
-    if run_id or guild_id or hub_url:
-        from .dashboard import dashboard_base_url
-
-        base = dashboard_base_url()
-        links = [hub_link(hub_url)] if hub_url else []
-        if run_id:
-            links.append(f"[Zeitleiste ansehen]({base}/runs/{run_id})")
-        if guild_id and bosses:
-            links.append(f"[Bestenliste]({base}/leaderboard/{guild_id})")
-        e.add_field(name=ANALYSIS_FIELD, value=" · ".join(links), inline=False)
-    e.set_footer(text=f"AION-2 · {reporters} DeckBar-Meldung(en) zusammengeführt")
-    return e
-
-
-ANALYSIS_FIELD = "📊 Analyse"
-HUB_LINK_TEXT = "Im NexHub ansehen"
-POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
+    cls_by_name = {p["name"]: p.get("cls") for p in players}
+    return [
+        {"boss": b["name"], "player": p["name"], "class": p.get("cls") or cls_by_name.get(p["name"]),
+         "damage": p["damage"], "dps": p.get("dps") or 0}
+        for b in bosses for p in b.get("players") or []
+    ]
 
 
 def hub_link(url: str) -> str:
@@ -484,9 +165,77 @@ def with_hub_link(embed: discord.Embed, url: str) -> discord.Embed:
     return embed.add_field(name=ANALYSIS_FIELD, value=hub_link(url), inline=False)
 
 
-def same_run_start(run: dict, dungeon: str, start_ms: int) -> bool:
-    """Meldet der Hub denselben Lauf? Gleicher Dungeon, Start in der Toleranz wie bei Mehrfachmeldungen."""
-    return run["dungeon"] == dungeon and abs(run["start_ms"] - start_ms) <= API_START_TOLERANCE_MS
+def build_run_embed(
+    run: dict, reporters: int, bosses: list[dict] | None = None, guild_id: int | None = None,
+    image_filename: str | None = None, hub_url: str | None = None,
+) -> discord.Embed:
+    title = f"⚔️ {run['dungeon']}" + (f" ({run['difficulty']})" if run.get("difficulty") else "")
+    minutes, seconds = divmod(round(run["fight_ms"] / 1000), 60)
+    e = discord.Embed(title=title, colour=discord.Colour.gold())
+    e.add_field(name="Bosse", value=f"{run['bosses_killed']}/{run['bosses_total']} besiegt")
+    e.add_field(name="Kampfzeit", value=f"{minutes}:{seconds:02d}")
+    if image_filename:
+        e.set_image(url=f"attachment://{image_filename}")
+    links = [hub_link(hub_url)] if hub_url else []
+    if guild_id and bosses and public_url():
+        links.append(f"[Bestenliste]({public_url()}/leaderboard/{guild_id})")
+    if links:
+        e.add_field(name=ANALYSIS_FIELD, value=" · ".join(links), inline=False)
+    e.set_footer(text=f"AION-2 · {reporters} NexBoard-Meldung(en) zusammengeführt")
+    return e
+
+
+LEADERBOARD_CSS = """
+:root { --bg: #0b0e1a; --panel: rgba(255,255,255,.055); --line: rgba(255,255,255,.12); --text: #f2f3f7;
+  --dim: rgba(242,243,247,.62); --accent: #5ac8fa; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; color: var(--text); font: 14px/1.5 Inter, system-ui, sans-serif;
+  background: radial-gradient(900px 400px at 10% -10%, rgba(88,60,220,.28), transparent 70%),
+    radial-gradient(800px 400px at 100% 0%, rgba(230,110,60,.18), transparent 70%), var(--bg); }
+main { padding: 20px 16px 60px; max-width: 920px; margin: 0 auto; }
+h1 { font-size: 20px; font-weight: 600; margin: 0 0 6px; }
+.sub { color: var(--dim); margin: 0 0 18px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--dim); margin: 0 0 14px; font-weight: 600; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+.bar-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.bar-name { width: 140px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-meta { font-size: 11px; color: var(--dim); }
+.bar-track { flex: 1; height: 16px; border-radius: 8px; background: rgba(0,0,0,.3); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--accent), #8f7cff); }
+.bar-value { width: 90px; flex-shrink: 0; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+.rank-1 .bar-fill { background: linear-gradient(90deg, #f0c040, #ffe49a); }
+.rank-2 .bar-fill { background: linear-gradient(90deg, #c0c0c0, #e8e8e8); }
+.rank-3 .bar-fill { background: linear-gradient(90deg, #cd7f32, #e8a868); }
+.rank-1 .bar-name, .rank-1 .bar-value { color: #f0c040; }
+@media (max-width: 520px) { .bar-name { width: 90px; } .bar-value { width: 70px; font-size: 12px; } }
+"""
+
+
+def leaderboard_html(guild_name: str, rows: list) -> str:
+    esc = html.escape
+    by_boss: dict[str, list] = {}
+    for r in rows:
+        by_boss.setdefault(r["boss"], []).append(r)
+    cards = []
+    for boss, entries in by_boss.items():
+        top = entries[:10]
+        best = top[0]["dps"] or 0
+        lines = []
+        for i, r in enumerate(top, start=1):
+            pct = 100 * r["dps"] / best if best else 0
+            cls = f' <span class="bar-meta">{esc(r["class"])}</span>' if r["class"] else ""
+            lines.append(
+                f'<div class="bar-row{f" rank-{i}" if i <= 3 else ""}"><span class="bar-name">#{i} {esc(r["player"])}{cls}</span>'
+                f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%"></div></div>'
+                f'<span class="bar-value">{fmt_dps(r["dps"])}</span></div>'
+            )
+        cards.append(f'<div class="card"><h2>{esc(boss)}</h2>{"".join(lines)}</div>')
+    body = "".join(cards) or '<div class="card">Noch keine Läufe gemeldet.</div>'
+    return f"""<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bestenliste – {esc(guild_name)}</title><style>{LEADERBOARD_CSS}</style></head><body>
+<main><h1>🏆 Bestenliste</h1><p class="sub">{esc(guild_name)} · beste DPS je Boss</p>{body}</main>
+</body></html>"""
 
 
 class ApiCluster:
@@ -498,98 +247,41 @@ class ApiCluster:
         self.hub_url: str | None = None  # vom NexHub gemeldet (attach_hub_link), sobald hochgeladen
 
 
-RUN_RETENTION_DAYS = 30
-
-
 class AionDedup(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
-        self.pending: dict[int, list[Cluster]] = {}  # guild_id -> offene Text-Cluster
         self.api_pending: dict[int, list[ApiCluster]] = {}  # guild_id -> offene API-Cluster
         self.api_posted: list[tuple[float, dict, discord.Message]] = []  # (gepostet, Lauf, Nachricht)
-        self.cleanup_runs.start()
+        self.runner: web.AppRunner | None = None
 
-    def cog_unload(self):
-        self.cleanup_runs.cancel()
-        for clusters in self.pending.values():
-            for c in clusters:
-                if c.task:
-                    c.task.cancel()
+    async def cog_load(self) -> None:
+        app = web.Application(client_max_size=1024 * 1024)
+        app.add_routes([
+            web.post("/api/aion/fight", self.handle_api_fight),
+            web.get("/leaderboard/{guild_id}", self.page_leaderboard),
+        ])
+        self.runner = web.AppRunner(app)
+        await self.runner.setup()
+        port = int(os.getenv("AION_PORT", DEFAULT_PORT))
+        await web.TCPSite(self.runner, "0.0.0.0", port).start()
+        log.info("AION-API und Bestenliste hören auf Port %d", port)
+
+    async def cog_unload(self) -> None:
         for clusters in self.api_pending.values():
             for c in clusters:
                 if c.task:
                     c.task.cancel()
-
-    @tasks.loop(hours=24)
-    async def cleanup_runs(self):
-        cutoff = time.time() - RUN_RETENTION_DAYS * 86400
-        rows = await self.db.fetchall("SELECT id FROM aion_runs WHERE created < ?", (cutoff,))
-        for r in rows:
-            (runs_dir(self.db) / f"{r['id']}.json").unlink(missing_ok=True)
-        if rows:
-            await self.db.execute("DELETE FROM aion_runs WHERE created < ?", (cutoff,))
-            log.info("AION-Analyse: %d alte Läufe (älter als %d Tage) aufgeräumt", len(rows), RUN_RETENTION_DAYS)
-
-    @cleanup_runs.before_loop
-    async def before_cleanup_runs(self):
-        await self.bot.wait_until_ready()
-
-    # ---- Variante 1: Nachrichten im DeckBar-Kanal -----------------------------------------
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.webhook_id is None or not message.guild:
-            return
-        channel_id = self.db.get_int(message.guild.id, "aion_channel")
-        if not channel_id or message.channel.id != channel_id:
-            return
-        if (message.author.name or "").strip().lower() != "deckbar":
-            return
-        run = parse_run(message.content or "")
-        if run is None:
-            return
-
-        clusters = self.pending.setdefault(message.guild.id, [])
-        for c in clusters:
-            if same_run(c.run, run):
-                c.duplicates.append(message)
-                log.info("AION: %s als Duplikat von %s erkannt (%s)", message.id, c.keeper.id, run["dungeon"])
-                return
-
-        delay = self.db.get_int(message.guild.id, "aion_dedup_delay") or DEFAULT_DELAY
-        cluster = Cluster(run, message)
-        clusters.append(cluster)
-        cluster.task = asyncio.create_task(self._finalize_later(message.guild.id, cluster, delay))
-
-    async def _finalize_later(self, guild_id: int, cluster: Cluster, delay: int) -> None:
-        await asyncio.sleep(delay)
-        clusters = self.pending.get(guild_id, [])
-        if cluster in clusters:
-            clusters.remove(cluster)
-        if not cluster.duplicates:
-            return
-        log.info(
-            "AION: %s – behalte %s, lösche %d Duplikat(e)",
-            cluster.run["dungeon"], cluster.keeper.id, len(cluster.duplicates),
-        )
-        for dup in cluster.duplicates:
-            try:
-                await dup.delete()
-            except discord.HTTPException as e:
-                log.warning("AION: Duplikat %s konnte nicht gelöscht werden: %r", dup.id, e)
-
-    # ---- Variante 2: API -------------------------------------------------------------------
+        if self.runner:
+            await self.runner.cleanup()
 
     def api_url(self) -> str:
-        # öffentliche Adresse (z. B. über Cloudflare Tunnel), NICHT die LAN-IP — die Gegenseite
-        # (DeckBar bei anderen Spielern) sitzt oft außerhalb des eigenen Netzes.
-        base = os.getenv("AION_PUBLIC_URL", "").rstrip("/") or "<AION_PUBLIC_URL fehlt in .env>"
-        return f"{base}/api/aion/fight"
+        return f"{public_url() or '<AION_PUBLIC_URL fehlt in .env>'}/api/aion/fight"
 
     async def handle_api_fight(self, request: web.Request) -> web.Response:
-        guild_id = self.db.guild_for_value("aion_api_token", (request.headers.get("Authorization") or "")[7:])
-        if guild_id is None or not (request.headers.get("Authorization") or "").startswith("Bearer "):
+        auth = request.headers.get("Authorization") or ""
+        guild_id = self.db.guild_for_value("aion_api_token", auth[7:]) if auth.startswith("Bearer ") else None
+        if guild_id is None:
             return web.json_response({"error": "unauthorized"}, status=401)
         channel_id = self.db.get_int(guild_id, "aion_channel")
         if not channel_id:
@@ -608,9 +300,7 @@ class AionDedup(commands.Cog):
             "dungeon": data["dungeon"].strip(), "difficulty": (data.get("difficulty") or "").strip() or None,
             "bosses_total": int(data["bosses_total"]), "bosses_killed": int(data["bosses_killed"]),
             "start_ms": int(data["start_ms"]), "fight_ms": int(data["fight_ms"]), "players": data["players"],
-            "bosses": data.get("bosses") or [], "timeline": data.get("timeline"),
-            "players_meta": data.get("players_meta"), "boss_hp": data.get("boss_hp"), "heals": data.get("heals"),
-            "skills": data.get("skills"), "attempts": data.get("attempts"),
+            "bosses": data.get("bosses") or [],
         }
         clusters = self.api_pending.setdefault(guild_id, [])
         for c in clusters:
@@ -636,23 +326,11 @@ class AionDedup(commands.Cog):
             return
         players = merge_players(cluster.reports)
         bosses = merge_bosses(cluster.reports)
-        players_meta = pick_best_list(cluster.reports, "players_meta")
-        timeline = pick_best_list(cluster.reports, "timeline")
-        attempts = pick_best_list(cluster.reports, "attempts")
-        extras = {
-            "players_meta": players_meta,
-            "boss_hp": pick_best_list(cluster.reports, "boss_hp"),
-            "heals": pick_best_list(cluster.reports, "heals"),
-            "skills": merge_skill_maps(cluster.reports),
-            "attempts": attempts,
-        }
-        run_id = await self._store_run(cluster.guild_id, cluster.run, players, bosses, timeline, extras, len(cluster.reports)) \
-            if (timeline or attempts) else None
         if bosses:
-            await self._update_leaderboard(cluster.guild_id, bosses, players_meta, run_id)
+            await self._update_leaderboard(cluster.guild_id, bosses, players)
         image_filename = "aion_run.png" if players else None
         embed = build_run_embed(
-            cluster.run, len(cluster.reports), bosses, run_id=run_id, guild_id=cluster.guild_id,
+            cluster.run, len(cluster.reports), bosses, guild_id=cluster.guild_id,
             image_filename=image_filename, hub_url=cluster.hub_url,
         )
         embeds = [embed]
@@ -667,7 +345,7 @@ class AionDedup(commands.Cog):
             )
             files.append(discord.File(image_buf, filename=image_filename))
         # max. 10 Embeds pro Discord-Nachricht, eines geht an das Haupt-Embed oben
-        for i, b in enumerate((bosses or [])[:9]):
+        for i, b in enumerate(bosses[:9]):
             from .aion_image import render_boss_image
 
             boss_buf = await loop.run_in_executor(None, render_boss_image, b["name"], b["players"])
@@ -706,54 +384,38 @@ class AionDedup(commands.Cog):
                 return "edited"
         return "unknown"
 
-    async def _update_leaderboard(
-        self, guild_id: int, bosses: list[dict], players_meta: list[dict] | None, run_id: str | None,
-    ) -> None:
+    async def _update_leaderboard(self, guild_id: int, bosses: list[dict], players: list[dict]) -> None:
         created = time.time()
-        for row in leaderboard_rows(bosses, players_meta):
+        for row in leaderboard_rows(bosses, players):
             await self.db.execute(
                 "INSERT INTO aion_leaderboard (guild_id, boss, player, class, damage, dps, run_id, created) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "VALUES (?, ?, ?, ?, ?, ?, NULL, ?) "
                 "ON CONFLICT(guild_id, boss, player) DO UPDATE SET "
                 "class=excluded.class, damage=excluded.damage, dps=excluded.dps, "
-                "run_id=excluded.run_id, created=excluded.created "
+                "run_id=NULL, created=excluded.created "
                 "WHERE excluded.dps > aion_leaderboard.dps",
-                (guild_id, row["boss"], row["player"], row["class"], row["damage"], row["dps"], run_id, created),
+                (guild_id, row["boss"], row["player"], row["class"], row["damage"], row["dps"], created),
             )
 
-    async def _store_run(
-        self, guild_id: int, run: dict, players: list[dict], bosses: list[dict],
-        timeline: list[dict], extras: dict, reporters: int,
-    ) -> str:
-        run_id = secrets.token_urlsafe(16)
-        created = time.time()
-        data = {
-            "dungeon": run["dungeon"], "difficulty": run.get("difficulty"),
-            "bosses_total": run["bosses_total"], "bosses_killed": run["bosses_killed"],
-            "fight_ms": run["fight_ms"], "created": created, "reporters": reporters,
-            "players": players, "bosses": bosses, "timeline": timeline, **extras,
-        }
-        path = runs_dir(self.db) / f"{run_id}.json"
-        text = json.dumps(data)
-
-        def _write():
-            path.write_text(text)
-
-        await asyncio.get_running_loop().run_in_executor(None, _write)  # Timeline kann einige MB groß sein
-        await self.db.execute(
-            "INSERT INTO aion_runs (id, guild_id, created, dungeon, difficulty, reporters) VALUES (?, ?, ?, ?, ?, ?)",
-            (run_id, guild_id, created, run["dungeon"], run.get("difficulty"), reporters),
+    async def page_leaderboard(self, request: web.Request) -> web.Response:
+        """Öffentliche Bestenliste je Boss, ohne Login. Die Guild-ID ist kein Geheimnis (steht in
+        jedem Invite-Link), ohne Treffer in `aion_leaderboard` ist die Seite einfach leer."""
+        raw = request.match_info["guild_id"]
+        guild = self.bot.get_guild(int(raw)) if raw.isdigit() else None
+        if not guild:
+            return web.Response(text="Unbekannter Server.", status=404)
+        rows = await self.db.fetchall(
+            "SELECT boss, player, class, dps FROM aion_leaderboard WHERE guild_id=? ORDER BY boss, dps DESC",
+            (guild.id,),
         )
-        return run_id
+        return web.Response(text=leaderboard_html(guild.name, rows), content_type="text/html")
 
-    # ---- Einrichtung -----------------------------------------------------------------------
-
-    @app_commands.command(name="aion", description="AION-2-Duplikatfilter für DeckBar-Posts einrichten")
+    @app_commands.command(name="aion", description="AION-2-Posts aus dem NexBoard einrichten")
     @app_commands.describe(
-        kanal="Kanal für den Duplikatfilter bzw. die zusammengeführten AION-Posts",
-        wartezeit="Sekunden, die auf weitere Posts vom selben Lauf gewartet wird (Standard 15)",
-        token="Neuen API-Token erzeugen (alten ungültig machen), für die DeckBar-API-Anbindung",
-        aus="Duplikatfilter abschalten",
+        kanal="Kanal für die zusammengeführten AION-Posts",
+        wartezeit="Sekunden, die auf weitere Meldungen vom selben Lauf gewartet wird (Standard 15)",
+        token="Neuen API-Token erzeugen (alten ungültig machen)",
+        aus="AION-Posts abschalten",
     )
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
@@ -763,37 +425,30 @@ class AionDedup(commands.Cog):
     ):
         if aus:
             await self.db.set(interaction.guild_id, "aion_channel", None)
-            return await interaction.response.send_message("AION-Duplikatfilter ist aus.", ephemeral=True)
+            return await interaction.response.send_message("AION-Posts sind aus.", ephemeral=True)
         if kanal:
             await self.db.set(interaction.guild_id, "aion_channel", kanal.id)
         if wartezeit:
             await self.db.set(interaction.guild_id, "aion_dedup_delay", wartezeit)
 
-        lines = []
         channel_id = self.db.get_int(interaction.guild_id, "aion_channel")
         channel = interaction.guild.get_channel(channel_id) if channel_id else None
         delay = self.db.get_int(interaction.guild_id, "aion_dedup_delay") or DEFAULT_DELAY
         if not channel:
             return await interaction.response.send_message(
-                "Noch kein Kanal festgelegt. `/aion kanal:#dein-deckbar-kanal`.", ephemeral=True
+                "Noch kein Kanal festgelegt. `/aion kanal:#dein-aion-kanal`.", ephemeral=True
             )
-        lines.append(f"Kanal: {channel.mention}, Wartezeit {delay}s.")
-        lines.append(
-            "Variante 1 (DeckBar unverändert): postet weiter selbst per eigenem Webhook in diesen Kanal, "
-            "der Bot löscht Duplikate."
-        )
-
         api_token = self.db.get(interaction.guild_id, "aion_api_token")
         if token or not api_token:
             api_token = secrets.token_urlsafe(24)
             await self.db.set(interaction.guild_id, "aion_api_token", api_token)
-        lines.append(
-            f"\nVariante 2 (API, braucht eine DeckBar-Änderung):\n`POST {self.api_url()}`\n"
-            f"`Authorization: Bearer {api_token}`\n"
-            "Geheim halten, nur an DeckBar-Instanzen geben, die mitmachen sollen. Mit `token:True` "
-            "einen neuen erzeugen (macht den alten ungültig)."
+        await interaction.response.send_message(
+            f"Kanal: {channel.mention}, Wartezeit {delay}s.\n\n"
+            f"Im NexBoard unter Discord-Bot eintragen:\n`{self.api_url()}`\nToken: `{api_token}`\n"
+            "Geheim halten, nur an NexBoards geben, die mitmachen sollen. Mit `token:True` einen neuen "
+            "erzeugen (macht den alten ungültig).",
+            ephemeral=True,
         )
-        await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
 
 async def setup(bot):

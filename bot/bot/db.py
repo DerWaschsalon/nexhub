@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS giveaways (
 CREATE TABLE IF NOT EXISTS giveaway_entries (
     message_id INTEGER NOT NULL, user_id INTEGER NOT NULL, PRIMARY KEY (message_id, user_id)
 );
--- Eigene Befehle, auch im Web-Dashboard bearbeitbar (siehe bot/cogs/dashboard.py, Seite /commands)
+-- Eigene Befehle, auch im NexHub (Bereich „Bot“) bearbeitbar
 CREATE TABLE IF NOT EXISTS custom_commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER NOT NULL, name TEXT NOT NULL, response TEXT NOT NULL,
     UNIQUE (guild_id, name)
@@ -76,16 +76,9 @@ CREATE TABLE IF NOT EXISTS level_rewards (
     id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER NOT NULL, level INTEGER NOT NULL,
     role_id INTEGER NOT NULL, UNIQUE (guild_id, level)
 );
--- AION-2-API-Läufe mit Zeitleiste, für die Analyse-Seite (/runs/<id> im Dashboard, siehe
--- aion_dedup.py). Die eigentlichen (teils mehrere MB großen) Daten liegen als Datei unter
--- <DB_PATH-Ordner>/runs/<id>.json, hier nur der Index zum Aufräumen/Nachschlagen.
-CREATE TABLE IF NOT EXISTS aion_runs (
-    id TEXT PRIMARY KEY, guild_id INTEGER NOT NULL, created REAL NOT NULL,
-    dungeon TEXT NOT NULL, difficulty TEXT, reporters INTEGER NOT NULL DEFAULT 1
-);
 -- Bestenliste je Boss: bester gemeldeter DPS-Wert pro Spieler (über alle Läufe hinweg), für
--- /leaderboard/<guild_id> im Dashboard (siehe aion_dedup.py). run_id verlinkt auf die
--- Analyse-Seite dieses Laufs, falls der eine Zeitleiste hatte (sonst NULL).
+-- /leaderboard/<guild_id> (siehe aion_dedup.py). run_id stammt von der früheren Analyse-Seite
+-- und bleibt NULL; ältere Datenbanken haben zusätzlich noch die ungenutzte Tabelle aion_runs.
 CREATE TABLE IF NOT EXISTS aion_leaderboard (
     guild_id INTEGER NOT NULL, boss TEXT NOT NULL, player TEXT NOT NULL,
     class TEXT, damage REAL NOT NULL, dps REAL NOT NULL, run_id TEXT, created REAL NOT NULL,
@@ -176,7 +169,7 @@ class Database:
         return [gid for gid, kv in self._settings.items() if key in kv]
 
     def guild_for_value(self, key: str, value: str) -> int | None:
-        """Server-ID, bei der `key` genau `value` ist (z. B. Token → Server beim DPS-Webhook)."""
+        """Server-ID, bei der `key` genau `value` ist (z. B. Token → Server bei der AION-API)."""
         for gid in self.guilds_with(key):
             if self.get(gid, key) == value:
                 return gid

@@ -18,10 +18,8 @@ Ein Bot für alles, was ihr bisher mit mehreren Bots macht. Alle Befehle sind Sl
 | **Aufräumen** | `/aufraeumen nachrichten`, `/aufraeumen bots`, `/aufraeumen bericht` | Alte Nachrichten löschen (Filter nach Alter, Person, nur Bots), alte Bots entfernen, Bericht über tote Kanäle und leere Rollen. Immer erst mit Vorschau und Bestätigung. |
 | **Erinnerungen** | `/erinnere wann: text: privat:` | Zeit relativ (`2h`, `30m`, `1d2h`) oder absolut (`18:30`, `24.12. 18:00`). `/erinnerungen` zeigt eigene offene Erinnerungen, `/erinnerung-loeschen` entfernt eine. |
 | **Tickets** | `/setup tickets rolle:` (fügt hinzu/entfernt, mehrere möglich; im Klick-Panel per Mehrfachauswahl), `/ticket-panel` | Panel mit Buttons (❓ Frage, ⚠️ Meldung, 📋 Bewerbung) → Modal → privater Thread mit allen Team-Rollen. „Schließen“ im Thread beendet ihn, sperrt ihn und schickt den Verlauf als `.txt` in den Log-Kanal. |
-| **DeckBar-Gruppen-DPS** | `/setup dps-webhook`, auch im Klick-Panel | Nimmt den Gruppen-Endstand von [DeckBar](https://github.com/gamunex/deckbar) nach jedem Kampf entgegen und postet ihn als Embed (eine Nachricht pro Gruppe, nicht pro Spieler). Braucht Port 8787 in `docker-compose.yml` und `DPS_WEBHOOK_HOST` in `.env`. |
 | **Benachrichtigungen** | Button „🔔 Benachrichtigungen" im Klick-Panel | GitHub-Repos beobachten (Releases, Issues, Pull Requests, Commits) per Klick-Assistent, komplett über Buttons/Select-Menüs/Modals, kein Befehl nötig. Modular für weitere Dienste (YouTube, Twitch, RSS, …) — siehe `bot/notify/`. |
-| **Web-Dashboard** | `/setup dashboard rolle:`, dann `http://<DASHBOARD_HOST>:8789` | Einstellungen im Browser mit Discord-Login, nur für die freigeschaltete Rolle. Siehe „Web-Dashboard einrichten" unten. |
-| **AION-2** | `/aion kanal:`, `/aion token:True` | Mehrere DeckBar-Posts vom selben Dungeon-Lauf zu einem zusammenführen — per Duplikatfilter (ohne DeckBar-Änderung) oder per API mit Rangliste (braucht DeckBar-Änderung). Siehe „AION-2: mehrere DeckBar-Posts zu einem zusammenführen" unten. |
+| **AION-2** | `/aion kanal:`, `/aion token:True` | Runs aus dem NexBoard: ein Post je Dungeon-Lauf mit Rangliste (auch wenn mehrere Mitspieler melden), Link in den NexHub und Bestenliste je Boss. Siehe „AION-2: Runs aus dem NexBoard“ unten. |
 | **DJ-Rolle** | `/setup dj-rolle` | Optional: Dann dürfen nur DJ, Admins und wer den Song gewünscht hat, überspringen und stoppen. |
 | **Bump-Erinnerung** | `/setup bump kanal: rolle:`, auch im Klick-Panel | Erkennt die Bump-Bestätigung von [DISBOARD](https://disboard.org) im festgelegten Kanal und erinnert nach Ablauf des 2-Stunden-Cooldowns per Ping (optionale Rolle) daran, `/bump` erneut zu tippen. Rein passiv, der Bot bumpt nicht selbst. |
 | **Mitglieder-Zähler** | `/setup mitglieder-zaehler kanal:`, auch im Klick-Panel | Name eines Sprachkanals zeigt laufend die aktuelle Mitgliederzahl (z. B. „👥 Mitglieder: 123“), aktualisiert bei Beitritt/Austritt und mindestens alle 10 Minuten (Discords Limit für Kanal-Umbenennungen). |
@@ -41,8 +39,8 @@ Ein Bot für alles, was ihr bisher mit mehreren Bots macht. Alle Befehle sind Sl
 
 `/setup anzeigen` zeigt alle Einstellungen, `/setup panel` öffnet sie zum Anklicken (Kanal-/Rollen-
 Auswahl per Dropdown, Text per Formular, Ein/Aus per Knopf — kein Befehl tippen nötig). Das
-Klick-Panel deckt inzwischen **alle** `/setup`-Einstellungen ab, inklusive Verwarnungs-Schwelle,
-Web-Dashboard-Rolle und der kompletten Verifizierungs-Ersteinrichtung (mit Vorschau/Bestätigung
+Klick-Panel deckt inzwischen **alle** `/setup`-Einstellungen ab, inklusive Verwarnungs-Schwelle
+und der kompletten Verifizierungs-Ersteinrichtung (mit Vorschau/Bestätigung
 wie beim Befehl).
 `/setup management-kanal kategorie:` legt einen festen Kanal mit genau diesem Klick-Panel an (z. B.
 unter einer internen Admin-Kategorie) — bleibt dauerhaft da und funktioniert auch nach einem
@@ -155,187 +153,58 @@ Architektur für weitere Dienste: `bot/notify/base.py` (Schnittstelle `Provider`
 Dienst (YouTube, Twitch, RSS, …) implementiert nur `Provider` und trägt sich in `PROVIDERS` ein —
 die Discord-Oberfläche in `bot/cogs/notifications.py` kennt nichts Dienst-Spezifisches.
 
-## AION-2: mehrere DeckBar-Posts zu einem zusammenführen
+## AION-2: Runs aus dem NexBoard
 
-Wenn mehrere Leute gemeinsam denselben Dungeon laufen und jeder sein eigenes
-[DeckBar](https://github.com/gamunex/deckbar) hat, postet sonst jeder seinen eigenen Dungeon-Run
-in Discord. Zwei unabhängige Wege, je nachdem ob DeckBar angepasst wird:
+Jedes [NexBoard](../nexboard/) schickt nach einem beendeten Dungeon-Run die Eckdaten an den Bot
+(Modul „Discord-Bot“, `nexboard/daemon/deckbar_daemon/bot.py`). Laufen mehrere Leute denselben
+Dungeon, wartet der Bot kurz (`wartezeit`, Standard 15 s), führt alle Meldungen zu einer Rangliste
+zusammen und postet genau einmal: Gesamt-Rangliste als Bild, dazu je Boss ein Bild (max. 9 pro
+Nachricht, Discords Limit). Unter „📊 Analyse“ stehen „Im NexHub ansehen“ (den Link meldet der Hub
+nach dem Upload, siehe `control.py`, `run-link`) und die Bestenliste je Boss
+(`<AION_PUBLIC_URL>/leaderboard/<guild_id>`, öffentlich, ohne Login).
 
-### Variante 1: ohne DeckBar zu ändern
+1. `AION_PUBLIC_URL` in der `.env` setzen (öffentliche Adresse ohne Slash am Ende, auf dem VPS die
+   Hub-Domain; Caddy leitet `/api/aion/*` und `/leaderboard/*` auf Port 8789 des Bots).
+2. `/aion kanal:#der-kanal` in Discord (auch im Klick-Panel unter „AION 2“ oder im Hub).
+3. `/aion token:True` zeigt Adresse und Token. Beides im NexBoard unter Discord-Bot eintragen.
+   Geheim halten, nur an NexBoards geben, die mitmachen sollen.
 
-Der Bot behält nur den zuerst angekommenen Post, löscht die restlichen — kein Eingriff in DeckBar,
-kein eigenes Gruppensystem/API/WebUI.
+Das NexBoard schickt pro Run:
 
-1. In Discord: Kanal-Einstellungen → Integrationen → Webhook erstellen → URL kopieren (normale
-   Discord-Funktion, nicht vom Bot).
-2. Diese Webhook-URL trägt **jeder** in seinem eigenen DeckBar ein: Web-UI → Karte
-   „Dungeon-Runs → Discord“ (oder `~/.config/deckbar/runs.yaml`, Feld `webhook`). DeckBar postet
-   dann wie gewohnt selbst, ganz ohne den Bot zu kennen.
-3. `/aion kanal:#der-kanal` in Discord — ab da beobachtet der Bot diesen Kanal und filtert Duplikate.
-   Geht auch über das Klick-Panel (`/setup panel` → „AION-2-Filter") oder im Web-Dashboard unter
-   „AION-2-Filter".
+```
+POST <AION_PUBLIC_URL>/api/aion/fight
+Authorization: Bearer <Token aus /aion>
+Content-Type: application/json
 
-Erkennung: gleicher Dungeon-Name, gleiche Boss-Anzahl/-Siege, Kampfzeit und Startzeit nah beieinander
-(DeckBars Text hat nur Minuten-Genauigkeit bei der Startzeit). Ein Spieler-Filter nach Namen ist
-hier **nicht** möglich — die Spielernamen stehen nur im angehängten Bild, nicht im Text der Nachricht.
+{
+  "dungeon": "Ferocious Horn Den", "difficulty": "Normal",
+  "bosses_total": 3, "bosses_killed": 3,
+  "start_ms": 1760445123000, "fight_ms": 350000,
+  "players": [{"name": "ReZero", "cls": "ranger", "damage": 13290000, "dps": 38000}, …],
+  "bosses": [                                         // optional, für die Bilder je Boss
+    {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 4200000, "dps": 41000}, …]},
+    …
+  ]
+}
+```
 
-### Variante 2: API (braucht eine Änderung an DeckBar)
+Gleicher Lauf heißt: gleicher Dungeon, gleiche Boss-Anzahl und -Siege, Startzeit höchstens 30 s und
+Kampfzeit höchstens 20 s auseinander. Bei abweichenden Werten für denselben Spieler gewinnt der höhere.
 
-Statt Discord-Posten zu filtern, schickt DeckBar strukturierte Lauf-Daten (echte Spielernamen,
-Schaden, DPS) an einen Endpunkt auf diesem Server. Der Bot merged mehrere Meldungen desselben
-Laufs zu einer Rangliste und postet einmal selbst ein Embed (🥇🥈🥉-Format). Braucht eine Änderung
-an DeckBar — auf dem `modular`-Branch (github.com/gamunex/deckbar) bereits als eigenes
-Discord-Bot-Modul (`daemon/deckbar_daemon/bot.py`) umgesetzt, Einrichtung dort über die Web-UI.
+## Einstellungen im Browser
 
-1. `AION_PUBLIC_URL` in der `.env` setzen (öffentliche Adresse, z. B. per Cloudflare Tunnel auf
-   `DASHBOARD_PORT`, ohne Pfad/Slash am Ende) und `/aion kanal:` wie oben einrichten.
-2. `/aion token:True` in Discord — erzeugt bzw. erneuert den API-Token und zeigt die volle
-   Endpunkt-URL. Geheim halten, nur an teilnehmende DeckBar-Instanzen geben.
-3. Jede teilnehmende DeckBar-Installation sendet pro abgeschlossenem Lauf:
-
-   ```
-   POST <AION_PUBLIC_URL>/api/aion/fight
-   Authorization: Bearer <Token aus /aion token:True>
-   Content-Type: application/json
-
-   {
-     "dungeon": "Ferocious Horn Den", "difficulty": "Normal",
-     "bosses_total": 3, "bosses_killed": 3,
-     "start_ms": 1760445123000, "fight_ms": 350000,
-     "players": [{"name": "ReZero", "damage": 13290000, "dps": 38000}, …],
-     "bosses": [                                         // optional, für DPS pro Boss
-       {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 4200000, "dps": 41000}, …]},
-       …
-     ],
-     "timeline": [                                        // optional, für die Analyse-Seite
-       {"t_ms": 1234, "player": "ReZero", "skill": "18090340",
-        "damage": 41200, "crit": true, "back": false, "perfect": false, "double": false,
-        "buffs": ["18090999"]},                            // optional, aktive Buff/Debuff-Codes bei diesem Treffer
-       …
-     ],
-     "skills": {                                           // optional, löst "skill" UND "buffs" oben auf
-       "18090340": {"name": "Arrow of Reckoning", "icon": "https://assets.playnccdn.com/…/ICON_RA_SKILL_031.png"},
-       "18090999": {"name": "Bloodlust", "icon": "https://assets.playnccdn.com/…/ICON_RA_BUFF_004.png"}
-     },
-     "players_meta": [{"name": "ReZero", "class": "Ranger", "gear_score": 2850, "combat_power": 12500}],  // optional
-     "boss_hp": [{"t_ms": 0, "hp_pct": 100.0}, {"t_ms": 5000, "hp_pct": 92.3}, …],  // optional
-     "heals": [{"t_ms": 1234, "player": "Priest1", "target": "ReZero", "amount": 8200}, …],  // optional
-     "attempts": [                                         // optional, einzelne Versuche/Trash-Phasen
-       {"label": "Versuch 1", "killed": false, "duration_ms": 92000,
-        "players": [{"name": "ReZero", "damage": 3100000, "dps": 33700}, …],
-        "timeline": [/* wie oben, nur für diesen Versuch */]},
-       {"label": "Versuch 2 (Kill)", "killed": true, "duration_ms": 350000,
-        "players": [{"name": "ReZero", "damage": 13290000, "dps": 38000}, …],
-        "timeline": [/* … */]}
-     ]
-   }
-   ```
-
-   `bosses` ist optional — ohne das Feld zeigt der Post nur das Gesamt-Balkendiagramm (PNG,
-   gerendert wie die Rangkarte des Levelsystems), mit dem Feld zusätzlich ein eigenes Balkendiagramm
-   pro Boss mit dem Schaden je Spieler für genau diesen Kampf (eigenes Embed je Boss, max. 9 Bosse
-   pro Nachricht — Discords Limit für Embeds pro Nachricht).
-
-   `timeline` ist ebenfalls optional (einzelne Treffer mit Zeitstempel in ms seit Kampfbeginn,
-   `player` muss zu einem Namen in `players[]` passen, der Rest ist optional) — damit postet der
-   Bot zusätzlich einen Link „📊 Analyse" auf eine eigene Seite im Web-Dashboard (`/runs/<id>`,
-   kein Login nötig, Optik/Umfang an [AbyssLogs](https://abysslogs.com) angelehnt) mit
-   DPS-über-Zeit-Diagramm, Trefferstatistik (Crit-/Back-Attack-/Perfect-/Double-Rate),
-   aufklappbarer Skill-Aufschlüsselung pro Spieler (mit Icon, falls aufgelöst) und einer rohen
-   Hit-für-Hit-Tabelle (Zeit/Spieler/Skill/Schaden/Flags, scrollbar, wie AbyssLogs' Zeitleiste —
-   nicht nur die Aggregat-Statistiken). `skill` kann ein
-   roher Code oder schon ein Name sein — `skills` (einmal pro Payload, nicht pro Einzeltreffer,
-   genau wie AbyssLogs' `timelineIcons`) löst ihn in Name + Icon-URL auf; fehlt ein Eintrag, zeigt
-   die Seite einfach den rohen Wert ohne Icon. DeckBars A2Tools-Kern löst Skill-Icons für die
-   eigene Overlay-Anzeige schon auf (`get_skill_details`/`skill_icons.json` in
-   `daemon/deckbar_daemon/a2ui.py`) — dieselbe Quelle sollte beim Bauen der `timeline` auch die
-   `skills`-Tabelle befüllen können, ohne eine neue Datenquelle zu brauchen.
-   `players_meta` (Klasse/Ausrüstung), `boss_hp` (HP-Kurve, Berserk-Zeitpunkt erkennbar) und
-   `heals` (Heilungsübersicht) sind jeweils unabhängig nutzbare Zusatzfelder — keines davon ist
-   Voraussetzung für die anderen, die Seite zeigt einfach nur die Abschnitte, für die Daten da
-   sind. Melden mehrere Spieler denselben Lauf, nimmt der Bot von jeder Liste die mit den meisten
-   Einträgen (bei `skills`: alle Mitschnitte vereint statt nur den größten genommen — andere
-   Mitschnitte könnten andere Skills aufgelöst haben), statt mehrere unabhängige Mitschnitte
-   event-genau zusammenzuführen.
-
-   `buffs` in einem Timeline-Eintrag ist optional und listet die Codes der beim jeweiligen Treffer
-   aktiven Buffs/Debuffs (z. B. eigene oder gruppeneigene Verstärkungen) — aufgelöst über dieselbe
-   `skills`-Tabelle wie oben. Die Analyse-Seite zeigt daraus pro Spieler eine aufklappbare
-   Buff/Debuff-Übersicht mit Anwesenheitsrate (Anteil der eigenen Treffer, bei denen der jeweilige
-   Buff aktiv war — keine echte Zeit-Uptime, da nur bei Treffern gemessen, nicht kontinuierlich).
-
-   `attempts` ist ebenfalls optional und bildet einzelne Versuche/Trash-Phasen innerhalb eines
-   Laufs ab (z. B. mehrere Wipes vor dem Kill) — jeder Eintrag hat ein `label`, optional `killed`
-   und `duration_ms`, eine eigene `players`-Liste und optional eine eigene `timeline`. Die
-   Analyse-Seite zeigt dafür einen aufklappbaren „Versuche"-Abschnitt mit je einem eigenen
-   Schadens-/DPS-/Trefferstatistik-Block pro Versuch (letzter Versuch standardmäßig aufgeklappt).
-
-Beide Varianten laufen unabhängig nebeneinander — schadet nichts, beide gleichzeitig eingerichtet
-zu haben.
-
-## Web-Dashboard einrichten
-
-Einstellungen im Browser statt in Discord, Login mit dem eigenen Discord-Konto. Optik angelehnt
-an [DeckBar](https://github.com/gamunex/deckbar) (dunkles „Liquid Glass", blauer Akzent).
-Deckt inzwischen fast alle Bereiche ab: Allgemein, Automod, Verwarnungen, Tickets, Community
-(Zähler/Starboard/Geburtstage/Bump-Erinnerung), Levelsystem, zeitgesteuerte Ankündigungen, eigene
-Befehle, DPS-Webhook, AION-2-Filter, Benachrichtigungen (an/aus/löschen), Sichtbarkeits-Matrix.
-Bewusst nur in Discord: der mehrstufige Assistent für neue Benachrichtigungen, die
-Verifizierungs-Ersteinrichtung (beide wegen Vorschau/Bestätigung), Giveaways (keine
-Schlüssel/Wert-Einstellung) und der Server-Status (braucht den Docker-Socket, nur für `OWNER_ID`).
-
-**Reiner LAN-/Tailscale-Zugriff** (jeder, der den Bot aufruft, ist im selben Netz):
-
-1. Im Developer Portal unter **OAuth2** → **Redirects** genau diese URL eintragen:
-   `http://<DASHBOARD_HOST>:<DASHBOARD_PORT>/callback` (Standard-Port 8789).
-2. `.env`: `DISCORD_CLIENT_ID` (General Information → Application ID), `DISCORD_CLIENT_SECRET`
-   (OAuth2 → Client Secret, **geheim**), `DASHBOARD_HOST` (LAN-IP dieses Servers), `DASHBOARD_PORT`.
-3. `/setup dashboard rolle:@Admin` in Discord — nur Mitglieder mit dieser Rolle kommen rein (ohne
-   das: nur wer „Server verwalten“ hat).
-4. Port 8789 ist in `docker-compose.yml` schon freigegeben. Aufrufen: `http://<DASHBOARD_HOST>:8789`.
-
-**Zugriff auch von außerhalb des LAN/Tailnets** (z. B. ein Mitarbeiter ohne Tailscale-Zugang):
-eine LAN-IP wie `192.168.1.10` ist von außen nicht erreichbar — dafür einen Cloudflare Tunnel auf
-`DASHBOARD_PORT` einrichten (eigener Hostname, von Cloudflare terminiertes https, kein Port in der
-öffentlichen URL) und statt Schritt 1/2 oben:
-
-1. Im Developer Portal unter **OAuth2** → **Redirects** genau `<DASHBOARD_PUBLIC_URL>/callback`
-   eintragen, z. B. `https://bot.example.com/callback` (`deckbarapi...` nur als Beispiel —
-   derselbe Tunnel kann auch schon für `AION_PUBLIC_URL` genutzt werden, beide zeigen auf denselben
-   `DASHBOARD_PORT`).
-2. `.env`: `DASHBOARD_PUBLIC_URL=https://bot.example.com` setzen (volle URL, kein
-   abschließender Slash) — hat Vorrang vor `DASHBOARD_HOST`/`DASHBOARD_PORT` beim Login-Redirect.
-
-Unter **Sichtbarkeit** gibt's zusätzlich eine Matrix (Kanal/Kategorie × Rolle): zeigt live, wer was
-sehen kann, Klick auf eine Zelle schaltet die Sichtbarkeit sofort um (nur „Sehen“, keine anderen
-Rechte). Zeigt nur echte Mitglieder-Rollen, keine bot-eigenen Integrations-Rollen.
-
-Läuft über HTTP ohne eigenes TLS — nur fürs LAN/Tailscale gedacht, nicht fürs offene Internet.
-Sessions gehen bei jedem Neustart des Bots verloren (dann einfach neu einloggen).
+Die Einstellungen ändert man im Bereich „Bot“ des NexHub (siehe `hub/README.md`) oder in Discord
+mit `/setup panel`. Das alte eigene Web-Dashboard des Bots gibt es nicht mehr.
 
 ### Steuerung über den NexHub
 
-Auf dem VPS ersetzt der Bereich „Bot“ im NexHub dieses Dashboard (siehe `hub/README.md`). Dafür
-hat der Bot eine JSON-Steuer-API (`bot/cogs/control.py`, Port 8790), die nur startet, wenn
+Für den Bereich „Bot“ im NexHub hat der Bot eine JSON-Steuer-API (`bot/cogs/control.py`, Port 8790), die nur startet, wenn
 `BOT_CONTROL_KEY` gesetzt ist (mindestens 24 Zeichen, derselbe Wert wie beim Hub). Jede Anfrage
 braucht `Authorization: Bearer <BOT_CONTROL_KEY>`. Den Port nie veröffentlichen: Er ist für das
 interne Docker-Netz gedacht, wer den Schlüssel hat, darf alle Einstellungen ändern.
 
 Die Formular-Bereiche stehen einmal in `SECTIONS` (Feldtyp, Beschriftung, Hinweis); der Hub
 zeichnet daraus seine Formulare. Ein neues Feld = ein `Field(...)`-Eintrag dort.
-
-## DeckBar-Gruppen-DPS einrichten
-
-Postet nach jedem Kampf den Endstand der eigenen Gruppe als eine Nachricht (nicht pro Spieler
-einzeln). Setzt eine [DeckBar](https://github.com/gamunex/deckbar)-Installation voraus, die den
-Gruppen-Stand bei Kampfende an eine Webhook-URL schickt (Teil der DeckBar-Einrichtung, nicht
-dieses Repos).
-
-1. In `docker-compose.yml` ist Port 8787 schon freigegeben, `.env`: `DPS_WEBHOOK_HOST=<LAN-IP
-   dieses Servers>` eintragen (z. B. `192.168.1.20`), damit die angezeigte URL stimmt.
-2. `/setup dps-webhook kanal:#dps` in Discord ausführen (oder im Klick-Panel unter „DPS-Webhook“) →
-   Antwort enthält die URL (`http://<HOST>:8787/dps/<Token>`), die in die DeckBar-Einstellungen gehört.
-3. URL geheim halten — wer sie hat, kann in diesem Kanal posten.
 
 ## Server-Status einrichten
 

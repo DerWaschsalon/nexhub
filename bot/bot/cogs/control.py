@@ -127,10 +127,7 @@ SECTIONS: dict[str, Section] = {s.id: s for s in [
         Field("level_no_xp_channels", "channels", "Kanäle ohne XP", "Ausnahmen"),
         Field("level_no_xp_roles", "roles", "Rollen ohne XP", "Ausnahmen"),
     )),
-    Section("dps", "DPS-Webhook", "Gruppen-DPS aus DeckBar in einen Kanal posten.", (
-        Field("dps_webhook_channel", "channel", "Ziel-Kanal"),
-    )),
-    Section("aion", "AION 2", "Läufe aus DeckBar: Duplikatfilter, Rangliste und Analyse-Link.", (
+    Section("aion", "AION 2", "Runs aus dem NexBoard: ein Post je Lauf mit Rangliste und Link in den NexHub.", (
         Field("aion_channel", "channel", "Ziel-Kanal", hint="Leer schaltet die Posts ab."),
     ), actions={"token": "Neuen Token erzeugen (der alte wird ungültig)"}),
 ]}
@@ -240,10 +237,28 @@ def guild_info(guild) -> dict:
             "members": guild.member_count or len(guild.members), "channels": channels, "roles": roles}
 
 
+def visible_roles(guild: discord.Guild) -> list[discord.Role]:
+    """Echte Mitglieder-Rollen für die Sichtbarkeits-Matrix — ohne @everyone und ohne
+    bot-eigene Integrations-Rollen (TheWashbot, Jellyfin, …), die kann man eh nicht manuell vergeben."""
+    return sorted((r for r in guild.roles if not r.is_default() and not r.managed), key=lambda r: -r.position)
+
+
+def role_can_view(channel, role: discord.Role, everyone: discord.Role) -> bool:
+    """Könnte ein Mitglied, das nur @everyone + diese eine Rolle hat, den Kanal/die Kategorie
+    sehen? (Admin-Rechte/Owner-Status bleiben hier bewusst außen vor — reine Rollen-Perspektive.)"""
+    base = everyone.permissions.value | role.permissions.value
+    VIEW = 1 << 10
+    for target in (everyone, role):
+        ow = channel.overwrites_for(target)
+        if ow.view_channel is False:
+            base &= ~VIEW
+        elif ow.view_channel is True:
+            base |= VIEW
+    return bool(base & VIEW)
+
+
 def matrix(guild) -> dict:
     """Wer sieht welchen Kanal: Zeilen = Kategorien mit ihren Kanälen, Spalten = Rollen."""
-    from .dashboard import role_can_view, visible_roles
-
     everyone = guild.default_role
     roles = visible_roles(guild)
 
@@ -395,13 +410,7 @@ class Control(commands.Cog):
     # ---- Formular-Bereiche ---------------------------------------------------------------------
 
     def section_info(self, guild, s: Section) -> list[dict]:
-        """Nur-Lese-Angaben unter einem Formular, z. B. die Webhook-Adresse für DeckBar."""
-        if s.id == "dps":
-            from .dps import webhook_url
-
-            token = self.db.get(guild.id, "dps_webhook_token")
-            return [{"label": "Webhook-URL für DeckBar", "value": webhook_url(token) if token else None,
-                     "code": True}]
+        """Nur-Lese-Angaben unter einem Formular, z. B. Adresse und Token für das NexBoard."""
         if s.id == "aion":
             aion = self.bot.get_cog("AionDedup")
             return [
@@ -444,12 +453,7 @@ class Control(commands.Cog):
         # Erst alles prüfen, dann speichern: ein ungültiges Feld lässt den Bereich unverändert
         converted = {k: convert_field(guild, by_key[k], v) for k, v in values.items()}
         for key, value in converted.items():
-            if s.id == "dps" and key == "dps_webhook_channel" and value is not None:
-                from .dps import ensure_webhook
-
-                await ensure_webhook(self.db, guild.id, value)
-            else:
-                await self.db.set(guild.id, key, value)
+            await self.db.set(guild.id, key, value)
         if s.id == "verwarnungen" and self.db.get_int(guild.id, "warn_threshold") is None:
             await self.db.set(guild.id, "warn_action", None)
         if s.id == "community" and (stats := self.bot.get_cog("Stats")):

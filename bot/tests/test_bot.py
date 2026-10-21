@@ -29,7 +29,6 @@ def test_all_commands_register():
                 ("Reminders", "check_due"), ("Notifications", "poll_feeds"),
                 ("Bump", "check_due"), ("Stats", "refresh"), ("Birthdays", "check"),
                 ("Announcements", "check_due"), ("VoiceStats", "tick"), ("Giveaways", "check_due"),
-                ("AionDedup", "cleanup_runs"),
             ]:
                 loop = getattr(bot.get_cog(cog_name), loop_name)
                 task = loop.get_task()
@@ -37,8 +36,7 @@ def test_all_commands_register():
                 if task:
                     with contextlib.suppress(Exception, asyncio.CancelledError):
                         await task
-            await bot.get_cog("DpsWebhook").runner.cleanup()
-            await bot.get_cog("Dashboard").cog_unload()
+            await bot.get_cog("AionDedup").cog_unload()
             await bot.get_cog("Notifications").manager.close()
             await bot.db.close()
             await bot.get_cog("Music").session.close()
@@ -48,7 +46,7 @@ def test_all_commands_register():
                      "setup log-kanal", "setup temp-voice", "setup panel", "setup management-kanal",
                      "setup verifizierung", "setup regeln-text", "setup verwarnungen", "rollen-panel", "timeout",
                      "warn", "warnungen", "warnung-loeschen", "kick", "ban", "unban",
-                     "erinnere", "erinnerungen", "erinnerung-loeschen", "setup dps-webhook", "setup dashboard", "aion",
+                     "erinnere", "erinnerungen", "erinnerung-loeschen", "aion",
                      "setup tickets", "ticket-panel", "setup bump", "setup mitglieder-zaehler", "setup starboard",
                      "setup bots-zaehler", "umfrage", "geburtstag-setzen", "geburtstag-loeschen", "geburtstag",
                      "setup geburtstage", "embed-erstellen", "befehl-erstellen", "befehl-loeschen", "befehle",
@@ -129,11 +127,11 @@ def test_settings_panel_persistent_has_stable_custom_ids():
 
     cog = type("FakeCog", (), {})()
     view = SettingsPanel(cog, guild=object(), persistent=True)
-    assert len(view.children) == 20  # kein Schließen-Button im persistenten Modus
+    assert len(view.children) == 18  # kein Schließen-Button im persistenten Modus
     assert all(item.custom_id for item in view.children)
 
     ephemeral = SettingsPanel(cog, guild=object(), persistent=False)
-    assert len(ephemeral.children) == 21  # inkl. Schließen
+    assert len(ephemeral.children) == 19  # inkl. Schließen
 
 
 def test_reminder_parsing():
@@ -358,205 +356,10 @@ def test_aion_api_merge_and_embed():
 
     embed = build_run_embed(base, reporters=2)
     assert "Ferocious Horn Den" in embed.title
-    assert "2 DeckBar-Meldung" in embed.footer.text
+    assert "2 NexBoard-Meldung" in embed.footer.text
 
     embed_with_image = build_run_embed(base, reporters=2, image_filename="aion_run.png")
     assert embed_with_image.image.url == "attachment://aion_run.png"
-
-
-def test_aion_timeline_validation_and_best_pick():
-    from bot.cogs.aion_dedup import pick_best_timeline, validate_fight_payload
-
-    base = {"dungeon": "Fire Temple", "bosses_total": 1, "bosses_killed": 1,
-            "start_ms": 1_760_445_123_000, "fight_ms": 96_000,
-            "players": [{"name": "Xqzmepls", "damage": 5_103_784, "dps": 53_107.4}]}
-
-    valid_tl = [{"t_ms": 0, "player": "Xqzmepls", "damage": 5648, "crit": False, "back": True}]
-    assert validate_fight_payload({**base, "timeline": valid_tl}) is None
-    assert validate_fight_payload({**base, "timeline": "nope"}) is not None  # keine Liste
-    assert validate_fight_payload({**base, "timeline": [{"player": "x"}]}) is not None  # t_ms fehlt
-    assert validate_fight_payload({**base, "timeline": [{"t_ms": 0, "damage": 1}]}) is not None  # player fehlt
-    assert validate_fight_payload({**base, "timeline": [{"t_ms": 0, "player": "x"}]}) is not None  # damage fehlt
-    assert validate_fight_payload(base) is None  # ganz ohne timeline weiterhin gültig (optional)
-
-    short = {**base, "timeline": valid_tl}
-    long_report = {**base, "timeline": valid_tl + [{"t_ms": 500, "player": "Xqzmepls", "damage": 14104}]}
-    assert pick_best_timeline([short, long_report]) == long_report["timeline"]
-    assert pick_best_timeline([base]) is None  # keine Meldung hat überhaupt eine Zeitleiste
-
-    assert validate_fight_payload({**base, "skills": {"123": {"name": "Fireball"}}}) is None
-    assert validate_fight_payload({**base, "skills": "nope"}) is not None  # kein Objekt
-    assert validate_fight_payload({**base, "skills": {"123": "nope"}}) is not None  # Wert kein Objekt
-
-    assert validate_fight_payload({**base, "timeline": [{"t_ms": 0, "player": "x", "damage": 1, "buffs": ["a"]}]}) is None
-    assert validate_fight_payload({**base, "timeline": [{"t_ms": 0, "player": "x", "damage": 1, "buffs": "a"}]}) is not None
-
-    valid_attempt = {"label": "Versuch 1", "killed": False, "players": [{"name": "x", "damage": 1}]}
-    assert validate_fight_payload({**base, "attempts": [valid_attempt]}) is None
-    assert validate_fight_payload({**base, "attempts": "nope"}) is not None
-    assert validate_fight_payload({**base, "attempts": [{"players": []}]}) is not None  # label fehlt
-    assert validate_fight_payload({**base, "attempts": [{"label": "x", "players": []}]}) is not None  # players leer
-    assert validate_fight_payload({**base, "attempts": [{"label": "x", "players": [{"name": "y"}]}]}) is not None  # damage fehlt
-
-
-def test_aion_bucket_dps_and_timeline_stats():
-    from bot.cogs.aion_dedup import bucket_dps, timeline_stats
-
-    timeline = [
-        {"t_ms": 0, "player": "A", "damage": 1000, "crit": True, "back": False},
-        {"t_ms": 500, "player": "A", "damage": 1000, "crit": False, "back": True},
-        {"t_ms": 1500, "player": "A", "damage": 2000, "crit": False, "back": False},
-        {"t_ms": 200, "player": "B", "damage": 500, "crit": False, "back": False},
-    ]
-    chart = bucket_dps(timeline, fight_ms=2000, buckets=2)
-    assert chart["labels_s"] == [1.0, 2.0]
-    # Bucket 0 (0-1000ms): A bekommt 1000+1000=2000 Schaden in 1s -> 2000/s, B 500 Schaden -> 500/s
-    assert chart["series"]["A"][0] == 2000.0
-    assert chart["series"]["B"][0] == 500.0
-    # Bucket 1 (1000-2000ms): nur A mit 2000 Schaden -> 2000/s, B taucht in dem Bucket gar nicht auf
-    assert chart["series"]["A"][1] == 2000.0
-
-    stats = timeline_stats(timeline)
-    assert stats["A"]["hits"] == 3 and stats["A"]["crits"] == 1 and stats["A"]["backs"] == 1
-    assert stats["A"]["crit_pct"] == round(100 / 3, 1)
-    assert stats["B"]["hits"] == 1 and stats["B"]["crit_pct"] == 0.0
-
-
-def test_aion_timeline_stats_perfect_and_double():
-    from bot.cogs.aion_dedup import timeline_stats
-
-    timeline = [
-        {"t_ms": 0, "player": "A", "damage": 100, "perfect": True, "double": False},
-        {"t_ms": 10, "player": "A", "damage": 100, "perfect": False, "double": True},
-        {"t_ms": 20, "player": "A", "damage": 100, "perfect": False, "double": False},
-    ]
-    stats = timeline_stats(timeline)
-    assert stats["A"]["perfects"] == 1 and stats["A"]["doubles"] == 1
-    assert stats["A"]["perfect_pct"] == round(100 / 3, 1)
-    assert stats["A"]["double_pct"] == round(100 / 3, 1)
-
-
-def test_aion_skill_breakdown():
-    from bot.cogs.aion_dedup import skill_breakdown
-
-    timeline = [
-        {"t_ms": 0, "player": "A", "skill": "Fireball", "damage": 300},
-        {"t_ms": 10, "player": "A", "skill": "Fireball", "damage": 300},
-        {"t_ms": 20, "player": "A", "skill": "Ice Shard", "damage": 400},
-        {"t_ms": 30, "player": "B", "skill": "Heal", "damage": 50},
-    ]
-    result = skill_breakdown(timeline)
-    a_skills = {s["skill"]: s for s in result["A"]}
-    assert a_skills["Fireball"]["hits"] == 2 and a_skills["Fireball"]["damage"] == 600
-    assert a_skills["Fireball"]["pct"] == 60.0  # 600 von 1000 Gesamtschaden A
-    assert a_skills["Ice Shard"]["pct"] == 40.0
-    # sortiert absteigend nach Schaden
-    assert [s["skill"] for s in result["A"]] == ["Fireball", "Ice Shard"]
-    assert result["B"][0]["skill"] == "Heal"
-
-    # top-Begrenzung
-    many = [{"t_ms": i, "player": "C", "skill": f"S{i}", "damage": 1} for i in range(20)]
-    assert len(skill_breakdown(many, top=5)["C"]) == 5
-
-
-def test_aion_skill_breakdown_resolves_name_and_icon():
-    from bot.cogs.aion_dedup import skill_breakdown
-
-    timeline = [
-        {"t_ms": 0, "player": "A", "skill": "18090340", "damage": 500},
-        {"t_ms": 10, "player": "A", "skill": "unknown-code", "damage": 100},
-    ]
-    skills = {"18090340": {"name": "Arrow of Reckoning", "icon": "https://example.com/icon.png"}}
-    result = skill_breakdown(timeline, skills)
-    by_key = {s["key"]: s for s in result["A"]}
-    assert by_key["18090340"]["skill"] == "Arrow of Reckoning"
-    assert by_key["18090340"]["icon"] == "https://example.com/icon.png"
-    # kein Eintrag in der Lookup-Tabelle -> der rohe Wert wird als Name angezeigt, kein Icon
-    assert by_key["unknown-code"]["skill"] == "unknown-code"
-    assert by_key["unknown-code"]["icon"] is None
-
-
-def test_aion_buff_uptime():
-    from bot.cogs.aion_dedup import buff_uptime
-
-    timeline = [
-        {"t_ms": 0, "player": "A", "damage": 1, "buffs": ["buff1", "buff2"]},
-        {"t_ms": 10, "player": "A", "damage": 1, "buffs": ["buff1"]},
-        {"t_ms": 20, "player": "A", "damage": 1},  # kein buffs-Feld -> zählt trotzdem als Treffer
-        {"t_ms": 30, "player": "A", "damage": 1},
-        {"t_ms": 0, "player": "B", "damage": 1, "buffs": ["buff1"]},
-    ]
-    result = buff_uptime(timeline)
-    a_by_key = {b["key"]: b for b in result["A"]}
-    assert a_by_key["buff1"]["pct"] == 50.0  # 2 von 4 Treffern
-    assert a_by_key["buff2"]["pct"] == 25.0  # 1 von 4 Treffern
-    assert result["B"][0]["pct"] == 100.0  # Bs einziger Treffer hatte buff1
-
-    skills = {"buff1": {"name": "Haste", "icon": "https://example.com/haste.png"}}
-    with_names = buff_uptime(timeline, skills)
-    a_named = {b["key"]: b for b in with_names["A"]}
-    assert a_named["buff1"]["buff"] == "Haste" and a_named["buff1"]["icon"] == "https://example.com/haste.png"
-    assert a_named["buff2"]["buff"] == "buff2" and a_named["buff2"]["icon"] is None  # nicht aufgelöst
-
-    # top-Begrenzung
-    many_buffs = [{"t_ms": 0, "player": "C", "damage": 1, "buffs": [f"b{i}" for i in range(15)]}]
-    assert len(buff_uptime(many_buffs, top=5)["C"]) == 5
-
-    # niemand hat buffs gemeldet -> leeres Ergebnis, kein Absturz
-    assert buff_uptime([{"t_ms": 0, "player": "D", "damage": 1}]) == {}
-
-
-def test_aion_merge_skill_maps():
-    from bot.cogs.aion_dedup import merge_skill_maps
-
-    reports = [
-        {"skills": {"1": {"name": "A"}, "2": {"name": "B"}}},
-        {"skills": {"2": {"name": "B2"}, "3": {"name": "C"}}},  # überschreibt "2", ergänzt "3"
-        {},  # keine skills -> wird einfach übersprungen
-    ]
-    merged = merge_skill_maps(reports)
-    assert merged == {"1": {"name": "A"}, "2": {"name": "B2"}, "3": {"name": "C"}}
-
-
-def test_dashboard_skill_icon_html_rejects_non_http():
-    from bot.cogs.dashboard import skill_icon_html
-
-    assert skill_icon_html(None) == ""
-    assert skill_icon_html("") == ""
-    assert skill_icon_html("javascript:alert(1)") == ""  # kein http(s) -> kein <img>
-    html_out = skill_icon_html("https://example.com/icon.png")
-    assert html_out.startswith('<img src="https://example.com/icon.png"')
-
-
-def test_aion_boss_hp_series_and_heals_summary():
-    from bot.cogs.aion_dedup import boss_hp_series, heals_summary
-
-    boss_hp = [{"t_ms": 5000, "hp_pct": 80.0}, {"t_ms": 0, "hp_pct": 100.0}]  # unsortiert
-    series = boss_hp_series(boss_hp)
-    assert series["labels_s"] == [0.0, 5.0]  # nach t_ms sortiert
-    assert series["values"] == [100.0, 80.0]
-
-    heals = [
-        {"t_ms": 0, "player": "Priest", "target": "A", "amount": 1000},
-        {"t_ms": 10, "player": "Priest", "target": "B", "amount": 2000},
-        {"t_ms": 20, "player": "Chanter", "target": "A", "amount": 500},
-    ]
-    summary = heals_summary(heals)
-    assert summary[0] == {"name": "Priest", "heals": 2, "amount": 3000.0}
-    assert summary[1]["name"] == "Chanter"  # absteigend nach Gesamtheilung
-
-
-def test_aion_pick_best_list_generic():
-    from bot.cogs.aion_dedup import pick_best_list
-
-    reports = [
-        {"timeline": [1, 2], "boss_hp": [1, 2, 3]},
-        {"timeline": [1, 2, 3, 4]},
-        {},
-    ]
-    assert pick_best_list(reports, "timeline") == [1, 2, 3, 4]
-    assert pick_best_list(reports, "boss_hp") == [1, 2, 3]
-    assert pick_best_list(reports, "heals") is None
 
 
 def test_aion_leaderboard_rows():
@@ -567,12 +370,12 @@ def test_aion_leaderboard_rows():
         {"name": "Boss 2", "players": [{"name": "ReZero", "damage": 200, "dps": 20},
                                         {"name": "Gamunex", "damage": 50, "dps": 5}]},
     ]
-    players_meta = [{"name": "ReZero", "class": "Ranger"}]
-    rows = leaderboard_rows(bosses, players_meta)
-    assert {"boss": "Boss 1", "player": "ReZero", "class": "Ranger", "damage": 100, "dps": 10} in rows
+    players = [{"name": "ReZero", "cls": "ranger"}, {"name": "Gamunex"}]
+    rows = leaderboard_rows(bosses, players)
+    assert {"boss": "Boss 1", "player": "ReZero", "class": "ranger", "damage": 100, "dps": 10} in rows
     assert {"boss": "Boss 2", "player": "Gamunex", "class": None, "dps": 5, "damage": 50} in rows
 
-    assert leaderboard_rows(bosses, None)[0]["class"] is None  # ohne players_meta: keine Klasse, kein Absturz
+    assert leaderboard_rows(bosses, [])[0]["class"] is None  # ohne Klasse: kein Absturz
 
 
 def test_aion_update_leaderboard_keeps_only_best():
@@ -590,33 +393,32 @@ def test_aion_update_leaderboard_keeps_only_best():
             cog.db = db
 
             bosses = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 100, "dps": 10}]}]
-            await cog._update_leaderboard(1, bosses, None, "run-a")
+            await cog._update_leaderboard(1, bosses, [])
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
-            assert row["dps"] == 10 and row["run_id"] == "run-a"
+            assert row["dps"] == 10
 
             # Schlechterer Lauf -> wird NICHT übernommen
             worse = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 50, "dps": 5}]}]
-            await cog._update_leaderboard(1, worse, None, "run-b")
+            await cog._update_leaderboard(1, worse, [])
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
-            assert row["dps"] == 10 and row["run_id"] == "run-a"  # unverändert
+            assert row["dps"] == 10  # unverändert
 
             # Besserer Lauf -> wird übernommen
             better = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 500, "dps": 50}]}]
-            await cog._update_leaderboard(1, better, None, "run-c")
+            await cog._update_leaderboard(1, better, [])
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
-            assert row["dps"] == 50 and row["run_id"] == "run-c"
+            assert row["dps"] == 50
 
             await db.close()
 
     run(go())
 
 
-def test_dashboard_leaderboard_page():
+def test_aion_leaderboard_page():
     import tempfile
     from pathlib import Path
 
     from bot.cogs.aion_dedup import AionDedup
-    from bot.cogs.dashboard import Dashboard
     from bot.db import Database
 
     class FakeGuild:
@@ -628,213 +430,21 @@ def test_dashboard_leaderboard_page():
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
 
-            aion_cog = AionDedup.__new__(AionDedup)
-            aion_cog.db = db
+            cog = AionDedup.__new__(AionDedup)
+            cog.db = db
+            cog.bot = type("B", (), {"get_guild": lambda self, gid: FakeGuild() if gid == 1 else None})()
             bosses = [{"name": "Kromede's Desire", "players": [{"name": "Xqzmepls", "damage": 500, "dps": 50}]}]
-            await aion_cog._update_leaderboard(1, bosses, [{"name": "Xqzmepls", "class": "Ranger"}], "run-x")
-
-            dash_cog = Dashboard.__new__(Dashboard)
-            dash_cog.db = db
-            dash_cog.bot = type("B", (), {"get_guild": lambda self, gid: FakeGuild() if gid == 1 else None})()
+            await cog._update_leaderboard(1, bosses, [{"name": "Xqzmepls", "cls": "ranger"}])
 
             class Req:
                 def __init__(self, gid):
                     self.match_info = {"guild_id": gid}
 
-            resp = await dash_cog.page_leaderboard(Req("1"))
+            resp = await cog.page_leaderboard(Req("1"))
             assert resp.status == 200
-            assert "Kromede" in resp.text and "Xqzmepls" in resp.text and "Ranger" in resp.text
-            assert 'href="/runs/run-x"' in resp.text
-
-            resp = await dash_cog.page_leaderboard(Req("999"))  # unbekannte Guild
-            assert resp.status == 404
-
-            resp = await dash_cog.page_leaderboard(Req("not-a-number"))
-            assert resp.status == 400
-
-            await db.close()
-
-    run(go())
-
-
-def test_dashboard_esc_js_and_date_formatting():
-    from bot.cogs.dashboard import datetime_fromtimestamp_de, esc_js
-
-    # "</script>" im JSON-Text darf das umschließende <script>-Tag nicht vorzeitig beenden
-    assert "</script>" not in esc_js('{"name": "</script><script>alert(1)</script>"}')
-
-    assert datetime_fromtimestamp_de(None) == "–"
-    assert datetime_fromtimestamp_de(0) == "–"  # falsy Timestamp -> kein Absturz
-    assert len(datetime_fromtimestamp_de(1_760_000_000)) > 0
-
-
-def test_dashboard_render_fight_section():
-    from bot.cogs.dashboard import render_fight_section
-
-    players = [{"name": "A", "damage": 100, "dps": 10}]
-    # ohne Zeitleiste: nur Schaden-Balken, kein Diagramm
-    html, spec = render_fight_section(players, [], {}, "chart0")
-    assert "A" in html and "100" in html and spec is None
-    assert "<canvas" not in html
-
-    timeline = [{"t_ms": 0, "player": "A", "skill": "s1", "damage": 100, "crit": True, "buffs": ["b1"]}]
-    html2, spec2 = render_fight_section(players, timeline, {"s1": {"name": "Fireball"}}, "chart1")
-    assert '<canvas id="chart1"' in html2
-    assert "Fireball" in html2  # Skill-Aufschlüsselung mit aufgelöstem Namen
-    assert "b1" in html2  # Buff ohne Lookup-Eintrag -> roher Wert
-    assert spec2 is not None and spec2[0] == "chart1"
-    assert "timeline-scroll" in html2  # rohe Hit-für-Hit-Tabelle (AbyssLogs-Stil) ist mit drin
-    assert "flag-crit" in html2
-
-
-def test_dashboard_build_fight_parts():
-    from bot.cogs.dashboard import build_fight_parts, render_fight_section
-
-    players = [{"name": "A", "damage": 300, "dps": 30}, {"name": "B", "damage": 100, "dps": 10}]
-    # ohne Zeitleiste: nur "bars" im Teile-Dict, keine der timeline-abhängigen Keys
-    parts, spec = build_fight_parts(players, [], {}, "chart0")
-    assert set(parts) == {"bars"}
-    assert spec is None
-    assert "rank-1" in parts["bars"] and "rank-2" in parts["bars"]  # Top-3-Rang-Färbung
-
-    timeline = [{"t_ms": 0, "player": "A", "skill": "s1", "damage": 300, "crit": True, "buffs": ["b1"]}]
-    parts2, spec2 = build_fight_parts(players, timeline, {"s1": {"name": "Fireball"}}, "chart1")
-    assert set(parts2) >= {"bars", "chart", "stats", "skills", "timeline_table"}
-    assert spec2 is not None and spec2[0] == "chart1"
-    assert "Fireball" in parts2["skills"]
-    assert "timeline-scroll" in parts2["timeline_table"]
-
-    # render_fight_section() bleibt ein dünner Wrapper, der dieselben Teile zu einem HTML-Blob
-    # zusammenfügt wie früher (Abwärtskompatibilität für die Versuche-Anzeige)
-    html, spec3 = render_fight_section(players, timeline, {"s1": {"name": "Fireball"}}, "chart1")
-    assert parts2["bars"] in html and parts2["timeline_table"] in html
-    assert spec3 == spec2
-
-
-def test_dashboard_render_timeline_table():
-    from bot.cogs.dashboard import render_timeline_table
-
-    skills = {"s1": {"name": "Fireball", "icon": "https://cdn.example.com/fireball.png"}}
-    timeline = [
-        {"t_ms": 65_000, "player": "ReZero", "skill": "s1", "damage": 41200,
-         "crit": True, "back": True, "perfect": False, "double": False},
-        {"t_ms": 1_000, "player": "Gamunex", "skill": "unknown_code", "damage": 9000},
-    ]
-    html = render_timeline_table(timeline, skills)
-    assert "1:05" in html  # 65_000 ms -> 1:05, sortiert nach t_ms (hier schon absteigend eingegeben)
-    assert "0:01" in html
-    assert "Fireball" in html and "fireball.png" in html
-    assert "unknown_code" in html  # kein Lookup-Treffer -> roher Code statt Absturz
-    assert 'class="flag flag-crit"' in html and 'class="flag flag-back"' in html
-    assert "flag-perfect" not in html  # nur gesetzte Flags werden angezeigt
-    assert "41,200" in html
-
-    # Schutzgrenze: mehr als `limit` Treffer werden abgeschnitten, mit Hinweistext
-    many = [{"t_ms": i * 100, "player": "A", "skill": "s1", "damage": 1} for i in range(10)]
-    truncated_html = render_timeline_table(many, skills, limit=3)
-    assert truncated_html.count("<tr>") == 4  # 1 Kopfzeile + 3 Datenzeilen (Limit)
-    assert "ersten 3 von 10" in truncated_html
-
-
-def test_dashboard_run_page_validates_id_and_404():
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.dashboard import Dashboard
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            cog = Dashboard.__new__(Dashboard)
-            cog.db = Database(Path(d) / "t.sqlite3")
-
-            class Req:
-                def __init__(self, rid):
-                    self.match_info = {"id": rid}
-
-            resp = await cog.page_run(Req("bad id with spaces!"))
-            assert resp.status == 400
-
-            resp = await cog.page_run(Req("x" * 20))
-            assert resp.status == 404
-
-    run(go())
-
-
-def test_aion_store_run_and_serve_analysis_page():
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.aion_dedup import AionDedup
-    from bot.cogs.dashboard import Dashboard
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-
-            aion_cog = AionDedup.__new__(AionDedup)
-            aion_cog.db = db
-
-            run = {"dungeon": "Fire Temple", "difficulty": "Normal", "bosses_total": 1,
-                   "bosses_killed": 1, "fight_ms": 96_000}
-            players = [{"name": "Xqzmepls", "damage": 5_103_784, "dps": 53_107.4}]
-            timeline = [
-                {"t_ms": 0, "player": "Xqzmepls", "skill": "18090340", "damage": 5648,
-                 "crit": False, "back": True, "perfect": True, "double": False, "buffs": ["buff_haste"]},
-                {"t_ms": 500, "player": "Xqzmepls", "skill": "18090340", "damage": 14_104,
-                 "crit": True, "back": True, "perfect": False, "double": True, "buffs": ["buff_haste"]},
-            ]
-            extras = {
-                "players_meta": [{"name": "Xqzmepls", "class": "Ranger", "gear_score": 2850, "combat_power": 12500}],
-                "boss_hp": [{"t_ms": 0, "hp_pct": 100.0}, {"t_ms": 96_000, "hp_pct": 0.0}],
-                "heals": [{"t_ms": 100, "player": "Khai", "target": "Xqzmepls", "amount": 2000}],
-                "skills": {"18090340": {"name": "Arrow of Reckoning", "icon": "https://example.com/icon.png"},
-                           "buff_haste": {"name": "Haste", "icon": "https://example.com/haste.png"}},
-                "attempts": [
-                    {"label": "Versuch 1", "killed": False, "duration_ms": 45_000,
-                     "players": [{"name": "Xqzmepls", "damage": 1_000_000, "dps": 22_000}]},
-                    {"label": "Versuch 2", "killed": True, "duration_ms": 96_000,
-                     "players": [{"name": "Xqzmepls", "damage": 5_103_784, "dps": 53_107.4}],
-                     "timeline": [{"t_ms": 0, "player": "Xqzmepls", "skill": "18090340", "damage": 5648}]},
-                ],
-            }
-
-            run_id = await aion_cog._store_run(1, run, players, [], timeline, extras, reporters=1)
-
-            row = await db.fetchone("SELECT * FROM aion_runs WHERE id=?", (run_id,))
-            assert row["dungeon"] == "Fire Temple" and row["guild_id"] == 1
-
-            dash_cog = Dashboard.__new__(Dashboard)
-            dash_cog.db = db
-
-            class Req:
-                match_info = {"id": run_id}
-
-            resp = await dash_cog.page_run(Req())
-            assert resp.status == 200
-            assert "Fire Temple" in resp.text
-            assert "Xqzmepls" in resp.text
-            assert "dpsChart" in resp.text  # Diagramm nur, wenn eine Zeitleiste vorliegt
-            assert "Ranger" in resp.text and "GS 2850" in resp.text  # players_meta
-            assert "hpChart" in resp.text  # Boss-HP-Diagramm nur, wenn boss_hp vorliegt
-            assert "Khai" in resp.text  # Heilungsübersicht
-            assert "Arrow of Reckoning" in resp.text  # Skill-Aufschlüsselung, Name aus skills aufgelöst
-            assert "18090340" not in resp.text  # roher Code wird nicht mehr angezeigt
-            assert '<img src="https://example.com/icon.png"' in resp.text  # Skill-Icon
-            assert "Haste" in resp.text and "100.0%" in resp.text  # Buff-Anwesenheit (beide Treffer hatten buff_haste)
-            assert '<img src="https://example.com/haste.png"' in resp.text  # Buff-Icon
-            assert "Versuch 1" in resp.text and "💀 Wipe" in resp.text
-            assert "Versuch 2" in resp.text and "✅ Kill" in resp.text
-            assert 'id="attemptChart1"' in resp.text  # Diagramm nur für den Versuch mit Zeitleiste
-            assert 'id="attemptChart0"' not in resp.text
-            # Tab-Navigation (AbyssLogs-Stil): nur Tabs mit tatsächlich vorhandenen Daten
-            assert 'data-tab="overview"' in resp.text and 'data-tab="timeline"' in resp.text
-            assert 'data-tab="skills"' in resp.text and 'data-tab="buffs"' in resp.text
-            assert 'data-tab="bosses"' in resp.text  # boss_hp vorhanden -> Bosse-Tab zeigt die HP-Kurve
-            assert 'data-tab="healing"' in resp.text and 'data-tab="attempts"' in resp.text
-            assert "Alle Treffer" in resp.text  # Hit-für-Hit-Tabelle jetzt auch beim Hauptkampf
+            assert "Kromede&#x27;s Desire" in resp.text and "Xqzmepls" in resp.text and "ranger" in resp.text
+            assert (await cog.page_leaderboard(Req("999"))).status == 404  # unbekannte Guild
+            assert (await cog.page_leaderboard(Req("not-a-number"))).status == 404
 
             await db.close()
 
@@ -878,41 +488,10 @@ def test_aion_api_boss_dps():
     assert boss_image.size[0] == WIDTH
 
 
-def test_aion_parse_and_match():
-    from bot.cogs.aion_dedup import parse_run, same_run
-
-    a = parse_run("**Ferocious Horn Den** – 3/3 Bosse besiegt, Kampfzeit 5:50 (15:42–15:48)")
-    b = parse_run("**Ferocious Horn Den** – 3/3 Bosse besiegt, Kampfzeit 5:48 (15:42–15:48)")
-    c = parse_run("**Ferocious Horn Den** – 3/3 Bosse besiegt, Kampfzeit 5:51 (15:42–15:48)")
-    assert a is not None and a["dungeon"] == "Ferocious Horn Den"
-    assert a["kills"] == 3 and a["total"] == 3 and a["duration_s"] == 350
-    # drei verschiedene DeckBars, minimal abweichende Werte vom selben Lauf -> alle als gleich erkannt
-    assert same_run(a, b) and same_run(a, c) and same_run(b, c)
-
-    # 20 Minuten späterer Re-Run desselben Dungeons -> NICHT zusammenführen
-    later = parse_run("**Ferocious Horn Den** – 3/3 Bosse besiegt, Kampfzeit 5:50 (16:02–16:08)")
-    assert not same_run(a, later)
-
-    # anderer Dungeon -> nie zusammenführen, auch bei gleicher Zeit
-    other_dungeon = parse_run("**Anderer Dungeon** – 3/3 Bosse besiegt, Kampfzeit 5:50 (15:42–15:48)")
-    assert not same_run(a, other_dungeon)
-
-    # andere Boss-Anzahl (z. B. ein Boss noch nicht besiegt) -> nicht derselbe abgeschlossene Lauf
-    partial = parse_run("**Ferocious Horn Den** – 2/3 Bosse besiegt, Kampfzeit 4:10 (15:42–15:46)")
-    assert not same_run(a, partial)
-
-    # Text, der nicht zum DeckBar-Format passt, wird ignoriert statt einen Fehler zu werfen
-    assert parse_run("Irgendeine andere Nachricht") is None
-
-    # Einzahl "Boss" bei genau einem Gegner
-    single = parse_run("**Solo-Boss** – 1/1 Boss besiegt, Kampfzeit 1:23 (10:00–10:01)")
-    assert single is not None and single["total"] == 1
-
-
 def test_role_can_view():
     import discord
 
-    from bot.cogs.dashboard import role_can_view
+    from bot.cogs.control import role_can_view
 
     class FakeChannel:
         def __init__(self, overwrites):
@@ -941,111 +520,6 @@ def test_role_can_view():
         role: discord.PermissionOverwrite(view_channel=True),
     })
     assert role_can_view(ch, role, everyone) is True
-
-
-def test_dashboard_login_redirect():
-    import os
-
-    from aiohttp.test_utils import make_mocked_request
-
-    from bot.cogs.dashboard import Dashboard
-
-    cog = Dashboard.__new__(Dashboard)  # kein echter Bot/aiohttp-Server nötig für diesen Handler
-    cog._http = None
-
-    async def go():
-        old = os.environ.pop("DISCORD_CLIENT_ID", None)
-        try:
-            resp = await cog.login(make_mocked_request("GET", "/login"))
-            assert resp.status == 500  # fehlende Client-ID wird gemeldet, nicht stillschweigend ignoriert
-
-            os.environ["DISCORD_CLIENT_ID"] = "123"
-            resp = await cog.login(make_mocked_request("GET", "/login"))
-            assert resp.status == 302
-            assert "client_id=123" in resp.headers["Location"]
-            assert "discord.com/oauth2/authorize" in resp.headers["Location"]
-        finally:
-            if old is None:
-                os.environ.pop("DISCORD_CLIENT_ID", None)
-            else:
-                os.environ["DISCORD_CLIENT_ID"] = old
-
-    run(go())
-
-
-def test_dashboard_base_url_prefers_public_url():
-    import os
-
-    from bot.cogs.dashboard import dashboard_base_url
-
-    keys = ["DASHBOARD_PUBLIC_URL", "DASHBOARD_HOST", "DASHBOARD_PORT"]
-    old = {k: os.environ.pop(k, None) for k in keys}
-    try:
-        os.environ["DASHBOARD_HOST"] = "192.168.1.10"
-        os.environ["DASHBOARD_PORT"] = "8789"
-        assert dashboard_base_url() == "http://192.168.1.10:8789"  # kein DASHBOARD_PUBLIC_URL -> LAN-Variante
-
-        os.environ["DASHBOARD_PUBLIC_URL"] = "https://bot.example.com/"
-        assert dashboard_base_url() == "https://bot.example.com"  # Vorrang, abschließender Slash weg
-    finally:
-        for k in keys:
-            if old[k] is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = old[k]
-
-
-def test_dashboard_html_escaping():
-    from bot.cogs.dashboard import esc
-
-    assert esc('<script>alert(1)</script>') == "&lt;script&gt;alert(1)&lt;/script&gt;"
-    assert esc(None) == ""
-
-
-def test_dashboard_channel_checklist():
-    import discord
-
-    from bot.cogs.dashboard import channel_checklist
-
-    class FakeChannel:
-        def __init__(self, id_, name, ctype, position):
-            self.id, self.name, self.type, self.position = id_, name, ctype, position
-
-    class FakeGuild:
-        channels = [
-            FakeChannel(1, "general", discord.ChannelType.text, 0),
-            FakeChannel(2, "<script>", discord.ChannelType.text, 1),
-            FakeChannel(3, "voice-only", discord.ChannelType.voice, 0),
-        ]
-
-    html = channel_checklist(FakeGuild(), "no_xp_channels", selected_ids=[1])
-    assert 'name="no_xp_channels" value="1" checked' in html
-    assert 'name="no_xp_channels" value="2"' in html and "checked" not in html.split('value="2"')[1].split(">")[0]
-    assert "value=\"3\"" not in html  # Sprachkanal, nicht im Text-Checklist
-    assert "&lt;script&gt;" in html and "<script>" not in html  # escaped, kein XSS
-
-    empty = channel_checklist(FakeGuild.__class__("G", (), {"channels": []})(), "x", [])
-    assert "Keine passenden Kanäle" in empty
-
-
-def test_dps_embed():
-    from bot.cogs.dps import build_embed
-
-    assert build_embed({"party": []}) is None
-    assert build_embed({}) is None
-
-    e = build_embed({
-        "target": "Kromede", "duration_s": 95,
-        "party": [
-            {"name": "Alice", "cls": "cleric", "dps": 1000, "dmg": 95000, "pct": 20.0},
-            {"name": "Bob", "cls": "gladiator", "dps": 5000, "dmg": 475000, "pct": 80.0},
-        ],
-    })
-    assert "Kromede" in e.title
-    # Nach DPS absteigend sortiert, trotz Reihenfolge im Payload
-    assert e.description.index("Bob") < e.description.index("Alice")
-    assert "5.000 DPS" in e.description
-    assert "95 s" in e.footer.text
 
 
 def test_panel_regex():
@@ -1122,7 +596,7 @@ def test_new_panel_subviews_build_without_overflow():
     from pathlib import Path
 
     from bot.cogs.settings import (
-        AutomodView, BirthdayView, BumpView, DashboardRoleView, LevelView, MemberCountView, SettingsPanel,
+        AutomodView, BirthdayView, BumpView, LevelView, MemberCountView, SettingsPanel,
         StarboardView, WarnView, VerifyView,
     )
     from bot.db import Database
@@ -1134,7 +608,7 @@ def test_new_panel_subviews_build_without_overflow():
     panel.cog, panel.guild, panel.persistent = cog, guild, True
 
     for view_cls in [
-        WarnView, DashboardRoleView, BumpView, MemberCountView, StarboardView, BirthdayView, AutomodView, LevelView,
+        WarnView, BumpView, MemberCountView, StarboardView, BirthdayView, AutomodView, LevelView,
     ]:
         view = view_cls(panel)
         assert all(item.custom_id for item in view.children)
@@ -1717,9 +1191,11 @@ def test_youtube_validate_source_rejects_non_channel_ids():
     run(go())
 
 
-def test_aion_hub_link():
+def test_aion_hub_link(monkeypatch):
     """Der NexHub meldet einen Run: Link an den wartenden Post, sonst nachträglich an den geposteten."""
     import time
+
+    monkeypatch.setenv("AION_PUBLIC_URL", "https://hub.example.com")
 
     from bot.cogs.aion_dedup import AionDedup, ApiCluster, build_run_embed, same_run_start, with_hub_link
 

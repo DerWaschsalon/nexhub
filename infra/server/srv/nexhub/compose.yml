@@ -82,10 +82,10 @@ services:
     environment:
       BOT_CONTROL_KEY: ${BOT_CONTROL_KEY:-}
     volumes:
-      # SQLite-Datenbank und gespeicherte AION-Läufe
+      # SQLite-Datenbank des Bots
       - ./daten/bot:/data
     # web: Weg nach draußen (Discord) und erreichbar für api (Steuer-API :8790) und Caddy
-    # (DPS-Webhook :8787, AION-API und Analyse-Seiten :8789). Keine veröffentlichten Ports.
+    # (AION-API und Bestenliste :8789). Keine veröffentlichten Ports.
     networks: [web]
 
   postgres:

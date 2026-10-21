@@ -67,10 +67,10 @@ der alte auf dem früheren Server ist gestoppt. Ablauf zum Nachlesen bzw. für e
 1. `/srv/nexhub/bot.env` aus `bot.env.beispiel` anlegen (Rechte 600), `BOT_CONTROL_KEY` in `.env`
    setzen (`openssl rand -base64 32 | tr -d '/+='`).
 2. Bot auf dem alten Server stoppen, dessen `data/` komplett nach `/srv/nexhub/daten/bot/`
-   kopieren (`bot.sqlite3` und `runs/` mit den gespeicherten AION-Läufen).
+   kopieren (`bot.sqlite3`).
 3. In `.env` `COMPOSE_PROFILES=bot` einkommentieren, `nexhub-update <wer> <branch>`.
-4. Im Hub unter Bot → Übersicht prüfen, ob er verbunden ist. DeckBar-Ziele (AION-API, DPS-Webhook)
-   auf die neue Adresse umstellen, sobald es eine Domain gibt.
+4. Im Hub unter Bot → Übersicht prüfen, ob er verbunden ist. In den NexBoards die Run-Adresse auf
+   `https://<domain>/api/aion/fight` umstellen.
 
 Zurück: Profil wieder auskommentieren, `docker compose up -d --remove-orphans`, alten Bot starten.
 
