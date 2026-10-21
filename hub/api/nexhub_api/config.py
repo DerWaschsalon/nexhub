@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     hub_version: str = "dev"
     # Hochgeladene Dateien (runs/<id>.nexlog.gz); im Container ein eigenes Volume
     hub_data_dir: Path = Path("data")
+    # Steuer-API von TheWashBot im internen Docker-Netz (z. B. http://bot:8790) und ihr Schlüssel
+    # (BOT_CONTROL_KEY, auf beiden Seiten gleich). Leer: der Bereich „Bot“ meldet „nicht verbunden“.
+    bot_control_url: str = ""
+    bot_control_key: str = ""
 
     @field_validator("hub_admin_ids", mode="before")
     @classmethod
@@ -47,7 +51,7 @@ class Settings(BaseSettings):
     def _empty_is_none(cls, v: object) -> object:
         return None if v == "" else v
 
-    @field_validator("hub_base_url")
+    @field_validator("hub_base_url", "bot_control_url")
     @classmethod
     def _strip_slash(cls, v: str) -> str:
         return v.rstrip("/")
@@ -68,6 +72,10 @@ class Settings(BaseSettings):
     @property
     def discord_configured(self) -> bool:
         return bool(self.discord_client_id and self.discord_client_secret)
+
+    @property
+    def bot_configured(self) -> bool:
+        return bool(self.bot_control_url and self.bot_control_key)
 
     @property
     def member_check(self) -> bool:

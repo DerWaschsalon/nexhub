@@ -9,5 +9,17 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 	}
-	reverse_proxy api:8000
+	# Öffentliche Endpunkte von TheWashBot (Dienst bot, nur mit COMPOSE_PROFILES=bot):
+	# Läufe und Gruppen-DPS aus DeckBar, Analyse-Seiten aus den Discord-Posts. Läuft der Bot
+	# nicht, antworten nur diese Pfade mit 502. Sein altes Dashboard bleibt intern.
+	@bot path /api/aion/* /runs/* /leaderboard/*
+	handle @bot {
+		reverse_proxy bot:8789
+	}
+	handle /dps/* {
+		reverse_proxy bot:8787
+	}
+	handle {
+		reverse_proxy api:8000
+	}
 }

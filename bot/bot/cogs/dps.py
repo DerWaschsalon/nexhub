@@ -44,6 +44,10 @@ async def ensure_webhook(db, guild_id: int, channel_id: int) -> str:
 
 
 def webhook_url(token: str) -> str:
+    # Hinter einem Reverse Proxy (NexHub-VPS): öffentliche Adresse ohne Port, z. B. https://hub.example.com
+    public = os.getenv("DPS_PUBLIC_URL", "").strip().rstrip("/")
+    if public:
+        return f"{public}/dps/{token}"
     host = os.getenv("DPS_WEBHOOK_HOST") or "<LAN-IP-DIESES-SERVERS>"
     port = os.getenv("DPS_WEBHOOK_PORT", str(DEFAULT_PORT))
     return f"http://{host}:{port}/dps/{token}"

@@ -313,6 +313,17 @@ Rechte). Zeigt nur echte Mitglieder-Rollen, keine bot-eigenen Integrations-Rolle
 Läuft über HTTP ohne eigenes TLS — nur fürs LAN/Tailscale gedacht, nicht fürs offene Internet.
 Sessions gehen bei jedem Neustart des Bots verloren (dann einfach neu einloggen).
 
+### Steuerung über den NexHub
+
+Auf dem VPS ersetzt der Bereich „Bot“ im NexHub dieses Dashboard (siehe `hub/README.md`). Dafür
+hat der Bot eine JSON-Steuer-API (`bot/cogs/control.py`, Port 8790), die nur startet, wenn
+`BOT_CONTROL_KEY` gesetzt ist (mindestens 24 Zeichen, derselbe Wert wie beim Hub). Jede Anfrage
+braucht `Authorization: Bearer <BOT_CONTROL_KEY>`. Den Port nie veröffentlichen: Er ist für das
+interne Docker-Netz gedacht, wer den Schlüssel hat, darf alle Einstellungen ändern.
+
+Die Formular-Bereiche stehen einmal in `SECTIONS` (Feldtyp, Beschriftung, Hinweis); der Hub
+zeichnet daraus seine Formulare. Ein neues Feld = ein `Field(...)`-Eintrag dort.
+
 ## DeckBar-Gruppen-DPS einrichten
 
 Postet nach jedem Kampf den Endstand der eigenen Gruppe als eine Nachricht (nicht pro Spieler

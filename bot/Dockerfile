@@ -13,8 +13,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY bot ./bot
 COPY entrypoint.sh .
 
-ENV PYTHONUNBUFFERED=1 DB_PATH=/data/bot.sqlite3
+# Stand des Codes (z. B. "main@71b65a2"), zeigt der Hub unter Bot → Übersicht
+ARG GIT_REV=dev
+ENV PYTHONUNBUFFERED=1 DB_PATH=/data/bot.sqlite3 GIT_REV=$GIT_REV
 VOLUME /data
 EXPOSE 8787
 EXPOSE 8789
+# Steuer-API für den NexHub, nur mit BOT_CONTROL_KEY und nur im internen Netz
+EXPOSE 8790
 ENTRYPOINT ["sh", "/app/entrypoint.sh"]

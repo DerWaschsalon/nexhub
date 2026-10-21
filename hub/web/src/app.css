@@ -269,3 +269,58 @@ a {
 	margin: 4px 0 0;
 	color: var(--dim);
 }
+
+/* Formulare: Feld = Beschriftung + Eingabe + Hinweis; .input für input, select und textarea */
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 13px;
+	color: var(--dim);
+}
+.field .hint {
+	font-size: 12px;
+	color: var(--faint);
+}
+.input {
+	width: 100%;
+	font: inherit;
+	/* 16px: sonst zoomt iOS beim Antippen hinein */
+	font-size: 16px;
+	color: var(--text);
+	background: rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--edge);
+	border-radius: var(--radius-sm);
+	padding: 10px 12px;
+}
+textarea.input {
+	min-height: 96px;
+	resize: vertical;
+}
+select.input option,
+select.input optgroup {
+	background: #141628;
+}
+.input:focus {
+	outline: none;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px rgba(106, 211, 255, 0.18);
+}
+.check {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: var(--text);
+	font-size: 14px;
+	cursor: pointer;
+}
+.check input {
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	accent-color: var(--accent);
+}
+.notice.ok {
+	border-color: rgba(74, 222, 128, 0.4);
+	background: rgba(74, 222, 128, 0.1);
+}

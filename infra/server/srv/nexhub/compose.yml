@@ -4,7 +4,7 @@
 #   cd /srv/nexhub && docker compose up -d
 #
 # Nach außen geht nur Caddy (80/443, ohne Domain nur auf 127.0.0.1). Alles andere hängt an internen Netzen ohne
-# veröffentlichte Ports. Der Bot kommt später als weiterer Dienst dazu.
+# veröffentlichte Ports. TheWashBot (bot) startet nur mit COMPOSE_PROFILES=bot, siehe unten.
 name: nexhub
 
 services:
@@ -45,6 +45,9 @@ services:
       HUB_ADMIN_IDS: ${HUB_ADMIN_IDS:-}
       HUB_GUILD_ID: ${HUB_GUILD_ID:-}
       HUB_MEMBER_ROLE_ID: ${HUB_MEMBER_ROLE_ID:-}
+      # Bereich „Bot“ im Hub: Steuer-API des Dienstes bot (leer = „nicht verbunden“)
+      BOT_CONTROL_URL: ${BOT_CONTROL_URL:-}
+      BOT_CONTROL_KEY: ${BOT_CONTROL_KEY:-}
     volumes:
       # Hochgeladene Runs (NexLog-Dateien); gehört dem Container-Nutzer 10001
       - ./daten/hub:/data
@@ -53,6 +56,30 @@ services:
         condition: service_healthy
     # web: Caddy davor und Weg nach draußen (Discord); db: Datenbank
     networks: [web, db]
+
+  # TheWashBot (bot/), gebaut aus demselben Klon wie der Hub. Startet nur, wenn in .env
+  # COMPOSE_PROFILES=bot steht: Derselbe Discord-Token darf nicht gleichzeitig auf einem anderen
+  # Server laufen, sonst antwortet der Bot doppelt. Umzug siehe infra/README.md.
+  bot:
+    profiles: [bot]
+    build:
+      context: ./src/bot
+      args:
+        GIT_REV: ${GIT_REV:-dev}
+    image: nexhub-bot:lokal
+    restart: unless-stopped
+    # Discord-Token und übrige Bot-Einstellungen (Vorlage: bot.env.beispiel)
+    env_file:
+      - path: bot.env
+        required: false
+    environment:
+      BOT_CONTROL_KEY: ${BOT_CONTROL_KEY:-}
+    volumes:
+      # SQLite-Datenbank und gespeicherte AION-Läufe
+      - ./daten/bot:/data
+    # web: Weg nach draußen (Discord) und erreichbar für api (Steuer-API :8790) und Caddy
+    # (DPS-Webhook :8787, AION-API und Analyse-Seiten :8789). Keine veröffentlichten Ports.
+    networks: [web]
 
   postgres:
     image: postgres:18
