@@ -16,7 +16,8 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      HUB_DOMAIN: ${HUB_DOMAIN:-}
+      # Leer in .env heißt: nur http auf Port 80 (Caddy ersetzt leere Variablen nicht selbst)
+      HUB_DOMAIN: ${HUB_DOMAIN:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./daten/caddy/data:/data
