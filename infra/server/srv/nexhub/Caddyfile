@@ -1,6 +1,16 @@
 # Reverse Proxy für NexHub. Ohne HUB_DOMAIN in /srv/nexhub/.env antwortet Caddy nur auf
 # Port 80 ohne HTTPS. Mit Domain holt er das Zertifikat selbst (Ports 80/443 müssen beim
-# Anbieter freigeschaltet sein).
+# Anbieter freigeschaltet sein). Eine IP als HUB_DOMAIN geht auch: Let's Encrypt stellt dafür nur
+# kurzlebige Zertifikate aus (Profil shortlived, ca. 6 Tage), Caddy erneuert sie selbst. Mehrere
+# Adressen mit Komma, z. B. "192.0.2.10, http://localhost" (localhost für den SSH-Tunnel).
+
+{
+	# Clients schicken bei einer IP kein SNI mit: dann dieses Zertifikat nehmen (HUB_DEFAULT_SNI = die IP)
+	default_sni {$HUB_DEFAULT_SNI}
+	cert_issuer acme {
+		profile shortlived
+	}
+}
 
 {$HUB_DOMAIN::80} {
 	encode zstd gzip

@@ -20,6 +20,8 @@ services:
     environment:
       # Leer in .env heißt: nur http auf Port 80 (Caddy ersetzt leere Variablen nicht selbst)
       HUB_DOMAIN: ${HUB_DOMAIN:-:80}
+      # Nur bei einer IP als HUB_DOMAIN nötig (dieselbe IP eintragen), sonst egal
+      HUB_DEFAULT_SNI: ${HUB_DEFAULT_SNI:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./daten/caddy/data:/data

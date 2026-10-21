@@ -32,22 +32,24 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
 - Docker aus download.docker.com mit Compose-Plugin, Logs rotiert (`etc/docker/daemon.json`).
   Läuft im unprivilegierten LXC (overlayfs, cgroup v2). Docker-Updates kommen nicht automatisch.
 - NexHub-Stack unter `/srv/nexhub` (`srv/nexhub/compose.yml`, Projekt `nexhub`):
-  - **Caddy** als einziger Dienst nach außen (80/443). Solange es keine Domain gibt, lauscht er
-    nur auf `127.0.0.1` (Zugang per SSH-Tunnel), weil es ohne Domain kein HTTPS gibt. Mit Domain
-    in `.env`: `HUB_DOMAIN=<domain>`, `HUB_BIND=0.0.0.0`, `HUB_BASE_URL=https://<domain>`, dann
-    holt Caddy das Zertifikat selbst.
+  - **Caddy** als einziger Dienst nach außen (80/443), holt das Zertifikat selbst. In `.env`:
+    `HUB_DOMAIN=<domain oder IP>`, `HUB_BIND=0.0.0.0`, `HUB_BASE_URL=https://<domain oder IP>`.
+    Seit dem 21.10. läuft er so auf der IP des Servers: Let's Encrypt gibt für IPs nur kurzlebige
+    Zertifikate (Profil `shortlived`, ca. 6 Tage, Caddy erneuert), und weil Browser bei IPs kein
+    SNI schicken, steht die IP zusätzlich in `HUB_DEFAULT_SNI`. Mit `, http://localhost` in
+    `HUB_DOMAIN` geht der SSH-Tunnel weiterhin. Leeres `HUB_BIND` = nur `127.0.0.1`.
   - **Postgres 18** im internen Netz `db` (kein Weg nach draußen, kein veröffentlichter Port),
     Daten in `/srv/nexhub/daten/postgres`.
   - Geheimnisse und Domain nur in `/srv/nexhub/.env` (Rechte 600, Vorlage `env.beispiel`).
   - **api**: der Hub (`hub/`), gebaut auf dem Server aus einem Klon in `/srv/nexhub/src`:
     `ssh waschsalon nexhub-update claude-gamunex <branch>` (Sperre nötig). Caddy leitet alles an
-    ihn weiter. Ohne Domain erreichbar per Tunnel: `ssh -L 8080:127.0.0.1:80 waschsalon`, dann
-    http://localhost:8080.
+    ihn weiter. Zusätzlich per Tunnel: `ssh -L 8080:127.0.0.1:80 waschsalon`, dann
+    http://localhost:8080 (der Login springt danach aber zu `HUB_BASE_URL`).
   - Hochgeladene Runs liegen in `/srv/nexhub/daten/hub/runs/` (gehört Nutzer 10001). Die
     nächtliche Sicherung erfasst bisher nur die Datenbank, nicht diese Dateien.
   - Übernehmen nach einem Deploy: `ssh waschsalon 'cd /srv/nexhub && docker compose up -d'`.
-  - **bot**: TheWashBot (`bot/`), gebaut aus demselben Klon. Startet nur mit
-    `COMPOSE_PROFILES=bot` in `.env`, damit er nicht versehentlich parallel zum alten Server mit
+  - **bot**: TheWashBot (`bot/`), gebaut aus demselben Klon, läuft seit dem 21.10. hier. Startet nur
+    mit `COMPOSE_PROFILES=bot` in `.env`, damit er nie parallel zu einer anderen Instanz mit
     demselben Discord-Token läuft. Einstellungen in `/srv/nexhub/bot.env` (Vorlage
     `bot.env.beispiel`), Daten in `/srv/nexhub/daten/bot/`. Keine veröffentlichten Ports: Der Hub
     spricht ihn über `BOT_CONTROL_URL=http://bot:8790` mit `BOT_CONTROL_KEY` an (Bereich „Bot“),
@@ -58,8 +60,9 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
 
 ## Bot-Umzug vom alten Server
 
-Der Bot läuft bis zum Umzug weiter auf dem alten Server. Reihenfolge, damit er nie doppelt läuft
-und keine Einstellungen verloren gehen (Sperre halten):
+Erledigt am 21.10.2026 (claude-navonex, siehe `/srv/waschsalon/CHANGELOG.md`): Bot läuft im Stack,
+der alte auf dem früheren Server ist gestoppt. Ablauf zum Nachlesen bzw. für einen erneuten Umzug
+(Sperre halten):
 
 1. `/srv/nexhub/bot.env` aus `bot.env.beispiel` anlegen (Rechte 600), `BOT_CONTROL_KEY` in `.env`
    setzen (`openssl rand -base64 32 | tr -d '/+='`).

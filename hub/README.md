@@ -136,8 +136,9 @@ Debuffs auf dem Boss) und Tode. Hub und geteilte Seite nutzen dieselben Komponen
   `HERKUNFT.md`), erst bei Bedarf geladen (`names.svelte.ts`); ohne Eintrag gilt der Name aus der
   Kampfdatei.
 
-Noch nicht: mehrere Uploads desselben Runs zusammenführen, Rohdateien nach 90 Tagen löschen. Bevor geteilte Links über eine
-Domain wirklich öffentlich erreichbar sind: Impressum und Datenschutzerklärung klären.
+Noch nicht: mehrere Uploads desselben Runs zusammenführen, Rohdateien nach 90 Tagen löschen.
+Offen, seit der Hub öffentlich erreichbar ist (21.10., über die IP des Servers): Impressum und
+Datenschutzerklärung.
 
 ## Bot
 
@@ -182,7 +183,9 @@ stammen (`Origin`-Prüfung in `main.py`), damit fremde Seiten nichts im Namen ei
 auslösen können.
 
 In der Discord-Anwendung (Developer Portal → OAuth2) muss `<HUB_BASE_URL>/api/auth/callback` als
-Redirect eingetragen sein, ohne Domain also `http://localhost:8080/api/auth/callback`.
+Redirect eingetragen sein, also `https://<domain oder IP>/api/auth/callback`. Ändert sich
+`HUB_BASE_URL`, muss die neue Adresse dort dazu, sonst lehnt Discord den Login ab. Bot und Hub
+sind zwei getrennte Discord-Anwendungen: Der Redirect gehört in die des Hubs (`DISCORD_CLIENT_ID`).
 
 ## Einstellungen
 
@@ -212,5 +215,5 @@ ssh waschsalon nexhub-update claude-… <branch>
 ssh waschsalon waschsalon-lock freigeben claude-…
 ```
 
-Ohne Domain nur über einen Tunnel erreichbar: `ssh -L 8080:127.0.0.1:80 waschsalon`, dann
-http://localhost:8080 öffnen.
+Erreichbar unter `HUB_BASE_URL` (siehe [`infra/README.md`](../infra/README.md)), zusätzlich per
+Tunnel: `ssh -L 8080:127.0.0.1:80 waschsalon`, dann http://localhost:8080.
