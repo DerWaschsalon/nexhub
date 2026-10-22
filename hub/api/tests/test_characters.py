@@ -133,3 +133,52 @@ def test_loeschen_entfernt_momentaufnahmen(make_client, fake, as_user, database_
         run_id = upload(c, pair(c, member), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
         assert member.delete(f"/api/runs/{run_id}", headers=ORIGIN).status_code == 204
     assert rows(database_url, run_id) == {}
+
+
+def test_routen(make_client, fake, as_user):
+    with make_client(**ON) as c:
+        member = as_user(MEMBER)
+        run_id = upload(c, pair(c, member), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
+        listed = member.get(f"/api/runs/{run_id}/characters").json()
+        assert [(x["name"], x["status"]) for x in listed] == [("Moonlin", "nicht_gefunden"), ("Testheld", "ok")]
+        held = next(x for x in listed if x["name"] == "Testheld")
+        assert held["combat_power"] == 123456 and held["item_level"] == 2554 and "data" not in held
+        detail = member.get(f"/api/runs/{run_id}/characters/{held['id']}").json()
+        assert detail["data"]["profile"]["name"] == "Testheld" and detail["error"] is None
+        assert member.get(f"/api/runs/{run_id}/characters/999999").status_code == 404
+        assert member.get("/api/runs/999999/characters").status_code == 404
+
+
+def test_routen_nur_mit_login(client):
+    assert client.get("/api/runs/1/characters").status_code == 401
+    assert client.get("/api/runs/1/characters/1").status_code == 401
+
+
+def test_geteilt_ohne_profile(make_client, fake, as_user):
+    with make_client(**ON) as c:
+        member = as_user(MEMBER)
+        run_id = upload(c, pair(c, member), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
+        token = member.post(f"/api/runs/{run_id}/share", headers=ORIGIN).json()["share_url"].rsplit("/", 1)[1]
+        public = c.get(f"/api/public/runs/{token}")
+        assert public.status_code == 200
+        assert "Testbogen" not in public.text and "123456" not in public.text and "characters" not in public.text
+
+
+def test_refresh(make_client, fake, as_user):
+    from .conftest import ADMIN, log_in
+    fake.nc.routes["/aion2global/search/v2/character"] = 503
+    member = as_user(MEMBER)
+    with make_client(**ON) as daemon, make_client(**ON) as admin:
+        # Neuholen braucht eine App mit eingeschaltetem Abruf; as_user() baut eine ohne
+        fake.user = ADMIN
+        log_in(admin)
+        run_id = upload(daemon, pair(daemon, admin), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
+        assert member.post(f"/api/runs/{run_id}/characters/refresh", headers=ORIGIN).status_code == 403
+        fake.nc.routes = {}
+        r = admin.post(f"/api/runs/{run_id}/characters/refresh", headers=ORIGIN)
+        # Testheld war fehler, Moonlin nicht_gefunden: beide neu
+        assert r.status_code == 202 and r.json() == {"started": 2}
+        statuses = {x["name"]: x["status"] for x in admin.get(f"/api/runs/{run_id}/characters").json()}
+        assert statuses == {"Testheld": "ok", "Moonlin": "nicht_gefunden"}
+        # zweites Mal innerhalb von 10 Minuten
+        assert admin.post(f"/api/runs/{run_id}/characters/refresh", headers=ORIGIN).status_code == 429
