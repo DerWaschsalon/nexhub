@@ -15,6 +15,9 @@ export type NavItem = {
 	icon: IconName;
 	/** nur für Admins sichtbar; die API prüft das zusätzlich */
 	admin?: boolean;
+	/** Spiel (Textschlüssel, z. B. 'game.aion2'): Einträge desselben Spiels stehen im Menü als ein
+	 *  Eintrag, ihre Seiten als Reiter über dem Inhalt (lib/modules.ts menu) */
+	game?: string;
 	/** Vorschau in der Kachel auf der Übersicht (routes/hub/+page.svelte); holt ihre Daten selbst */
 	overview?: Component;
 };

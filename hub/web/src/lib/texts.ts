@@ -6,6 +6,7 @@ export const CORE_TEXTS = defineTexts(
 	{
 		'lang.label': 'Language',
 		'nav.overview': 'Overview',
+		'game.aion2': 'AION 2',
 		'nav.accounts': 'Accounts',
 		'nav.system': 'System',
 		'role.admin': 'Admin',
@@ -70,6 +71,7 @@ export const CORE_TEXTS = defineTexts(
 	{
 		'lang.label': 'Sprache',
 		'nav.overview': 'Übersicht',
+		'game.aion2': 'AION 2',
 		'nav.accounts': 'Konten',
 		'nav.system': 'System',
 		'role.admin': 'Admin',

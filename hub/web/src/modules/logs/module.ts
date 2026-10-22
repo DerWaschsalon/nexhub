@@ -8,6 +8,8 @@ import { TEXTS } from './texts.ts';
 
 export default {
 	id: 'logs',
-	nav: [{ href: '/hub/runs', label: 'logs.nav', icon: 'trophy', overview: RecentRuns }],
+	nav: [
+		{ href: '/hub/runs', label: 'logs.nav', icon: 'trophy', game: 'game.aion2', overview: RecentRuns }
+	],
 	texts: TEXTS
 } satisfies HubModule;
