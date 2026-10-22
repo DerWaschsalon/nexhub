@@ -4,7 +4,7 @@
 	import { api } from '#lib/api.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { REGIONS, type ArmoryHit, type ArmoryItem } from '#modules/armory/api.ts';
-	import CharacterCard from '#modules/armory/components/CharacterCard.svelte';
+	import CharacterGrid from '#modules/armory/components/CharacterGrid.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -103,16 +103,12 @@
 
 {#if mine.length}
 	<h2 class="group">{t('armory.mine')}</h2>
-	<div class="grid">
-		{#each mine as c (c.id)}<CharacterCard {c} />{/each}
-	</div>
+	<CharacterGrid characters={mine} />
 {/if}
 
 {#if others.length}
 	<h2 class="group">{t('armory.all')}</h2>
-	<div class="grid">
-		{#each others as c (c.id)}<CharacterCard {c} />{/each}
-	</div>
+	<CharacterGrid characters={others} />
 {:else if !mine.length}
 	<h2 class="group">{t('armory.all')}</h2>
 	<p class="dim empty">{t('armory.none')}</p>
@@ -165,13 +161,8 @@
 	.small {
 		font-size: 12px;
 	}
+	/* Abstand nach oben statt unter dem Raster: fällt mit dem des Suchkastens zusammen */
 	.group {
-		margin: 6px 0 12px;
-	}
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-		gap: 12px;
-		margin-bottom: 22px;
+		margin: 22px 0 12px;
 	}
 </style>

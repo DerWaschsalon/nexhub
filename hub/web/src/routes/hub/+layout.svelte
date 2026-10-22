@@ -10,12 +10,12 @@
 	import LangSwitch from '#lib/components/LangSwitch.svelte';
 	import LegalLinks from '#lib/components/LegalLinks.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
-	import { NAV } from '#lib/modules.ts';
+	import { navFor } from '#lib/modules.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
 
-	const items = $derived(NAV.filter((i) => !i.admin || data.me.role === 'admin'));
+	const items = $derived(navFor(data.me));
 
 	// Übersicht nur bei genau /hub markieren, die anderen auch auf Unterseiten
 	function active(href: string): boolean {
