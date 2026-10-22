@@ -1,4 +1,5 @@
 // Angemeldete Module. Ein neues Modul bekommt hier eine Zeile; Menü und Texte ergeben sich daraus.
+import type { Me } from '#lib/api.ts';
 import { addTexts } from '#lib/i18n.svelte.ts';
 import type { HubModule, NavItem } from '#lib/module.ts';
 import { CORE_TEXTS } from '#lib/texts.ts';
@@ -19,6 +20,9 @@ export const NAV: NavItem[] = [
 	{ href: '/hub/admin/konten', label: 'nav.accounts', icon: 'users', admin: true },
 	{ href: '/hub/admin/system', label: 'nav.system', icon: 'server', admin: true }
 ];
+
+/** Was dieses Konto im Menü sieht: Admin-Seiten nur für Admins. */
+export const navFor = (me: Me): NavItem[] => NAV.filter((i) => !i.admin || me.role === 'admin');
 
 /** Ein Eintrag der Seitenleiste: eine Seite, oder ein Spiel mit seinen Seiten (`pages`). */
 export type MenuEntry = NavItem & { pages: NavItem[] };
