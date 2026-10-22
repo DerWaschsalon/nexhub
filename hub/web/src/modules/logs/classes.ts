@@ -23,4 +23,11 @@ export function classInfo(cls: string | null | undefined): ClassInfo | null {
 	return c ? { label: c[i18n.lang], color: c.color, icon: `/klassen/${cls}.png` } : null;
 }
 
+/** Klasse zum Klassennamen, wie die AION-2-Website ihn schreibt (Englisch oder Deutsch). */
+export function classFromName(name: string | null | undefined): string | null {
+	const n = name?.trim().toLowerCase();
+	if (!n) return null;
+	return Object.keys(CLASSES).find((k) => CLASSES[k].en.toLowerCase() === n || CLASSES[k].de.toLowerCase() === n) ?? null;
+}
+
 export const classColor = (cls: string | null | undefined) => (cls && CLASSES[cls]?.color) || UNKNOWN;

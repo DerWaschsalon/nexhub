@@ -1,6 +1,7 @@
 """Charakterprofile zu einem Run (Momentaufnahmen aus characters.py), nur mit Login.
 
-    GET  /api/runs/{id}/characters            alle Spieler des Runs mit Status, ohne die Daten
+    GET  /api/runs/{id}/characters            alle Spieler des Runs mit Status, ohne die Daten (mit
+                                              armory_id, wenn der Spieler in der Armory steht)
     GET  /api/runs/{id}/characters/{char}     eine Momentaufnahme
     POST /api/runs/{id}/characters/refresh    fehler/nicht_gefunden neu holen (wer hochgeladen hat
                                               oder ein Admin, höchstens alle 10 Minuten)
@@ -17,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..deps import DB, CurrentUser
-from ..models import RunCharacter
+from ..models import Character, RunCharacter
 from .runs import _get, _may_manage
 
 router = APIRouter(prefix="/api/runs", tags=["characters"])
@@ -35,6 +36,7 @@ class CharacterOut(BaseModel):
     combat_power: int | None
     item_level: int | None
     fetched_at: datetime | None
+    armory_id: int | None = None  # derselbe Charakter in der Armory (routes/armory.py)
 
 
 class CharacterDetail(CharacterOut):
@@ -50,8 +52,13 @@ def _out(row: RunCharacter) -> dict:
 @router.get("/{run_id}/characters")
 async def list_characters(run_id: int, user: CurrentUser, db: DB) -> list[CharacterOut]:
     await _get(db, run_id)
-    found = await db.scalars(select(RunCharacter).where(RunCharacter.run_id == run_id).order_by(RunCharacter.name))
-    return [CharacterOut(**_out(row)) for row in found]
+    found = (await db.scalars(select(RunCharacter).where(RunCharacter.run_id == run_id)
+                              .order_by(RunCharacter.name))).all()
+    # Namen sind je Server eindeutig
+    armory = {(server, name): cid for cid, server, name in (await db.execute(
+        select(Character.id, Character.server_id, Character.name).where(
+            Character.name.in_([row.name for row in found])))).all()}
+    return [CharacterOut(**_out(row), armory_id=armory.get((row.server_id, row.name))) for row in found]
 
 
 @router.get("/{run_id}/characters/{char_id}")
@@ -59,7 +66,9 @@ async def get_character(run_id: int, char_id: int, user: CurrentUser, db: DB) ->
     row = await db.scalar(select(RunCharacter).where(RunCharacter.run_id == run_id, RunCharacter.id == char_id))
     if row is None:
         raise HTTPException(404, "Spieler nicht in diesem Run")
-    return CharacterDetail(**_out(row), data=row.data, error=row.error)
+    armory_id = await db.scalar(select(Character.id).where(Character.server_id == row.server_id,
+                                                           Character.name == row.name))
+    return CharacterDetail(**_out(row), armory_id=armory_id, data=row.data, error=row.error)
 
 
 class Started(BaseModel):

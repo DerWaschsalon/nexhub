@@ -187,6 +187,7 @@ def test_refresh(make_client, fake, as_user):
 # Robustheit des Abrufs (Funde aus dem Review)
 
 from nexhub_api.aion2 import NC  # noqa: E402
+from nexhub_api import characters  # noqa: E402
 from nexhub_api.characters import Fetcher  # noqa: E402
 
 
@@ -243,16 +244,16 @@ def test_ein_kaputter_run_haelt_das_nachholen_nicht_auf(make_client, fake, as_us
     assert first != second
     set_status(database_url, first, "offen")
     set_status(database_url, second, "offen")
-    original = Fetcher._fill
+    original = characters.fill
 
-    async def boom(self, row):
+    async def boom(nc, row, where):
         if row.run_id == first:
             raise RuntimeError("kaputt")
-        await original(self, row)
+        await original(nc, row, where)
 
-    monkeypatch.setattr(Fetcher, "_fill", boom)
+    monkeypatch.setattr(characters, "fill", boom)
     fetch(database_url, NC(httpx.AsyncClient(transport=httpx.MockTransport(fake.nc)), pause=0), resume=True)
-    # der erste stürzt ab (hier absichtlich an _fill vorbei), der zweite wird trotzdem geholt
+    # der erste stürzt ab (hier absichtlich an fill vorbei), der zweite wird trotzdem geholt
     assert rows(database_url, second)["Testheld"].status == "ok"
 
 

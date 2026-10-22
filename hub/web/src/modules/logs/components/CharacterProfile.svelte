@@ -1,4 +1,5 @@
-<!-- Charakterprofil aus der Momentaufnahme zum Run: Kopf, Ausrüstung, Werte, Titel, Skills, Daevanion. -->
+<!-- Charakterprofil aus einer Momentaufnahme: Kopf, Ausrüstung, Werte, Titel, Skills, Daevanion.
+     Dieselbe Ansicht für Mitspieler eines Runs und die Armory; `source` sagt, woher der Stand kommt. -->
 <script lang="ts">
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
@@ -7,7 +8,7 @@
 	import ItemIcon from './ItemIcon.svelte';
 	import PlayerName from './PlayerName.svelte';
 
-	let { character, data }: { character: CharacterListItem; data: CharacterData } = $props();
+	let { character, data, source }: { character: CharacterListItem; data: CharacterData; source?: string } = $props();
 
 	// Plätze wie im Ausrüstungsfenster: links Waffen und Rüstung, rechts Schmuck, darunter der Rest
 	const LEFT = ['MainHand', 'SubHand', 'Helmet', 'Shoulder', 'Torso', 'Pants', 'Gloves', 'Boots', 'Cape', 'Belt'];
@@ -43,8 +44,9 @@
 	<div class="who">
 		<h2><PlayerName name={data.profile.name} cls={character.cls} size={26} /></h2>
 		<p class="dim">
-			{data.profile.class} · {t('logs.char.level', { n: data.profile.level })} · {data.profile.server}{#if data.profile.guild}
-				· {data.profile.guild}{/if}
+			{[data.profile.class, t('logs.char.level', { n: data.profile.level }), data.profile.server, data.profile.guild]
+				.filter(Boolean)
+				.join(' · ')}
 		</p>
 		{#if data.profile.title}<p class="dim">„{data.profile.title}“</p>{/if}
 	</div>
@@ -157,7 +159,7 @@
 	{/if}
 </section>
 
-<p class="dim small">{t('logs.char.source')}</p>
+<p class="dim small">{source ?? t('logs.char.source')}</p>
 
 <style>
 	section,

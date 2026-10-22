@@ -1,6 +1,9 @@
-"""Charakterprofile: Momentaufnahmen der Mitspieler eines Runs von der AION-2-Website.
+"""Charakterprofile: Momentaufnahmen von der AION-2-Website.
 
-Beim Upload legt `create` je Spieler eine Zeile `offen` an (maskierte Namen gleich als
+`fill` füllt eine Momentaufnahme (models.Snapshot) – für Mitspieler eines Runs wie für die Armory
+(armory.py), damit Abruf und Fehlerbehandlung nur einmal existieren.
+
+Mitspieler: beim Upload legt `create` je Spieler eine Zeile `offen` an (maskierte Namen gleich als
 `name_maskiert`), danach füllt `Fetcher.run` sie im Hintergrund. Startet der Hub neu, holt
 `Fetcher.resume` liegengebliebene Zeilen nach.
 """
@@ -17,7 +20,7 @@ from nexproto import NexLog
 from nexproto.nexlog import JOB_CLASSES, player_name
 
 from .aion2 import NC, NCError, NotFound, item_level
-from .models import RunCharacter
+from .models import RunCharacter, Snapshot
 
 log = logging.getLogger(__name__)
 
@@ -52,6 +55,27 @@ async def create(db: AsyncSession, run_id: int, nexlog: NexLog) -> None:
     await db.commit()
 
 
+async def fill(nc: NC, row: Snapshot, where: str) -> None:
+    """Holt die Momentaufnahme und setzt Status, Daten und Kennzahlen. Wirft nie: ein Fehler landet
+    als Status `fehler`/`nicht_gefunden` in der Zeile. Mit bekannter Charakter-ID entfällt die Suche."""
+    try:
+        cid = row.nc_character_id or await nc.find(row.name, row.server_id)
+        data = await nc.snapshot(row.server_id, cid)
+    except NotFound as e:
+        row.status, row.error = "nicht_gefunden", str(e)[:200]
+    except NCError as e:
+        row.status, row.error = "fehler", str(e)[:200]
+        log.warning("Charakter %s (%s): %s", row.name, where, e)
+    except Exception as e:  # unerwartete Antwort von NC: nie in „offen“ hängen bleiben
+        row.status, row.error = "fehler", f"Format unbekannt: {type(e).__name__}"
+        log.exception("Charakter %s (%s): unerwartete Antwort", row.name, where)
+    else:
+        row.status, row.error, row.nc_character_id, row.data = "ok", None, cid, data
+        row.combat_power = (data.get("profile") or {}).get("combat_power")
+        row.item_level = item_level(data)
+    row.fetched_at = datetime.now(UTC)
+
+
 class Fetcher:
     """Füllt offene Zeilen, einen Run nach dem anderen; läuft ein Run schon, kommt er nicht doppelt."""
 
@@ -72,7 +96,7 @@ class Fetcher:
                     if not pending:
                         return
                     for row in pending:
-                        await self._fill(row)
+                        await fill(self.nc, row, f"Run {run_id}")
                         try:
                             await db.commit()
                         except StaleDataError:
@@ -80,24 +104,6 @@ class Fetcher:
                             return
         finally:
             self.running.discard(run_id)
-
-    async def _fill(self, row: RunCharacter) -> None:
-        try:
-            cid = await self.nc.find(row.name, row.server_id)
-            data = await self.nc.snapshot(row.server_id, cid)
-        except NotFound as e:
-            row.status, row.error = "nicht_gefunden", str(e)[:200]
-        except NCError as e:
-            row.status, row.error = "fehler", str(e)[:200]
-            log.warning("Charakter %s (Run %d): %s", row.name, row.run_id, e)
-        except Exception as e:  # unerwartete Antwort von NC: nie in „offen“ hängen bleiben
-            row.status, row.error = "fehler", f"Format unbekannt: {type(e).__name__}"
-            log.exception("Charakter %s (Run %d): unerwartete Antwort", row.name, row.run_id)
-        else:
-            row.status, row.error, row.nc_character_id, row.data = "ok", None, cid, data
-            row.combat_power = (data.get("profile") or {}).get("combat_power")
-            row.item_level = item_level(data)
-        row.fetched_at = datetime.now(UTC)
 
     async def resume(self) -> None:
         async with self.sessionmaker() as db:

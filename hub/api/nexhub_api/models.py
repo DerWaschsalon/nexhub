@@ -1,9 +1,9 @@
 """Datenbanktabellen. Änderungen immer mit Alembic-Migration (nexhub_api/migrations/versions)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # SQLite (Tests) vergibt automatische IDs nur für INTEGER PRIMARY KEY
@@ -115,16 +115,12 @@ class Run(Base):
 
 
 
-class RunCharacter(Base):
-    """Momentaufnahme eines Mitspielers zum Run, von der AION-2-Website (characters.py).
+class Snapshot:
+    """Momentaufnahme eines Charakters von der AION-2-Website, gefüllt von characters.fill().
+    Gemeinsam für Mitspieler eines Runs (RunCharacter) und die Armory (Character).
 
     status: offen, ok, nicht_gefunden, name_maskiert, fehler. `data` ist das Format aus aion2.py."""
 
-    __tablename__ = "run_characters"
-    __table_args__ = (UniqueConstraint("run_id", "name"),)
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(64))
     cls: Mapped[str | None] = mapped_column(String(32))
     server_id: Mapped[int] = mapped_column(Integer, default=0)
@@ -135,3 +131,38 @@ class RunCharacter(Base):
     data: Mapped[dict | None] = mapped_column(JSON)
     error: Mapped[str | None] = mapped_column(String(200))
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RunCharacter(Snapshot, Base):
+    """Ein Mitspieler, so wie er zur Zeit des Runs aussah (characters.py)."""
+
+    __tablename__ = "run_characters"
+    __table_args__ = (UniqueConstraint("run_id", "name"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+
+
+class Character(Snapshot, Base):
+    """Ein Charakter in der Armory: eingetragen von einem Konto, täglich neu abgerufen (armory.py).
+    Jeder Charakter gehört höchstens einem Konto."""
+
+    __tablename__ = "characters"
+    __table_args__ = (UniqueConstraint("server_id", "nc_character_id"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CharacterDay(Base):
+    """Verlauf in der Armory: je Charakter und Tag Kampfkraft und Item-Level des letzten Abrufs."""
+
+    __tablename__ = "character_days"
+    __table_args__ = (UniqueConstraint("character_id", "day"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    day: Mapped[date] = mapped_column(Date)
+    combat_power: Mapped[int | None] = mapped_column(BigInteger)
+    item_level: Mapped[int | None] = mapped_column(Integer)
