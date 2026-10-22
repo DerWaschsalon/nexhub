@@ -1,6 +1,8 @@
 <!-- Gegenstand wie im Spiel: Symbol vom NCSOFT-CDN im Rahmen der Seltenheit, Verzauberung und
      Durchbruch an den Ecken, Name als Tooltip. -->
 <script lang="ts">
+	import { gradeColor } from '../grades.ts';
+
 	let {
 		name,
 		icon,
@@ -11,16 +13,7 @@
 	}: { name: string; icon: string | null; grade?: string | null; enchant?: number; exceed?: number; size?: number } =
 		$props();
 
-	// Rahmenfarben der Seltenheit wie im Spiel; unbekannte Stufen neutral
-	const GRADES: Record<string, string> = {
-		Common: '#9aa0a6',
-		Rare: '#4f9cf0',
-		Legend: '#f0b429',
-		Unique: '#c77dff',
-		Epic: '#ff7a59',
-		Special: '#38d39f'
-	};
-	const color = $derived((grade && GRADES[grade]) || 'var(--edge)');
+	const color = $derived(gradeColor(grade));
 </script>
 
 <span class="item" style:width="{size}px" style:height="{size}px" style:border-color={color} title={name}>

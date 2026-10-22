@@ -69,8 +69,15 @@ def test_momentaufnahme():
     assert nezekan == {"id": 31, "name": "Nezekan",
                        "icon": "https://assets.playnccdn.com/static-aion2-gamedata/resources/UT_Sword.png",
                        "open": True, "open_nodes": 64, "total_nodes": 88, "stats": ["LP +600"],
-                       "skills": ["Orkanpfeil +1"]}
-    assert azphel["open"] is False and azphel["stats"] == [] and azphel["icon"] is None
+                       "skills": ["Orkanpfeil +1"],
+                       # leere Felder (type None) fallen weg, leere Effekte auch
+                       "nodes": [{"row": 8, "col": 8, "type": "Start", "grade": "None", "open": False,
+                                  "effects": []},
+                                 {"row": 3, "col": 7, "type": "SkillLevel", "grade": "Rare", "open": True,
+                                  "effects": ["Orkanpfeil +1"]},
+                                 {"row": 3, "col": 8, "type": "Stat", "grade": "Common", "open": False,
+                                  "effects": ["LP +600"]}]}
+    assert azphel["open"] is False and azphel["stats"] == [] and azphel["icon"] is None and azphel["nodes"] == []
     # geschlossenes Brett wird nicht abgefragt
     assert fake.calls.count("/api/character/daevanion/detail") == 1
 

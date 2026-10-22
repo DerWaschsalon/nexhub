@@ -57,7 +57,14 @@ def equipment() -> dict:
 
 def board() -> dict:
     return {"nodeList": [{"boardId": 31, "nodeId": 310004, "name": "", "grade": "None", "type": "None", "icon": "",
-                          "row": 1, "col": 4, "open": 0, "effectList": []}],
+                          "row": 1, "col": 4, "open": 0, "effectList": []},
+                         {"boardId": 31, "nodeId": 310113, "name": "Nezekan – Start", "grade": "None", "type": "Start",
+                          "icon": "", "row": 8, "col": 8, "open": 0, "effectList": [{"desc": ""}]},
+                         {"boardId": 31, "nodeId": 310037, "name": "Fäh.-Stufenaufstieg – Orkanpfeil", "grade": "Rare",
+                          "type": "SkillLevel", "icon": "", "row": 3, "col": 7, "open": 1,
+                          "effectList": [{"desc": "Orkanpfeil +1"}]},
+                         {"boardId": 31, "nodeId": 310038, "name": "LP", "grade": "Common", "type": "Stat", "icon": "",
+                          "row": 3, "col": 8, "open": 0, "effectList": [{"desc": "LP +600"}]}],
             "openSkillEffectList": [{"desc": "Orkanpfeil +1"}],
             "openStatEffectList": [{"desc": "LP +600"}]}
 

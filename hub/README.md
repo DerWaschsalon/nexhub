@@ -160,7 +160,7 @@ Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nac
   `fehler`/`nicht_gefunden` neu (Rechte wie Löschen, höchstens alle 10 Minuten). Gelungene
   Momentaufnahmen bleiben, wie sie zum Run passen.
 - Nur mit Login; geteilte Links zeigen keine Profile. Gespeichert wird nur, was das Profil zeigt
-  (etwa 15–30 KB je Spieler), gelöscht mit dem Run.
+  (etwa 75 KB je Spieler, davon das meiste die Knoten der Daevanion-Bretter), gelöscht mit dem Run.
 - Nur Global-Server (NA, EU, SA, Asien); den Shard verrät die Server-ID (2302 = EU). Taiwan und
   Korea haben eigene Seiten.
 - Web: Modul `logs`, Seite `hub/runs/<id>/spieler/<char>`, Namen in der Run-Übersicht verlinken

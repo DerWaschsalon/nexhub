@@ -138,7 +138,18 @@ export type CharacterData = {
 		total_nodes: number;
 		stats: string[];
 		skills: string[];
+		/** belegte Felder des Bretts (Raster 15×15); fehlt bei Momentaufnahmen vor dem Brett */
+		nodes?: DaevanionNode[];
 	}[];
+};
+
+export type DaevanionNode = {
+	row: number;
+	col: number;
+	type: 'Start' | 'Stat' | 'SkillLevel' | string;
+	grade: string;
+	open: boolean;
+	effects: string[];
 };
 
 export type CharacterDetail = CharacterListItem & { data: CharacterData | null; error: string | null };

@@ -3,6 +3,7 @@
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterListItem } from '../api.ts';
+	import DaevanionBoard from './DaevanionBoard.svelte';
 	import ItemIcon from './ItemIcon.svelte';
 	import PlayerName from './PlayerName.svelte';
 
@@ -136,6 +137,9 @@
 
 <section class="glass pad">
 	<h3>{t('logs.char.daevanion')}</h3>
+	{#if data.daevanion.some((b) => b.nodes?.length)}
+		<DaevanionBoard boards={data.daevanion} />
+	{:else}
 	<div class="boards">
 		{#each data.daevanion as b (b.id)}
 			<div class="board">
@@ -150,6 +154,7 @@
 			</div>
 		{/each}
 	</div>
+	{/if}
 </section>
 
 <p class="dim small">{t('logs.char.source')}</p>

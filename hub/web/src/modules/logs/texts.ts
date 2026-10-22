@@ -103,7 +103,14 @@ export const TEXTS = defineTexts(
 		'logs.char.nodes': '{o}/{t} nodes',
 		'logs.char.pet': 'Pet',
 		'logs.char.wing': 'Wings',
-		'logs.char.source': 'Data from the official AION 2 website, fetched when the run was uploaded.'
+		'logs.char.source': 'Data from the official AION 2 website, fetched when the run was uploaded.',
+		'logs.char.node.Start': 'Start',
+		'logs.char.node.Stat': 'Stat',
+		'logs.char.node.SkillLevel': 'Skill level',
+		'logs.char.node.open': 'unlocked',
+		'logs.char.node.closed': 'locked',
+		'logs.char.node.hint': 'Point at or tap a node to see its effect.',
+		'logs.char.board.effects': 'Unlocked on this board'
 	},
 	{
 		'logs.nav': 'Runs',
@@ -206,6 +213,13 @@ export const TEXTS = defineTexts(
 		'logs.char.nodes': '{o}/{t} Knoten',
 		'logs.char.pet': 'Haustier',
 		'logs.char.wing': 'Flügel',
-		'logs.char.source': 'Daten von der offiziellen AION-2-Website, geholt beim Hochladen des Runs.'
+		'logs.char.source': 'Daten von der offiziellen AION-2-Website, geholt beim Hochladen des Runs.',
+		'logs.char.node.Start': 'Start',
+		'logs.char.node.Stat': 'Wert',
+		'logs.char.node.SkillLevel': 'Skill-Stufe',
+		'logs.char.node.open': 'freigeschaltet',
+		'logs.char.node.closed': 'gesperrt',
+		'logs.char.node.hint': 'Zeig auf einen Knoten oder tippe ihn an, um seinen Effekt zu sehen.',
+		'logs.char.board.effects': 'Freigeschaltet auf diesem Brett'
 	}
 );

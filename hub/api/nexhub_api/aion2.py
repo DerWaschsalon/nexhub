@@ -50,6 +50,17 @@ def _pick(row: object, **fields: str) -> dict | None:
     return {k: row.get(src) for k, src in fields.items()} if isinstance(row, dict) else None
 
 
+def _nodes(rows: object) -> list[dict]:
+    """Knoten eines Daevanion-Bretts für die Darstellung wie im Spiel (Raster 15×15). Leere Felder
+    (type None, rund 60 %) fallen weg; Typen Start, Stat, SkillLevel; Seltenheit wie bei Gegenständen.
+    Den Namen lassen wir weg, er wiederholt nur den Effekt („Fäh.-Stufenaufstieg – Orkanpfeil“)."""
+    if not isinstance(rows, list):
+        return []
+    return [{"row": n.get("row"), "col": n.get("col"), "type": n.get("type"), "grade": n.get("grade"),
+             "open": _flag(n.get("open")), "effects": [e for e in _lines(n.get("effectList")) if e]}
+            for n in rows if isinstance(n, dict) and n.get("type") not in (None, "None")]
+
+
 def item_level(data: dict) -> int | None:
     return next((s["value"] for s in data.get("stats", []) if s["type"] == "ItemLevel"), None)
 
@@ -119,7 +130,8 @@ class NC:
                            "open": is_open, "open_nodes": b.get("openNodeCount") or 0,
                            "total_nodes": b.get("totalNodeCount") or 0,
                            "stats": _lines(detail.get("openStatEffectList")),
-                           "skills": _lines(detail.get("openSkillEffectList"))})
+                           "skills": _lines(detail.get("openSkillEffectList")),
+                           "nodes": _nodes(detail.get("nodeList"))})
 
         titles = info.get("title") or {}
         petwing = equip.get("petwing") or {}
