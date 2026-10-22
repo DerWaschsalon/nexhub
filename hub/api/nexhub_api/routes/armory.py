@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import defer
 
-from ..aion2 import NC, NCError, NotFound, localized, shard_of
+from ..aion2 import LANGS, NC, NCError, NotFound, localized, shard_of
 from ..armory import Armory
 from ..deps import DB, CurrentUser
 from ..models import Character, CharacterDay, User
@@ -58,6 +58,7 @@ class Hit(BaseModel):
     server_id: int
     server: str | None
     level: int | None
+    cls: str | None  # Klasse wie im Hub ("ranger")
     character_id: str
     image: str | None
     taken_by: str | None  # schon eingetragen, von wem
@@ -106,12 +107,13 @@ async def _get(db: DB, character_id: int) -> tuple[Character, User]:
 
 
 @router.get("/search")
-async def search(name: str, request: Request, user: CurrentUser, db: DB, region: str = "eu") -> list[Hit]:
+async def search(name: str, request: Request, user: CurrentUser, db: DB, region: str = "eu",
+                 cls: str | None = None) -> list[Hit]:
     name = name.strip()
     if len(name) < 2:
         raise HTTPException(422, "Mindestens zwei Zeichen")
     try:
-        hits = await _nc(request).search(name, region)
+        hits = await _nc(request).search(name, region, cls)
     except NotFound as e:
         raise HTTPException(422, str(e)) from e
     except NCError as e:
@@ -121,6 +123,26 @@ async def search(name: str, request: Request, user: CurrentUser, db: DB, region:
         select(Character.server_id, Character.nc_character_id, User).join(User, User.id == Character.user_id)
         .where(Character.nc_character_id.in_(ids)))).all()} if ids else {}
     return [Hit(**h, taken_by=taken.get((h["server_id"], h["character_id"]))) for h in hits]
+
+
+class Live(BaseModel):
+    name: str
+    server_id: int
+    data: dict  # eine Sprache, Format aus aion2.py; die Klasse steht in data["profile"]["class"]
+
+
+@router.get("/live")
+async def live(name: str, server_id: int, request: Request, user: CurrentUser, lang: str = "en") -> Live:
+    """Beliebigen Charakter jetzt von der Website holen, zum Vergleichen. Wird nicht gespeichert,
+    damit sich keine Daten fremder Charaktere ansammeln."""
+    nc = _nc(request)
+    try:
+        data = await nc.snapshot(server_id, await nc.find(name.strip(), server_id), lang if lang in LANGS else "en")
+    except NotFound as e:
+        raise HTTPException(404, f"Charakter {e}") from e
+    except NCError as e:
+        raise HTTPException(502, f"AION-2-Website: {e}") from e
+    return Live(name=(data.get("profile") or {}).get("name") or name, server_id=server_id, data=data)
 
 
 @router.get("")

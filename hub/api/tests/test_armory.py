@@ -3,7 +3,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from nexhub_api.aion2 import NC
@@ -169,3 +169,29 @@ def test_taeglich_faellig(make_client, fake, database_url):
         await engine.dispose()
         return ids
     assert sorted(asyncio.run(due())) == sorted([old, stuck]) and fresh not in asyncio.run(due())
+
+
+def test_suche_nach_klasse(make_client, fake):
+    fake.nc.rows = [search_row("Testheld"), search_row("Testheiler", cid="heil%3D", pc=30)]
+    c = login(make_client, fake, MEMBER)
+    alle = c.get("/api/armory/search", params={"name": "test"}).json()
+    assert [(h["name"], h["cls"]) for h in alle] == [("Testheld", "ranger"), ("Testheiler", "cleric")]
+    nur = c.get("/api/armory/search", params={"name": "test", "cls": "cleric"}).json()
+    assert [h["name"] for h in nur] == ["Testheiler"]
+    # die Klassentabelle holt der Hub nur einmal
+    assert fake.nc.calls.count("/en-us/api/gameinfo/pcdata") == 1
+    assert c.get("/api/armory/search", params={"name": "test", "cls": "koch"}).status_code == 422
+
+
+def test_live_ohne_speichern(make_client, fake, database_url):
+    c = login(make_client, fake, MEMBER)
+    r = c.get("/api/armory/live", params={"server_id": 2302, "name": "Testheld", "lang": "de"})
+    assert r.status_code == 200
+    assert r.json()["name"] == "Testheld" and r.json()["data"]["profile"]["class"] == "Waldläufer"
+    # nichts gespeichert: weder Charakter noch Verlauf
+    assert db_run(database_url, lambda db: db.scalar(select(func.count()).select_from(Character))) == 0
+    assert c.get("/api/armory/live", params={"server_id": 2302, "name": "Niemand"}).status_code == 404
+
+
+def test_live_nur_mit_login(client):
+    assert client.get("/api/armory/live", params={"server_id": 2302, "name": "Testheld"}).status_code == 401
