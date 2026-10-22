@@ -43,7 +43,7 @@ MAX_ROWS = 8
 RETRY_S = 3
 # Ohne Snapshot (auch ohne „: ping“ alle 15 s) gilt die Verbindung als tot
 READ_TIMEOUT_S = 40
-# Wie lange ohne neuen Schaden noch „im Kampf“, wenn return_after = 0 (nie zurück)
+# Wie lange ohne neuen Schaden noch „im Kampf“, wenn return_after = 0
 DEFAULT_IDLE_S = 30
 CLASSES = ("gladiator", "templar", "ranger", "assassin", "sorcerer", "cleric", "spiritmaster", "chanter", "brawler")
 
@@ -77,7 +77,8 @@ class DpsSettings(_Strict):
     key: str = Field("", max_length=128)
     # Bei Kampfbeginn auf diese Seite wechseln (None = nie)
     auto_page: ID | None = None
-    # Sekunden ohne neuen Schaden, bis die vorige Seite zurückkommt (0 = auf der DPS-Seite bleiben)
+    # Sekunden ohne neuen Schaden bis Kampfende; danach zeigt die Leiste wieder die erste Seite
+    # (0 = DEFAULT_IDLE_S)
     return_after: int = Field(20, ge=0, le=600)
 
 

@@ -91,7 +91,7 @@ function settingsTab(ctx) {
         card("Touch-Leiste", "Automatischer Seitenwechsel im Kampf", null,
           modOn("deck") ? el("div", { class: "grid g2" },
             field("Bei Kampfbeginn zeigen", select(pages, st.auto_page || "", (v) => { patch({ auto_page: v || null }); draw(); })),
-            field("Zurück nach (s, 0 = nie)", input(st.return_after, (v) => patch({ return_after: clampInt(v, 0, 600, 20) }), { type: "number", min: 0, max: 600, disabled: !st.auto_page })))
+            field("Kampfende nach (s ohne Schaden)", input(st.return_after, (v) => patch({ return_after: clampInt(v, 0, 600, 20) }), { type: "number", min: 0, max: 600, disabled: !st.auto_page })))
             : el("p", { class: "hint", text: "Das Modul Touch-Leiste ist aus." }))),
       callout("info", "shield-check", el("span", {}, "Der Mitschnitt ist rein passiv: Er liest nur Netzwerkpakete mit (libpcap, Recht cap_net_raw), verändert nichts am Spiel und lädt nichts hoch.")));
   };
