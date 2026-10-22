@@ -12,7 +12,7 @@ teilen, TheWashBot steuern. Oberfläche auf Englisch und Deutsch.
 
 | Bereich | Web | API | Wer |
 |---|---|---|---|
-| öffentlich | `/`, `/login`, geteilte Runs `/r/<token>` | `/api/public/…` | alle |
+| öffentlich | `/`, `/login`, geteilte Runs `/r/<token>`, geteilte Vergleiche `/v/<token>` | `/api/public/…` | alle |
 | Hub | `/hub/…` | `/api/…` | angemeldete Admins und Mitglieder |
 | Admin | `/hub/admin/…` | `/api/admin/…` | nur Admins |
 
@@ -71,7 +71,7 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 | Modul | Menü | Seiten |
 |---|---|---|
 | `logs` | Runs | `hub/runs/…`, geteilt `(public)/r/<token>/…` |
-| `armory` | Armory | `hub/armory/…` – Profilansicht aus `logs` |
+| `armory` | Armory | `hub/armory/…`, geteilter Vergleich `(public)/v/<token>` – Profilansicht aus `logs` |
 | `devices` | Geräte | `hub/geraete/` |
 | `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 
@@ -214,7 +214,14 @@ und die Typen aus `modules/logs`.
   der Armory, rechts ein beliebiger, den `GET /api/armory/live?server_id=…&name=…` jetzt von der
   Website holt und **nicht speichert**. Kampfkraft, Werte, Ausrüstung je Platz und Skills mit
   Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
-  rot umrandet ist, was der andere schon offen hat. Die Adresse lässt sich teilen.
+  rot umrandet ist, was der andere schon offen hat. Die Adresse zeigt Angemeldeten denselben Vergleich.
+- Teilen ohne Login: `POST /api/armory/compare/share` (`left`, `server_id`, `name`) speichert nur das
+  Paar (`models.Comparison`) und gibt einen Link `/v/<token>`; derselbe Vergleich vom selben Konto
+  gibt denselben Link. `DELETE /api/armory/compare/share/{token}` zieht ihn zurück (wer geteilt hat
+  oder ein Admin), Austragen des Armory-Charakters ebenso. `GET /api/public/vergleich/{token}`
+  liefert links die Momentaufnahme ohne Besitzer, rechts holt es live (`fetch_live`, wie
+  `/api/armory/live`); fehlt der rechte, steht `right_error` da und links trotzdem.
+  Kasten mit Link, Kopieren und Zurückziehen: `lib/components/ShareLink.svelte`, wie bei Runs.
 
 ## Bot
 

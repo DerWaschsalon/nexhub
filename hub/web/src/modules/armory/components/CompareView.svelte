@@ -8,9 +8,9 @@
 	import ItemIcon from '#modules/logs/components/ItemIcon.svelte';
 	import PlayerName from '#modules/logs/components/PlayerName.svelte';
 	import { ARCANA, LEFT, RIGHT } from '#modules/logs/slots.ts';
+	import type { CompareSide } from '../compare.ts';
 
-	type Side = { name: string; cls: string | null; data: CharacterData };
-	let { left, right }: { left: Side; right: Side } = $props();
+	let { left, right }: { left: CompareSide; right: CompareSide } = $props();
 
 	let board = $state(0);
 

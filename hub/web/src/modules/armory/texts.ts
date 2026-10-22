@@ -46,7 +46,9 @@ export const TEXTS = defineTexts(
 		'armory.compare.pickRight': 'Search for a character to compare with.',
 		'armory.compare.diff': 'Difference',
 		'armory.compare.boardHint': 'Red frame: the other character has unlocked this node, this one has not.',
-		'armory.compare.share': 'The address of this page shows the same comparison to anyone signed in to the hub.'
+		'armory.compare.sharedText': 'Anyone with this link can see the comparison without signing in. The other character is fetched again from the AION 2 website whenever it is opened.',
+		'armory.compare.confirmUnshare': 'Withdraw the link? Anyone who has it can no longer see the comparison.',
+		'armory.compare.sharedTitle': '{left} vs. {right}'
 	},
 	{
 		'armory.nav': 'Armory',
@@ -93,6 +95,8 @@ export const TEXTS = defineTexts(
 		'armory.compare.pickRight': 'Such einen Charakter, mit dem du vergleichen willst.',
 		'armory.compare.diff': 'Unterschied',
 		'armory.compare.boardHint': 'Roter Rahmen: Der andere hat diesen Knoten freigeschaltet, dieser noch nicht.',
-		'armory.compare.share': 'Die Adresse dieser Seite zeigt allen, die im Hub angemeldet sind, denselben Vergleich.'
+		'armory.compare.sharedText': 'Wer diesen Link hat, sieht den Vergleich ohne Login. Der andere Charakter wird bei jedem Öffnen neu von der AION-2-Website geholt.',
+		'armory.compare.confirmUnshare': 'Link zurückziehen? Wer ihn hat, sieht den Vergleich danach nicht mehr.',
+		'armory.compare.sharedTitle': '{left} gegen {right}'
 	}
 );
