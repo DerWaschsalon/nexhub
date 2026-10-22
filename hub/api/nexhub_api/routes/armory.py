@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import defer
 
-from ..aion2 import NC, NCError, NotFound, shard_of
+from ..aion2 import NC, NCError, NotFound, localized, shard_of
 from ..armory import Armory
 from ..deps import DB, CurrentUser
 from ..models import Character, CharacterDay, User
@@ -83,7 +83,9 @@ def _nc(request: Request) -> NC:
 # Felder der Liste aus dem Profil: Ausgabename → Schlüssel in data["profile"] (aion2.py). In der
 # Liste direkt aus dem JSON gelesen, damit sie die Daten (~75 KB je Charakter) nicht laden muss.
 PROFILE = {"class_name": "class", "server": "server", "image": "image"}
-PROFILE_COLUMNS = [Character.data["profile"][key].as_string() for key in PROFILE.values()]
+# Ab FORMAT 2 je Sprache (aion2.py); Klasse, Server und Bild nehmen wir aus der englischen
+PROFILE_COLUMNS = [func.coalesce(Character.data["en"]["profile"][key].as_string(),
+                                 Character.data["profile"][key].as_string()) for key in PROFILE.values()]
 
 
 def _armory_out(row: Character, owner: User, user: User, profile: dict) -> dict:
@@ -91,7 +93,7 @@ def _armory_out(row: Character, owner: User, user: User, profile: dict) -> dict:
 
 
 def _profile_of(row: Character) -> dict:
-    p = (row.data or {}).get("profile") or {}
+    p = localized(row.data or {}).get("profile") or {}
     return {out: p.get(key) for out, key in PROFILE.items()}
 
 
@@ -182,7 +184,9 @@ async def refresh(character_id: int, request: Request, user: CurrentUser, db: DB
     row, _ = await _get(db, character_id)
     if row.status == "offen" or character_id in armory.running:
         raise HTTPException(409, "Wird gerade abgerufen")
-    if row.fetched_at and datetime.now(UTC) - row.fetched_at.replace(tzinfo=row.fetched_at.tzinfo or UTC) < REFRESH_EVERY:
+    # SQLite (Tests) gibt Zeitpunkte ohne Zeitzone zurück; gespeichert wird immer UTC
+    last = row.fetched_at.replace(tzinfo=row.fetched_at.tzinfo or UTC) if row.fetched_at else None
+    if last and datetime.now(UTC) - last < REFRESH_EVERY:
         raise HTTPException(429, "Höchstens alle 10 Minuten")
     row.status = "offen"
     await db.commit()

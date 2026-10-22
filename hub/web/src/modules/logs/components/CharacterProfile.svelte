@@ -2,25 +2,58 @@
      Dieselbe Ansicht für Mitspieler eines Runs und die Armory; `source` sagt, woher der Stand kommt. -->
 <script lang="ts">
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
-	import { t } from '#lib/i18n.svelte.ts';
-	import type { CharacterData, CharacterListItem } from '../api.ts';
+	import { i18n, t } from '#lib/i18n.svelte.ts';
+	import { localized, type CharacterListItem, type CharacterSnapshot } from '../api.ts';
+	import { CHARACTER_ART } from '../assets.ts';
 	import DaevanionBoard from './DaevanionBoard.svelte';
+	import ItemCard from './ItemCard.svelte';
 	import ItemIcon from './ItemIcon.svelte';
 	import PlayerName from './PlayerName.svelte';
+	import SkillGrid from './SkillGrid.svelte';
+	import StatPanel from './StatPanel.svelte';
 
-	let { character, data, source }: { character: CharacterListItem; data: CharacterData; source?: string } = $props();
+	let {
+		character,
+		data: snapshot,
+		source,
+		loadDetails
+	}: {
+		character: CharacterListItem;
+		data: CharacterSnapshot;
+		source?: string;
+		/** Runs: Werte je Gegenstand nachladen (Knopf in der Ausrüstung); die Armory hat sie immer */
+		loadDetails?: () => Promise<void>;
+	} = $props();
 
-	// Plätze wie im Ausrüstungsfenster: links Waffen und Rüstung, rechts Schmuck, darunter der Rest
+	const data = $derived(localized(snapshot, i18n.lang));
+	const details = $derived('v' in snapshot ? snapshot.details : undefined);
+
+	// Plätze wie im Ausrüstungsfenster: links Waffen und Rüstung, rechts Schmuck, dann Arkana, dann der Rest
 	const LEFT = ['MainHand', 'SubHand', 'Helmet', 'Shoulder', 'Torso', 'Pants', 'Gloves', 'Boots', 'Cape', 'Belt'];
 	const RIGHT = ['Necklace', 'Earring1', 'Earring2', 'Ring1', 'Ring2', 'Bracelet1', 'Bracelet2', 'Amulet', 'Rune1', 'Rune2'];
+	const ARCANA = ['Arcana1', 'Arcana2', 'Arcana3', 'Arcana4', 'Arcana5'];
 	const bySlot = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
-	const rest = $derived(data.equipment.filter((e) => !LEFT.includes(e.slot_name) && !RIGHT.includes(e.slot_name)));
-	const groups = $derived([
-		{ label: t('logs.char.active'), skills: data.skills.filter((s) => s.category === 'Active') },
-		{ label: t('logs.char.passive'), skills: data.skills.filter((s) => s.category === 'Passive') },
-		{ label: t('logs.char.stigma'), skills: data.skills.filter((s) => s.category === 'Dp' && (s.equipped || s.learned)) }
-	]);
-	const stats = $derived(data.stats.filter((s) => s.type !== 'ItemLevel'));
+	const inSlots = (names: string[]) => names.map((n) => bySlot.get(n)).filter((e) => e !== undefined);
+	const rest = $derived(data.equipment.filter((e) => ![...LEFT, ...RIGHT, ...ARCANA].includes(e.slot_name)));
+	const arcana = $derived(inSlots(ARCANA));
+	const arcanaSet = $derived(arcana.find((e) => e.detail?.set)?.detail?.set);
+	// Werte je Gegenstand vorhanden (Armory immer, Runs nach „Item-Werte laden“)
+	const withValues = $derived(data.equipment.some((e) => e.detail !== undefined));
+	const canLoad = $derived(!!loadDetails && details?.state !== 'laden' && (!withValues || details?.state === 'fehler'));
+
+	let busy = $state(false);
+	let error = $state('');
+	async function load() {
+		busy = true;
+		error = '';
+		try {
+			await loadDetails?.();
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			busy = false;
+		}
+	}
 </script>
 
 {#snippet slots(names: string[])}
@@ -68,15 +101,37 @@
 </header>
 
 <section class="glass pad">
-	<h3>{t('logs.char.equipment')}</h3>
-	<div class="gear">
-		{@render slots(LEFT)}
-		{@render slots(RIGHT)}
+	<div class="sec-head">
+		<h3>{t('logs.char.equipment')}</h3>
+		{#if canLoad}
+			<button class="btn small" onclick={load} disabled={busy}>{t('logs.char.loadDetails')}</button>
+		{/if}
 	</div>
+	{#if details?.state === 'laden'}
+		<p class="notice" role="status">{t('logs.char.loadingDetails')}</p>
+	{:else if details?.state === 'ok' && details.at}
+		<p class="dim small note">{t('logs.char.detailsAsOf', { d: formatDateTime(details.at) })}</p>
+	{:else if details?.state === 'fehler'}
+		<p class="notice error" role="alert">{t('logs.char.detailsFailed', { why: details.error ?? '' })}</p>
+	{/if}
+	{#if error}<p class="notice error" role="alert">{error}</p>{/if}
+
+	{#if withValues}
+		<div class="cards">
+			{#each [...inSlots(LEFT), ...inSlots(RIGHT), ...rest] as e (e.slot)}<ItemCard item={e} />{/each}
+		</div>
+	{:else}
+		<div class="gear">
+			{@render slots(LEFT)}
+			{@render slots(RIGHT)}
+		</div>
+	{/if}
 	<div class="extra">
-		{#each rest as e (e.slot)}
-			<ItemIcon name={e.name} icon={e.icon} grade={e.grade} enchant={e.enchant} exceed={e.exceed} size={40} />
-		{/each}
+		{#if !withValues}
+			{#each [...arcana, ...rest] as e (e.slot)}
+				<ItemIcon name={e.name} icon={e.icon} grade={e.grade} enchant={e.enchant} exceed={e.exceed} size={40} />
+			{/each}
+		{/if}
 		{#if data.wing}
 			<ItemIcon name="{t('logs.char.wing')}: {data.wing.name}" icon={data.wing.icon} grade={data.wing.grade} enchant={data.wing.enchant} size={40} />
 		{/if}
@@ -86,55 +141,59 @@
 	</div>
 </section>
 
-<div class="cols">
+{#if withValues && arcana.length}
 	<section class="glass pad">
-		<h3>{t('logs.char.stats')}</h3>
-		<div class="table-wrap">
-			<table class="table">
-				<tbody>
-					{#each stats as s (s.type)}
-						<tr>
-							<td>{s.name}</td>
-							<td class="num right">{s.value}</td>
-							<td class="dim small">{s.effects.join(' · ')}</td>
-						</tr>
+		<h3>{t('logs.char.arcana')}</h3>
+		{#if arcanaSet}
+			<div class="set">
+				<div class="set-head">
+					<strong>{arcanaSet.name}</strong>
+					<span class="chip">{t('logs.char.setCount', { n: arcanaSet.equipped, t: arcanaSet.total })}</span>
+				</div>
+				<ul>
+					{#each arcanaSet.bonuses as b (b.degree)}
+						<li class:active={arcanaSet.equipped >= b.degree}>
+							<span class="degree">{t('logs.char.setEffect', { n: b.degree })}</span>
+							<span>{b.lines.join(' · ')}</span>
+						</li>
 					{/each}
-				</tbody>
-			</table>
+				</ul>
+			</div>
+		{/if}
+		<div class="cards">
+			{#each arcana as e (e.slot)}<ItemCard item={e} />{/each}
 		</div>
 	</section>
+{/if}
 
+<section class="glass pad">
+	<h3>{t('logs.char.stats')}</h3>
+	<StatPanel stats={data.stats} />
+</section>
+
+{#if data.titles.equipped.length}
 	<section class="glass pad">
 		<h3>{t('logs.char.titles', { o: data.titles.owned, t: data.titles.total })}</h3>
-		{#each data.titles.equipped as title (title.name)}
-			<div class="title">
-				<strong>{title.name}</strong> <span class="chip">{title.category}</span>
-				<p class="dim small">{title.effects.join(' · ')}</p>
-			</div>
-		{/each}
+		<div class="titles">
+			{#each data.titles.equipped as title (title.name)}
+				<div class="title">
+					{#if title.category}
+						<img src="{CHARACTER_ART}/info/title_icon_{title.category.toLowerCase()}.png" alt={title.category} title={title.category}
+							width="36" height="36" loading="lazy" referrerpolicy="no-referrer" />
+					{/if}
+					<div>
+						<strong>{title.name}</strong>
+						<p class="dim small">{title.effects.join(' · ')}</p>
+					</div>
+				</div>
+			{/each}
+		</div>
 	</section>
-</div>
+{/if}
 
 <section class="glass pad">
 	<h3>{t('logs.char.skills')}</h3>
-	{#each groups as g (g.label)}
-		{#if g.skills.length}
-			<h4>{g.label}</h4>
-			<div class="skills">
-				{#each g.skills as s (s.name)}
-					<div
-						class="skill"
-						class:missing={s.equipped && !s.learned}
-						title={s.equipped && !s.learned ? `${s.name} – ${t('logs.char.notLearned')}` : s.name}
-					>
-						{#if s.icon}<img src={s.icon} alt="" width="36" height="36" loading="lazy" referrerpolicy="no-referrer" />{/if}
-						<span>{s.name}</span>
-						<strong class="num">{s.level}</strong>
-					</div>
-				{/each}
-			</div>
-		{/if}
-	{/each}
+	<SkillGrid skills={data.skills} />
 </section>
 
 <section class="glass pad">
@@ -169,11 +228,6 @@
 	h3 {
 		font-size: 17px;
 		margin-bottom: 12px;
-	}
-	h4 {
-		font-size: 13px;
-		margin: 14px 0 8px;
-		color: var(--dim);
 	}
 	.head {
 		display: flex;
@@ -220,47 +274,75 @@
 		min-width: 0;
 	}
 	.item-name,
-	.skill span {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
 	.extra {
 		display: flex;
 		gap: 8px;
 		flex-wrap: wrap;
 		margin-top: 14px;
 	}
-	.cols {
+	.sec-head {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 12px;
+	}
+	.sec-head h3 {
+		margin-bottom: 0;
+	}
+	.note,
+	.notice {
+		margin-bottom: 12px;
+	}
+	.cards {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
-		gap: 0 16px;
+		grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+		gap: 12px;
+	}
+	.set {
+		margin-bottom: 14px;
+		padding: 12px 14px;
+		border-radius: var(--radius-sm);
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid var(--edge-soft);
+	}
+	.set-head {
+		display: flex;
+		gap: 10px;
+		align-items: center;
+		margin-bottom: 8px;
+	}
+	.set ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 13px;
+		color: var(--faint);
+	}
+	.set li {
+		display: flex;
+		gap: 10px;
+	}
+	.set li.active {
+		color: var(--text);
+	}
+	.degree {
+		flex-shrink: 0;
+		font-weight: 600;
+	}
+	.titles {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+		gap: 12px;
 	}
 	.title {
-		margin-bottom: 10px;
-	}
-	.skills {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		gap: 8px;
-	}
-	.skill {
 		display: flex;
-		gap: 8px;
-		align-items: center;
-		padding: 2px;
-		border-radius: 8px;
-	}
-	.skill img {
-		border-radius: 8px;
-	}
-	.skill span {
-		flex: 1;
-		min-width: 0;
-	}
-	.skill.missing {
-		opacity: 0.6;
-		outline: 1px dashed var(--danger);
+		gap: 10px;
+		align-items: flex-start;
 	}
 	.boards {
 		display: grid;

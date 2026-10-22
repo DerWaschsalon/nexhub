@@ -69,12 +69,29 @@ def board() -> dict:
             "openStatEffectList": [{"desc": "LP +600"}]}
 
 
+def item(name: str = "Testbogen") -> dict:
+    """Werte eines angelegten Gegenstands (/api/character/equipment/item), gekürzt."""
+    return {"id": 110430050, "name": name, "grade": "Unique", "level": 86, "categoryName": "Bogen",
+            "mainStats": [{"id": "WeaponFixingDamage", "name": "Angriffskraft", "minValue": "354", "value": "486",
+                           "extra": "146", "exceed": False}],
+            "subStats": [{"id": "AdditionalHitRate", "name": "Mehrfachtreffer-Chance", "value": "9.1%"}],
+            "magicStoneStat": [{"id": "Critical", "icon": ICON, "value": "+6", "name": "Kritischer Treffer",
+                                "grade": "Legend", "slotPos": 0}],
+            "godStoneStat": [{"icon": ICON, "name": "Gottstein: Test", "desc": "10 % Chance auf Wind-Schaden",
+                              "grade": "Rare", "slotPos": 0}],
+            "subSkills": [{"id": 1, "level": 2, "icon": ICON, "name": "Zielpfeil"}],
+            "set": {"id": "Arcana_A_set_001", "name": "Testset", "equippedCount": 3,
+                    "items": [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}, {"id": 5}],
+                    "bonuses": [{"degree": 2, "descriptions": ["Angriffskraft (PvE) +60"]}]}}
+
+
 class FakeNC:
     """Beantwortet Suche, Profil, Ausrüstung und Daevanion. `routes` lässt sich je Test überschreiben:
     Pfad → Antwort (dict = JSON 200, int = Statuscode, Exception = wird geworfen)."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.langs: list[str] = []  # lang jeder Profil-/Ausrüstungs-/Gegenstandsanfrage
         self.rows = [search_row("Testheld")]
         self.routes: dict[str, object] = {}
         # Charakter-IDs, für die das Profil mit 500 antwortet (Fehler nur bei einem Spieler)
@@ -84,6 +101,8 @@ class FakeNC:
         path = request.url.path
         self.calls.append(path)
         q = {k: v[0] for k, v in parse_qs(request.url.query.decode()).items()}
+        if path.startswith("/api/character/"):
+            self.langs.append(q.get("lang", ""))
         if path == "/api/character/info" and q.get("characterId") in self.fail_for:
             return httpx.Response(500)
         default = {
@@ -93,6 +112,7 @@ class FakeNC:
             "/api/character/info": info(),
             "/api/character/equipment": equipment(),
             "/api/character/daevanion/detail": board(),
+            "/api/character/equipment/item": item(),
         }
         answer = self.routes.get(path, default.get(path, 404))
         if isinstance(answer, Exception):

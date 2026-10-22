@@ -154,19 +154,28 @@ Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nac
 
 - Nach dem Upload eine Zeile `run_characters` je Spieler (Name über `names`, Server aus `serverId`
   je Actor der Kampfdatei). Im Hintergrund: Suche nach Name und Server, dann Profil, Ausrüstung und
-  die offenen Daevanion-Bretter, nacheinander mit `HUB_AION2_PAUSE` (0,3 s), etwa 8 Anfragen je
-  Spieler. Status `offen`, `ok`, `nicht_gefunden` (auch: Server unbekannt oder nicht Global),
+  die offenen Daevanion-Bretter, auf Deutsch und Englisch (die Seite zeigt die passende Sprache),
+  nacheinander mit `HUB_AION2_PAUSE` (0,3 s), etwa 14 Anfragen je Spieler. Format:
+  `{"v": 2, "de": {…}, "en": {…}}`, ältere Momentaufnahmen sind ein deutsches Objekt
+  (`aion2.localized`, im Web `localized`). Status `offen`, `ok`, `nicht_gefunden` (auch: Server unbekannt oder nicht Global),
   `name_maskiert`, `fehler`. Offene Zeilen holt der Hub beim Start nach.
 - `GET /api/runs/{id}/characters`, `GET …/characters/{char}`; `POST …/characters/refresh` holt
   `fehler`/`nicht_gefunden` neu (Rechte wie Löschen, höchstens alle 10 Minuten). Gelungene
   Momentaufnahmen bleiben, wie sie zum Run passen.
+- Werte je Gegenstand (Seelenbindung, Manasteine, Göttersteine, Fähigkeitseffekte, Arkana-Set) nur
+  auf Knopfdruck: `POST …/characters/{char}/details` (alle Angemeldeten, je Spieler höchstens alle
+  10 Minuten, `characters.load_details`), eine Anfrage je Gegenstand und Sprache. Geholt wird für
+  genau die gespeicherten Gegenstände (die Momentaufnahme merkt sich ihre IDs); trägt der Charakter
+  einen nicht mehr, antwortet NC mit 404 und er bleibt ohne Werte. Stand in `data["details"]`.
 - Nur mit Login; geteilte Links zeigen keine Profile. Gespeichert wird nur, was das Profil zeigt
-  (etwa 75 KB je Spieler, davon das meiste die Knoten der Daevanion-Bretter), gelöscht mit dem Run.
+  (etwa 150 KB je Spieler in zwei Sprachen, davon das meiste die Knoten der Daevanion-Bretter, mit
+  Werten je Gegenstand gut das Doppelte), gelöscht mit dem Run.
 - Nur Global-Server (NA, EU, SA, Asien); den Shard verrät die Server-ID (2302 = EU). Taiwan und
   Korea haben eigene Seiten.
 - Web: Modul `logs`, Seite `hub/runs/<id>/spieler/<char>`, Namen in der Run-Übersicht verlinken
   dorthin. Bilder direkt von NCSOFT ohne Herkunftsadresse; das Daevanion-Brett nutzt die Kacheln der
-  offiziellen Charakterseite (`assets.playnccdn.com/static-aion2/characters/img/daevanion/`).
+  offiziellen Charakterseite, ebenso die Symbole der Werte und Titel (Pfade in `modules/logs/assets.ts`).
+  Ansicht in `CharacterProfile.svelte` mit `ItemCard`, `StatPanel`, `SkillGrid`, `DaevanionBoard`.
 - Tests gegen eine nachgebaute Seite (`tests/fake_nc.py`, nur erfundene Daten). Format gegen die
   echte Seite: `AION2_LIVE=1 AION2_NAME=<Charakter> AION2_SERVER=<Server-ID> uv run pytest -q tests/test_aion2.py -k echte`.
 
@@ -181,6 +190,8 @@ und die Typen aus `modules/logs`.
 - Eintragen über die Suche der AION-2-Website (`GET /api/armory/search?name=…&region=eu`, Name und
   Region genügen), dann `POST /api/armory` mit dem Treffer. Jeder Charakter gehört höchstens einem
   Konto, höchstens 20 je Konto. Mit bekannter Charakter-ID entfällt beim Abruf die Suche.
+- Immer mit Werten je Gegenstand (`fill(…, items=True)`): rund 64 Anfragen je Charakter, ein Abruf
+  dauert etwa eine Minute.
 - Neu abgerufen wird stündlich geprüft alles, dessen letzter Abruf älter als einen Tag ist (oder
   das ein Neustart auf `offen` stehen ließ), und per `POST /api/armory/{id}/refresh` (alle
   Angemeldeten, höchstens alle 10 Minuten). Schlägt ein Abruf fehl, bleibt der letzte Stand sichtbar.
@@ -247,7 +258,7 @@ Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 `DATABASE_URL`, `HUB_BASE_URL`, `HUB_SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
 `HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs),
 `BOT_CONTROL_URL` und `BOT_CONTROL_KEY` (Bereich „Bot“, siehe oben), `HUB_OPERATOR_*` und
-`HUB_HOSTER` (Impressum, Datenschutz), `HUB_AION2_ENABLED`, `HUB_AION2_LANG` und `HUB_AION2_PAUSE`
+`HUB_HOSTER` (Impressum, Datenschutz), `HUB_AION2_ENABLED` und `HUB_AION2_PAUSE`
 (Charakterprofile, siehe oben).
 
 ## Entwickeln

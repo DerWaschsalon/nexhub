@@ -2,9 +2,9 @@
 // public/src/js/skillIcons.js, GPL-3.0): erst die Tabelle aus den Spieldaten (erste vier Ziffern des
 // achtstelligen Codes), sonst aus Klasse und Nummer. Das CDN erlaubt kein fetch von fremden Seiten,
 // ein einfaches <img> lädt aber.
+import { GAMEDATA as BASE } from './assets.ts';
 import iconMap from './data/skill_icons.json';
 
-const BASE = 'https://assets.playnccdn.com/static-aion2-gamedata/resources';
 const MAP = iconMap as Record<string, string>;
 
 const CLASS_BY_PREFIX: Record<string, string> = {

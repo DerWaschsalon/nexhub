@@ -67,7 +67,7 @@
 			Skills, Daevanion). Sie ist nur für angemeldete Mitglieder sichtbar, nicht über geteilte Links, und
 			wird mit dem Run gelöscht.
 			In der Armory können Mitglieder Charaktere eintragen. Dazu speichert der Hub, wer den Charakter
-			eingetragen hat, eine Momentaufnahme wie oben, die einmal täglich und auf Knopfdruck neu von der
+			eingetragen hat, eine Momentaufnahme wie oben samt den Werten der Gegenstände, die einmal täglich und auf Knopfdruck neu von der
 			AION-2-Website geholt wird, und je Tag Kampfkraft und Gegenstandsstufe als Verlauf. Das sehen nur
 			angemeldete Mitglieder. Es wird gelöscht, wenn der Charakter ausgetragen oder das Konto gelöscht wird.
 			Ein geteilter Link zeigt einen Run allen, die den Link haben, ohne Anmeldung; Suchmaschinen werden
@@ -148,7 +148,7 @@
 			of the players in it from NCSOFT's official AION 2 website and stores a snapshot (combat power,
 			equipment, stats, titles, skills, Daevanion); only signed-in members see it, not shared links, and it is
 			deleted with the run. Members can add characters to the armory. For those the hub stores who added the
-			character, a snapshot as above, fetched again from the AION 2 website once a day and on request, and
+			character, a snapshot as above including the item values, fetched again from the AION 2 website once a day and on request, and
 			combat power and item level per day as a history. Only signed-in members see it; it is deleted when the
 			character is removed or the account is deleted. A shared link shows a run to anyone who has the link,
 			without signing in; search engines are asked not to index such pages. Purpose: analysing the

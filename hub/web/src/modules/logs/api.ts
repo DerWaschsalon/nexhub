@@ -109,6 +109,8 @@ export type CharacterListItem = {
 };
 
 export type CharacterItem = {
+	/** Gegenstands-ID (ab Format 2), nötig zum Nachladen der Werte */
+	id?: number | null;
 	slot: number;
 	slot_name: string;
 	name: string;
@@ -116,6 +118,25 @@ export type CharacterItem = {
 	enchant: number;
 	exceed: number;
 	icon: string | null;
+	/** Werte wie im Spiel (aion2.py _item_detail); null = trägt der Charakter nicht mehr, fehlt = nicht geladen */
+	detail?: ItemDetail | null;
+};
+
+export type ItemStat = { name: string; value: string; extra?: string | null };
+
+export type ItemDetail = {
+	level: number | null;
+	category: string | null;
+	/** Grundwerte; extra = Bonus aus Verzauberung */
+	main: ItemStat[];
+	/** zufällige Zusatzwerte (Seelenprägung) */
+	sub: ItemStat[];
+	stones: (ItemStat & { grade: string | null; icon: string | null })[];
+	godstones: { name: string; desc: string | null; grade: string | null; icon: string | null }[];
+	/** verstärkte Skills (Schmuck, Arkana) */
+	skills: { name: string; level: number; icon: string | null }[];
+	/** nur Arkana */
+	set?: { name: string; equipped: number; total: number; bonuses: { degree: number; lines: string[] }[] };
 };
 
 export type CharacterData = {
@@ -160,4 +181,21 @@ export type DaevanionNode = {
 	effects: string[];
 };
 
-export type CharacterDetail = CharacterListItem & { data: CharacterData | null; error: string | null };
+/** Gespeicherte Momentaufnahme: ab Format 2 je Sprache, ältere sind ein Sprach-Objekt (Deutsch). */
+export type CharacterSnapshot =
+	| CharacterData
+	| {
+			v: number;
+			de?: CharacterData;
+			en?: CharacterData;
+			/** nachgeladene Werte je Gegenstand (Runs, Knopf „Item-Werte laden“) */
+			details?: { state: 'laden' | 'ok' | 'fehler'; at?: string; error?: string };
+	  };
+
+/** Die Momentaufnahme in der Sprache der Seite. */
+export function localized(data: CharacterSnapshot, lang: string): CharacterData {
+	if (!('v' in data)) return data;
+	return (lang === 'de' ? data.de : data.en) ?? data.en ?? (data.de as CharacterData);
+}
+
+export type CharacterDetail = CharacterListItem & { data: CharacterSnapshot | null; error: string | null };

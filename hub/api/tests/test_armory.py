@@ -73,10 +73,12 @@ def test_eintragen_abrufen_verlauf(make_client, fake, database_url):
     # Der Abruf läuft im Hintergrund, im TestClient direkt nach der Antwort
     d = c.get(f"/api/armory/{cid}").json()
     assert (d["status"], d["combat_power"], d["item_level"], d["class_name"]) == ("ok", 123456, 2554, "Waldläufer")
-    assert d["data"]["equipment"][0]["name"] == "Testbogen" and d["mine"] and d["can_delete"]
+    assert d["data"]["de"]["equipment"][0]["name"] == "Testbogen" and d["mine"] and d["can_delete"]
     assert [(x["combat_power"], x["item_level"]) for x in d["days"]] == [(123456, 2554)]
-    # Mit bekannter Charakter-ID keine Suche, nur Profil, Ausrüstung, Daevanion
+    # Mit bekannter Charakter-ID keine Suche; in der Armory immer mit Werten je Gegenstand, beide Sprachen
     assert "/aion2global/search/v2/character" not in fake.nc.calls
+    assert d["data"]["en"]["equipment"][0]["detail"]["set"]["name"] == "Testset"
+    assert d["data"]["de"]["equipment"][0]["detail"]["sub"][0]["value"] == "9.1%"
 
     listed = c.get("/api/armory").json()
     assert [(x["name"], x["owner"], x["mine"], x["class_name"], x["server"]) for x in listed] == [
@@ -107,7 +109,7 @@ def test_fehler_behaelt_die_letzten_daten(make_client, fake, database_url):
     assert c.post(f"/api/armory/{cid}/refresh", headers=ORIGIN).status_code == 202
     d = c.get(f"/api/armory/{cid}").json()
     assert d["status"] == "fehler" and d["error"]
-    assert d["data"]["profile"]["combat_power"] == 123456 and len(d["days"]) == 1
+    assert d["data"]["en"]["profile"]["combat_power"] == 123456 and len(d["days"]) == 1
 
 
 def test_einmal_je_charakter_und_rechte(make_client, fake, database_url):

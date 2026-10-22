@@ -1,6 +1,7 @@
 """Armory: eingetragene Charaktere, einmal täglich und auf Knopfdruck neu von der AION-2-Website.
 
-Abruf und Speicherformat sind dieselben wie bei den Mitspielern eines Runs (characters.fill). Nach
+Abruf und Speicherformat sind dieselben wie bei den Mitspielern eines Runs (characters.fill), hier
+immer mit den Werten je Gegenstand (bei Runs nur auf Knopfdruck, characters.load_details). Nach
 jedem gelungenen Abruf steht Kampfkraft und Item-Level des Tages in `character_days` (Verlauf).
 Der tägliche Lauf sieht stündlich nach, wessen letzter Abruf älter als einen Tag ist – so holt er
 nach einem Neustart nach, ohne alle auf einmal abzurufen.
@@ -52,7 +53,7 @@ class Armory:
                 row = await db.get(Character, character_id)
                 if row is None:  # inzwischen entfernt
                     return
-                await fill(self.nc, row, f"Armory {character_id}")
+                await fill(self.nc, row, f"Armory {character_id}", items=True)
                 await record_day(db, row)
                 await db.commit()
         finally:
