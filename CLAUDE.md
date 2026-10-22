@@ -49,3 +49,13 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
 - Die Symlinks `daemon`, `capture`, `overlay` und `update.sh` an der Wurzel sind Übergänge für
   NexBoard-Checkouts aus der Zeit vor dem Monorepo (systemd-Unit, uv-Installation und Tray-Knopf
   zeigen dorthin). Nicht entfernen, solange es solche Installationen gibt.
+
+## Code-Stil (gilt für jede Aufgabe rund um den Waschsalon)
+Wunsch von Navonex und Fabio, ohne dass man es jedes Mal dazusagen muss:
+- **So wenig Code wie möglich.** Erst schauen, ob es das im Repo schon gibt, und das benutzen.
+  Nichts auf Vorrat bauen, keine Abstraktion für einen einzigen Fall.
+- **Sauber gegliedert.** Eine Datei, eine Funktion = eine Aufgabe. Kurze Funktionen, klare Namen,
+  dem Aufbau folgen, der im jeweiligen Teil schon da ist.
+- **Für Laien lesbar.** Lieber einfach als clever: keine verschachtelten Einzeiler, keine Tricks.
+  Ein kurzer Kommentar auf Deutsch erklärt, *warum* etwas so ist, wo es nicht offensichtlich ist.
+- Das gilt auch für Tests, Skripte und `infra/`.
