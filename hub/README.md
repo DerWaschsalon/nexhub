@@ -164,7 +164,8 @@ Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nac
 - Nur Global-Server (NA, EU, SA, Asien); den Shard verrät die Server-ID (2302 = EU). Taiwan und
   Korea haben eigene Seiten.
 - Web: Modul `logs`, Seite `hub/runs/<id>/spieler/<char>`, Namen in der Run-Übersicht verlinken
-  dorthin. Bilder direkt von NCSOFT ohne Herkunftsadresse.
+  dorthin. Bilder direkt von NCSOFT ohne Herkunftsadresse; das Daevanion-Brett nutzt die Kacheln der
+  offiziellen Charakterseite (`assets.playnccdn.com/static-aion2/characters/img/daevanion/`).
 - Tests gegen eine nachgebaute Seite (`tests/fake_nc.py`, nur erfundene Daten). Format gegen die
   echte Seite: `AION2_LIVE=1 AION2_NAME=<Charakter> AION2_SERVER=<Server-ID> uv run pytest -q tests/test_aion2.py -k echte`.
 

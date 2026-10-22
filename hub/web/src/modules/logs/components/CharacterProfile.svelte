@@ -138,7 +138,7 @@
 <section class="glass pad">
 	<h3>{t('logs.char.daevanion')}</h3>
 	{#if data.daevanion.some((b) => b.nodes?.length)}
-		<DaevanionBoard boards={data.daevanion} />
+		<DaevanionBoard boards={data.daevanion} cls={character.cls} />
 	{:else}
 	<div class="boards">
 		{#each data.daevanion as b (b.id)}
