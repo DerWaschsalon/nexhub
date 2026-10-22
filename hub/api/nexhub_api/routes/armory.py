@@ -354,8 +354,12 @@ async def start_check(character_id: int, request: Request, user: CurrentUser, db
 @router.get("/{character_id}/check")
 async def get_check(character_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> CheckOut:
     check = await _check(db, character_id)
-    return CheckOut(status=check.status, progress=check.progress, size=(check.result or {}).get("size"),
-                    error=check.error, result=check.result, started_at=check.started_at,
+    status, error = check.status, check.error
+    if status == "läuft" and datetime.now(UTC) - aware(check.started_at) >= STALE:
+        # ein Neustart des Hubs hat den Lauf beendet; als Fehler gemeldet, damit „Neu prüfen“ erscheint
+        status, error = "fehler", "Build-Check abgebrochen (Hub neu gestartet), bitte neu starten"
+    return CheckOut(status=status, progress=check.progress, size=(check.result or {}).get("size"),
+                    error=error, result=check.result, started_at=check.started_at,
                     finished_at=check.finished_at, share_url=check_url(settings, check))
 
 

@@ -47,6 +47,8 @@ class BuildChecker:
     def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], armory: Armory, http: httpx.AsyncClient) -> None:
         self.sessionmaker, self.armory, self.nc, self.http = sessionmaker, armory, armory.nc, http
         self.running: set[int] = set()
+        # gilt für alle Checks zusammen: laufen mehrere, teilen sie sich die Abrufe bei NC
+        self.slots = asyncio.Semaphore(PARALLEL)
 
     async def run(self, character_id: int) -> None:
         """Wirft nie: Fehler landen als Status `fehler`, das vorige Ergebnis bleibt."""
@@ -54,13 +56,15 @@ class BuildChecker:
             return
         self.running.add(character_id)
         try:
-            await self._refresh_own(character_id)
             async with self.sessionmaker() as db:
                 check = await db.scalar(select(BuildCheck).where(BuildCheck.character_id == character_id))
-                row = await db.get(Character, character_id)
-                if check is None or row is None:  # inzwischen ausgetragen
+                if check is None:  # inzwischen ausgetragen
                     return
                 try:
+                    await self._refresh_own(character_id)
+                    row = await db.get(Character, character_id, populate_existing=True)
+                    if row is None:
+                        return
                     profiles = await self._group(db, row, check)
                     if len(profiles) < MIN_GROUP:
                         raise CheckError(f"Zu wenige Vergleichsspieler ({len(profiles)} von mindestens {MIN_GROUP})")
@@ -99,18 +103,24 @@ class BuildChecker:
         for start in range(0, len(candidates), PARALLEL):
             if len(profiles) >= GROUP:
                 break
-            batch = await asyncio.gather(*(self._profile(e, cls) for e in candidates[start:start + PARALLEL]))
+            batch = await asyncio.gather(*(self._profile(e, cls, row) for e in candidates[start:start + PARALLEL]))
             profiles += [p for p in batch if p is not None][:GROUP - len(profiles)]
             check.progress = len(profiles)
             await db.commit()
         return profiles
 
-    async def _profile(self, entry: dict, cls: str) -> dict | None:
+    async def _profile(self, entry: dict, cls: str, own: Character | None = None) -> dict | None:
         """Profil zu einem Namen der Rangliste. Gibt es den Namen auf mehreren Servern, gewinnt die
-        Kampfkraft, die der Rangliste am nächsten liegt. Nicht auffindbar: None, der nächste rückt nach."""
+        Kampfkraft, die der Rangliste am nächsten liegt. Nicht auffindbar oder der eigene Charakter
+        (er stünde sonst in seiner eigenen Vergleichsgruppe): None, der nächste rückt nach."""
+        async with self.slots:
+            return await self._resolve(entry, cls, own)
+
+    async def _resolve(self, entry: dict, cls: str, own: Character | None) -> dict | None:
         name = entry["playerName"]
         try:
-            hits = [h for h in await self.nc.search(name, REGION, cls) if h["name"].casefold() == name.casefold()]
+            hits = [h for h in await self.nc.search(name, REGION, cls) if h["name"].casefold() == name.casefold()
+                    and not (own and (h["server_id"], h["character_id"]) == (own.server_id, own.nc_character_id))]
             if len(hits) > 1:
                 cp = entry.get("combatPower") or 0
                 profiles = [(h, await self.nc.snapshot(h["server_id"], h["character_id"], "en")) for h in hits]

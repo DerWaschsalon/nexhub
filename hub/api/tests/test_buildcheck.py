@@ -1,14 +1,19 @@
 """Build-Check: Lauf, Sperren, Fehler, Teilen. NC und Abyss Logs nachgebaut (fake_nc.py, fake_abyss.py)."""
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import update
 
+from types import SimpleNamespace
+
+from nexhub_api.buildcheck import PARALLEL, BuildChecker
 from nexhub_api.models import BuildCheck
 
 from .conftest import BASE, MEMBER
 from .fake_nc import search_row
-from .test_armory import NEW, ON, db_run, login
+from .fake_abyss import entry
+from .test_armory import NEW, ON, age, db_run, login
 from .test_devices import ORIGIN
 
 
@@ -133,3 +138,63 @@ def test_teilen_oeffentlich(make_client, fake):
 def test_nur_mit_login(client):
     assert client.post("/api/armory/1/check").status_code == 401
     assert client.get("/api/public/check/gibtsnicht").status_code == 404
+
+
+def test_abgebrochener_lauf_zeigt_fehler(make_client, fake, database_url):
+    # nach einem Neustart steht „läuft“ für immer da; die Seite braucht einen Fehler, um den Knopf zu zeigen
+    top_rows(fake)
+    c = login(make_client, fake, MEMBER)
+    cid = add(c, fake)
+    start(c, cid)
+    set_check(database_url, cid, status="läuft", started_at=ago(20))
+    d = c.get(f"/api/armory/{cid}/check").json()
+    assert d["status"] == "fehler" and "abgebrochen" in d["error"]
+
+
+def test_fehler_beim_auffrischen_haengt_nicht(make_client, fake, database_url):
+    top_rows(fake)
+    c = login(make_client, fake, MEMBER)
+    cid = add(c, fake)
+    age(database_url, cid, hours=1)  # eigene Momentaufnahme veraltet → wird vorher aufgefrischt
+
+    async def boom(character_id: int) -> None:
+        raise RuntimeError("DB weg")
+    c.app.state.armory.refresh = boom
+    start(c, cid)
+    assert c.get(f"/api/armory/{cid}/check").json()["status"] == "fehler"
+
+
+def test_nicht_mit_sich_selbst(make_client, fake):
+    # der eigene Charakter (Testheld, abc=) steht selbst in der Rangliste
+    fake.nc.rows += [search_row(f"Bogenheld{i}", cid=f"top{i}%3D") for i in range(2, 7)]
+    fake.abyss.size = 6
+    fake.abyss.routes["/v1/leaderboards"] = {"entries": [entry("Testheld", dps=99_000)] + fake.abyss.leaderboard()["entries"][1:]}
+    c = login(make_client, fake, MEMBER)
+    cid = add(c, fake)
+    start(c, cid)
+    assert c.get(f"/api/armory/{cid}/check").json()["size"] == 5
+
+
+def test_nc_last_ueber_alle_checks_begrenzt():
+    """Zwei Checks zugleich holen zusammen höchstens PARALLEL Profile auf einmal."""
+    active, peak = 0, 0
+
+    class SlowNC:
+        async def search(self, name, region, cls=None):
+            return [{"name": name, "server_id": 2302, "character_id": name}]
+
+        async def snapshot(self, server_id, character_id, lang, items=False):
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.01)
+            active -= 1
+            return {}
+
+    checker = BuildChecker(None, SimpleNamespace(nc=SlowNC()), None)
+
+    async def two_checks():
+        names = [{"playerName": f"N{i}", "combatPower": 1} for i in range(8)]
+        await asyncio.gather(*(asyncio.gather(*(checker._profile(e, "ranger") for e in names)) for _ in range(2)))
+    asyncio.run(two_checks())
+    assert peak <= PARALLEL

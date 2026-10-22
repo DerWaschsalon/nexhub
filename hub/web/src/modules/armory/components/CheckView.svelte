@@ -110,7 +110,7 @@
 	{#each boxes.filter((b) => b.fields.length) as b (b.title)}
 		<section class="glass pad box">
 			<h3>{b.title}</h3>
-			<ul>{#each b.fields as f (f.slot + f.key)}{@render line(f)}{/each}</ul>
+			<ul>{#each b.fields as f (f.area + f.slot + f.key)}{@render line(f)}{/each}</ul>
 		</section>
 	{/each}
 </div>
