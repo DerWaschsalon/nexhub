@@ -1,7 +1,7 @@
 <!-- Modul Logs: alle hochgeladenen Runs, neueste zuerst, mit Suche und Filtern. -->
 <script lang="ts">
-	import { goto, replaceState } from '$app/navigation';
-	import { page } from '$app/state';
+	import { untrack } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { formatDuration, formatMs, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { RUN_LIMIT } from '#modules/logs/api.ts';
@@ -10,14 +10,19 @@
 
 	let { data }: PageProps = $props();
 
-	let filter = $state<RunFilter>(fromParams(page.url.searchParams));
+	// Aus location statt page.url: nach Zurück aus einem Run zeigt page.url die Adresse ohne Filter
+	let filter = $state<RunFilter>(fromParams(new URLSearchParams(location.search)));
 	const options = $derived(filterOptions(data.runs));
 	const runs = $derived(applyFilter(data.runs, filter));
 
-	// Filter in die Adresse schreiben, ohne neu zu laden: Zurück aus einem Run landet in derselben Auswahl
+	// Filter in die Adresse schreiben, ohne neu zu laden: Zurück aus einem Run landet in derselben Auswahl.
+	// Verglichen wird mit location, nicht page.url – die bleibt bei shallow auf dem alten Stand – und
+	// nur der Filter ist Abhängigkeit, sonst startet jede Adressänderung den Effekt endlos neu.
 	$effect(() => {
 		const search = toSearch(filter);
-		if (search !== page.url.search) replaceState(`${page.url.pathname}${search}`, page.state);
+		untrack(() => {
+			if (search !== location.search) goto(`${location.pathname}${search}`, { shallow: true, replace: true });
+		});
 	});
 
 	function reset() {
