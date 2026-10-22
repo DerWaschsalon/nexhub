@@ -37,3 +37,9 @@ export const REGIONS = ['eu', 'nae', 'naw', 'la', 'as'] as const;
 
 /** Ein Charakter, live von der Website geholt (GET /api/armory/live) – wird nicht gespeichert. */
 export type ArmoryLive = { name: string; server_id: number; data: CharacterData };
+
+/** Linke Seite eines Vergleichs: ein Armory-Charakter, beim geteilten Link ohne Besitzer */
+export type ComparisonLeft = Pick<ArmoryDetail, 'name' | 'cls' | 'class_name' | 'data'>;
+
+/** Geteilter Vergleich (GET /api/public/vergleich/{token}): rechts live, kann fehlen */
+export type ArmoryComparison = { left: ComparisonLeft; right: ArmoryLive | null; right_error: string | null };

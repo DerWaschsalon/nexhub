@@ -3,13 +3,13 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api.ts';
+	import ShareLink from '#lib/components/ShareLink.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import RunView from '#modules/logs/components/RunView.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
 	const run = $derived(data.run);
-	let copied = $state(false);
 	let error = $state('');
 
 	async function call(method: 'POST' | 'DELETE', path: string) {
@@ -31,12 +31,6 @@
 	async function unshare() {
 		if (confirm(t('logs.confirmUnshare'))) await call('DELETE', `/api/runs/${run.id}/share`);
 	}
-
-	async function copy() {
-		await navigator.clipboard.writeText(run.share_url ?? '');
-		copied = true;
-		setTimeout(() => (copied = false), 2000);
-	}
 </script>
 
 <svelte:head><title>{run.dungeon} · NexHub</title></svelte:head>
@@ -48,7 +42,7 @@
 		<a class="btn small" href="/api/runs/{run.id}/nexlog" download>{t('logs.download')}</a>
 		{#if run.can_delete}
 			{#if !run.share_url}
-				<button class="btn small" onclick={() => call('POST', `/api/runs/${run.id}/share`)}>{t('logs.share')}</button>
+				<button class="btn small" onclick={() => call('POST', `/api/runs/${run.id}/share`)}>{t('share.button')}</button>
 			{/if}
 			<button class="btn small danger" onclick={remove}>{t('logs.delete')}</button>
 		{/if}
@@ -56,50 +50,13 @@
 	{#snippet extra()}
 		{#if error}<p class="notice error" role="alert">{error}</p>{/if}
 		{#if run.share_url}
-			<section class="glass pad share">
-				<div>
-					<strong>{t('logs.shared')}</strong>
-					<span class="dim">{t('logs.sharedText')}</span>
-				</div>
-				<div class="link">
-					<input class="input" readonly value={run.share_url} onfocus={(e) => e.currentTarget.select()} />
-					<button class="btn small primary" onclick={copy}>{copied ? t('logs.copied') : t('logs.copy')}</button>
-					{#if run.can_delete}<button class="btn small" onclick={unshare}>{t('logs.unshare')}</button>{/if}
-				</div>
-			</section>
+			<ShareLink url={run.share_url} text={t('logs.sharedText')} onunshare={run.can_delete ? unshare : undefined} />
 		{/if}
 	{/snippet}
 	{@render children()}
 </RunView>
 
 <style>
-	.share {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		padding: 16px 20px;
-	}
-	.share > div:first-child {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px 12px;
-		align-items: baseline;
-	}
-	.share .dim {
-		font-size: 14px;
-	}
-	.link {
-		display: flex;
-		gap: 8px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-	.link .input {
-		flex: 1 1 260px;
-		width: auto;
-		font-size: 14px;
-		padding: 7px 10px;
-	}
 	.notice {
 		margin: 0 0 16px;
 	}

@@ -166,3 +166,18 @@ class CharacterDay(Base):
     day: Mapped[date] = mapped_column(Date)
     combat_power: Mapped[int | None] = mapped_column(BigInteger)
     item_level: Mapped[int | None] = mapped_column(Integer)
+
+
+class Comparison(Base):
+    """Geteilter Vergleich: wer den Link /v/<token> kennt, sieht ihn ohne Login. Gespeichert ist nur, wer
+    mit wem verglichen wird; die Werte holt der Hub beim Öffnen (der rechte live von der Website)."""
+
+    __tablename__ = "comparisons"
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    token: Mapped[str] = mapped_column(String(32), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    left_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    right_server_id: Mapped[int] = mapped_column(Integer)
+    right_name: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
