@@ -54,6 +54,14 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
 Wunsch von Navonex und Fabio, ohne dass man es jedes Mal dazusagen muss:
 - **So wenig Code wie möglich.** Erst schauen, ob es das im Repo schon gibt, und das benutzen.
   Nichts auf Vorrat bauen, keine Abstraktion für einen einzigen Fall.
+- **Keine Dopplungen.** Jede Sache steht genau einmal im Code: Konstanten, Typen, Texte, Abrufe,
+  Komponenten. Braucht ein zweiter Teil dasselbe, wird das Vorhandene geteilt oder erweitert, nicht
+  kopiert (Beispiele: `models.Snapshot`, `characters.fill`, `CharacterProfile.svelte`).
+- **Objektorientiert, wo es passt.** Was zusammengehört (Daten und das, was damit passiert), kommt
+  in eine Klasse; Gemeinsames in eine Basisklasse. Einfache Hilfen bleiben Funktionen, keine
+  Klassen-Hierarchien auf Vorrat.
+- **Nach Coding-Standards, ohne zu übertreiben.** Python nach PEP 8 mit Typangaben, Web ohne
+  Fehler und Warnungen von `npm run check`, Schreibweise wie im übrigen Code des Teils.
 - **Sauber gegliedert.** Eine Datei, eine Funktion = eine Aufgabe. Kurze Funktionen, klare Namen,
   dem Aufbau folgen, der im jeweiligen Teil schon da ist.
 - **Für Laien lesbar.** Lieber einfach als clever: keine verschachtelten Einzeiler, keine Tricks.
