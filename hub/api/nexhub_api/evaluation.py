@@ -13,8 +13,12 @@ from .aion2 import combat_power, item_level
 
 Key = tuple[str, str, str]  # (Bereich, Platz, Feld)
 NONE = "—"  # Auswahl, die fehlt (kein Flügel, kein Titel)
-# Felder, die nur zählen, wenn sie mindestens ein Drittel der Gruppe hat (sonst Rauschen)
+# Felder, die nur zählen, wenn sie mindestens zwei Drittel der Gruppe haben: mit echten Daten war
+# „8 von 15 haben Manastein HP“ Rauschen, keine Empfehlung
 PRESENCE = ("sub:", "stone:", "godstone:", "skill:")
+PRESENCE_SHARE = 2 / 3
+# Eine Auswahl, bei der nicht mal ein Drittel dasselbe hat, ist keine Empfehlung (z. B. das Haustier)
+CONSENSUS = 1 / 3
 TODO = 5
 
 
@@ -66,7 +70,7 @@ def _number(mine: float, values: list[float]) -> dict:
 def _choice(mine: str, values: list[str]) -> dict:
     counts = Counter(values)
     common = [{"value": v, "count": n} for v, n in counts.most_common(2)]
-    if mine in [c["value"] for c in common]:
+    if mine in [c["value"] for c in common] or common[0]["count"] < len(values) * CONSENSUS:
         light = "green"
     else:
         light = "yellow" if counts[mine] >= 2 else "red"
@@ -74,10 +78,10 @@ def _choice(mine: str, values: list[str]) -> dict:
 
 
 def _keys(own: dict[Key, float | str], group: list[dict[Key, float | str]]) -> list[Key]:
-    """Eigene Felder plus, was ein Drittel der Gruppe hat und dem Charakter fehlt (Zusatzwerte,
+    """Eigene Felder plus, was zwei Drittel der Gruppe haben und dem Charakter fehlt (Zusatzwerte,
     Manasteine, Gottsteine, verstärkte Skills, gelernte Skills)."""
     counts = Counter(k for g in group for k in g)
-    extra = [k for k, n in counts.items() if k not in own and n * 3 >= len(group)
+    extra = [k for k, n in counts.items() if k not in own and n >= len(group) * PRESENCE_SHARE
              and (k[2].startswith(PRESENCE) or k[0] == "skills")]
     return list(own) + sorted(extra)
 
@@ -91,7 +95,8 @@ def evaluate(own: dict, group: list[dict]) -> dict:
         values = [g.get(key, NONE if isinstance(mine, str) else 0) for g in theirs]
         rated = _choice(mine, values) if isinstance(mine, str) else _number(mine, values)
         result.append({"area": key[0], "slot": key[1], "key": key[2], "mine": mine, **rated})
-    open_items = [f for f in result if f["light"] != "green"]
+    # Kampfkraft und Gegenstandsstufe steigen von selbst, wenn man den Rest verbessert
+    open_items = [f for f in result if f["light"] != "green" and f["area"] != "profile"]
     # Gleichstand: Ausrüstung zuerst, weil man dort am ehesten selbst etwas tun kann
     open_items.sort(key=lambda f: (-f["better"], f["area"] != "equipment"))
     return {"size": len(group), "fields": result, "todo": open_items[:TODO]}

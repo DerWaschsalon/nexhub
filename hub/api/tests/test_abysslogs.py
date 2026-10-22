@@ -47,3 +47,9 @@ def test_fehler_wird_abysserror(abyss, answer):
     abyss.routes["/v1/leaderboards"] = answer
     with pytest.raises(AbyssError):
         run(abyss, lambda http: leaderboard(http, "Ranger", 2350709))
+
+
+def test_boss_ohne_rangliste_ist_leer(abyss):
+    # Abyss Logs führt nicht für jeden Boss eine Rangliste
+    abyss.routes["/v1/leaderboards"] = (400, {"error": "boss is not ranked"})
+    assert run(abyss, lambda http: leaderboard(http, "Ranger", 2356708)) == []

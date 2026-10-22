@@ -228,9 +228,11 @@ und die Typen aus `modules/logs`.
   `api.abysslogs.com/v1/leaderboards`, inoffiziell und nicht dokumentiert) an den Bossen der
   höchsten Transzendenz-Stufe, Kämpfe ab 30 s. Die Rangliste nennt keinen Server; `buildcheck.py`
   sucht ihn über die NC-Suche (Name und Klasse, bei mehreren Treffern die nächstliegende
-  Kampfkraft) und holt die Profile mit Gegenständen. Das dauert zwei bis drei Minuten, der Stand
-  steht in `GET …/check` (`progress`). `evaluation.py` vergleicht Feld für Feld: Zahlen gegen den
-  Median, Auswahlen gegen die zwei häufigsten; Ampel und „Zuerst“ nach „wie viele haben es besser“.
+  Kampfkraft) und holt die Profile mit Gegenständen, vier gleichzeitig (je Profil rund 40
+  Anfragen). Das dauert etwa sechs Minuten, der Stand steht in `GET …/check` (`progress`). `evaluation.py` vergleicht Feld für Feld: Zahlen gegen den
+  Median, Auswahlen gegen die zwei häufigsten (ohne Mehrheit von einem Drittel keine Empfehlung);
+  Zusatzwerte, Manasteine, Gottsteine und verstärkte Skills erst, wenn zwei Drittel sie haben.
+  Ampel und „Zuerst“ nach „wie viele haben es besser“, „Zuerst“ ohne Kampfkraft und Stufe.
   Gespeichert wird nur das Ergebnis (`build_checks`, je Charakter der letzte), keine Namen und
   keine Profile der Top-Spieler. Geht etwas schief, bleibt das vorige Ergebnis mit `error`.
   Teilen wie beim Vergleich (`POST/DELETE …/check/share`, öffentlich `GET /api/public/check/{token}`,

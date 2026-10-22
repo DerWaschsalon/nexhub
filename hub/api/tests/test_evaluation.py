@@ -39,7 +39,7 @@ def test_auswahl_haeufigste_zwei():
     assert field(evaluate(snap(grade="Legend"), group), "equipment", "MainHand", "grade")["light"] == "red"
 
 
-def test_zusatzwert_fehlt_nur_wenn_ein_drittel_ihn_hat():
+def test_zusatzwert_fehlt_den_die_meisten_haben():
     group = [snap(subs=("Attack Speed",))] * 12 + [snap(subs=("Move Speed",))] * 3
     result = evaluate(snap(subs=()), group)
     keys = {(f["slot"], f["key"]) for f in result["fields"]}
@@ -62,3 +62,23 @@ def test_todo_fuenf_nach_besser_ohne_gruene():
 def test_fehlende_felder_sind_null():
     f = fields({"profile": {}, "stats": [], "equipment": [], "skills": [], "daevanion": [], "titles": {}})
     assert f[("profile", "", "combat_power")] == 0 and f[("wing", "", "name")] == "—"
+
+
+def test_zusatzwert_erst_ab_zwei_dritteln():
+    # mit echten Daten waren „8 von 15 haben Manastein HP“ nur Rauschen
+    group = [snap(subs=("Crit",))] * 9 + [snap(subs=())] * 6
+    keys = {f["key"] for f in evaluate(snap(subs=()), group)["fields"]}
+    assert "sub:Crit" not in keys
+    group = [snap(subs=("Crit",))] * 10 + [snap(subs=())] * 5
+    assert "sub:Crit" in {f["key"] for f in evaluate(snap(subs=()), group)["fields"]}
+
+
+def test_auswahl_ohne_mehrheit_ist_gruen():
+    group = [snap(grade=g) for g in ("Epic", "Epic", "Epic", "Unique", "Unique", "Rare", "Legend", "Mythic", "A",
+                                     "B", "C", "D", "E", "F", "G")]
+    assert field(evaluate(snap(grade="Common"), group), "equipment", "MainHand", "grade")["light"] == "green"
+
+
+def test_zuerst_ohne_kampfkraft_und_stufe():
+    result = evaluate(snap(cp=80_000, enchant=10), [snap(cp=100_000 + i) for i in range(15)])
+    assert all(f["area"] != "profile" for f in result["todo"])

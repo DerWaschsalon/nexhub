@@ -6,6 +6,7 @@ Gespeichert wird nur das Ergebnis, keine Namen und keine Profile der Top-Spieler
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -23,6 +24,9 @@ log = logging.getLogger(__name__)
 
 GROUP = 15
 MIN_GROUP = 5
+# Profile gleichzeitig: eines mit Gegenständen braucht rund 40 Anfragen (etwa eine Minute), einzeln
+# dauerte ein Check eine Viertelstunde. Vier zugleich halten die Last bei NC noch klein.
+PARALLEL = 4
 REGION = "eu"
 FRESH = timedelta(minutes=10)  # ältere eigene Momentaufnahme vorher neu abrufen
 STALE = timedelta(minutes=15)  # länger „läuft“ heißt: ein Neustart hat den Lauf abgebrochen
@@ -90,15 +94,15 @@ class BuildChecker:
         cls = await self._own_class(row)
         entries = [e for boss in await top_bosses(self.http)
                    for e in await leaderboard(self.http, abyss_class(cls), boss)]
+        candidates = pick_group(entries, row.combat_power or 0)
         profiles: list[dict] = []
-        for entry in pick_group(entries, row.combat_power or 0):
+        for start in range(0, len(candidates), PARALLEL):
             if len(profiles) >= GROUP:
                 break
-            profile = await self._profile(entry, cls)
-            if profile is not None:
-                profiles.append(profile)
-                check.progress = len(profiles)
-                await db.commit()
+            batch = await asyncio.gather(*(self._profile(e, cls) for e in candidates[start:start + PARALLEL]))
+            profiles += [p for p in batch if p is not None][:GROUP - len(profiles)]
+            check.progress = len(profiles)
+            await db.commit()
         return profiles
 
     async def _profile(self, entry: dict, cls: str) -> dict | None:

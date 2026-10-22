@@ -20,8 +20,9 @@ def entry(name: str, cp: int = 123_000, dps: float = 50_000, duration: float = 1
 
 
 class FakeAbyss:
-    """`routes` je Test überschreibbar (Pfad → dict/list = JSON 200, int = Statuscode). `size` Einträge in der
-    Rangliste, Namen „Bogenheld“, „Bogenheld2“ …, Kampfkraft passend zu fake_nc.info (123_456)."""
+    """`routes` je Test überschreibbar (Pfad → dict/list = JSON 200, int = Statuscode, (int, dict) = beides).
+    `size` Einträge in der Rangliste, Namen „Bogenheld“, „Bogenheld2“ …, Kampfkraft passend zu
+    fake_nc.info (123_456)."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -42,4 +43,6 @@ class FakeAbyss:
         answer = self.routes.get(path, default.get(path, 404))
         if isinstance(answer, int):
             return httpx.Response(answer)
+        if isinstance(answer, tuple):
+            return httpx.Response(answer[0], json=answer[1])
         return httpx.Response(200, json=answer)

@@ -23,6 +23,10 @@ class AbyssError(Exception):
     pass
 
 
+class NotRanked(AbyssError):
+    """Für diesen Boss führt Abyss Logs keine Rangliste (HTTP 400 „boss is not ranked“)."""
+
+
 def abyss_class(cls: str) -> str:
     return CLASS_NAMES.get(cls, cls.capitalize())
 
@@ -32,6 +36,8 @@ async def _get(http: httpx.AsyncClient, path: str, params: dict) -> object:
         r = await http.get(f"{API}{path}", params=params, timeout=15)
     except httpx.HTTPError as e:
         raise AbyssError(f"Abyss Logs nicht erreichbar ({type(e).__name__})") from e
+    if r.status_code == 400 and "not ranked" in r.text:
+        raise NotRanked(r.text)
     if r.status_code >= 400:
         raise AbyssError(f"Abyss Logs: HTTP {r.status_code}")
     try:
@@ -59,7 +65,10 @@ async def top_bosses(http: httpx.AsyncClient) -> list[int]:
 
 async def leaderboard(http: httpx.AsyncClient, cls: str, boss: int) -> list[dict]:
     """Bestenliste einer Klasse an einem Boss (Anzeigename der Klasse, siehe abyss_class)."""
-    body = await _get(http, "/leaderboards", {"region": REGION, "class": cls, "boss": boss, "limit": 100})
+    try:
+        body = await _get(http, "/leaderboards", {"region": REGION, "class": cls, "boss": boss, "limit": 100})
+    except NotRanked:  # nicht jeder Boss der höchsten Stufe hat eine Rangliste
+        return []
     entries = body.get("entries") if isinstance(body, dict) else None
     if not isinstance(entries, list):
         raise AbyssError("Abyss Logs: Rangliste unbekannt")

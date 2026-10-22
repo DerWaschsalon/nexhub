@@ -47,6 +47,7 @@
 	<a class="back" href="/hub/armory">‹ {t('armory.back')}</a>
 	<span class="actions">
 		<a class="btn small" href="/hub/armory/vergleich?links={c.id}">{t('armory.compare')}</a>
+		{#if c.data}<a class="btn small" href="/hub/armory/{c.id}/check">{t('armory.check.title')}</a>{/if}
 		<button class="btn small" onclick={refresh} disabled={c.status === 'offen'}>{t('armory.refresh')}</button>
 		{#if c.can_delete}<button class="btn small danger" onclick={remove}>{t('armory.remove')}</button>{/if}
 	</span>
