@@ -35,7 +35,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
             log.warning("DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET fehlen – Login ist aus")
         app.state.characters, app.state.armory, tasks = None, None, []
         if settings.hub_aion2_enabled:
-            nc = NC(app.state.http, settings.hub_aion2_lang, settings.hub_aion2_pause)
+            nc = NC(app.state.http, settings.hub_aion2_pause)
             app.state.characters = Fetcher(app.state.sessionmaker, nc)
             app.state.armory = Armory(app.state.sessionmaker, nc)
             # liegengebliebene Abrufe vom letzten Lauf und der tägliche Armory-Abruf; laufen neben dem Webserver

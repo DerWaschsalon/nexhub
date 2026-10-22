@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from nexhub_api.characters import players_of
 from nexhub_api.models import RunCharacter
+from nexhub_api.routes.characters import _details
 
-from .conftest import MEMBER
+from .conftest import ADMIN, MEMBER, log_in
 from .fake_nc import info, search_row
 from .test_devices import ORIGIN, pair
 from .test_runs import nexlog, upload
@@ -37,6 +38,16 @@ def rows(database_url: str, run_id: int) -> dict[str, RunCharacter]:
     return {r.name: r for r in asyncio.run(go())}
 
 
+def run_db(database_url: str, work) -> None:
+    async def go() -> None:
+        engine = create_async_engine(database_url)
+        async with async_sessionmaker(engine)() as db:
+            await work(db)
+            await db.commit()
+        await engine.dispose()
+    asyncio.run(go())
+
+
 def test_spieler_aus_den_kaempfen():
     log = unpack(with_servers(nexlog(), {"Testheld": 2302}))
     # Mo***n ist über names zu Moonlin aufgelöst, hat aber keine serverId
@@ -58,7 +69,8 @@ def test_upload_legt_an_und_fuellt(make_client, fake, as_user, database_url):
     held, moon = found["Testheld"], found["Moonlin"]
     assert held.status == "ok" and held.combat_power == 123456 and held.item_level == 2554
     assert held.nc_character_id == "abc=" and held.server_id == 2302 and held.fetched_at
-    assert held.data["equipment"][0]["name"] == "Testbogen"
+    assert held.data["v"] == 2 and held.data["de"]["equipment"][0]["name"] == "Testbogen"
+    assert "detail" not in held.data["de"]["equipment"][0]  # Werte je Gegenstand nur auf Knopfdruck
     assert moon.status == "nicht_gefunden" and moon.error == "Server unbekannt" and moon.data is None
 
 
@@ -144,7 +156,7 @@ def test_routen(make_client, fake, as_user):
         held = next(x for x in listed if x["name"] == "Testheld")
         assert held["combat_power"] == 123456 and held["item_level"] == 2554 and "data" not in held
         detail = member.get(f"/api/runs/{run_id}/characters/{held['id']}").json()
-        assert detail["data"]["profile"]["name"] == "Testheld" and detail["error"] is None
+        assert detail["data"]["de"]["profile"]["name"] == "Testheld" and detail["error"] is None
         assert member.get(f"/api/runs/{run_id}/characters/999999").status_code == 404
         assert member.get("/api/runs/999999/characters").status_code == 404
 
@@ -288,9 +300,9 @@ def test_run_waehrend_des_abrufs_geloescht(make_client, fake, as_user, database_
         await engine.dispose()
 
     class Deleting(NC):
-        async def snapshot(self, server_id, character_id):
+        async def snapshots(self, server_id, character_id, items=False):
             await wipe()
-            return await super().snapshot(server_id, character_id)
+            return await super().snapshots(server_id, character_id, items)
 
     fetch(database_url, Deleting(httpx.AsyncClient(transport=httpx.MockTransport(fake.nc)), pause=0), run_id)
     assert rows(database_url, run_id) == {}
@@ -307,3 +319,64 @@ def test_kaputte_server_id_bricht_den_upload_nicht(make_client, fake, as_user, d
     found = rows(database_url, r.json()["id"])
     assert found["Testheld"].server_id == 0 and found["Moonlin"].server_id == 0
     assert players_of(unpack(with_servers(nexlog(), {"Testheld": "2302"})))[0][2] == 2302
+
+
+def test_item_werte_fuer_einen_run_nachladen(make_client, fake, as_user, database_url):
+    _details.clear()
+    with make_client(**ON) as c, make_client(**ON) as member:
+        # Nachladen braucht eine App mit eingeschaltetem Abruf; as_user() baut eine ohne
+        fake.user = MEMBER
+        log_in(member)
+        run_id = upload(c, pair(c, member), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
+        chars = {x["name"]: x["id"] for x in member.get(f"/api/runs/{run_id}/characters").json()}
+        url = f"/api/runs/{run_id}/characters/{chars['Testheld']}/details"
+        fake.nc.calls.clear()
+        assert c.post(url, headers=ORIGIN).status_code == 401  # c ist nicht angemeldet
+        r = member.post(url, headers=ORIGIN)
+        assert r.status_code == 202, r.text
+        data = member.get(f"/api/runs/{run_id}/characters/{chars['Testheld']}").json()["data"]
+        assert data["details"]["state"] == "ok" and data["details"]["at"]
+        assert data["de"]["equipment"][0]["detail"]["sub"][0]["value"] == "9.1%"
+        assert data["en"]["equipment"][0]["detail"]["main"]
+        # nur die Gegenstände, kein neues Profil: die Momentaufnahme bleibt die vom Run
+        assert set(fake.nc.calls) == {"/api/character/equipment/item"}
+        assert member.post(url, headers=ORIGIN).status_code == 429
+        # ohne Momentaufnahme (Moonlin hat keinen Server) geht es nicht
+        moon = f"/api/runs/{run_id}/characters/{chars['Moonlin']}/details"
+        assert member.post(moon, headers=ORIGIN).status_code == 409
+
+
+def test_nicht_mehr_getragen_bleibt_ohne_werte(make_client, fake, as_user, database_url):
+    _details.clear()
+    with make_client(**ON) as c, make_client(**ON) as member:
+        # Nachladen braucht eine App mit eingeschaltetem Abruf; as_user() baut eine ohne
+        fake.user = MEMBER
+        log_in(member)
+        run_id = upload(c, pair(c, member), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
+        held = next(x["id"] for x in member.get(f"/api/runs/{run_id}/characters").json() if x["name"] == "Testheld")
+        fake.nc.routes["/api/character/equipment/item"] = 404
+        assert member.post(f"/api/runs/{run_id}/characters/{held}/details", headers=ORIGIN).status_code == 202
+        data = member.get(f"/api/runs/{run_id}/characters/{held}").json()["data"]
+    assert data["details"]["state"] == "ok" and data["de"]["equipment"][0]["detail"] is None
+
+
+def test_alte_momentaufnahme_laedt_keine_werte(make_client, fake, as_user, database_url):
+    _details.clear()
+    with make_client(**ON) as c, make_client(**ON) as member:
+        # Nachladen braucht eine App mit eingeschaltetem Abruf; as_user() baut eine ohne
+        fake.user = MEMBER
+        log_in(member)
+        run_id = upload(c, pair(c, member), with_servers(nexlog(), {"Testheld": 2302})).json()["id"]
+    held = rows(database_url, run_id)["Testheld"]
+
+    async def make_old(db):
+        row = await db.get(RunCharacter, held.id)
+        row.data = row.data["de"]  # so sahen Momentaufnahmen vor den zwei Sprachen aus
+    run_db(database_url, make_old)
+    _details.clear()
+    with make_client(**ON) as c, make_client(**ON) as member:
+        # Nachladen braucht eine App mit eingeschaltetem Abruf; as_user() baut eine ohne
+        fake.user = MEMBER
+        log_in(member)
+        r = member.post(f"/api/runs/{run_id}/characters/{held.id}/details", headers=ORIGIN)
+    assert r.status_code == 409

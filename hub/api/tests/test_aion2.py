@@ -5,7 +5,7 @@ import os
 import httpx
 import pytest
 
-from nexhub_api.aion2 import NC, NCError, NotFound, item_level, shard_of
+from nexhub_api.aion2 import NC, NCError, NotFound, combat_power, item_level, localized, shard_of
 
 from .fake_nc import ICON, FakeNC, search_row
 
@@ -60,8 +60,8 @@ def test_momentaufnahme():
     assert item_level(data) == 2554
     assert data["titles"] == {"owned": 206, "total": 297, "equipped": [
         {"name": "Goldener Glanz", "grade": "Unique", "category": "Attack", "effects": ["Krit.-Angriffskraft +45"]}]}
-    assert data["equipment"] == [{"slot": 1, "slot_name": "MainHand", "name": "Testbogen", "grade": "Unique",
-                                  "enchant": 15, "exceed": 1, "icon": ICON}]
+    assert data["equipment"] == [{"id": 110430050, "slot": 1, "slot_name": "MainHand", "name": "Testbogen",
+                                  "grade": "Unique", "enchant": 15, "exceed": 1, "icon": ICON}]
     assert data["pet"]["name"] == "Testeule" and data["wing"]["name"] == "Testflügel"
     assert data["skills"][1] == {"name": "Greifenpfeil", "category": "Dp", "level": 0, "learned": False,
                                  "equipped": True, "icon": ICON}
@@ -138,7 +138,40 @@ def test_echte_seite():
         async with httpx.AsyncClient() as http:
             nc = NC(http)
             server = int(os.environ["AION2_SERVER"])
-            return await nc.snapshot(server, await nc.find(os.environ["AION2_NAME"], server))
+            return await nc.snapshot(server, await nc.find(os.environ["AION2_NAME"], server), "de", items=True)
 
     data = run(go())
     assert data["profile"]["name"] and data["equipment"] and data["skills"] and data["daevanion"]
+    assert any(i["detail"] and i["detail"]["main"] for i in data["equipment"])
+
+
+def test_beide_sprachen_und_werte_je_gegenstand():
+    fake = FakeNC()
+    data = run(client(fake).snapshots(2302, "abc=", items=True))
+    assert data["v"] == 2 and set(data) == {"v", "de", "en"}
+    assert {"de-DE", "en-US"} <= set(fake.langs)
+    assert item_level(data) == 2554 and combat_power(data) == 123456
+    detail = data["de"]["equipment"][0]["detail"]
+    assert detail["main"] == [{"name": "Angriffskraft", "value": "486", "extra": "146"}]
+    assert detail["sub"] == [{"name": "Mehrfachtreffer-Chance", "value": "9.1%"}]
+    assert detail["stones"][0] == {"name": "Kritischer Treffer", "value": "+6", "grade": "Legend", "icon": ICON}
+    assert detail["godstones"][0]["desc"] == "10 % Chance auf Wind-Schaden"
+    assert detail["skills"] == [{"name": "Zielpfeil", "level": 2, "icon": ICON}]
+    assert detail["set"] == {"name": "Testset", "equipped": 3, "total": 5,
+                             "bonuses": [{"degree": 2, "lines": ["Angriffskraft (PvE) +60"]}]}
+    # ohne items keine Anfrage je Gegenstand
+    fake.calls.clear()
+    run(client(fake).snapshots(2302, "abc="))
+    assert "/api/character/equipment/item" not in fake.calls
+
+
+def test_gegenstand_nicht_mehr_angelegt():
+    fake = FakeNC()
+    fake.routes["/api/character/equipment/item"] = 404  # so antwortet NC bei falschem Slot oder Gegenstand
+    assert run(client(fake).item(2302, "abc=", "de", {"id": 1, "slot": 1, "enchant": 0})) is None
+    assert run(client(fake).item(2302, "abc=", "de", {"id": None, "slot": 1})) is None
+
+
+def test_alte_momentaufnahme_ohne_sprachen():
+    old = {"profile": {"combat_power": 5}, "stats": [{"type": "ItemLevel", "value": 7}]}
+    assert localized(old, "de") is old and combat_power(old) == 5 and item_level(old) == 7

@@ -2,9 +2,9 @@
 // in der gewählten Sprache. Die Tabellen sind zusammen gut 1 MB groß und werden erst beim ersten
 // Aufruf je Sprache geladen; bis dahin gilt der Name aus der Kampfdatei.
 import { i18n, type Lang } from '#lib/i18n.svelte.ts';
+import { GAMEDATA as BASE } from './assets.ts';
 
 type Table = Record<string, string>;
-const BASE = 'https://assets.playnccdn.com/static-aion2-gamedata/resources';
 
 const skillTables: Record<Lang, () => Promise<{ default: Table }>> = {
 	en: () => import('./data/skills/en.json'),

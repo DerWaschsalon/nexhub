@@ -1,6 +1,6 @@
 // Antworten der Hub-API für die Armory (hub/api/nexhub_api/routes/armory.py). Ein Armory-Charakter
 // ist eine Momentaufnahme wie ein Mitspieler im Run – Typen und Ansicht kommen aus modules/logs.
-import type { CharacterData, CharacterListItem } from '#modules/logs/api.ts';
+import type { CharacterListItem, CharacterSnapshot } from '#modules/logs/api.ts';
 
 export type ArmoryItem = CharacterListItem & {
 	owner: string;
@@ -14,7 +14,7 @@ export type ArmoryItem = CharacterListItem & {
 export type ArmoryDay = { day: string; combat_power: number | null; item_level: number | null };
 
 export type ArmoryDetail = ArmoryItem & {
-	data: CharacterData | null;
+	data: CharacterSnapshot | null;
 	error: string | null;
 	days: ArmoryDay[];
 	can_delete: boolean;

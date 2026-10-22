@@ -10,11 +10,18 @@
 	const c = $derived(data.character);
 	let error = $state('');
 
+	// Neu laden, solange der Abruf oder das Nachladen der Item-Werte läuft
+	const busy = $derived(c.status === 'offen' || (!!c.data && 'v' in c.data && c.data.details?.state === 'laden'));
 	$effect(() => {
-		if (c.status !== 'offen') return;
+		if (!busy) return;
 		const timer = setInterval(() => invalidateAll(), 5000);
 		return () => clearInterval(timer);
 	});
+
+	async function loadDetails() {
+		await api<unknown>(`/api/runs/${data.run.id}/characters/${c.id}/details`, { method: 'POST' });
+		await invalidateAll();
+	}
 
 	async function retry() {
 		error = '';
@@ -35,7 +42,7 @@
 </div>
 
 {#if c.status === 'ok' && c.data}
-	<CharacterProfile character={c} data={c.data} />
+	<CharacterProfile character={c} data={c.data} {loadDetails} />
 {:else}
 	<section class="glass pad">
 		<h2>{c.name}</h2>

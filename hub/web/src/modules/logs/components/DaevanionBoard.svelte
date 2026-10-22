@@ -4,11 +4,12 @@
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, DaevanionNode } from '../api.ts';
+	import { CHARACTER_ART } from '../assets.ts';
 
 	let { boards, cls }: { boards: CharacterData['daevanion']; cls: string | null } = $props();
 
 	// Grafiken wie auf aion2.plaync.com/characters (static-aion2/characters/css/index.css)
-	const ART = 'https://assets.playnccdn.com/static-aion2/characters/img/daevanion';
+	const ART = `${CHARACTER_ART}/daevanion`;
 	// Klassen-Schlüssel des Hubs → Name der Startgrafik
 	const START: Record<string, string> = { spiritmaster: 'elementalist', brawler: 'fighter' };
 

@@ -16,6 +16,9 @@ import httpx
 SITE = "https://aion2.plaync.com/api/character"
 SEARCH = "https://api-search.plaync.com/aion2global/search/v2/character"
 PROFILE_IMAGES = "https://profileimg.plaync.com"
+# Jede Momentaufnahme gibt es in beiden Sprachen des Hubs; die Web-Oberfläche zeigt die passende
+LANGS = {"de": "de-DE", "en": "en-US"}
+FORMAT = 2  # data = {"v": 2, "de": {...}, "en": {...}}; ältere Momentaufnahmen sind ein Sprach-Objekt
 SHARDS = {1: "nae", 2: "naw", 3: "eu", 4: "la", 5: "as"}
 # Wie die aion2-api: die Seite antwortet Browsern
 USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -62,13 +65,54 @@ def _nodes(rows: object) -> list[dict]:
             for n in rows if isinstance(n, dict) and n.get("type") not in (None, "None")]
 
 
+def localized(data: dict, lang: str = "en") -> dict:
+    """Die Momentaufnahme in einer Sprache – auch ältere ohne Sprachen (siehe FORMAT)."""
+    if not data.get("v"):
+        return data
+    return data.get(lang) or data.get("en") or {}
+
+
 def item_level(data: dict) -> int | None:
-    return next((s["value"] for s in data.get("stats", []) if s["type"] == "ItemLevel"), None)
+    return next((s["value"] for s in localized(data).get("stats", []) if s["type"] == "ItemLevel"), None)
+
+
+def combat_power(data: dict) -> int | None:
+    return (localized(data).get("profile") or {}).get("combat_power")
+
+
+def _stats(rows: object, *fields: str) -> list[dict]:
+    """Werte eines Gegenstands: [{name, value, …}] ohne leere Zeilen."""
+    if not isinstance(rows, list):
+        return []
+    return [{"name": r.get("name"), "value": r.get("value"), **{f: r.get(f) for f in fields}}
+            for r in rows if isinstance(r, dict) and r.get("name")]
+
+
+def _item_detail(d: dict) -> dict:
+    """Was ein Gegenstand im Spiel anzeigt: Grundwerte (+ Bonus aus Verzauberung), zufällige
+    Zusatzwerte, Manasteine, Gottsteine, verstärkte Skills und bei Arkana das Set."""
+    detail = {
+        "level": d.get("level"), "category": d.get("categoryName"),
+        "main": _stats(d.get("mainStats"), "extra"),
+        "sub": _stats(d.get("subStats")),
+        "stones": _stats(d.get("magicStoneStat"), "grade", "icon"),
+        "godstones": [{"name": g.get("name"), "desc": g.get("desc"), "grade": g.get("grade"), "icon": g.get("icon")}
+                      for g in d.get("godStoneStat") or [] if isinstance(g, dict)],
+        "skills": [{"name": k.get("name"), "level": k.get("level"), "icon": k.get("icon")}
+                   for k in d.get("subSkills") or [] if isinstance(k, dict)],
+    }
+    if isinstance(d.get("set"), dict):
+        st = d["set"]
+        detail["set"] = {"name": st.get("name"), "equipped": st.get("equippedCount") or 0,
+                         "total": len(st.get("items") or []),
+                         "bonuses": [{"degree": b.get("degree"), "lines": [x for x in b.get("descriptions") or [] if x]}
+                                     for b in st.get("bonuses") or [] if isinstance(b, dict)]}
+    return detail
 
 
 class NC:
-    def __init__(self, http: httpx.AsyncClient, lang: str = "de-DE", pause: float = 0.3) -> None:
-        self.http, self.lang, self.pause = http, lang, pause
+    def __init__(self, http: httpx.AsyncClient, pause: float = 0.3) -> None:
+        self.http, self.pause = http, pause
 
     async def _get(self, url: str, params: dict) -> dict:
         """Eine Anfrage, nacheinander mit Pause; 5xx, 429 und Netzfehler bis zu dreimal."""
@@ -83,6 +127,8 @@ class NC:
             if r.status_code >= 500 or r.status_code == 429:
                 error = NCError(f"HTTP {r.status_code}")
                 continue
+            if r.status_code == 404:  # z. B. Gegenstand nicht (mehr) in diesem Slot
+                raise NotFound("HTTP 404")
             if r.status_code >= 400:
                 raise NCError(f"HTTP {r.status_code}")
             try:
@@ -100,7 +146,7 @@ class NC:
         if shard is None:
             raise NotFound("Server nicht unterstützt" if server_id else "Server unbekannt")
         body = await self._get(SEARCH, {"keyword": name, "page": 1, "size": 40, "serverId": server_id,
-                                        "region": shard, "localeInfo": self.lang})
+                                        "region": shard, "localeInfo": LANGS["en"]})
         rows = body.get("list")
         if not isinstance(rows, list):
             raise NCError("Format unbekannt: Suche ohne list")
@@ -115,7 +161,7 @@ class NC:
         if region not in SHARDS.values():
             raise NotFound("Region nicht unterstützt")
         body = await self._get(SEARCH, {"keyword": name, "page": 1, "size": 20, "region": region,
-                                        "localeInfo": self.lang})
+                                        "localeInfo": LANGS["en"]})
         rows = body.get("list")
         if not isinstance(rows, list):
             raise NCError("Format unbekannt: Suche ohne list")
@@ -131,9 +177,33 @@ class NC:
                          "image": PROFILE_IMAGES + image if image.startswith("/") else None})
         return hits
 
-    async def snapshot(self, server_id: int, character_id: str) -> dict:
-        """Profil, Werte, Titel, Ausrüstung, Skills und Daevanion in dem Format, das der Hub speichert."""
-        q = {"lang": self.lang, "region": shard_of(server_id), "serverId": server_id, "characterId": character_id}
+    async def item(self, server_id: int, character_id: str, lang: str, item: dict) -> dict | None:
+        """Werte eines angelegten Gegenstands (_item_detail). None, wenn der Charakter ihn in diesem
+        Slot nicht mehr trägt – so passen nachgeladene Werte immer zum gespeicherten Gegenstand."""
+        if not item.get("id"):
+            return None
+        try:
+            d = await self._get(f"{SITE}/equipment/item", {
+                "lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id,
+                "characterId": character_id, "id": item["id"], "enchantLevel": item.get("enchant") or 0,
+                "slotPos": item.get("slot")})
+        except NotFound:
+            return None
+        if not d.get("id") or not d.get("name"):
+            return None
+        return _item_detail(d)
+
+    async def snapshots(self, server_id: int, character_id: str, items: bool = False) -> dict:
+        """Momentaufnahme in allen Sprachen (FORMAT). `items`: dazu je Gegenstand die Werte – eine
+        Anfrage mehr je Gegenstand und Sprache, deshalb nur für die Armory."""
+        data: dict = {"v": FORMAT}
+        for lang in LANGS:
+            data[lang] = await self.snapshot(server_id, character_id, lang, items)
+        return data
+
+    async def snapshot(self, server_id: int, character_id: str, lang: str = "en", items: bool = False) -> dict:
+        """Profil, Werte, Titel, Ausrüstung, Skills und Daevanion in einer Sprache, im gespeicherten Format."""
+        q = {"lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id, "characterId": character_id}
         info = await self._get(f"{SITE}/info", q)
         profile = info.get("profile")
         if not isinstance(profile, dict):
@@ -155,6 +225,15 @@ class NC:
                            "skills": _lines(detail.get("openSkillEffectList")),
                            "nodes": _nodes(detail.get("nodeList"))})
 
+        equipment = []
+        for e in equip["equipment"].get("equipmentList") or []:
+            item = {"id": e.get("id"), "slot": e.get("slotPos"), "slot_name": e.get("slotPosName"),
+                    "name": e.get("name"), "grade": e.get("grade"), "enchant": e.get("enchantLevel") or 0,
+                    "exceed": e.get("exceedLevel") or 0, "icon": e.get("icon") or None}
+            if items:
+                item["detail"] = await self.item(server_id, character_id, lang, item)
+            equipment.append(item)
+
         titles = info.get("title") or {}
         petwing = equip.get("petwing") or {}
         return {
@@ -168,10 +247,7 @@ class NC:
                        "equipped": [{"name": t.get("name"), "grade": t.get("grade"),
                                      "category": t.get("equipCategory"), "effects": _lines(t.get("equipStatList"))}
                                     for t in titles.get("titleList") or []]},
-            "equipment": [{"slot": e.get("slotPos"), "slot_name": e.get("slotPosName"), "name": e.get("name"),
-                           "grade": e.get("grade"), "enchant": e.get("enchantLevel") or 0,
-                           "exceed": e.get("exceedLevel") or 0, "icon": e.get("icon") or None}
-                          for e in equip["equipment"].get("equipmentList") or []],
+            "equipment": equipment,
             "pet": _pick(petwing.get("pet"), name="name", level="level", icon="icon"),
             "wing": _pick(petwing.get("wing"), name="name", grade="grade", enchant="enchantLevel", icon="icon"),
             "skills": [{"name": s.get("name"), "category": s.get("category"), "level": s.get("skillLevel") or 0,

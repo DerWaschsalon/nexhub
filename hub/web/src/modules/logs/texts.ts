@@ -127,7 +127,22 @@ export const TEXTS = defineTexts(
 		'logs.char.node.open': 'unlocked',
 		'logs.char.node.closed': 'locked',
 		'logs.char.node.hint': 'Point at or tap a node to see its effect.',
-		'logs.char.board.effects': 'Unlocked on this board'
+		'logs.char.board.effects': 'Unlocked on this board',
+		'logs.char.baseStats': 'Base stats',
+		'logs.char.lordStats': 'Lord stats',
+		'logs.char.itemLvl': 'Item level {n}',
+		'logs.char.soulBinding': 'Soul Binding',
+		'logs.char.manastones': 'Manastone Engraving',
+		'logs.char.theostones': 'Theostone Engraving',
+		'logs.char.skillEffects': 'Skill effects',
+		'logs.char.arcana': 'Arcana',
+		'logs.char.setCount': '{n}/{t} equipped',
+		'logs.char.setEffect': '{n}-piece',
+		'logs.char.notWorn': 'No longer worn, so no values.',
+		'logs.char.loadDetails': 'Load item values',
+		'logs.char.loadingDetails': 'Loading the item values from the AION 2 website …',
+		'logs.char.detailsAsOf': 'Item values as of {d}: loaded later, and only for items the character still wears.',
+		'logs.char.detailsFailed': 'Could not load the item values: {why}'
 	},
 	{
 		'logs.nav': 'Runs',
@@ -254,6 +269,21 @@ export const TEXTS = defineTexts(
 		'logs.char.node.open': 'freigeschaltet',
 		'logs.char.node.closed': 'gesperrt',
 		'logs.char.node.hint': 'Zeig auf einen Knoten oder tippe ihn an, um seinen Effekt zu sehen.',
-		'logs.char.board.effects': 'Freigeschaltet auf diesem Brett'
+		'logs.char.board.effects': 'Freigeschaltet auf diesem Brett',
+		'logs.char.baseStats': 'Grundwerte',
+		'logs.char.lordStats': 'Lord-Werte',
+		'logs.char.itemLvl': 'Gegenstandsstufe {n}',
+		'logs.char.soulBinding': 'Seelenbindung',
+		'logs.char.manastones': 'Manastein-Prägung',
+		'logs.char.theostones': 'Götterstein-Prägung',
+		'logs.char.skillEffects': 'Fähigkeitseffekte',
+		'logs.char.arcana': 'Arkana',
+		'logs.char.setCount': '{n}/{t} angelegt',
+		'logs.char.setEffect': '{n} Teile',
+		'logs.char.notWorn': 'Wird nicht mehr getragen, daher keine Werte.',
+		'logs.char.loadDetails': 'Item-Werte laden',
+		'logs.char.loadingDetails': 'Item-Werte werden von der AION-2-Website geladen …',
+		'logs.char.detailsAsOf': 'Item-Werte vom {d}: nachträglich geladen, nur für Gegenstände, die der Charakter noch trägt.',
+		'logs.char.detailsFailed': 'Item-Werte konnten nicht geladen werden: {why}'
 	}
 );

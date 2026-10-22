@@ -5,6 +5,8 @@
     GET  /api/runs/{id}/characters/{char}     eine Momentaufnahme
     POST /api/runs/{id}/characters/refresh    fehler/nicht_gefunden neu holen (wer hochgeladen hat
                                               oder ein Admin, höchstens alle 10 Minuten)
+    POST /api/runs/{id}/characters/{char}/details   Werte je Gegenstand nachladen (alle Angemeldeten,
+                                              je Spieler höchstens alle 10 Minuten; characters.load_details)
 
 Geteilte Links (routes/public.py) zeigen keine Profile.
 """
@@ -18,13 +20,15 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from ..deps import DB, CurrentUser
+from ..characters import has_item_ids
 from ..models import Character, RunCharacter
 from .runs import _get, _may_manage
 
 router = APIRouter(prefix="/api/runs", tags=["characters"])
 
-REFRESH_EVERY = 600  # Sekunden je Run; der Hub läuft mit einem Prozess, das reicht im Speicher
+REFRESH_EVERY = 600  # Sekunden je Run bzw. Spieler; der Hub läuft mit einem Prozess, das reicht im Speicher
 _refreshed: dict[int, float] = {}
+_details: dict[int, float] = {}
 
 
 class CharacterOut(BaseModel):
@@ -93,3 +97,25 @@ async def refresh(run_id: int, request: Request, user: CurrentUser, db: DB, back
     await db.commit()
     background.add_task(fetcher.run, run_id)
     return Started(started=len(rows))
+
+
+@router.post("/{run_id}/characters/{char_id}/details", status_code=202)
+async def load_details(run_id: int, char_id: int, request: Request, user: CurrentUser, db: DB,
+                       background: BackgroundTasks) -> Started:
+    fetcher = request.app.state.characters
+    if fetcher is None:
+        raise HTTPException(503, "Charakterprofile sind ausgeschaltet")
+    row = await db.scalar(select(RunCharacter).where(RunCharacter.run_id == run_id, RunCharacter.id == char_id))
+    if row is None:
+        raise HTTPException(404, "Spieler nicht in diesem Run")
+    if row.status != "ok" or not has_item_ids(row.data):
+        raise HTTPException(409, "Für diese Momentaufnahme nicht möglich (zu alt oder nicht geladen)")
+    if char_id in fetcher.loading:
+        raise HTTPException(409, "Wird gerade geladen")
+    if time.monotonic() - _details.get(char_id, -REFRESH_EVERY) < REFRESH_EVERY:
+        raise HTTPException(429, "Höchstens alle 10 Minuten")
+    _details[char_id] = time.monotonic()
+    row.data = {**row.data, "details": {"state": "laden"}}
+    await db.commit()
+    background.add_task(fetcher.details, row.id)
+    return Started(started=1)
