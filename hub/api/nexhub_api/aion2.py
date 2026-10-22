@@ -162,11 +162,16 @@ class NC:
         raise NotFound("nicht gefunden")
 
     async def classes(self) -> dict[int, str]:
-        """pcId → Klasse wie im Hub ("ranger"). Ändert sich nicht, deshalb nur einmal geholt."""
-        if self._classes is None:
+        """pcId → Klasse wie im Hub ("ranger"). Ändert sich nicht, deshalb nur einmal geholt. Ist die
+        Tabelle gerade nicht zu haben, sucht die Armory ohne Klassen weiter (und fragt beim nächsten Mal neu)."""
+        if self._classes is not None:
+            return self._classes
+        try:
             rows = (await self._get(PCDATA, {"lang": LANGS["en"]})).get("pcDataList") or []
-            names = {row["id"]: str(row.get("className", "")).lower() for row in rows if isinstance(row, dict)}
-            self._classes = {pc: CLASS_KEYS.get(name, name) for pc, name in names.items()}
+        except NCError:
+            return {}
+        names = {row["id"]: str(row.get("className", "")).lower() for row in rows if isinstance(row, dict)}
+        self._classes = {pc: CLASS_KEYS.get(name, name) for pc, name in names.items()}
         return self._classes
 
     async def search(self, name: str, region: str, cls: str | None = None) -> list[dict]:

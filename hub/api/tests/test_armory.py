@@ -195,3 +195,11 @@ def test_live_ohne_speichern(make_client, fake, database_url):
 
 def test_live_nur_mit_login(client):
     assert client.get("/api/armory/live", params={"server_id": 2302, "name": "Testheld"}).status_code == 401
+
+
+def test_suche_ohne_klassentabelle(make_client, fake):
+    """Fällt die Klassentabelle der Website aus, sucht die Armory trotzdem, nur ohne Klasse."""
+    fake.nc.routes["/en-us/api/gameinfo/pcdata"] = 503
+    c = login(make_client, fake, MEMBER)
+    hits = c.get("/api/armory/search", params={"name": "Testheld"}).json()
+    assert [(h["name"], h["cls"]) for h in hits] == [("Testheld", None)]

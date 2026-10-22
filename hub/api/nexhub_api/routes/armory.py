@@ -137,7 +137,8 @@ async def live(name: str, server_id: int, request: Request, user: CurrentUser, l
     damit sich keine Daten fremder Charaktere ansammeln."""
     nc = _nc(request)
     try:
-        data = await nc.snapshot(server_id, await nc.find(name.strip(), server_id), lang if lang in LANGS else "en")
+        character_id = await nc.find(name.strip(), server_id)
+        data = await nc.snapshot(server_id, character_id, lang if lang in LANGS else "en")
     except NotFound as e:
         raise HTTPException(404, f"Charakter {e}") from e
     except NCError as e:
