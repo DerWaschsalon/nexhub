@@ -16,6 +16,9 @@ const CLASSES: Record<string, { en: string; de: string; color: string }> = {
 	brawler: { en: 'Brawler', de: 'Faustkämpfer', color: '#E85D5D' }
 };
 
+/** alle Klassen, z. B. für eine Auswahlliste */
+export const CLASS_KEYS = Object.keys(CLASSES);
+
 const UNKNOWN = '#8a90a3';
 
 export function classInfo(cls: string | null | undefined): ClassInfo | null {

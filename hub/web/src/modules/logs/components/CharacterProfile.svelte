@@ -3,6 +3,7 @@
 <script lang="ts">
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
+	import { ARCANA, LEFT, RIGHT } from '../slots.ts';
 	import { localized, type CharacterListItem, type CharacterSnapshot } from '../api.ts';
 	import { CHARACTER_ART } from '../assets.ts';
 	import DaevanionBoard from './DaevanionBoard.svelte';
@@ -29,9 +30,6 @@
 	const details = $derived('v' in snapshot ? snapshot.details : undefined);
 
 	// Plätze wie im Ausrüstungsfenster: links Waffen und Rüstung, rechts Schmuck, dann Arkana, dann der Rest
-	const LEFT = ['MainHand', 'SubHand', 'Helmet', 'Shoulder', 'Torso', 'Pants', 'Gloves', 'Boots', 'Cape', 'Belt'];
-	const RIGHT = ['Necklace', 'Earring1', 'Earring2', 'Ring1', 'Ring2', 'Bracelet1', 'Bracelet2', 'Amulet', 'Rune1', 'Rune2'];
-	const ARCANA = ['Arcana1', 'Arcana2', 'Arcana3', 'Arcana4', 'Arcana5'];
 	const bySlot = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
 	const inSlots = (names: string[]) => names.map((n) => bySlot.get(n)).filter((e) => e !== undefined);
 	const rest = $derived(data.equipment.filter((e) => ![...LEFT, ...RIGHT, ...ARCANA].includes(e.slot_name)));
