@@ -66,6 +66,7 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 | Modul | Menü | Seiten |
 |---|---|---|
 | `logs` | Runs | `hub/runs/…`, geteilt `(public)/r/<token>/…` |
+| `armory` | Armory | `hub/armory/…` – Profilansicht aus `logs` |
 | `devices` | Geräte | `hub/geraete/` |
 | `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 
@@ -168,6 +169,27 @@ Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nac
   offiziellen Charakterseite (`assets.playnccdn.com/static-aion2/characters/img/daevanion/`).
 - Tests gegen eine nachgebaute Seite (`tests/fake_nc.py`, nur erfundene Daten). Format gegen die
   echte Seite: `AION2_LIVE=1 AION2_NAME=<Charakter> AION2_SERVER=<Server-ID> uv run pytest -q tests/test_aion2.py -k echte`.
+
+## Armory
+
+Mitglieder tragen ihre Charaktere ein, alle Angemeldeten sehen alle. Code in `armory.py` (Abruf,
+täglicher Lauf) und `routes/armory.py`. Abruf, Speicherformat und Profilansicht sind dieselben wie
+bei den Charakterprofilen oben: `models.Snapshot` (gemeinsame Spalten von `run_characters` und
+`characters`), `characters.fill` (Abruf und Fehlerbehandlung), im Web `CharacterProfile.svelte`
+und die Typen aus `modules/logs`.
+
+- Eintragen über die Suche der AION-2-Website (`GET /api/armory/search?name=…&region=eu`, Name und
+  Region genügen), dann `POST /api/armory` mit dem Treffer. Jeder Charakter gehört höchstens einem
+  Konto, höchstens 20 je Konto. Mit bekannter Charakter-ID entfällt beim Abruf die Suche.
+- Neu abgerufen wird stündlich geprüft alles, dessen letzter Abruf älter als einen Tag ist (oder
+  das ein Neustart auf `offen` stehen ließ), und per `POST /api/armory/{id}/refresh` (alle
+  Angemeldeten, höchstens alle 10 Minuten). Schlägt ein Abruf fehl, bleibt der letzte Stand sichtbar.
+- Verlauf: `character_days`, je Charakter und Tag Kampfkraft und Item-Level des letzten Abrufs;
+  die volle Momentaufnahme nur im aktuellen Stand.
+- Austragen: wer eingetragen hat oder ein Admin. Ein Mitspieler im Run, der auch in der Armory
+  steht, bekommt `armory_id` und auf seiner Profilseite einen Link dorthin.
+- Die Klasse kommt als Klassenname von der Website (`class_name`); Farbe und Symbol leitet das Web
+  über `classFromName` aus `modules/logs/classes.ts` ab, damit die Klassentabelle nur dort steht.
 
 ## Bot
 

@@ -15,6 +15,7 @@ import httpx
 
 SITE = "https://aion2.plaync.com/api/character"
 SEARCH = "https://api-search.plaync.com/aion2global/search/v2/character"
+PROFILE_IMAGES = "https://profileimg.plaync.com"
 SHARDS = {1: "nae", 2: "naw", 3: "eu", 4: "la", 5: "as"}
 # Wie die aion2-api: die Seite antwortet Browsern
 USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -108,6 +109,27 @@ class NC:
                     and row.get("serverId") == server_id and row.get("characterId")):
                 return unquote(row["characterId"])
         raise NotFound("nicht gefunden")
+
+    async def search(self, name: str, region: str) -> list[dict]:
+        """Charaktere, deren Name `name` enthält, auf allen Servern einer Region (für die Armory)."""
+        if region not in SHARDS.values():
+            raise NotFound("Region nicht unterstützt")
+        body = await self._get(SEARCH, {"keyword": name, "page": 1, "size": 20, "region": region,
+                                        "localeInfo": self.lang})
+        rows = body.get("list")
+        if not isinstance(rows, list):
+            raise NCError("Format unbekannt: Suche ohne list")
+        hits = []
+        for row in rows:
+            if not (isinstance(row, dict) and row.get("characterId") and isinstance(row.get("serverId"), int)
+                    and shard_of(row["serverId"])):
+                continue
+            image = str(row.get("profileImageUrl") or "")  # relativ zu PROFILE_IMAGES
+            hits.append({"name": _TAGS.sub("", str(row.get("name", ""))), "server_id": row["serverId"],
+                         "server": row.get("serverName"), "level": row.get("level"),
+                         "character_id": unquote(row["characterId"]),
+                         "image": PROFILE_IMAGES + image if image.startswith("/") else None})
+        return hits
 
     async def snapshot(self, server_id: int, character_id: str) -> dict:
         """Profil, Werte, Titel, Ausrüstung, Skills und Daevanion in dem Format, das der Hub speichert."""

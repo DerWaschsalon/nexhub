@@ -104,6 +104,8 @@ export type CharacterListItem = {
 	combat_power: number | null;
 	item_level: number | null;
 	fetched_at: string | null;
+	/** derselbe Charakter in der Armory (nur in der Spielerliste eines Runs) */
+	armory_id?: number | null;
 };
 
 export type CharacterItem = {

@@ -29,7 +29,10 @@
 
 <svelte:head><title>{c.name} · {data.run.dungeon} · NexHub</title></svelte:head>
 
-<a class="back" href="/hub/runs/{data.run.id}">‹ {t('logs.char.back')}</a>
+<div class="bar">
+	<a class="back" href="/hub/runs/{data.run.id}">‹ {t('logs.char.back')}</a>
+	{#if c.armory_id}<a class="btn small" href="/hub/armory/{c.armory_id}">{t('armory.inArmory')} ›</a>{/if}
+</div>
 
 {#if c.status === 'ok' && c.data}
 	<CharacterProfile character={c} data={c.data} />
@@ -55,6 +58,17 @@
 {/if}
 
 <style>
+	.bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		margin-bottom: 10px;
+	}
+	.bar .back {
+		margin-bottom: 0;
+	}
 	h2 {
 		font-size: 17px;
 		margin-bottom: 10px;
