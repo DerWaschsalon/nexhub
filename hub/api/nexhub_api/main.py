@@ -1,6 +1,7 @@
 """FastAPI-Anwendung: API unter /api, alles andere ist die statische Web-Oberfläche."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from .aion2 import NC
+from .characters import Fetcher
 from .config import Settings
 from .deps import DB, SESSION_COOKIE
 from .routes import ROUTERS
@@ -29,7 +32,15 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         app.state.http = http or httpx.AsyncClient(timeout=10)
         if not settings.discord_configured:
             log.warning("DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET fehlen – Login ist aus")
+        app.state.characters, resume = None, None
+        if settings.hub_aion2_enabled:
+            app.state.characters = Fetcher(app.state.sessionmaker,
+                                           NC(app.state.http, settings.hub_aion2_lang, settings.hub_aion2_pause))
+            # liegengebliebene Abrufe vom letzten Lauf; läuft neben dem Webserver
+            resume = asyncio.create_task(app.state.characters.resume())
         yield
+        if resume and not resume.done():
+            resume.cancel()  # ein Neustart soll nicht auf NC warten; der Rest kommt beim nächsten Start
         if http is None:
             await app.state.http.aclose()
         await engine.dispose()

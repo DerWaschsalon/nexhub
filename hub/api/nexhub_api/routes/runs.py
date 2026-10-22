@@ -28,15 +28,16 @@ import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from nexproto import NexLogError, dungeon_label, unpack
 from nexproto.nexlog import MAX_PACKED
 
+from .. import characters
 from ..analysis import fight_detail, summarize
 from ..config import Settings
 from ..deps import DB, CurrentDevice, CurrentUser, SettingsDep
-from ..models import Run, User
+from ..models import Run, RunCharacter, User
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +110,9 @@ async def upload(request: Request, device: CurrentDevice, db: DB, settings: Sett
     tmp.replace(path)
     await db.commit()
     log.info("Run %d: %s von Gerät %d (%d Kämpfe, %d KB)", run.id, r.dungeon, device.id, run.fights, len(data) // 1024)
+    if request.app.state.characters is not None:
+        await characters.create(db, run.id, nexlog)
+        background.add_task(request.app.state.characters.run, run.id)
     url = f"{settings.hub_base_url}/hub/runs/{run.id}"
     if settings.bot_configured and r.bosses_killed:
         background.add_task(tell_bot, request.app.state.http, settings,
@@ -235,6 +239,8 @@ async def delete_run(run_id: int, user: CurrentUser, db: DB, settings: SettingsD
     run, _ = await _get(db, run_id)
     if not _may_manage(run, user):
         raise HTTPException(403, "Nur wer hochgeladen hat, oder ein Admin")
+    # SQLite (Tests) kennt kein ON DELETE CASCADE ohne PRAGMA; Postgres löscht ohnehin mit
+    await db.execute(delete(RunCharacter).where(RunCharacter.run_id == run_id))
     await db.delete(run)
     await db.commit()
     run_file(settings, run_id).unlink(missing_ok=True)
