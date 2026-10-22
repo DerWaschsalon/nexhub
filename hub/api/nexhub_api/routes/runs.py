@@ -1,7 +1,7 @@
 """Runs: NexBoards laden fertige Dungeon-Runs hoch, Angemeldete sehen sie sich an.
 
     POST   /api/runs               Gerät (Bearer): NexLog hochladen (gzip, siehe proto/README.md)
-    GET    /api/runs               alle Runs, neueste zuerst
+    GET    /api/runs               alle Runs, neueste zuerst (mit Spieler- und Bossnamen zum Suchen)
     GET    /api/runs/{id}          Eckdaten und Zusammenfassung
     GET    /api/runs/{id}/nexlog   die Datei, so wie sie hochgeladen wurde
     GET    /api/runs/{id}/fights/{kampf}   ein Kampf im Detail (DPS-Kurve, Skills, Tode)
@@ -138,6 +138,8 @@ class RunOut(BaseModel):
     character: str | None
     uploader: str
     created_at: datetime
+    players: list[str]  # Namen aus der Zusammenfassung, für Suche und Filter der Liste
+    bosses: list[str]
 
 
 class RunDetail(RunOut):
@@ -151,7 +153,9 @@ def _out(run: Run, uploader: User) -> dict:
     return dict(id=run.id, dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty, start_ms=run.start_ms,
                 end_ms=run.end_ms, complete=run.complete, bosses_total=run.bosses_total,
                 bosses_killed=run.bosses_killed, fights=run.fights, hits=run.hits, character=run.character,
-                uploader=uploader.name, created_at=run.created_at)
+                uploader=uploader.name, created_at=run.created_at,
+                players=[p["name"] for p in run.summary.get("players", [])],
+                bosses=[b["name"] for b in run.summary.get("bosses", [])])
 
 
 @router.get("")

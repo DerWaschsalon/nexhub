@@ -1,5 +1,8 @@
 // Antworten der Hub-API für Runs (hub/api/nexhub_api/routes/runs.py und public.py).
 
+/** Obergrenze von GET /api/runs (routes/runs.py) */
+export const RUN_LIMIT = 500;
+
 export type Player = { name: string; cls: string | null; damage: number; dps: number };
 
 export type Boss = {
@@ -28,10 +31,13 @@ export type RunListItem = {
 	character: string | null;
 	uploader: string;
 	created_at: string;
+	/** Namen aus der Zusammenfassung, für Suche und Filter (modules/logs/filter.ts) */
+	players: string[];
+	bosses: string[];
 };
 
 /** Was jede Run-Ansicht braucht – im Hub und auf einer geteilten Seite. */
-export type Run = Omit<RunListItem, 'id' | 'uploader' | 'created_at'> &
+export type Run = Omit<RunListItem, 'id' | 'uploader' | 'created_at' | 'players' | 'bosses'> &
 	Partial<Pick<RunListItem, 'uploader'>> & { summary: Summary };
 
 /** Run im Hub (mit Login): dazu Teilen und Löschen. */

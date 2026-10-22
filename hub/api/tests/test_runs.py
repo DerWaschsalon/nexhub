@@ -55,6 +55,8 @@ def test_hochladen_und_ansehen(client, as_user):
     assert [(x["dungeon"], x["bosses_killed"], x["fights"], x["hits"], x["character"]) for x in runs] == \
         [("Ferocious Horn Den", 1, 2, 2, "Testheld")]
     assert runs[0]["uploader"] == "Testname"
+    # Namen für Suche und Filter der Liste, maskierte schon aufgelöst
+    assert (runs[0]["players"], runs[0]["bosses"]) == (["Testheld", "Moonlin"], ["Boss 1", "Boss 2"])
 
     detail = member.get(f"/api/runs/{run_id}").json()
     s = detail["summary"]
