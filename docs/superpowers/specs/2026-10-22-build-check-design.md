@@ -63,7 +63,8 @@ Auswahl (Entscheidung Claude, im Bau anpassbar):
 - Je Boss der höchsten Stufe eine Abfrage (Fabios Vorbild nimmt T4), Einträge mit
   `combatDuration` unter 30 s verwerfen.
 - Nur Einträge mit ähnlicher Kampfkraft (±15 % um die eigene), damit sich die Ausrüstung
-  vergleichen lässt. Fabios Vorbild: 134–150k bei 133k eigener.
+  vergleichen lässt. Fabios Vorbild: 134–150k bei 133k eigener. Von Navonex bestätigt (22.10.):
+  die Besten auf der eigenen Stufe, nicht die Besten überhaupt.
 - Je Name die beste Platzierung, die besten **15** Namen.
 
 ### Server auflösen
