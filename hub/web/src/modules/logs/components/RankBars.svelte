@@ -9,8 +9,18 @@
 	let {
 		players,
 		selected = null,
-		onSelect
-	}: { players: (Player & { actor?: number })[]; selected?: string | null; onSelect?: (id: string) => void } = $props();
+		onSelect,
+		href,
+		note
+	}: {
+		players: (Player & { actor?: number })[];
+		selected?: string | null;
+		onSelect?: (id: string) => void;
+		/** Link je Spieler (Charakterprofil im Hub); ohne: kein Link */
+		href?: (p: Player) => string | undefined;
+		/** kleiner Zusatz hinter dem Namen, z. B. die Kampfkraft */
+		note?: (p: Player) => string | undefined;
+	} = $props();
 
 	const max = $derived(players[0]?.damage || 1);
 	const total = $derived(players.reduce((s, p) => s + p.damage, 0) || 1);
@@ -19,7 +29,10 @@
 {#snippet body(p: Player, i: number)}
 	{@const color = classColor(p.cls)}
 	<span class="rank num">{i + 1}</span>
-	<PlayerName name={p.name} cls={p.cls} />
+	<span class="who">
+		<PlayerName name={p.name} cls={p.cls} />
+		{#if note?.(p)}<small>{note(p)}</small>{/if}
+	</span>
 	<span class="bar" aria-hidden="true">
 		<span style:width="{(100 * p.damage) / max}%" style:background={color} style:box-shadow="0 0 18px -4px {color}"></span>
 	</span>
@@ -36,6 +49,8 @@
 				<button type="button" class="row" aria-pressed={selected === playerId(p)} onclick={() => onSelect(playerId(p))}>
 					{@render body(p, i)}
 				</button>
+			{:else if href?.(p)}
+				<a class="row" href={href(p)}>{@render body(p, i)}</a>
 			{:else}
 				<div class="row">{@render body(p, i)}</div>
 			{/if}
@@ -69,7 +84,21 @@
 	button.row {
 		cursor: pointer;
 	}
-	button.row:hover {
+	/* Name, darunter der Zusatz (Kampfkraft), damit der Name nicht abgeschnitten wird */
+	.who {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+	.who small {
+		margin-left: 30px;
+		font-size: 12px;
+	}
+	a.row {
+		text-decoration: none;
+	}
+	button.row:hover,
+	a.row:hover {
 		background: rgba(255, 255, 255, 0.05);
 	}
 	.selected .row {
@@ -114,7 +143,7 @@
 		.rank {
 			grid-area: rank;
 		}
-		.row > :global(.player) {
+		.who {
 			grid-area: name;
 		}
 		.value {
