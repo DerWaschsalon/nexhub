@@ -19,3 +19,19 @@ export const NAV: NavItem[] = [
 	{ href: '/hub/admin/konten', label: 'nav.accounts', icon: 'users', admin: true },
 	{ href: '/hub/admin/system', label: 'nav.system', icon: 'server', admin: true }
 ];
+
+/** Ein Eintrag der Seitenleiste: eine Seite, oder ein Spiel mit seinen Seiten (`pages`). */
+export type MenuEntry = NavItem & { pages: NavItem[] };
+
+/** Fasst die Einträge eines Spiels zu einem zusammen. Er führt zur ersten Seite des Spiels und
+ *  trägt deren Symbol; die Seiten selbst zeigt das Layout als Reiter über dem Inhalt. */
+export function menu(items: NavItem[]): MenuEntry[] {
+	const entries: MenuEntry[] = [];
+	for (const item of items) {
+		const game = item.game ? entries.find((e) => e.label === item.game) : undefined;
+		if (game) game.pages.push(item);
+		else if (item.game) entries.push({ ...item, label: item.game, pages: [item] });
+		else entries.push({ ...item, pages: [] });
+	}
+	return entries;
+}

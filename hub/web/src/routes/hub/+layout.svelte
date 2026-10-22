@@ -1,5 +1,6 @@
 <!-- Login-Bereich: Seitenleiste mit Menü (Kern + Module, lib/modules.ts), Sprache und Konto;
-     rechts die jeweilige Seite. -->
+     rechts die jeweilige Seite. Gehört sie zu einem Spiel (AION 2 …), stehen dessen Seiten als
+     Reiter darüber. -->
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
@@ -10,18 +11,23 @@
 	import LangSwitch from '#lib/components/LangSwitch.svelte';
 	import LegalLinks from '#lib/components/LegalLinks.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
-	import { NAV } from '#lib/modules.ts';
+	import { menu, NAV, type MenuEntry } from '#lib/modules.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
 
 	const items = $derived(NAV.filter((i) => !i.admin || data.me.role === 'admin'));
+	const entries = $derived(menu(items));
+	// das Spiel der aktuellen Seite, falls sie zu einem gehört: seine Seiten werden Reiter
+	const game = $derived(entries.find((e) => e.pages.some((p) => active(p.href))));
 
 	// Übersicht nur bei genau /hub markieren, die anderen auch auf Unterseiten
 	function active(href: string): boolean {
 		const path = page.url.pathname;
 		return href === '/hub' ? path === href : path === href || path.startsWith(href + '/');
 	}
+
+	const entryActive = (e: MenuEntry) => e === game || (!e.pages.length && active(e.href));
 
 	async function logout() {
 		await post('/api/auth/logout');
@@ -33,11 +39,11 @@
 <div class="shell">
 	<aside class="glass">
 		<Brand href="/hub" />
-		<nav>
-			{#each items as item (item.href)}
-				<a href={item.href} class:active={active(item.href)}>
-					<Icon name={item.icon} />
-					<span>{t(item.label)}</span>
+		<nav class="menu">
+			{#each entries as e (e.label)}
+				<a href={e.href} class:active={entryActive(e)}>
+					<Icon name={e.icon} />
+					<span>{t(e.label)}</span>
 				</a>
 			{/each}
 		</nav>
@@ -56,6 +62,13 @@
 	</aside>
 
 	<main>
+		{#if game}
+			<nav class="tabs pages" aria-label={t(game.label)}>
+				{#each game.pages as p (p.href)}
+					<a href={p.href} class:active={active(p.href)}>{t(p.label)}</a>
+				{/each}
+			</nav>
+		{/if}
 		{@render children()}
 	</main>
 </div>
@@ -82,13 +95,13 @@
 	aside > :global(.brand) {
 		padding: 0 8px;
 	}
-	nav {
+	.menu {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 		flex: 1;
 	}
-	nav a {
+	.menu a {
 		display: flex;
 		align-items: center;
 		gap: 12px;
@@ -102,17 +115,17 @@
 			background 0.15s,
 			color 0.15s;
 	}
-	nav a:hover {
+	.menu a:hover {
 		color: var(--text);
 		background: rgba(255, 255, 255, 0.06);
 	}
-	nav a.active {
+	.menu a.active {
 		color: var(--text);
 		background: rgba(255, 255, 255, 0.1);
 		border-color: var(--edge-soft);
 		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 	}
-	nav a.active :global(svg) {
+	.menu a.active :global(svg) {
 		color: var(--accent);
 	}
 	aside > :global(.lang) {
@@ -148,6 +161,9 @@
 		padding: 12px 8px;
 		min-width: 0;
 	}
+	.pages {
+		margin-bottom: 16px;
+	}
 
 	/* Schmal: Leiste wird zur Kopfzeile, Menü scrollt seitlich */
 	@media (max-width: 820px) {
@@ -166,14 +182,14 @@
 			padding: 10px 12px;
 			border-radius: 20px;
 		}
-		nav {
+		.menu {
 			order: 3;
 			flex-basis: 100%;
 			flex-direction: row;
 			overflow-x: auto;
 			scrollbar-width: none;
 		}
-		nav a {
+		.menu a {
 			white-space: nowrap;
 			padding: 8px 12px;
 		}

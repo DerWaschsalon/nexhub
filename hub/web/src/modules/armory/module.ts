@@ -6,6 +6,6 @@ import { TEXTS } from './texts.ts';
 
 export default {
 	id: 'armory',
-	nav: [{ href: '/hub/armory', label: 'armory.nav', icon: 'shield' }],
+	nav: [{ href: '/hub/armory', label: 'armory.nav', icon: 'shield', game: 'game.aion2' }],
 	texts: TEXTS
 } satisfies HubModule;

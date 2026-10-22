@@ -53,8 +53,11 @@ Formatierung (`lib/format.ts`, folgt der Sprache) und den API-Zugriff (`lib/api.
 
 Ein **Modul** bringt nur seinen Inhalt mit, in `web/src/modules/<id>/`:
 
-- `module.ts`: Menüeinträge (`nav`, Beschriftung als Textschlüssel, `admin: true` nur für Admins)
-  und Texte (`texts`), Typ `HubModule` aus `lib/module.ts`
+- `module.ts`: Menüeinträge (`nav`, Beschriftung als Textschlüssel, `admin: true` nur für Admins,
+  `game: 'game.aion2'` für Seiten eines Spiels) und Texte (`texts`), Typ `HubModule` aus `lib/module.ts`.
+  Einträge desselben Spiels zeigt die Seitenleiste als einen Eintrag („AION 2“), ihre Seiten als
+  Reiter über dem Inhalt (`menu` in `lib/modules.ts`). Ein neues Spiel braucht nur `game` und einen
+  Text `game.<spiel>` in `lib/texts.ts`.
 - `texts.ts`: `defineTexts(en, de)` – svelte-check meldet, wenn auf Deutsch ein Schlüssel fehlt;
   Schlüssel mit dem Modulnamen davor (`logs.…`)
 - Typen der API, Komponenten mit eigenem `<style>` (Svelte begrenzt das auf die Komponente), Daten
