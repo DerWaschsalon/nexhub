@@ -1,22 +1,38 @@
 <!-- Daevanion wie im Spiel: je Gottheit ein Brett, Kacheln an ihrer Stelle im Raster 15×15 mit den
      Grafiken der offiziellen Charakterseite (Seltenheit, offen/gesperrt, Start mit Klassensymbol).
-     Zeigen oder Antippen nennt den Effekt. -->
+     Zeigen oder Antippen nennt den Effekt. Mit `compare` (Brett eines anderen Charakters) sind Knoten
+     markiert, die der andere offen hat und dieser noch nicht. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, DaevanionNode } from '../api.ts';
 	import { CHARACTER_ART } from '../assets.ts';
 
-	let { boards, cls }: { boards: CharacterData['daevanion']; cls: string | null } = $props();
+	let {
+		boards,
+		cls,
+		compare,
+		chosen = $bindable(0)
+	}: {
+		boards: CharacterData['daevanion'];
+		cls: string | null;
+		compare?: CharacterData['daevanion'];
+		/** gewähltes Brett; beim Vergleich teilen sich beide Bretter die Auswahl */
+		chosen?: number;
+	} = $props();
 
 	// Grafiken wie auf aion2.plaync.com/characters (static-aion2/characters/css/index.css)
 	const ART = `${CHARACTER_ART}/daevanion`;
 	// Klassen-Schlüssel des Hubs → Name der Startgrafik
 	const START: Record<string, string> = { spiritmaster: 'elementalist', brawler: 'fighter' };
 
-	let chosen = $state(0);
 	let focused = $state<DaevanionNode | null>(null);
 	const board = $derived(boards[Math.min(chosen, boards.length - 1)]);
 	const nodes = $derived(board?.nodes ?? []);
+	// Knoten, die der Vergleichs-Charakter auf demselben Brett offen hat
+	const openThere = $derived(
+		new Set((compare?.find((b) => b.id === board?.id)?.nodes ?? []).filter((n) => n.open).map((n) => `${n.row}:${n.col}`))
+	);
+	const missing = (n: DaevanionNode) => !n.open && openThere.has(`${n.row}:${n.col}`);
 	// Ausschnitt auf die belegten Felder
 	const r0 = $derived(Math.min(...nodes.map((n) => n.row)));
 	const c0 = $derived(Math.min(...nodes.map((n) => n.col)));
@@ -37,59 +53,66 @@
 	}
 </script>
 
-<div class="tabs" role="tablist">
-	{#each boards as b, i (b.id)}
-		<button type="button" role="tab" class:active={i === chosen} aria-selected={i === chosen} onclick={() => pick(i)}>
-			{b.name} <span class="count">{b.open_nodes}/{b.total_nodes}</span>
-		</button>
-	{/each}
+<div class="daevanion">
+	<div class="tabs" role="tablist">
+		{#each boards as b, i (b.id)}
+			<button type="button" role="tab" class:active={i === chosen} aria-selected={i === chosen} onclick={() => pick(i)}>
+				{b.name} <span class="count">{b.open_nodes}/{b.total_nodes}</span>
+			</button>
+		{/each}
+	</div>
+
+	{#if board}
+		<div class="layout">
+			{#if nodes.length}
+				<div class="board" style:--rows={rows} style:--cols={cols} role="group" aria-label={board.name}>
+					{#each nodes as n (`${n.row}:${n.col}`)}
+						<button
+							type="button"
+							class="node"
+							class:open={n.open || n.type === 'Start'}
+							class:focused={focused === n}
+							class:missing={missing(n)}
+							style:grid-row={n.row - r0 + 1}
+							style:grid-column={n.col - c0 + 1}
+							title={label(n)}
+							aria-label={label(n)}
+							onmouseenter={() => (focused = n)}
+							onfocus={() => (focused = n)}
+							onclick={() => (focused = n)}
+						>
+							<img src={art(n)} alt="" referrerpolicy="no-referrer" />
+						</button>
+					{/each}
+				</div>
+			{/if}
+
+			<div class="side">
+				<p class="info" aria-live="polite">
+					{#if focused}
+						<strong>{t(`logs.char.node.${focused.type}`)}</strong>
+						<span class="dim">· {focused.open ? t('logs.char.node.open') : t('logs.char.node.closed')}</span><br />
+						{focused.effects.join(', ') || '–'}
+					{:else}
+						<span class="dim">{t('logs.char.node.hint')}</span>
+					{/if}
+				</p>
+				{#if board.stats.length || board.skills.length}
+					<h4>{t('logs.char.board.effects')}</h4>
+					<ul class="effects">
+						{#each [...board.stats, ...board.skills] as e (e)}<li>{e}</li>{/each}
+					</ul>
+				{/if}
+			</div>
+		</div>
+	{/if}
 </div>
 
-{#if board}
-	<div class="layout">
-		{#if nodes.length}
-			<div class="board" style:--rows={rows} style:--cols={cols} role="group" aria-label={board.name}>
-				{#each nodes as n (`${n.row}:${n.col}`)}
-					<button
-						type="button"
-						class="node"
-						class:open={n.open || n.type === 'Start'}
-						class:focused={focused === n}
-						style:grid-row={n.row - r0 + 1}
-						style:grid-column={n.col - c0 + 1}
-						title={label(n)}
-						aria-label={label(n)}
-						onmouseenter={() => (focused = n)}
-						onfocus={() => (focused = n)}
-						onclick={() => (focused = n)}
-					>
-						<img src={art(n)} alt="" referrerpolicy="no-referrer" />
-					</button>
-				{/each}
-			</div>
-		{/if}
-
-		<div class="side">
-			<p class="info" aria-live="polite">
-				{#if focused}
-					<strong>{t(`logs.char.node.${focused.type}`)}</strong>
-					<span class="dim">· {focused.open ? t('logs.char.node.open') : t('logs.char.node.closed')}</span><br />
-					{focused.effects.join(', ') || '–'}
-				{:else}
-					<span class="dim">{t('logs.char.node.hint')}</span>
-				{/if}
-			</p>
-			{#if board.stats.length || board.skills.length}
-				<h4>{t('logs.char.board.effects')}</h4>
-				<ul class="effects">
-					{#each [...board.stats, ...board.skills] as e (e)}<li>{e}</li>{/each}
-				</ul>
-			{/if}
-		</div>
-	</div>
-{/if}
-
 <style>
+	/* richtet sich nach der eigenen Breite, damit zwei Bretter nebeneinander passen */
+	.daevanion {
+		container-type: inline-size;
+	}
 	.count {
 		color: var(--faint);
 		font-weight: 450;
@@ -102,7 +125,7 @@
 		margin-top: 12px;
 		align-items: start;
 	}
-	@media (max-width: 820px) {
+	@container (max-width: 820px) {
 		.layout {
 			grid-template-columns: minmax(0, 1fr);
 		}
@@ -129,6 +152,12 @@
 	}
 	.node.open {
 		opacity: 1;
+	}
+	.node.missing {
+		opacity: 0.9;
+		outline: 2px solid var(--danger);
+		outline-offset: -2px;
+		border-radius: 10px;
 	}
 	.node img {
 		display: block;

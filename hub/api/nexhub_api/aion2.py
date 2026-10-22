@@ -16,6 +16,10 @@ import httpx
 SITE = "https://aion2.plaync.com/api/character"
 SEARCH = "https://api-search.plaync.com/aion2global/search/v2/character"
 PROFILE_IMAGES = "https://profileimg.plaync.com"
+# Klassentabelle der Website: die Suche nennt nur eine pcId (Klasse × Geschlecht × Rasse)
+PCDATA = "https://aion2.plaync.com/en-us/api/gameinfo/pcdata"
+# Klassennamen der Website, die im Hub anders heißen (modules/logs/classes.ts)
+CLASS_KEYS = {"elementalist": "spiritmaster"}
 # Jede Momentaufnahme gibt es in beiden Sprachen des Hubs; die Web-Oberfläche zeigt die passende
 LANGS = {"de": "de-DE", "en": "en-US"}
 FORMAT = 2  # data = {"v": 2, "de": {...}, "en": {...}}; ältere Momentaufnahmen sind ein Sprach-Objekt
@@ -113,6 +117,7 @@ def _item_detail(d: dict) -> dict:
 class NC:
     def __init__(self, http: httpx.AsyncClient, pause: float = 0.3) -> None:
         self.http, self.pause = http, pause
+        self._classes: dict[int, str] | None = None  # pcId → Klasse, einmal geholt
 
     async def _get(self, url: str, params: dict) -> dict:
         """Eine Anfrage, nacheinander mit Pause; 5xx, 429 und Netzfehler bis zu dreimal."""
@@ -156,12 +161,33 @@ class NC:
                 return unquote(row["characterId"])
         raise NotFound("nicht gefunden")
 
-    async def search(self, name: str, region: str) -> list[dict]:
-        """Charaktere, deren Name `name` enthält, auf allen Servern einer Region (für die Armory)."""
+    async def classes(self) -> dict[int, str]:
+        """pcId → Klasse wie im Hub ("ranger"). Ändert sich nicht, deshalb nur einmal geholt. Ist die
+        Tabelle gerade nicht zu haben, sucht die Armory ohne Klassen weiter (und fragt beim nächsten Mal neu)."""
+        if self._classes is not None:
+            return self._classes
+        try:
+            rows = (await self._get(PCDATA, {"lang": LANGS["en"]})).get("pcDataList") or []
+        except NCError:
+            return {}
+        names = {row["id"]: str(row.get("className", "")).lower() for row in rows if isinstance(row, dict)}
+        self._classes = {pc: CLASS_KEYS.get(name, name) for pc, name in names.items()}
+        return self._classes
+
+    async def search(self, name: str, region: str, cls: str | None = None) -> list[dict]:
+        """Charaktere, deren Name `name` enthält, auf allen Servern einer Region (für die Armory).
+        Mit `cls` nur diese Klasse; das filtert schon die Website, sonst fielen bei häufigen
+        Namen passende Treffer aus den 20 heraus."""
         if region not in SHARDS.values():
             raise NotFound("Region nicht unterstützt")
-        body = await self._get(SEARCH, {"keyword": name, "page": 1, "size": 20, "region": region,
-                                        "localeInfo": LANGS["en"]})
+        classes = await self.classes()
+        params = {"keyword": name, "page": 1, "size": 20, "region": region, "localeInfo": LANGS["en"]}
+        if cls:
+            pc_ids = [str(pc) for pc, c in classes.items() if c == cls]
+            if not pc_ids:
+                raise NotFound("Klasse unbekannt")
+            params["pcId"] = ",".join(pc_ids)
+        body = await self._get(SEARCH, params)
         rows = body.get("list")
         if not isinstance(rows, list):
             raise NCError("Format unbekannt: Suche ohne list")
@@ -173,6 +199,7 @@ class NC:
             image = str(row.get("profileImageUrl") or "")  # relativ zu PROFILE_IMAGES
             hits.append({"name": _TAGS.sub("", str(row.get("name", ""))), "server_id": row["serverId"],
                          "server": row.get("serverName"), "level": row.get("level"),
+                         "cls": classes.get(row.get("pcId")),
                          "character_id": unquote(row["characterId"]),
                          "image": PROFILE_IMAGES + image if image.startswith("/") else None})
         return hits

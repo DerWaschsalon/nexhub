@@ -9,8 +9,8 @@ HOSTS = {"aion2.plaync.com", "api-search.plaync.com"}
 ICON = "https://assets.playnccdn.com/static-aion2-gamedata/resources/Icon_WP_BW_0028_T05.png"
 
 
-def search_row(name: str, server: int = 2302, cid: str = "abc%3D") -> dict:
-    return {"characterId": cid, "name": f"<strong>{name}</strong>", "race": 2, "pcId": 16, "level": 45,
+def search_row(name: str, server: int = 2302, cid: str = "abc%3D", pc: int = 16) -> dict:
+    return {"characterId": cid, "name": f"<strong>{name}</strong>", "race": 2, "pcId": pc, "level": 45,
             "serverId": server, "serverName": "Zikel", "region": "eu",
             "profileImageUrl": f"/game_profile_images/aion2global/images?gameServerKey={server}&charKey=1"}
 
@@ -85,6 +85,13 @@ def item(name: str = "Testbogen") -> dict:
                     "bonuses": [{"degree": 2, "descriptions": ["Angriffskraft (PvE) +60"]}]}}
 
 
+def pcdata() -> dict:
+    """Klassentabelle der Website: je Klasse vier pcIds (Geschlecht × Rasse); hier nur drei Klassen."""
+    classes = {13: "RANGER", 21: "ELEMENTALIST", 29: "CLERIC"}
+    return {"pcDataList": [{"id": first + i, "className": name, "classText": name.title()}
+                           for first, name in classes.items() for i in range(4)]}
+
+
 class FakeNC:
     """Beantwortet Suche, Profil, Ausrüstung und Daevanion. `routes` lässt sich je Test überschreiben:
     Pfad → Antwort (dict = JSON 200, int = Statuscode, Exception = wird geworfen)."""
@@ -105,9 +112,12 @@ class FakeNC:
             self.langs.append(q.get("lang", ""))
         if path == "/api/character/info" and q.get("characterId") in self.fail_for:
             return httpx.Response(500)
+        pc_ids = q["pcId"].split(",") if "pcId" in q else None  # Klassenfilter der Suche
+        found = [r for r in self.rows if q.get("keyword", "").lower() in r["name"].lower()
+                 and (pc_ids is None or str(r["pcId"]) in pc_ids)]
         default = {
-            "/aion2global/search/v2/character": {"list": [r for r in self.rows if q.get("keyword", "").lower()
-                                                           in r["name"].lower()],
+            "/en-us/api/gameinfo/pcdata": pcdata(),
+            "/aion2global/search/v2/character": {"list": found,
                                                   "pagination": {"page": 1, "size": 40, "total": 1, "endPage": 1}},
             "/api/character/info": info(),
             "/api/character/equipment": equipment(),
