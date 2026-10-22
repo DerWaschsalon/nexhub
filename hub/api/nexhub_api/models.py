@@ -113,3 +113,25 @@ class Run(Base):
     share_token: Mapped[str | None] = mapped_column(String(32), unique=True)
     shared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
+
+class RunCharacter(Base):
+    """Momentaufnahme eines Mitspielers zum Run, von der AION-2-Website (characters.py).
+
+    status: offen, ok, nicht_gefunden, name_maskiert, fehler. `data` ist das Format aus aion2.py."""
+
+    __tablename__ = "run_characters"
+    __table_args__ = (UniqueConstraint("run_id", "name"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    cls: Mapped[str | None] = mapped_column(String(32))
+    server_id: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    nc_character_id: Mapped[str | None] = mapped_column(String(128))
+    combat_power: Mapped[int | None] = mapped_column(BigInteger)
+    item_level: Mapped[int | None] = mapped_column(Integer)
+    data: Mapped[dict | None] = mapped_column(JSON)
+    error: Mapped[str | None] = mapped_column(String(200))
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

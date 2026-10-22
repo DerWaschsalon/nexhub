@@ -62,6 +62,10 @@
 			Kontakt und Programmversion. Ein gekoppeltes NexBoard lädt beendete Dungeon-Runs hoch. Sie enthalten
 			Kampfdaten aus dem Spiel, auch die Charakternamen und Klassen aller Mitspieler der Gruppe, Schaden,
 			Fähigkeiten, Buffs und Zeitpunkte, dazu, wer hochgeladen hat. Angemeldete Mitglieder sehen alle Runs.
+			Zu jedem Run ruft der Hub die öffentlichen Charakterseiten der Mitspieler auf der offiziellen
+			AION-2-Website von NCSOFT ab und speichert eine Momentaufnahme (Kampfkraft, Ausrüstung, Werte, Titel,
+			Skills, Daevanion). Sie ist nur für angemeldete Mitglieder sichtbar, nicht über geteilte Links, und
+			wird mit dem Run gelöscht.
 			Ein geteilter Link zeigt einen Run allen, die den Link haben, ohne Anmeldung; Suchmaschinen werden
 			gebeten, solche Seiten nicht aufzunehmen. Zweck ist die gemeinsame Auswertung der Spielrunden in der
 			Gemeinschaft (Art. 6 Abs. 1 lit. f DSGVO). Runs bleiben gespeichert, bis die Hochladenden oder ein
@@ -70,8 +74,9 @@
 
 		<h2>6. Inhalte von fremden Servern</h2>
 		<p>
-			Symbole von Fähigkeiten und Buffs lädt dein Browser direkt vom Server des Spieleherstellers NCSOFT
-			(<code>assets.playnccdn.com</code>), Profilbilder direkt von Discord (<code>cdn.discordapp.com</code>).
+			Symbole von Fähigkeiten, Buffs und Gegenständen sowie Charakterbilder lädt dein Browser direkt von
+			Servern des Spieleherstellers NCSOFT (<code>assets.playnccdn.com</code>,
+			<code>profileimg.plaync.com</code>), Profilbilder direkt von Discord (<code>cdn.discordapp.com</code>).
 			Dabei erfahren diese Anbieter deine IP-Adresse; der Hub schickt bei den Spielsymbolen keine
 			Herkunftsadresse mit.
 		</p>
@@ -135,7 +140,10 @@
 			For a paired NexBoard the hub stores device name, pairing time, last contact and program version. A
 			paired NexBoard uploads finished dungeon runs. They contain combat data from the game, including the
 			character names and classes of everyone in the group, damage, skills, buffs and timestamps, plus who
-			uploaded them. Signed-in members see all runs. A shared link shows a run to anyone who has the link,
+			uploaded them. Signed-in members see all runs. For every run the hub fetches the public character pages
+			of the players in it from NCSOFT's official AION 2 website and stores a snapshot (combat power,
+			equipment, stats, titles, skills, Daevanion); only signed-in members see it, not shared links, and it is
+			deleted with the run. A shared link shows a run to anyone who has the link,
 			without signing in; search engines are asked not to index such pages. Purpose: analysing the
 			community's runs together (Art. 6(1)(f) GDPR). Runs are kept until the uploader or an admin deletes
 			them; there is currently no automatic deletion.
@@ -143,8 +151,9 @@
 
 		<h2>6. Content from other servers</h2>
 		<p>
-			Your browser loads skill and buff icons directly from the game publisher NCSOFT
-			(<code>assets.playnccdn.com</code>) and avatars directly from Discord (<code>cdn.discordapp.com</code>).
+			Your browser loads skill, buff and item icons and character portraits directly from servers of the game
+			publisher NCSOFT (<code>assets.playnccdn.com</code>, <code>profileimg.plaync.com</code>) and avatars
+			directly from Discord (<code>cdn.discordapp.com</code>).
 			These providers see your IP address; for the game icons the hub sends no referrer.
 		</p>
 

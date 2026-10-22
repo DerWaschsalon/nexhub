@@ -84,3 +84,72 @@ export type Fight = {
 	target: number | null;
 	buffs: Buff[];
 };
+
+// Charakterprofile (hub/api/nexhub_api/routes/characters.py, Format aus aion2.py)
+
+export type CharacterStatus = 'offen' | 'ok' | 'nicht_gefunden' | 'name_maskiert' | 'fehler';
+
+export type CharacterListItem = {
+	id: number;
+	name: string;
+	cls: string | null;
+	server_id: number;
+	status: CharacterStatus;
+	combat_power: number | null;
+	item_level: number | null;
+	fetched_at: string | null;
+};
+
+export type CharacterItem = {
+	slot: number;
+	slot_name: string;
+	name: string;
+	grade: string;
+	enchant: number;
+	exceed: number;
+	icon: string | null;
+};
+
+export type CharacterData = {
+	profile: {
+		name: string;
+		level: number;
+		class: string;
+		gender: string;
+		race: number;
+		server: string;
+		guild: string | null;
+		title: string | null;
+		combat_power: number;
+		image: string | null;
+	};
+	stats: { type: string; name: string; value: number; effects: string[] }[];
+	titles: { owned: number; total: number; equipped: { name: string; grade: string; category: string; effects: string[] }[] };
+	equipment: CharacterItem[];
+	pet: { name: string; level: number; icon: string | null } | null;
+	wing: { name: string; grade: string; enchant: number; icon: string | null } | null;
+	skills: { name: string; category: string; level: number; learned: boolean; equipped: boolean; icon: string | null }[];
+	daevanion: {
+		id: number;
+		name: string;
+		icon: string | null;
+		open: boolean;
+		open_nodes: number;
+		total_nodes: number;
+		stats: string[];
+		skills: string[];
+		/** belegte Felder des Bretts (Raster 15×15); fehlt bei Momentaufnahmen vor dem Brett */
+		nodes?: DaevanionNode[];
+	}[];
+};
+
+export type DaevanionNode = {
+	row: number;
+	col: number;
+	type: 'Start' | 'Stat' | 'SkillLevel' | string;
+	grade: string;
+	open: boolean;
+	effects: string[];
+};
+
+export type CharacterDetail = CharacterListItem & { data: CharacterData | null; error: string | null };

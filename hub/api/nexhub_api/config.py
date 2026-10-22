@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     hub_operator_email: str = ""
     # Wo der Server läuft (Anbieter, Land), für die Datenschutzerklärung; leer: allgemeiner Satz
     hub_hoster: str = ""
+    # Charakterprofile: zu jedem Run die Mitspieler von der AION-2-Website holen (characters.py).
+    # Sprache der Namen von Werten und Gegenständen; Pause zwischen zwei Anfragen in Sekunden.
+    hub_aion2_enabled: bool = True
+    hub_aion2_lang: str = "de-DE"
+    hub_aion2_pause: float = 0.3
 
     @field_validator("hub_admin_ids", mode="before")
     @classmethod

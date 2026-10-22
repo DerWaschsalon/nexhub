@@ -13,6 +13,9 @@ from nexhub_api.config import Settings
 from nexhub_api.db import migrate
 from nexhub_api.main import create_app
 
+from .fake_nc import HOSTS as NC_HOSTS
+from .fake_nc import FakeNC
+
 ADMIN = 111111111111111111
 MEMBER = 222222222222222222
 STRANGER = 333333333333333333
@@ -31,8 +34,12 @@ class FakeDiscord:
         self.token_status = 200
         # Steuer-API von TheWashBot (BOT_CONTROL_URL=http://bot:8790), siehe test_bot.py
         self.bot: Callable[[httpx.Request], httpx.Response] = lambda request: httpx.Response(404)
+        # AION-2-Website, siehe fake_nc.py und test_characters.py
+        self.nc = FakeNC()
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.host in NC_HOSTS:
+            return self.nc(request)
         if request.url.host == "bot":
             return self.bot(request)
         path = request.url.path.removeprefix("/api/v10")
@@ -69,7 +76,7 @@ def database_url(tmp_path):
         async def _clean() -> None:
             engine = create_async_engine(url)
             async with engine.begin() as conn:
-                await conn.execute(text("DROP TABLE IF EXISTS runs, device_pairings, devices, sessions, users, alembic_version"))
+                await conn.execute(text("DROP TABLE IF EXISTS run_characters, runs, device_pairings, devices, sessions, users, alembic_version"))
             await engine.dispose()
         asyncio.run(_clean())
 
@@ -86,7 +93,9 @@ def make_client(database_url, fake, tmp_path):
                       discord_client_id="cid", discord_client_secret="csecret",
                       hub_admin_ids=f"{ADMIN}", hub_guild_id=str(GUILD), hub_member_role_id=str(ROLE),
                       # explizit, sonst greifen HUB_WEB_DIR/HUB_DATA_DIR aus der Umgebung (im Image gesetzt)
-                      hub_web_dir=None, hub_data_dir=str(tmp_path / "data"))
+                      hub_web_dir=None, hub_data_dir=str(tmp_path / "data"),
+                      # Charakterdaten nur in den Tests, die es einschalten (test_characters.py)
+                      hub_aion2_enabled=False, hub_aion2_pause=0)
         settings = Settings(**{**values, **overrides})
         app = create_app(settings, http=httpx.AsyncClient(transport=httpx.MockTransport(fake)))
         return TestClient(app, base_url=BASE, follow_redirects=False)

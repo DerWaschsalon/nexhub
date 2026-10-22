@@ -4,6 +4,7 @@ Konvention für Pfade:
     /api/public/…  ohne Login (öffentlicher Bereich)
     /api/…         mit Login (CurrentUser), /api/admin/… nur Admins
 """
-from . import account, admin, auth, bot, devices, public, runs
+from . import account, admin, auth, bot, characters, devices, public, runs
 
-ROUTERS = [auth.router, account.router, devices.router, runs.router, public.router, admin.router, bot.router]
+ROUTERS = [auth.router, account.router, devices.router, runs.router, characters.router, public.router,
+           admin.router, bot.router]
