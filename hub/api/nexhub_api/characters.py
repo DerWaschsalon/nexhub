@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm.exc import StaleDataError
 
 from nexproto import NexLog
 from nexproto.nexlog import JOB_CLASSES, player_name
@@ -20,6 +21,16 @@ from .models import RunCharacter
 
 log = logging.getLogger(__name__)
 
+# Wie oft `run` nachsieht, ob während des Abrufs Zeilen wieder geöffnet wurden (refresh)
+PASSES = 5
+
+
+def _server(value: object) -> int:
+    """serverId aus der Kampfdatei; das Feld prüft das Modell nicht (extra="allow"), also vorsichtig."""
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 2**31 else 0
+
 
 def players_of(nexlog: NexLog) -> list[tuple[str, str | None, int]]:
     """(Name, Klasse, Server-ID) aller Spieler in den Kämpfen, jeder einmal. A2Tools schreibt die
@@ -28,7 +39,7 @@ def players_of(nexlog: NexLog) -> list[tuple[str, str | None, int]]:
     for fight in nexlog.fights:
         for actor in fight.actors:
             name = player_name(nexlog, actor)
-            server = int((actor.model_extra or {}).get("serverId") or 0)
+            server = _server((actor.model_extra or {}).get("serverId"))
             if name not in found or (server and not found[name][2]):
                 found[name] = (name, JOB_CLASSES.get(actor.jobId), server)
     return list(found.values())
@@ -54,11 +65,19 @@ class Fetcher:
         self.running.add(run_id)
         try:
             async with self.sessionmaker() as db:
-                pending = (await db.scalars(select(RunCharacter).where(
-                    RunCharacter.run_id == run_id, RunCharacter.status == "offen"))).all()
-                for row in pending:
-                    await self._fill(row)
-                    await db.commit()
+                # Mehrere Durchgänge: refresh kann Zeilen wieder öffnen, während dieser Abruf läuft
+                for _ in range(PASSES):
+                    pending = (await db.scalars(select(RunCharacter).where(
+                        RunCharacter.run_id == run_id, RunCharacter.status == "offen"))).all()
+                    if not pending:
+                        return
+                    for row in pending:
+                        await self._fill(row)
+                        try:
+                            await db.commit()
+                        except StaleDataError:
+                            await db.rollback()  # Run inzwischen gelöscht
+                            return
         finally:
             self.running.discard(run_id)
 
@@ -71,6 +90,9 @@ class Fetcher:
         except NCError as e:
             row.status, row.error = "fehler", str(e)[:200]
             log.warning("Charakter %s (Run %d): %s", row.name, row.run_id, e)
+        except Exception as e:  # unerwartete Antwort von NC: nie in „offen“ hängen bleiben
+            row.status, row.error = "fehler", f"Format unbekannt: {type(e).__name__}"
+            log.exception("Charakter %s (Run %d): unerwartete Antwort", row.name, row.run_id)
         else:
             row.status, row.error, row.nc_character_id, row.data = "ok", None, cid, data
             row.combat_power = (data.get("profile") or {}).get("combat_power")
@@ -82,4 +104,7 @@ class Fetcher:
             run_ids = (await db.scalars(select(RunCharacter.run_id).where(
                 RunCharacter.status == "offen").distinct())).all()
         for run_id in run_ids:
-            await self.run(run_id)
+            try:
+                await self.run(run_id)
+            except Exception:  # ein kaputter Run hält die anderen nicht auf
+                log.exception("Charakterprofile für Run %d nicht nachgeholt", run_id)

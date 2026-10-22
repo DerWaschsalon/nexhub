@@ -111,8 +111,12 @@ async def upload(request: Request, device: CurrentDevice, db: DB, settings: Sett
     await db.commit()
     log.info("Run %d: %s von Gerät %d (%d Kämpfe, %d KB)", run.id, r.dungeon, device.id, run.fights, len(data) // 1024)
     if request.app.state.characters is not None:
-        await characters.create(db, run.id, nexlog)
-        background.add_task(request.app.state.characters.run, run.id)
+        try:
+            await characters.create(db, run.id, nexlog)
+            background.add_task(request.app.state.characters.run, run.id)
+        except Exception:  # der Run ist gespeichert; ohne Profile ist er trotzdem gültig
+            await db.rollback()
+            log.exception("Run %d: Charakterprofile nicht angelegt", run.id)
     url = f"{settings.hub_base_url}/hub/runs/{run.id}"
     if settings.bot_configured and r.bosses_killed:
         background.add_task(tell_bot, request.app.state.http, settings,

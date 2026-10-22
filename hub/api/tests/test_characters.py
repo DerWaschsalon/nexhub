@@ -11,7 +11,7 @@ from nexhub_api.characters import players_of
 from nexhub_api.models import RunCharacter
 
 from .conftest import MEMBER
-from .fake_nc import search_row
+from .fake_nc import info, search_row
 from .test_devices import ORIGIN, pair
 from .test_runs import nexlog, upload
 
@@ -182,3 +182,127 @@ def test_refresh(make_client, fake, as_user):
         assert statuses == {"Testheld": "ok", "Moonlin": "nicht_gefunden"}
         # zweites Mal innerhalb von 10 Minuten
         assert admin.post(f"/api/runs/{run_id}/characters/refresh", headers=ORIGIN).status_code == 429
+
+
+# Robustheit des Abrufs (Funde aus dem Review)
+
+from nexhub_api.aion2 import NC  # noqa: E402
+from nexhub_api.characters import Fetcher  # noqa: E402
+
+
+def failed_run(make_client, as_user, fake, database_url, dungeon: str = "Ferocious Horn Den") -> int:
+    """Run mit zwei Zeilen im Status fehler (Suche antwortet 403)."""
+    fake.nc.routes["/aion2global/search/v2/character"] = 403
+    with make_client(**ON) as c:
+        run_id = upload(c, pair(c, as_user(MEMBER)),
+                        with_servers(nexlog(dungeon=dungeon), {"Testheld": 2302, "Mo***n": 2302})).json()["id"]
+    fake.nc.routes = {}
+    fake.nc.rows = [search_row("Testheld"), search_row("Moonlin", cid="moon")]
+    return run_id
+
+
+def set_status(database_url: str, run_id: int, status: str, names: tuple[str, ...] = ("Testheld", "Moonlin")) -> None:
+    async def go() -> None:
+        engine = create_async_engine(database_url)
+        async with async_sessionmaker(engine)() as db:
+            for row in (await db.scalars(select(RunCharacter).where(RunCharacter.run_id == run_id,
+                                                                    RunCharacter.name.in_(names)))).all():
+                row.status = status
+            await db.commit()
+        await engine.dispose()
+    asyncio.run(go())
+
+
+def fetch(database_url: str, nc, *run_ids: int, resume: bool = False) -> None:
+    async def go() -> None:
+        engine = create_async_engine(database_url)
+        fetcher = Fetcher(async_sessionmaker(engine, expire_on_commit=False), nc)
+        if resume:
+            await fetcher.resume()
+        for run_id in run_ids:
+            await fetcher.run(run_id)
+        await engine.dispose()
+    asyncio.run(go())
+
+
+def test_unerwartete_antwort_wird_fehler(make_client, fake, as_user, database_url):
+    run_id = failed_run(make_client, as_user, fake, database_url)
+    set_status(database_url, run_id, "offen")
+    broken = info()
+    broken["daevanion"]["boardList"] = [{"name": "ohne id", "open": 1}]
+    fake.nc.routes["/api/character/info"] = broken
+    fetch(database_url, NC(httpx.AsyncClient(transport=httpx.MockTransport(fake.nc)), pause=0), run_id)
+    found = rows(database_url, run_id)
+    assert {r.status for r in found.values()} == {"fehler"}
+    assert found["Testheld"].error == "Format unbekannt: KeyError"
+
+
+def test_ein_kaputter_run_haelt_das_nachholen_nicht_auf(make_client, fake, as_user, database_url, monkeypatch):
+    first = failed_run(make_client, as_user, fake, database_url)
+    second = failed_run(make_client, as_user, fake, database_url, dungeon="Anderer Dungeon")
+    assert first != second
+    set_status(database_url, first, "offen")
+    set_status(database_url, second, "offen")
+    original = Fetcher._fill
+
+    async def boom(self, row):
+        if row.run_id == first:
+            raise RuntimeError("kaputt")
+        await original(self, row)
+
+    monkeypatch.setattr(Fetcher, "_fill", boom)
+    fetch(database_url, NC(httpx.AsyncClient(transport=httpx.MockTransport(fake.nc)), pause=0), resume=True)
+    # der erste stürzt ab (hier absichtlich an _fill vorbei), der zweite wird trotzdem geholt
+    assert rows(database_url, second)["Testheld"].status == "ok"
+
+
+def test_waehrend_des_abrufs_neu_geoeffnete_zeilen_kommen_mit(make_client, fake, as_user, database_url):
+    run_id = failed_run(make_client, as_user, fake, database_url)
+    set_status(database_url, run_id, "offen", ("Moonlin",))
+
+    class Reopening(NC):
+        """Beim ersten Abruf setzt jemand (wie refresh) Testheld wieder auf offen."""
+        reopened = False
+
+        async def find(self, name, server_id):
+            if not self.reopened:
+                self.reopened = True
+                await asyncio.to_thread(set_status, database_url, run_id, "offen", ("Testheld",))
+            return await super().find(name, server_id)
+
+    fetch(database_url, Reopening(httpx.AsyncClient(transport=httpx.MockTransport(fake.nc)), pause=0), run_id)
+    assert {n: r.status for n, r in rows(database_url, run_id).items()} == {"Testheld": "ok", "Moonlin": "ok"}
+
+
+def test_run_waehrend_des_abrufs_geloescht(make_client, fake, as_user, database_url):
+    run_id = failed_run(make_client, as_user, fake, database_url)
+    set_status(database_url, run_id, "offen")
+
+    async def wipe() -> None:
+        engine = create_async_engine(database_url)
+        async with async_sessionmaker(engine)() as db:
+            from sqlalchemy import delete
+            await db.execute(delete(RunCharacter).where(RunCharacter.run_id == run_id))
+            await db.commit()
+        await engine.dispose()
+
+    class Deleting(NC):
+        async def snapshot(self, server_id, character_id):
+            await wipe()
+            return await super().snapshot(server_id, character_id)
+
+    fetch(database_url, Deleting(httpx.AsyncClient(transport=httpx.MockTransport(fake.nc)), pause=0), run_id)
+    assert rows(database_url, run_id) == {}
+
+
+def test_kaputte_server_id_bricht_den_upload_nicht(make_client, fake, as_user, database_url):
+    data = unpack(nexlog()).model_dump(mode="json")
+    data["fights"][0]["actors"][0]["serverId"] = "EU-2302"
+    data["fights"][1]["actors"][0]["serverId"] = 2**40
+    data["fights"][0]["actors"][1]["serverId"] = {"id": 1}
+    with make_client(**ON) as c:
+        r = upload(c, pair(c, as_user(MEMBER)), pack(NexLog.model_validate(data)))
+    assert r.status_code == 201
+    found = rows(database_url, r.json()["id"])
+    assert found["Testheld"].server_id == 0 and found["Moonlin"].server_id == 0
+    assert players_of(unpack(with_servers(nexlog(), {"Testheld": "2302"})))[0][2] == 2302
