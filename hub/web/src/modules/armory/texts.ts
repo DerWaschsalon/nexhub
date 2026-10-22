@@ -33,7 +33,19 @@ export const TEXTS = defineTexts(
 		'region.nae': 'North America East',
 		'region.naw': 'North America West',
 		'region.la': 'South America',
-		'region.as': 'Asia'
+		'region.as': 'Asia',
+		'armory.class': 'Class',
+		'armory.allClasses': 'All classes',
+		'armory.compare': 'Compare',
+		'armory.compare.title': 'Compare characters',
+		'armory.compare.intro': 'A character from the armory next to any other. The other one is fetched live and not stored.',
+		'armory.compare.left': 'From the armory',
+		'armory.compare.right': 'Compare with',
+		'armory.compare.pick': 'Compare',
+		'armory.compare.pickRight': 'Search for a character to compare with.',
+		'armory.compare.diff': 'Difference',
+		'armory.compare.boardHint': 'Red frame: the other character has unlocked this node, this one has not.',
+		'armory.compare.share': 'The address of this page shows the same comparison to anyone signed in to the hub.'
 	},
 	{
 		'armory.nav': 'Armory',
@@ -67,6 +79,18 @@ export const TEXTS = defineTexts(
 		'region.nae': 'Nordamerika Ost',
 		'region.naw': 'Nordamerika West',
 		'region.la': 'Südamerika',
-		'region.as': 'Asien'
+		'region.as': 'Asien',
+		'armory.class': 'Klasse',
+		'armory.allClasses': 'Alle Klassen',
+		'armory.compare': 'Vergleichen',
+		'armory.compare.title': 'Charaktere vergleichen',
+		'armory.compare.intro': 'Ein Charakter aus der Armory neben einem beliebigen anderen. Der andere wird live geholt und nicht gespeichert.',
+		'armory.compare.left': 'Aus der Armory',
+		'armory.compare.right': 'Vergleichen mit',
+		'armory.compare.pick': 'Vergleichen',
+		'armory.compare.pickRight': 'Such einen Charakter, mit dem du vergleichen willst.',
+		'armory.compare.diff': 'Unterschied',
+		'armory.compare.boardHint': 'Roter Rahmen: Der andere hat diesen Knoten freigeschaltet, dieser noch nicht.',
+		'armory.compare.share': 'Die Adresse dieser Seite zeigt allen, die im Hub angemeldet sind, denselben Vergleich.'
 	}
 );

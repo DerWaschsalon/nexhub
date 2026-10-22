@@ -201,6 +201,15 @@ und die Typen aus `modules/logs`.
   steht, bekommt `armory_id` und auf seiner Profilseite einen Link dorthin.
 - Die Klasse kommt als Klassenname von der Website (`class_name`); Farbe und Symbol leitet das Web
   über `classFromName` aus `modules/logs/classes.ts` ab, damit die Klassentabelle nur dort steht.
+- Die Suche filtert auf Wunsch nach Klasse (`&cls=ranger`). Das macht schon die Website über ihre
+  `pcId` (Klasse × Geschlecht × Rasse); die Tabelle dazu holt `NC.classes` einmal. Jeder Treffer
+  nennt seine Klasse. Die Suchmaske ist eine Komponente (`CharacterSearch.svelte`) für Eintragen
+  und Vergleich.
+- Vergleich (`hub/armory/vergleich?links=<id>&rechts=<Server-ID>/<Name>`): links ein Charakter aus
+  der Armory, rechts ein beliebiger, den `GET /api/armory/live?server_id=…&name=…` jetzt von der
+  Website holt und **nicht speichert**. Kampfkraft, Werte, Ausrüstung je Platz und Skills mit
+  Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
+  rot umrandet ist, was der andere schon offen hat. Die Adresse lässt sich teilen.
 
 ## Bot
 

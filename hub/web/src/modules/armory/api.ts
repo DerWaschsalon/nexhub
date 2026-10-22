@@ -1,6 +1,6 @@
 // Antworten der Hub-API für die Armory (hub/api/nexhub_api/routes/armory.py). Ein Armory-Charakter
 // ist eine Momentaufnahme wie ein Mitspieler im Run – Typen und Ansicht kommen aus modules/logs.
-import type { CharacterListItem, CharacterSnapshot } from '#modules/logs/api.ts';
+import type { CharacterData, CharacterListItem, CharacterSnapshot } from '#modules/logs/api.ts';
 
 export type ArmoryItem = CharacterListItem & {
 	owner: string;
@@ -25,6 +25,8 @@ export type ArmoryHit = {
 	server_id: number;
 	server: string | null;
 	level: number | null;
+	/** Klasse wie im Hub ("ranger") */
+	cls: string | null;
 	character_id: string;
 	image: string | null;
 	taken_by: string | null;
@@ -32,3 +34,6 @@ export type ArmoryHit = {
 
 /** Regionen der Global-Server (aion2.py SHARDS) */
 export const REGIONS = ['eu', 'nae', 'naw', 'la', 'as'] as const;
+
+/** Ein Charakter, live von der Website geholt (GET /api/armory/live) – wird nicht gespeichert. */
+export type ArmoryLive = { name: string; server_id: number; data: CharacterData };
