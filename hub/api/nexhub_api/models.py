@@ -181,3 +181,20 @@ class Comparison(Base):
     right_server_id: Mapped[int] = mapped_column(Integer)
     right_name: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class BuildCheck(Base):
+    """Letzter Build-Check eines Armory-Charakters (buildcheck.py). `result` ist die Auswertung aus
+    evaluation.py, ohne Namen der Top-Spieler. Geteilt: wer /c/<share_token> kennt, sieht ihn ohne Login."""
+
+    __tablename__ = "build_checks"
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), unique=True)
+    status: Mapped[str] = mapped_column(String(16))  # läuft, fertig, fehler
+    progress: Mapped[int] = mapped_column(Integer, default=0)  # Profile der Gruppe schon geholt
+    error: Mapped[str | None] = mapped_column(String(200))
+    result: Mapped[dict | None] = mapped_column(JSON)
+    share_token: Mapped[str | None] = mapped_column(String(32), unique=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

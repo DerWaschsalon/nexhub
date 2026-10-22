@@ -222,6 +222,19 @@ und die Typen aus `modules/logs`.
   liefert links die Momentaufnahme ohne Besitzer, rechts holt es live (`fetch_live`, wie
   `/api/armory/live`); fehlt der rechte, steht `right_error` da und links trotzdem.
   Kasten mit Link, Kopieren und Zurückziehen: `lib/components/ShareLink.svelte`, wie bei Runs.
+- Build-Check (`hub/armory/<id>/check`): der Charakter gegen die 15 besten Spieler seiner Klasse in
+  der EU mit ähnlicher Kampfkraft (±15 %), nur auf Klick (`POST /api/armory/{id}/check`, höchstens
+  alle 10 Minuten). Die Top-Spieler kommen aus der Rangliste von **Abyss Logs** (`abysslogs.py`,
+  `api.abysslogs.com/v1/leaderboards`, inoffiziell und nicht dokumentiert) an den Bossen der
+  höchsten Transzendenz-Stufe, Kämpfe ab 30 s. Die Rangliste nennt keinen Server; `buildcheck.py`
+  sucht ihn über die NC-Suche (Name und Klasse, bei mehreren Treffern die nächstliegende
+  Kampfkraft) und holt die Profile mit Gegenständen. Das dauert zwei bis drei Minuten, der Stand
+  steht in `GET …/check` (`progress`). `evaluation.py` vergleicht Feld für Feld: Zahlen gegen den
+  Median, Auswahlen gegen die zwei häufigsten; Ampel und „Zuerst“ nach „wie viele haben es besser“.
+  Gespeichert wird nur das Ergebnis (`build_checks`, je Charakter der letzte), keine Namen und
+  keine Profile der Top-Spieler. Geht etwas schief, bleibt das vorige Ergebnis mit `error`.
+  Teilen wie beim Vergleich (`POST/DELETE …/check/share`, öffentlich `GET /api/public/check/{token}`,
+  Seite `/c/<token>`).
 
 ## Bot
 

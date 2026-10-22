@@ -5,6 +5,7 @@ Nur herausgeben, was geteilt werden darf:
     GET /api/public/runs/{token}    ein geteilter Run (Teilen-Link /r/<token>)
     GET /api/public/runs/{token}/fights/{kampf}   ein Kampf daraus im Detail
     GET /api/public/vergleich/{token}?lang=de     ein geteilter Vergleich (Teilen-Link /v/<token>)
+    GET /api/public/check/{token}                 ein geteilter Build-Check (Teilen-Link /c/<token>)
 
 Geteilte Runs zeigen Eckdaten und Zusammenfassung mit den Namen der Mitspieler, aber kein
 Discord-Konto und nicht die Rohdatei. Geteilte Vergleiche zeigen beide Charaktere, aber nicht, wer
@@ -19,8 +20,8 @@ from sqlalchemy import select
 from nexproto import dungeon_label
 
 from ..deps import DB, SettingsDep
-from ..models import Comparison, Run
-from .armory import ComparisonOut, load_comparison
+from ..models import BuildCheck, Comparison, Run
+from .armory import ComparisonOut, SharedCheck, load_comparison, load_shared_check
 from .runs import load_fight_detail
 
 router = APIRouter(prefix="/api/public", tags=["öffentlich"])
@@ -91,3 +92,12 @@ async def shared_comparison(token: str, request: Request, db: DB, response: Resp
         raise HTTPException(404, "Link ungültig oder zurückgezogen")
     _not_for_search_engines(response)
     return await load_comparison(request, db, row, lang)
+
+
+@router.get("/check/{token}")
+async def shared_check(token: str, db: DB, response: Response) -> SharedCheck:
+    check = await db.scalar(select(BuildCheck).where(BuildCheck.share_token == token)) if len(token) <= 32 else None
+    if check is None or check.result is None:
+        raise HTTPException(404, "Link ungültig oder zurückgezogen")
+    _not_for_search_engines(response)
+    return await load_shared_check(db, check)
