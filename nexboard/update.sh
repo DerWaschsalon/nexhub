@@ -33,6 +33,18 @@ if ! git diff --quiet --ignore-submodules || ! git diff --cached --quiet --ignor
   fail "lokale Änderungen im Repo. Bitte erst committen oder verwerfen."
 fi
 OLD=$(git rev-parse HEAD)
+# modular war bis 21.10.2026 der Zweig der Installationen und läuft aus: auf main umsteigen.
+# Hängt nur am Namen, klappt also auch, wenn modular auf GitHub schon gelöscht ist.
+if [[ $(git rev-parse --abbrev-ref HEAD) == modular ]]; then
+  REMOTE=$(git config branch.modular.remote || echo origin)
+  git fetch --quiet "$REMOTE" main || fail "main von $REMOTE nicht abrufbar"
+  if git show-ref --verify --quiet refs/heads/main; then
+    git switch --quiet main || fail "Wechsel von modular auf main"
+  else
+    git switch --quiet --track "$REMOTE/main" || fail "Wechsel von modular auf main"
+  fi
+  SUMMARY_SWITCH="Zweig modular → main"
+fi
 if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
   git pull --ff-only --quiet || fail "git pull ging nicht (lokale Commits? Dann von Hand zusammenführen)."
 else
@@ -42,6 +54,7 @@ fi
 NEW=$(git rev-parse HEAD)
 changed() { [[ $OLD != "$NEW" ]] && ! git diff --quiet "$OLD" "$NEW" -- "$@"; }
 SUMMARY=()
+[[ -n ${SUMMARY_SWITCH-} ]] && SUMMARY+=("$SUMMARY_SWITCH")
 [[ $OLD != "$NEW" ]] && SUMMARY+=("NexBoard: $(git rev-list --count "$OLD..$NEW") neue Commits")
 
 # ------------------------------------------------------------------ A2Tools-Kern
