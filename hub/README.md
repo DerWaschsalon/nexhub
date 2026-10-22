@@ -30,7 +30,9 @@ api/nexhub_api/
   discord.py     Discord-OAuth2
   analysis.py    Zusammenfassung eines NexLogs (Bosse, Schaden je Spieler)
   logs.py        Logging, Zugriffslog ohne OAuth-Code
-  routes/        ein Modul pro Bereich: auth, account, devices, runs, public, admin
+  aion2.py       Client für Charakterdaten der AION-2-Website
+  characters.py  Momentaufnahmen der Mitspieler je Run (Abruf im Hintergrund)
+  routes/        ein Modul pro Bereich: auth, account, devices, runs, characters, public, admin
   main.py        App zusammenbauen, Herkunftsprüfung, Web-Seiten ausliefern
 web/src/
   app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table .tabs
@@ -143,6 +145,29 @@ der Seitenleiste). Wer den Hub betreibt, kommt nur aus `.env` (`HUB_OPERATOR_NAM
 Repo. Die Datenschutzerklärung beschreibt, was der Code tatsächlich tut – ändert sich das (neue
 Cookies, Protokolle, Inhalte von fremden Servern, Löschfristen), die Seite mit ändern.
 
+## Charakterprofile
+
+Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nach dem Vorbild von
+[nuriland/aion2-api](https://github.com/nuriland/aion2-api) (MIT). Code in `aion2.py` (Client),
+`characters.py` (Abruf) und `routes/characters.py`:
+
+- Nach dem Upload eine Zeile `run_characters` je Spieler (Name über `names`, Server aus `serverId`
+  je Actor der Kampfdatei). Im Hintergrund: Suche nach Name und Server, dann Profil, Ausrüstung und
+  die offenen Daevanion-Bretter, nacheinander mit `HUB_AION2_PAUSE` (0,3 s), etwa 8 Anfragen je
+  Spieler. Status `offen`, `ok`, `nicht_gefunden` (auch: Server unbekannt oder nicht Global),
+  `name_maskiert`, `fehler`. Offene Zeilen holt der Hub beim Start nach.
+- `GET /api/runs/{id}/characters`, `GET …/characters/{char}`; `POST …/characters/refresh` holt
+  `fehler`/`nicht_gefunden` neu (Rechte wie Löschen, höchstens alle 10 Minuten). Gelungene
+  Momentaufnahmen bleiben, wie sie zum Run passen.
+- Nur mit Login; geteilte Links zeigen keine Profile. Gespeichert wird nur, was das Profil zeigt
+  (etwa 15–30 KB je Spieler), gelöscht mit dem Run.
+- Nur Global-Server (NA, EU, SA, Asien); den Shard verrät die Server-ID (2302 = EU). Taiwan und
+  Korea haben eigene Seiten.
+- Web: Modul `logs`, Seite `hub/runs/<id>/spieler/<char>`, Namen in der Run-Übersicht verlinken
+  dorthin. Bilder direkt von NCSOFT ohne Herkunftsadresse.
+- Tests gegen eine nachgebaute Seite (`tests/fake_nc.py`, nur erfundene Daten). Format gegen die
+  echte Seite: `AION2_LIVE=1 AION2_NAME=<Charakter> AION2_SERVER=<Server-ID> uv run pytest -q tests/test_aion2.py -k echte`.
+
 ## Bot
 
 Der Bereich „Bot“ (`/hub/admin/bot/…`, nur Admins) steuert TheWashBot und ersetzt dessen altes
@@ -199,7 +224,8 @@ Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 `DATABASE_URL`, `HUB_BASE_URL`, `HUB_SECRET_KEY`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
 `HUB_ADMIN_IDS`, `HUB_GUILD_ID`, `HUB_MEMBER_ROLE_ID`, `HUB_WEB_DIR`, `HUB_DATA_DIR` (Ablage der Runs),
 `BOT_CONTROL_URL` und `BOT_CONTROL_KEY` (Bereich „Bot“, siehe oben), `HUB_OPERATOR_*` und
-`HUB_HOSTER` (Impressum, Datenschutz).
+`HUB_HOSTER` (Impressum, Datenschutz), `HUB_AION2_ENABLED`, `HUB_AION2_LANG` und `HUB_AION2_PAUSE`
+(Charakterprofile, siehe oben).
 
 ## Entwickeln
 
