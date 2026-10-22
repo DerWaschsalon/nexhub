@@ -14,6 +14,8 @@ from nexhub_api.db import migrate
 from nexhub_api.main import create_app
 
 from .fake_nc import HOSTS as NC_HOSTS
+from .fake_abyss import HOST as ABYSS_HOST
+from .fake_abyss import FakeAbyss
 from .fake_nc import FakeNC
 
 ADMIN = 111111111111111111
@@ -36,10 +38,14 @@ class FakeDiscord:
         self.bot: Callable[[httpx.Request], httpx.Response] = lambda request: httpx.Response(404)
         # AION-2-Website, siehe fake_nc.py und test_characters.py
         self.nc = FakeNC()
+        # Abyss Logs (Build-Check), siehe fake_abyss.py
+        self.abyss = FakeAbyss()
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.host in NC_HOSTS:
             return self.nc(request)
+        if request.url.host == ABYSS_HOST:
+            return self.abyss(request)
         if request.url.host == "bot":
             return self.bot(request)
         path = request.url.path.removeprefix("/api/v10")

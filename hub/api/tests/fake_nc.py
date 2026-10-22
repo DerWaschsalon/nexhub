@@ -103,6 +103,10 @@ class FakeNC:
         self.routes: dict[str, object] = {}
         # Charakter-IDs, für die das Profil mit 500 antwortet (Fehler nur bei einem Spieler)
         self.fail_for: set[str] = set()
+        # Build-Check: Kampfkraft je Charakter-ID im Profil, abgefragte IDs für Profil und Gegenstände
+        self.cp_for: dict[str, int] = {}
+        self.snapshot_ids: list[str] = []
+        self.item_ids: list[str] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -112,6 +116,10 @@ class FakeNC:
             self.langs.append(q.get("lang", ""))
         if path == "/api/character/info" and q.get("characterId") in self.fail_for:
             return httpx.Response(500)
+        if path == "/api/character/info":
+            self.snapshot_ids.append(q.get("characterId", ""))
+        if path == "/api/character/equipment/item":
+            self.item_ids.append(q.get("characterId", ""))
         pc_ids = q["pcId"].split(",") if "pcId" in q else None  # Klassenfilter der Suche
         found = [r for r in self.rows if q.get("keyword", "").lower() in r["name"].lower()
                  and (pc_ids is None or str(r["pcId"]) in pc_ids)]
@@ -124,6 +132,8 @@ class FakeNC:
             "/api/character/daevanion/detail": board(),
             "/api/character/equipment/item": item(),
         }
+        if path == "/api/character/info" and q.get("characterId") in self.cp_for:
+            default[path]["profile"]["combatPower"] = self.cp_for[q["characterId"]]
         answer = self.routes.get(path, default.get(path, 404))
         if isinstance(answer, Exception):
             raise answer
