@@ -30,13 +30,19 @@ Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel 
   Vertraute (`0x9000`/`0x900D`/`0x9014`): 207 Vertraute mit Art (Cogni/Fera/Natura/Varian), Stufe, Seelen,
   fehlenden Seelen bis zur nächsten Stufe (5/25/75) und den Monstern, die die Seele droppen (Katalog aus
   aion2pettracker, GPL-3.0). Filter nach Stand und Art. Stand in `~/.local/share/aion2-radar/{feldbosse,vertraute}.json`.
-- **Lernmodus:** Beim Betreten eines Dungeons startet eine Aufnahme nach `mitschnitte/<Dungeon>-<Zeit>.pcap`,
+- **Lernmodus:** Beim Betreten eines Dungeons startet eine Aufnahme nach `~/.local/share/aion2-radar/mitschnitte/<Dungeon>-<Zeit>.pcap`,
   beim Verlassen stoppt sie (Statuszeile „● REC“), jeder Lauf eine Datei. Abschaltbar im Meldungen-Fenster
   („Dungeons automatisch aufnehmen“). Von Hand: Rechtsklick > Boss-Warnungen > Aufnahme. Auswerten mit
   `python3 -m werkzeuge.lernen mitschnitte/<datei>.pcap`: pro Boss jeder Skill mit Vorlauf bis zum Treffer,
   Toden und dem Cast, der regelmäßig davor kommt.
 
-Start: `aion2-radar` (Charaktername über `AION2_CHAR`, Standard Navonex).
+Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seite „Radar“). Ist es an, startet der Daemon das Radar,
+sobald AION 2 läuft, und beendet es 30 s nach Spielende. Auf der Seite stehen alle Einstellungen, auch der
+Charaktername. Von Hand geht weiterhin `python3 -m radar --name <Charakter> [--pcap datei.pcap]` in diesem Ordner,
+ein zweites Live-Radar verhindert die Sperrdatei.
+
+Befehle vom Daemon kommen als Textzeile über stdin (`radar/befehle.py`), Standardwerte und Warnungsliste
+stehen in `radar/standard.json` und `radar/meldungen.json` (liest auch der Daemon).
 
 | Datei | Inhalt |
 |---|---|
@@ -51,6 +57,7 @@ Start: `aion2-radar` (Charaktername über `AION2_CHAR`, Standard Navonex).
 | `radar/punkte.py`, `radar/karte.py` | Spawnpunkte, Eichung, Kartenfenster |
 | `werkzeuge/auswertung.py` | Kämpfe auswerten: Tode, Ursachen, Vorwarnzeiten |
 | `werkzeuge/analyse.py` | Opcode-Statistik eines Mitschnitts |
+| `radar/befehle.py` | Befehle vom NexBoard-Daemon (stdin) |
 | `werkzeuge/lernen.py` | Lernmodus: Boss-Skills einer Aufnahme auswerten |
 | `werkzeuge/bosse.py` | erzeugt `radar/bosse.json` und `radar/zonen.json` (Boss/Zone -> Dungeon) aus den A2Tools-Daten |
 
