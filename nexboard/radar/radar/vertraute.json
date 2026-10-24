@@ -1,0 +1,2811 @@
+{
+"1001": {
+"art": "Spezial",
+"de": "Black Dragon",
+"en": "Black Dragon",
+"monster": [],
+"orte": []
+},
+"1002": {
+"art": "Cogni",
+"de": "Krall Laborer",
+"en": "Krall Laborer",
+"monster": [
+2100075,
+2100480,
+2100914
+],
+"orte": [
+"Verteron: Verteron Fortress Ruins",
+"Verteron: Destroyed Abyss Gate",
+"Verteron: Scarlet Forest"
+]
+},
+"1003": {
+"art": "Natura",
+"de": "Forest Specter",
+"en": "Forest Specter",
+"monster": [
+2100601,
+2100662
+],
+"orte": [
+"Verteron: Altamia Canyon",
+"Verteron: Garden of the Illusion God"
+]
+},
+"1004": {
+"art": "Fera",
+"de": "Fossa",
+"en": "Fossa",
+"monster": [
+2100163,
+2400254,
+2400414
+],
+"orte": [
+"Verteron: Southern Tolbas Forest",
+"Altgard: Uruthumheim",
+"Altgard: Basfelt Ruins"
+]
+},
+"1005": {
+"art": "Cogni",
+"de": "Klaw",
+"en": "Klaw",
+"monster": [
+2100078,
+2600029,
+2600429,
+2600504,
+2600538,
+2600558
+],
+"orte": [
+"Verteron: Destroyed Abyss Gate",
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1006": {
+"art": "Fera",
+"de": "Sparkie",
+"en": "Sparkie",
+"monster": [
+2100273,
+2100305,
+2100753,
+2100795,
+2100986,
+2100992
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Southern Altamia Highland",
+"Verteron: Western Altamia Highland",
+"Verteron: Aullaeu Village"
+]
+},
+"1007": {
+"art": "Fera",
+"de": "Potcrab",
+"en": "Potcrab",
+"monster": [
+2100032,
+2100610,
+2101098,
+2400363,
+2400755,
+2400812
+],
+"orte": [
+"Verteron: Ellun River Marsh",
+"Verteron: Altamia Canyon",
+"Verteron: Eternal Isle",
+"Altgard: Dranactus",
+"Altgard: Spirit Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1008": {
+"art": "Fera",
+"de": "Odspinnling",
+"en": "Baby Odyle Spider",
+"monster": [
+2100034
+],
+"orte": [
+"Verteron: Spirit's Rest"
+]
+},
+"1009": {
+"art": "Fera",
+"de": "Kernon",
+"en": "Kernon",
+"monster": [],
+"orte": []
+},
+"1010": {
+"art": "Cogni",
+"de": "Kämpfer (Manduri)",
+"en": "Manduri Fighter",
+"monster": [
+2110506,
+2400617
+],
+"orte": [
+"Verteron: Crimson Isle",
+"Altgard: Black Claw Village"
+]
+},
+"1011": {
+"art": "Fera",
+"de": "Mantaris",
+"en": "Skyray",
+"monster": [
+2100047,
+2100048,
+2100182,
+2100556,
+2100607,
+2100613,
+2100832,
+2101123,
+2101124,
+2101132,
+2400163,
+2400945
+],
+"orte": [
+"Verteron: Spirit's Rest",
+"Verteron: Ellun River Midstream",
+"Verteron: Eastern Tolbas Forest",
+"Verteron: Pilgrim's Ridge",
+"Verteron: Altamia Canyon",
+"Verteron: Kraka Footpath",
+"Verteron: Western Cantas Valley",
+"Verteron: Southern Altamia Highland",
+"Altgard: Tranein Pond",
+"Altgard: Idun's Lake"
+]
+},
+"1012": {
+"art": "Natura",
+"de": "Fungie",
+"en": "Fungie",
+"monster": [
+2100041
+],
+"orte": [
+"Verteron: Eastern Cantas Valley"
+]
+},
+"1013": {
+"art": "Varian",
+"de": "Swarm",
+"en": "Swarm",
+"monster": [
+2400080,
+2400456,
+2600001,
+2600011,
+2600021,
+2600401,
+2600411,
+2600421
+],
+"orte": [
+"Altgard: Calderon Canyon",
+"Altgard: Fafnite Deposit",
+"Chaotic Lower Reshanta: Devastated Remnants",
+"Chaotic Lower Reshanta: Black Fragments Area",
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Steel Titan's Grave",
+"Chaotic Middle Reshanta: Eroded Fragment Area",
+"Chaotic Middle Reshanta: Contaminated Marsh"
+]
+},
+"1014": {
+"art": "Fera",
+"de": "Wachhund (Drakan)",
+"en": "Drakan Guard Dog",
+"monster": [
+2101002,
+2101009,
+2400359,
+2400587,
+2400655,
+2600052
+],
+"orte": [
+"Verteron: Nahid Brigade Fortress",
+"Altgard: Dranactus",
+"Altgard: Eastern Gribade Highland",
+"Altgard: Lagta Fortress",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings"
+]
+},
+"1015": {
+"art": "Fera",
+"de": "Kailin",
+"en": "Kailin",
+"monster": [
+2101021,
+2400736,
+2400905,
+2400934
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Altgard: Spirit Isle",
+"Altgard: Tranein Highland",
+"Altgard: Battlescar Mound"
+]
+},
+"1016": {
+"art": "Fera",
+"de": "Slink",
+"en": "Slink",
+"monster": [
+2100165,
+2100188,
+2101097,
+2400520,
+2400819,
+2400909,
+2400943,
+2600048,
+2600448,
+2600576,
+2600586
+],
+"orte": [
+"Verteron: Southern Tolbas Forest",
+"Verteron: Ellun River Midstream",
+"Verteron: Eternal Isle",
+"Altgard: Western Gribade Highland",
+"Altgard: Immortal Isle",
+"Altgard: Tranein Pond",
+"Altgard: Southern Gribade Highland",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1017": {
+"art": "Cogni",
+"de": "Schamane (Krall)",
+"en": "Krall Warshaman",
+"monster": [
+2100074,
+2100855
+],
+"orte": [
+"Verteron: Verteron Fortress Ruins",
+"Verteron: Drana Processing Area"
+]
+},
+"1018": {
+"art": "Cogni",
+"de": "Berserker (Varg)",
+"en": "Varg Berserker",
+"monster": [
+2400385,
+2400609,
+2600105,
+2600135,
+2600455,
+2600515,
+2600580,
+2600590
+],
+"orte": [
+"Altgard: Dranactus",
+"Altgard: Black Claw Village",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1021": {
+"art": "Fera",
+"de": "Aberrant Odyle Spider",
+"en": "Aberrant Odyle Spider",
+"monster": [],
+"orte": []
+},
+"1022": {
+"art": "Fera",
+"de": "Crasaur",
+"en": "Crasaur",
+"monster": [
+2100215,
+2100608,
+2101083,
+2400327,
+2400809
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Altamia Canyon",
+"Verteron: Eternal Isle",
+"Altgard: Purifying Forest",
+"Altgard: Immortal Isle"
+]
+},
+"1025": {
+"art": "Fera",
+"de": "Mutated Aberrant Odyle Spider",
+"en": "Mutated Aberrant Odyle Spider",
+"monster": [
+2100030,
+2100663,
+2100745,
+2400744
+],
+"orte": [
+"Verteron: Contaminated Marsh",
+"Verteron: Garden of the Illusion God",
+"Verteron: Eastern Altamia Highland",
+"Altgard: Spirit Isle"
+]
+},
+"1026": {
+"art": "Cogni",
+"de": "Krall Warrior",
+"en": "Krall Warrior",
+"monster": [
+2100073,
+2100910,
+2101005
+],
+"orte": [
+"Verteron: Verteron Fortress Ruins",
+"Verteron: Scarlet Forest",
+"Verteron: Nahid Brigade Fortress"
+]
+},
+"1027": {
+"art": "Natura",
+"de": "Dürrer Agrint",
+"en": "Withered Agrint",
+"monster": [
+2100612,
+2100652,
+2600026
+],
+"orte": [
+"Verteron: Altamia Canyon",
+"Verteron: Garden of the Illusion God",
+"Chaotic Lower Reshanta: Sulfur Tree Island"
+]
+},
+"1028": {
+"art": "Varian",
+"de": "Kraomutant",
+"en": "Krao Mutant",
+"monster": [],
+"orte": []
+},
+"1029": {
+"art": "Cogni",
+"de": "Klaw Scout",
+"en": "Klaw Scout",
+"monster": [
+2400313,
+2600002,
+2600012,
+2600402,
+2600412
+],
+"orte": [
+"Altgard: Purifying Forest",
+"Chaotic Lower Reshanta: Devastated Remnants",
+"Chaotic Lower Reshanta: Black Fragments Area",
+"Chaotic Middle Reshanta: Steel Titan's Grave",
+"Chaotic Middle Reshanta: Eroded Fragment Area"
+]
+},
+"1030": {
+"art": "Cogni",
+"de": "Hüterkrieger (Nagarant)",
+"en": "Nagarant Guardian Warrior",
+"monster": [
+2600036,
+2600041,
+2600436,
+2600441,
+2600537,
+2600557
+],
+"orte": [
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1031": {
+"art": "Natura",
+"de": "Konutin Worker",
+"en": "Konutin Worker",
+"monster": [
+2100157
+],
+"orte": [
+"Verteron: Northern Tolbas Forest"
+]
+},
+"1032": {
+"art": "Fera",
+"de": "Elite Keneire",
+"en": "Elite Keneire",
+"monster": [],
+"orte": []
+},
+"1033": {
+"art": "Cogni",
+"de": "Elite Manduri Fighter",
+"en": "Elite Manduri Fighter",
+"monster": [
+2100557,
+2100569,
+2400605
+],
+"orte": [
+"Verteron: Pilgrim's Ridge",
+"Altgard: Black Claw Village"
+]
+},
+"1034": {
+"art": "Fera",
+"de": "Giant Sparkie",
+"en": "Giant Sparkie",
+"monster": [
+2100015,
+2100796,
+2100987,
+2100993,
+2400341,
+2400466
+],
+"orte": [
+"Verteron: Eastern Cantas Valley",
+"Verteron: Southern Altamia Highland",
+"Verteron: Aullaeu Village",
+"Altgard: Purifying Forest",
+"Altgard: Fafnite Deposit"
+]
+},
+"1035": {
+"art": "Fera",
+"de": "Skama",
+"en": "Skama",
+"monster": [
+2100031,
+2100376,
+2100907
+],
+"orte": [
+"Verteron: Contaminated Marsh",
+"Verteron: Ellun River Midstream",
+"Verteron: Scarlet Forest"
+]
+},
+"1036": {
+"art": "Fera",
+"de": "Lupyllini",
+"en": "Lupyllini",
+"monster": [
+2100746
+],
+"orte": [
+"Verteron: Eastern Altamia Highland"
+]
+},
+"1037": {
+"art": "Fera",
+"de": "Male Crestlich",
+"en": "Male Crestlich",
+"monster": [
+2100151,
+2100750
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Southern Altamia Highland"
+]
+},
+"1038": {
+"art": "Fera",
+"de": "Airon",
+"en": "Airon",
+"monster": [
+2100144,
+2100216,
+2100609,
+2100741,
+2400567,
+2400568
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Altamia Canyon",
+"Verteron: Western Altamia Highland",
+"Altgard: Eastern Gribade Highland"
+]
+},
+"1039": {
+"art": "Fera",
+"de": "Crestlich",
+"en": "Crestlich",
+"monster": [
+2100037,
+2100150,
+2100799
+],
+"orte": [
+"Verteron: Western Cantas Valley",
+"Verteron: Ellun River Midstream",
+"Verteron: Southern Altamia Highland"
+]
+},
+"1040": {
+"art": "Cogni",
+"de": "Schamane (Aulau)",
+"en": "Aullaeu Shaman",
+"monster": [
+2100950
+],
+"orte": [
+"Verteron: Aullaeu Village"
+]
+},
+"1041": {
+"art": "Fera",
+"de": "Cave Bat",
+"en": "Cave Bat",
+"monster": [
+2100911
+],
+"orte": [
+"Verteron: Scarlet Forest"
+]
+},
+"1042": {
+"art": "Fera",
+"de": "Ursus",
+"en": "Ursus",
+"monster": [
+2100172,
+2100552,
+2100560,
+2100655,
+2100817,
+2400376,
+2400916
+],
+"orte": [
+"Verteron: Southern Tolbas Forest",
+"Verteron: Pilgrim's Ridge",
+"Verteron: Garden of the Illusion God",
+"Verteron: Kraka Footpath",
+"Altgard: Battlescar Mound",
+"Altgard: Silent Hill"
+]
+},
+"1043": {
+"art": "Fera",
+"de": "Elite Ursus",
+"en": "Elite Ursus",
+"monster": [],
+"orte": []
+},
+"1044": {
+"art": "Cogni",
+"de": "Aultross's Doppelganger",
+"en": "Aultross's Doppelganger",
+"monster": [],
+"orte": []
+},
+"1045": {
+"art": "Fera",
+"de": "Sylphen",
+"en": "Sylphen",
+"monster": [
+2100004,
+2100023,
+2100219,
+2100472,
+2100565,
+2100743,
+2400362
+],
+"orte": [
+"Verteron: Western Cantas Valley",
+"Verteron: Contaminated Marsh",
+"Verteron: Ellun River Midstream",
+"Verteron: Eastern Tolbas Forest",
+"Verteron: Pilgrim's Ridge",
+"Verteron: Eastern Altamia Highland",
+"Altgard: Battlescar Mound"
+]
+},
+"1046": {
+"art": "Fera",
+"de": "Armadon",
+"en": "Armadon",
+"monster": [
+2400002,
+2400249
+],
+"orte": [
+"Altgard: Dredgion Crash Site",
+"Altgard: Moslan Forest"
+]
+},
+"1047": {
+"art": "Fera",
+"de": "Aberrant Armadon",
+"en": "Aberrant Armadon",
+"monster": [
+2100453,
+2100751
+],
+"orte": [
+"Verteron: Eastern Cantas Valley",
+"Verteron: Southern Altamia Highland"
+]
+},
+"1048": {
+"art": "Natura",
+"de": "Waldgeist",
+"en": "Forest Spirit",
+"monster": [
+2100022,
+2100142,
+2100555,
+2100611,
+2400337
+],
+"orte": [
+"Verteron: Ellun River Marsh",
+"Verteron: Ellun River Midstream",
+"Verteron: Pilgrim's Ridge",
+"Verteron: Altamia Canyon",
+"Altgard: Purifying Forest"
+]
+},
+"1049": {
+"art": "Natura",
+"de": "Mutated Forest Spirit",
+"en": "Mutated Forest Spirit",
+"monster": [
+2100711,
+2100715,
+2400061
+],
+"orte": [
+"Verteron: Contaminated Sanctum",
+"Altgard: Nameless Cemetery"
+]
+},
+"1050": {
+"art": "Natura",
+"de": "Gravi",
+"en": "Gravi",
+"monster": [
+2100650,
+2101125,
+2400307
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Verteron: Northern Tolbas Forest",
+"Altgard: Purifying Forest"
+]
+},
+"1051": {
+"art": "Natura",
+"de": "Magic Gravi",
+"en": "Magic Gravi",
+"monster": [
+2100659,
+2101126,
+2400329,
+2400731
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Verteron: Northern Tolbas Forest",
+"Altgard: Purifying Forest",
+"Altgard: Spirit Isle"
+]
+},
+"1052": {
+"art": "Natura",
+"de": "Großblattgravi",
+"en": "Large Leaf Gravi",
+"monster": [
+2100285,
+2100651,
+2400342
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Garden of the Illusion God",
+"Altgard: Purifying Forest"
+]
+},
+"1053": {
+"art": "Fera",
+"de": "Aberrant Potcrab",
+"en": "Aberrant Potcrab",
+"monster": [
+2100908,
+2110512
+],
+"orte": [
+"Verteron: Scarlet Forest",
+"Verteron: Crimson Isle"
+]
+},
+"1054": {
+"art": "Cogni",
+"de": "Mumu Warrior",
+"en": "Mumu Warrior",
+"monster": [
+2400350,
+2400570,
+2400606
+],
+"orte": [
+"Altgard: Dranactus",
+"Altgard: Eastern Gribade Highland",
+"Altgard: Black Claw Village"
+]
+},
+"1055": {
+"art": "Fera",
+"de": "Grave Rat",
+"en": "Grave Rat",
+"monster": [],
+"orte": []
+},
+"1056": {
+"art": "Varian",
+"de": "Sonde (Drakan)",
+"en": "Drakan Probe",
+"monster": [
+2100866,
+2101014,
+2400143,
+2400162,
+2400382,
+2400658
+],
+"orte": [
+"Verteron: Drana Processing Area",
+"Verteron: Nahid Brigade Fortress",
+"Altgard: Sanctum Outpost",
+"Altgard: Tranein Pond",
+"Altgard: Dranactus",
+"Altgard: Lagta Fortress"
+]
+},
+"1057": {
+"art": "Fera",
+"de": "Coradon",
+"en": "Coradon",
+"monster": [],
+"orte": []
+},
+"1058": {
+"art": "Natura",
+"de": "Schwarzrauch Murute",
+"en": "Black Smoke Murute",
+"monster": [
+2300312,
+2310312,
+2320312
+],
+"orte": []
+},
+"1059": {
+"art": "Fera",
+"de": "Giant Bee",
+"en": "Giant Bee",
+"monster": [
+2100551
+],
+"orte": [
+"Verteron: Pilgrim's Ridge"
+]
+},
+"1060": {
+"art": "Fera",
+"de": "Sternenschildkröte",
+"en": "Starturtle",
+"monster": [
+2100033,
+2100808,
+2101082,
+2400374,
+2400519,
+2400808
+],
+"orte": [
+"Verteron: Ellun River Marsh",
+"Verteron: Kraka Footpath",
+"Verteron: Eternal Isle",
+"Altgard: Dranactus",
+"Altgard: Western Gribade Highland",
+"Altgard: Immortal Isle"
+]
+},
+"1061": {
+"art": "Varian",
+"de": "Slime",
+"en": "Slime",
+"monster": [
+2400320
+],
+"orte": [
+"Altgard: Purifying Forest"
+]
+},
+"1062": {
+"art": "Varian",
+"de": "Verseuchter Schleim",
+"en": "Contaminated Slime",
+"monster": [
+2100025,
+2100717,
+2600023,
+2600423,
+2600539,
+2600559
+],
+"orte": [
+"Verteron: Ellun River Marsh",
+"Verteron: Contaminated Sanctum",
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1063": {
+"art": "Varian",
+"de": "Wachsamer Oculazen",
+"en": "Vigilant Oculazen",
+"monster": [
+2400364
+],
+"orte": [
+"Altgard: Dranactus"
+]
+},
+"1064": {
+"art": "Varian",
+"de": "Oculazen",
+"en": "Oculazen",
+"monster": [
+2100854,
+2400711
+],
+"orte": [
+"Verteron: Drana Cultivation Area",
+"Altgard: Impetusium Square"
+]
+},
+"1065": {
+"art": "Cogni",
+"de": "Biruta",
+"en": "Biruta",
+"monster": [
+2100183,
+2400920
+],
+"orte": [
+"Verteron: Eastern Tolbas Forest",
+"Altgard: Nameless Cemetery"
+]
+},
+"1066": {
+"art": "Fera",
+"de": "Papis",
+"en": "Papis",
+"monster": [
+2000926,
+2000927,
+2000928,
+2000929,
+2000951,
+2100009,
+2100220,
+2100654,
+2400594,
+2400903,
+2400938,
+2400940,
+2400947
+],
+"orte": [
+"Altgard: Silent Hill",
+"Altgard: Moslan Forest",
+"Altgard: Uruthumheim",
+"Altgard: Tranein Highland",
+"Altgard: Basfelt Ruins",
+"Verteron: Western Cantas Valley",
+"Verteron: Ellun River Midstream",
+"Verteron: Garden of the Illusion God",
+"Altgard: Eastern Gribade Highland",
+"Altgard: Safe Haven",
+"Altgard: Sanctum Outpost",
+"Altgard: Southern Gribade Highland",
+"Altgard: Mahindel River"
+]
+},
+"1067": {
+"art": "Fera",
+"de": "Scorpion",
+"en": "Scorpion",
+"monster": [
+2100709,
+2400470
+],
+"orte": [
+"Verteron: Contaminated Sanctum",
+"Altgard: Fafnite Deposit"
+]
+},
+"1068": {
+"art": "Varian",
+"de": "Krao Test Subject",
+"en": "Krao Test Subject",
+"monster": [],
+"orte": []
+},
+"1069": {
+"art": "Natura",
+"de": "Stone Spirit",
+"en": "Stone Spirit",
+"monster": [
+2100812,
+2400301,
+2600056,
+2600118,
+2600128,
+2600148
+],
+"orte": [
+"Verteron: Kraka Footpath",
+"Altgard: Purifying Forest",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings"
+]
+},
+"1071": {
+"art": "Fera",
+"de": "Leicheninsektoid",
+"en": "Cadaver Insectoid",
+"monster": [
+2400018
+],
+"orte": [
+"Altgard: Dredgion Crash Site"
+]
+},
+"1072": {
+"art": "Fera",
+"de": "Tog",
+"en": "Tog",
+"monster": [
+2400912
+],
+"orte": [
+"Altgard: Silent Hill"
+]
+},
+"1073": {
+"art": "Natura",
+"de": "Nepenthes",
+"en": "Nepenthes",
+"monster": [
+2100160,
+2100744,
+2600049,
+2600449,
+2600511
+],
+"orte": [
+"Verteron: Northern Tolbas Forest",
+"Verteron: Eastern Altamia Highland",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest"
+]
+},
+"1074": {
+"art": "Cogni",
+"de": "Arbeiter (Kuru)",
+"en": "Kuru Worker",
+"monster": [
+2100180,
+2100964,
+2101133,
+2101136,
+2400831
+],
+"orte": [
+"Verteron: Eastern Tolbas Forest",
+"Verteron: Forest of Exiles",
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1075": {
+"art": "Cogni",
+"de": "Knecht (Kuru)",
+"en": "Kuru Tinkerer",
+"monster": [
+2100181,
+2101134,
+2101137,
+2400832
+],
+"orte": [
+"Verteron: Eastern Tolbas Forest",
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1077": {
+"art": "Varian",
+"de": "Harcon",
+"en": "Harcon",
+"monster": [
+2300104,
+2310104,
+2320104
+],
+"orte": []
+},
+"1078": {
+"art": "Cogni",
+"de": "Streiter (Urugugu)",
+"en": "Urugugu Brawler",
+"monster": [],
+"orte": []
+},
+"1079": {
+"art": "Natura",
+"de": "Ultimate Wind Spirit",
+"en": "Ultimate Wind Spirit",
+"monster": [],
+"orte": []
+},
+"1080": {
+"art": "Cogni",
+"de": "Überwachungswaffe K'nash",
+"en": "Sentinel K'nash",
+"monster": [],
+"orte": []
+},
+"1081": {
+"art": "Natura",
+"de": "Dionae",
+"en": "Dionae",
+"monster": [],
+"orte": []
+},
+"1082": {
+"art": "Natura",
+"de": "Ultimate Fire Spirit",
+"en": "Ultimate Fire Spirit",
+"monster": [],
+"orte": []
+},
+"1083": {
+"art": "Fera",
+"de": "Spider",
+"en": "Spider",
+"monster": [
+2600046,
+2600446,
+2600578,
+2600588
+],
+"orte": [
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1084": {
+"art": "Varian",
+"de": "Kalgolem",
+"en": "Kalgolem",
+"monster": [
+2100002,
+2100700,
+2400328,
+2600070,
+2600470
+],
+"orte": [
+"Verteron: Western Cantas Valley",
+"Verteron: Destroyed Temple Site",
+"Altgard: Purifying Forest",
+"Chaotic Lower Reshanta: Reshanta's Root",
+"Chaotic Middle Reshanta: Corroded Heart"
+]
+},
+"1086": {
+"art": "Natura",
+"de": "Fungen",
+"en": "Fungen",
+"monster": [
+2100456
+],
+"orte": [
+"Verteron: Eastern Cantas Valley"
+]
+},
+"1087": {
+"art": "Varian",
+"de": "Pino",
+"en": "Pino",
+"monster": [
+2100953,
+2100954
+],
+"orte": [
+"Verteron: Aullaeu Village"
+]
+},
+"1088": {
+"art": "Varian",
+"de": "Arbeiter (Pino)",
+"en": "Pino Worker",
+"monster": [
+2100955
+],
+"orte": [
+"Verteron: Aullaeu Village"
+]
+},
+"1089": {
+"art": "Fera",
+"de": "Aberrant Skama",
+"en": "Aberrant Skama",
+"monster": [
+2100710,
+2600024,
+2600424,
+2600535,
+2600555
+],
+"orte": [
+"Verteron: Contaminated Sanctum",
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1090": {
+"art": "Natura",
+"de": "Ultimate Water Spirit",
+"en": "Ultimate Water Spirit",
+"monster": [],
+"orte": []
+},
+"1091": {
+"art": "Natura",
+"de": "Rotflamme Ignus",
+"en": "Red Spark Ignus",
+"monster": [
+2300311,
+2310311,
+2320311
+],
+"orte": []
+},
+"1092": {
+"art": "Natura",
+"de": "Lesser Wind Spirit",
+"en": "Lesser Wind Spirit",
+"monster": [
+2100605,
+2101096,
+2400324
+],
+"orte": [
+"Verteron: Altamia Canyon",
+"Verteron: Eternal Isle",
+"Altgard: Purifying Forest"
+]
+},
+"1093": {
+"art": "Cogni",
+"de": "Phantom-Lakshmi",
+"en": "Phantasmal Lakshmi",
+"monster": [
+2300401,
+2310401,
+2320401
+],
+"orte": []
+},
+"1094": {
+"art": "Natura",
+"de": "Intermediate Wind Spirit",
+"en": "Intermediate Wind Spirit",
+"monster": [
+2100658,
+2101103,
+2400824
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1095": {
+"art": "Natura",
+"de": "Superior Wind Spirit",
+"en": "Superior Wind Spirit",
+"monster": [
+2100666,
+2400302,
+2400818
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Altgard: Purifying Forest",
+"Altgard: Immortal Isle"
+]
+},
+"1096": {
+"art": "Natura",
+"de": "Superior Fire Spirit",
+"en": "Superior Fire Spirit",
+"monster": [
+2100664,
+2400303,
+2400749,
+2400815
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Altgard: Purifying Forest",
+"Altgard: Spirit Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1097": {
+"art": "Fera",
+"de": "Karnif",
+"en": "Karnif",
+"monster": [
+2100174,
+2100348,
+2100349,
+2100742,
+2100752,
+2100802,
+2100805
+],
+"orte": [
+"Verteron: Southern Tolbas Forest",
+"Verteron: Northern Tolbas Forest",
+"Verteron: Western Altamia Highland",
+"Verteron: Eastern Altamia Highland",
+"Verteron: Kraka Footpath"
+]
+},
+"1098": {
+"art": "Fera",
+"de": "Modified Karnif",
+"en": "Modified Karnif",
+"monster": [
+2100070,
+2100096,
+2100130,
+2100481,
+2600004,
+2600014,
+2600404,
+2600414,
+2600482,
+2600483,
+2600492,
+2600493
+],
+"orte": [
+"Verteron: Verteron Fortress Ruins",
+"Verteron: Destroyed Abyss Gate",
+"Chaotic Lower Reshanta: Devastated Remnants",
+"Chaotic Lower Reshanta: Black Fragments Area",
+"Chaotic Middle Reshanta: Steel Titan's Grave",
+"Chaotic Middle Reshanta: Eroded Fragment Area"
+]
+},
+"1099": {
+"art": "Fera",
+"de": "Elite Karnif",
+"en": "Elite Karnif",
+"monster": [
+2406071
+],
+"orte": [
+"Morheim: Nephra Snowfield"
+]
+},
+"1100": {
+"art": "Natura",
+"de": "Ultimate Earth Spirit",
+"en": "Ultimate Earth Spirit",
+"monster": [],
+"orte": []
+},
+"1101": {
+"art": "Natura",
+"de": "Forest Guardian",
+"en": "Forest Guardian",
+"monster": [
+2100660,
+2600103,
+2600133,
+2600454
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest"
+]
+},
+"1102": {
+"art": "Natura",
+"de": "Dried Up Forest Guardian",
+"en": "Dried Up Forest Guardian",
+"monster": [],
+"orte": []
+},
+"1103": {
+"art": "Cogni",
+"de": "Pretor Veil Administrator",
+"en": "Pretor Veil Administrator",
+"monster": [
+2101278
+],
+"orte": [
+"Eltnen: Eltnen Barrier Tower Ruins"
+]
+},
+"1104": {
+"art": "Cogni",
+"de": "Manduri Trebuchet Worker",
+"en": "Manduri Trebuchet Worker",
+"monster": [
+2100816,
+2110507,
+2400615
+],
+"orte": [
+"Verteron: Kraka Footpath",
+"Verteron: Crimson Isle",
+"Altgard: Black Claw Village"
+]
+},
+"1105": {
+"art": "Cogni",
+"de": "Kräutersammler (Biruta)",
+"en": "Biruta Herbalist",
+"monster": [
+2400919
+],
+"orte": [
+"Altgard: Nameless Cemetery"
+]
+},
+"1106": {
+"art": "Fera",
+"de": "Tayga",
+"en": "Tayga",
+"monster": [
+2400564,
+2400583,
+2400611
+],
+"orte": [
+"Altgard: Eastern Gribade Highland",
+"Altgard: Black Claw Village"
+]
+},
+"1107": {
+"art": "Varian",
+"de": "Krao-Siegelhüter",
+"en": "Krao Seal Guardian",
+"monster": [],
+"orte": []
+},
+"1108": {
+"art": "Cogni",
+"de": "Verstärkter Kampfsoldat (Krall)",
+"en": "Enhanced Krall Combatant",
+"monster": [
+2100097
+],
+"orte": [
+"Verteron: Verteron Fortress Ruins"
+]
+},
+"1109": {
+"art": "Cogni",
+"de": "Verstärkter Wachsoldat (Krall)",
+"en": "Enhanced Krall Sentry",
+"monster": [
+2100072
+],
+"orte": [
+"Verteron: Verteron Fortress Ruins"
+]
+},
+"1110": {
+"art": "Varian",
+"de": "Blauer Kalgolem",
+"en": "Blue Kalgolem",
+"monster": [
+2100454,
+2400471,
+2600051,
+2600451,
+2600513,
+2600575,
+2600585
+],
+"orte": [
+"Verteron: Eastern Cantas Valley",
+"Altgard: Fafnite Deposit",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1111": {
+"art": "Spezial",
+"de": "Swift Lugi",
+"en": "Swift Lugi",
+"monster": [],
+"orte": []
+},
+"1112": {
+"art": "Spezial",
+"de": "Wandering Merchant Lugi",
+"en": "Wandering Merchant Lugi",
+"monster": [],
+"orte": []
+},
+"1114": {
+"art": "Fera",
+"de": "Aschgraue Spinne",
+"en": "Ashen Spider",
+"monster": [
+2100283,
+2400230
+],
+"orte": [
+"Verteron: Anguish Hill",
+"Altgard: Moslan Forest"
+]
+},
+"1115": {
+"art": "Cogni",
+"de": "Aufseher (Kuru)",
+"en": "Kuru Overseer",
+"monster": [
+2101139,
+2400833
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1116": {
+"art": "Fera",
+"de": "Dürrastspinne",
+"en": "Withered Branch Spider",
+"monster": [
+2000956,
+2000957,
+2400902,
+2400933,
+2400939,
+2400946,
+2400948
+],
+"orte": [
+"Altgard: Nameless Cemetery",
+"Altgard: Silent Hill",
+"Altgard: Purifying Forest",
+"Altgard: Basfelt Ruins",
+"Altgard: Mahindel Cliff",
+"Altgard: Southern Gribade Highland"
+]
+},
+"1117": {
+"art": "Fera",
+"de": "Unstable Spider",
+"en": "Unstable Spider",
+"monster": [
+2101023,
+2110509,
+2400319,
+2400745,
+2600045
+],
+"orte": [
+"Verteron: Forest of Exiles",
+"Verteron: Crimson Isle",
+"Altgard: Purifying Forest",
+"Altgard: Spirit Isle",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings"
+]
+},
+"1118": {
+"art": "Fera",
+"de": "Aberrant Bee",
+"en": "Aberrant Bee",
+"monster": [
+2000955,
+2100286,
+2100550,
+2400900,
+2400930
+],
+"orte": [
+"Altgard: Basfelt Ruins",
+"Verteron: Pamos Farm",
+"Verteron: Pilgrim's Ridge",
+"Altgard: Nameless Cemetery"
+]
+},
+"1119": {
+"art": "Fera",
+"de": "Coradon-Abart",
+"en": "Aberrant Coradon",
+"monster": [
+2000952,
+2100699,
+2100821,
+2100828,
+2400907
+],
+"orte": [
+"Altgard: Basfelt Ruins",
+"Verteron: Garden of the Illusion God",
+"Verteron: Kraka Footpath",
+"Altgard: Tranein Highland"
+]
+},
+"1120": {
+"art": "Fera",
+"de": "Kailinjunges",
+"en": "Young Kailin",
+"monster": [
+2101022,
+2400737,
+2400906,
+2400935
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Altgard: Spirit Isle",
+"Altgard: Tranein Highland",
+"Altgard: Battlescar Mound"
+]
+},
+"1121": {
+"art": "Fera",
+"de": "Slinkjunges",
+"en": "Young Slink",
+"monster": [
+2100189,
+2100473,
+2400910,
+2400950,
+2600047,
+2600447
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Southern Tolbas Forest",
+"Altgard: Tranein Pond",
+"Altgard: Idun's Lake",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest"
+]
+},
+"1122": {
+"art": "Fera",
+"de": "Togjunges",
+"en": "Young Tog",
+"monster": [],
+"orte": []
+},
+"1123": {
+"art": "Fera",
+"de": "Ursusjunges",
+"en": "Young Ursus",
+"monster": [
+2100173,
+2100818,
+2400377,
+2400917
+],
+"orte": [
+"Verteron: Southern Tolbas Forest",
+"Verteron: Kraka Footpath",
+"Altgard: Battlescar Mound",
+"Altgard: Silent Hill"
+]
+},
+"1124": {
+"art": "Fera",
+"de": "Zaif",
+"en": "Zaif",
+"monster": [
+2100573,
+2100748,
+2100797,
+2100813
+],
+"orte": [
+"Verteron: Rock Tomb Hill",
+"Verteron: Eastern Altamia Highland",
+"Verteron: Southern Altamia Highland",
+"Verteron: Kraka Footpath"
+]
+},
+"1125": {
+"art": "Fera",
+"de": "Aberrant Zaif",
+"en": "Aberrant Zaif",
+"monster": [
+2100558,
+2400578
+],
+"orte": [
+"Verteron: Pilgrim's Ridge",
+"Altgard: Eastern Gribade Highland"
+]
+},
+"1126": {
+"art": "Fera",
+"de": "Tog-Abart",
+"en": "Aberrant Tog",
+"monster": [
+2100006,
+2100145,
+2100288,
+2100793,
+2100819,
+2400936
+],
+"orte": [
+"Verteron: Eastern Cantas Valley",
+"Verteron: Pamos Farm",
+"Verteron: Ellun River Midstream",
+"Verteron: Southern Altamia Highland",
+"Verteron: Kraka Footpath",
+"Altgard: Battlescar Mound"
+]
+},
+"1127": {
+"art": "Natura",
+"de": "Odfelsgeist",
+"en": "Odyle Stone Spirit",
+"monster": [
+2400734
+],
+"orte": [
+"Altgard: Spirit Isle"
+]
+},
+"1128": {
+"art": "Varian",
+"de": "Dranaschleim",
+"en": "Drana Slime",
+"monster": [
+2400015
+],
+"orte": [
+"Altgard: Dredgion Crash Site"
+]
+},
+"1129": {
+"art": "Varian",
+"de": "Dranaschwarm",
+"en": "Drana Swarm",
+"monster": [
+2110501
+],
+"orte": [
+"Verteron: Crimson Isle"
+]
+},
+"1130": {
+"art": "Fera",
+"de": "Mutated Cadaver Insectoid",
+"en": "Mutated Cadaver Insectoid",
+"monster": [
+2100554
+],
+"orte": [
+"Verteron: Pilgrim's Ridge"
+]
+},
+"1131": {
+"art": "Natura",
+"de": "Dranaspore",
+"en": "Drana Spore",
+"monster": [
+2110502
+],
+"orte": [
+"Verteron: Crimson Isle"
+]
+},
+"1132": {
+"art": "Fera",
+"de": "Aschgraue Lupyllini",
+"en": "Ashen Lupyllini",
+"monster": [],
+"orte": []
+},
+"1133": {
+"art": "Natura",
+"de": "Forest Dionae",
+"en": "Forest Dionae",
+"monster": [],
+"orte": []
+},
+"1134": {
+"art": "Fera",
+"de": "Ewiger Coradon",
+"en": "Eternal Coradon",
+"monster": [
+2400941,
+2600061,
+2600461
+],
+"orte": [
+"Altgard: Southern Gribade Highland",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest"
+]
+},
+"1135": {
+"art": "Natura",
+"de": "Aschgrauer Dionae",
+"en": "Ashen Dionae",
+"monster": [
+2400248
+],
+"orte": [
+"Altgard: Moslan Forest"
+]
+},
+"1136": {
+"art": "Natura",
+"de": "Rafflesia",
+"en": "Rafflesia",
+"monster": [
+2000925,
+2110513,
+2400056,
+2400735,
+2400813,
+2400949
+],
+"orte": [
+"Altgard: Sanctum Outpost",
+"Verteron: Crimson Isle",
+"Altgard: Nameless Cemetery",
+"Altgard: Spirit Isle",
+"Altgard: Immortal Isle",
+"Altgard: Southern Gribade Highland"
+]
+},
+"1137": {
+"art": "Cogni",
+"de": "Arbeiter (Momo)",
+"en": "Mumu Worker",
+"monster": [
+2400351,
+2400390
+],
+"orte": [
+"Altgard: Dranactus",
+"Altgard: Battlescar Mound"
+]
+},
+"1138": {
+"art": "Cogni",
+"de": "Aufseher (Momo)",
+"en": "Mumu Overseer",
+"monster": [],
+"orte": []
+},
+"1139": {
+"art": "Varian",
+"de": "Swamp Monster",
+"en": "Swamp Monster",
+"monster": [],
+"orte": []
+},
+"1140": {
+"art": "Varian",
+"de": "Forest Monster",
+"en": "Forest Monster",
+"monster": [
+2100350,
+2400225
+],
+"orte": [
+"Verteron: Northern Tolbas Forest",
+"Altgard: Moslan Forest"
+]
+},
+"1141": {
+"art": "Varian",
+"de": "Targon (Sümpfe)",
+"en": "Marsh Targon",
+"monster": [
+2100021,
+2600426,
+2600502,
+2600532,
+2600552
+],
+"orte": [
+"Verteron: Ellun River Marsh",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1142": {
+"art": "Varian",
+"de": "Deformierter Mutant",
+"en": "Distorted Mutant",
+"monster": [
+2400312
+],
+"orte": [
+"Altgard: Purifying Forest"
+]
+},
+"1143": {
+"art": "Fera",
+"de": "Mutated Ursus",
+"en": "Mutated Ursus",
+"monster": [
+2400217
+],
+"orte": [
+"Altgard: Moslan Forest"
+]
+},
+"1144": {
+"art": "Natura",
+"de": "Waldhüter (Mutierter Wald)",
+"en": "Mutated Forest Guardian",
+"monster": [
+2400214,
+2400751
+],
+"orte": [
+"Altgard: Moslan Forest",
+"Altgard: Spirit Isle"
+]
+},
+"1145": {
+"art": "Fera",
+"de": "Valka-Insektoidmutant",
+"en": "Mutated Insectoid Valka",
+"monster": [],
+"orte": []
+},
+"1146": {
+"art": "Varian",
+"de": "Torwächter Pinopi",
+"en": "Gatekeeper Pinopi",
+"monster": [],
+"orte": []
+},
+"1147": {
+"art": "Cogni",
+"de": "Dratona",
+"en": "Dratona",
+"monster": [
+2100901,
+2400116,
+2400161,
+2400380
+],
+"orte": [
+"Verteron: Scarlet Forest",
+"Altgard: Sanctum Outpost",
+"Altgard: Tranein Pond",
+"Altgard: Dranactus"
+]
+},
+"1148": {
+"art": "Varian",
+"de": "Drakana Kalgolem",
+"en": "Drakana Kalgolem",
+"monster": [
+2400014
+],
+"orte": [
+"Altgard: Dredgion Crash Site"
+]
+},
+"1153": {
+"art": "Varian",
+"de": "Drana Mutant Brute",
+"en": "Drana Mutant Brute",
+"monster": [
+2101135,
+2110503,
+2400834
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Verteron: Crimson Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1154": {
+"art": "Varian",
+"de": "Verblasster Mutantenbrecher",
+"en": "Faded Mutant Brute",
+"monster": [
+2400476,
+2600432,
+2600541,
+2600561
+],
+"orte": [
+"Altgard: Fafnite Deposit",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1155": {
+"art": "Natura",
+"de": "Superior Water Spirit",
+"en": "Superior Water Spirit",
+"monster": [
+2100665,
+2400306,
+2400739,
+2400816
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Altgard: Purifying Forest",
+"Altgard: Spirit Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1156": {
+"art": "Cogni",
+"de": "Elite Klaw",
+"en": "Elite Klaw",
+"monster": [
+2100079
+],
+"orte": [
+"Verteron: Destroyed Abyss Gate"
+]
+},
+"1157": {
+"art": "Varian",
+"de": "Cadaver Cleaner",
+"en": "Cadaver Cleaner",
+"monster": [
+2400275,
+2400412,
+2400418,
+2600119
+],
+"orte": [
+"Altgard: Uruthumheim",
+"Altgard: Basfelt Ruins"
+]
+},
+"1158": {
+"art": "Fera",
+"de": "Todesgiftinsektoid Sram",
+"en": "Venomous Insect Sram",
+"monster": [],
+"orte": []
+},
+"1159": {
+"art": "Varian",
+"de": "Parasite Swarm",
+"en": "Parasite Swarm",
+"monster": [
+2400473
+],
+"orte": [
+"Altgard: Fafnite Deposit"
+]
+},
+"1160": {
+"art": "Varian",
+"de": "Drana Contaminant",
+"en": "Drana Contaminant",
+"monster": [],
+"orte": []
+},
+"1161": {
+"art": "Varian",
+"de": "Verblasster Schweber",
+"en": "Faded Floater",
+"monster": [
+2400479
+],
+"orte": [
+"Altgard: Fafnite Deposit"
+]
+},
+"1162": {
+"art": "Cogni",
+"de": "Kerubar",
+"en": "Kerubar",
+"monster": [
+2101075,
+2101079,
+2400801
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1163": {
+"art": "Fera",
+"de": "Basilisk",
+"en": "Basilisk",
+"monster": [
+2400240
+],
+"orte": [
+"Altgard: Moslan Forest"
+]
+},
+"1164": {
+"art": "Natura",
+"de": "Lesser Earth Spirit",
+"en": "Lesser Earth Spirit",
+"monster": [
+2101089
+],
+"orte": [
+"Verteron: Eternal Isle"
+]
+},
+"1165": {
+"art": "Natura",
+"de": "Intermediate Earth Spirit",
+"en": "Intermediate Earth Spirit",
+"monster": [
+2100653,
+2101102,
+2400823
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1166": {
+"art": "Natura",
+"de": "Superior Earth Spirit",
+"en": "Superior Earth Spirit",
+"monster": [
+2100667,
+2400310,
+2400817
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Altgard: Purifying Forest",
+"Altgard: Immortal Isle"
+]
+},
+"1167": {
+"art": "Varian",
+"de": "Wächterstatue (Flammenstein)",
+"en": "Flame Stone Guardian Statue",
+"monster": [],
+"orte": []
+},
+"1168": {
+"art": "Natura",
+"de": "Lesser Water Spirit",
+"en": "Lesser Water Spirit",
+"monster": [
+2100231,
+2101088
+],
+"orte": [
+"Verteron: Spirit's Rest",
+"Verteron: Eternal Isle"
+]
+},
+"1169": {
+"art": "Natura",
+"de": "Intermediate Water Spirit",
+"en": "Intermediate Water Spirit",
+"monster": [
+2100657,
+2101101,
+2400738,
+2400822
+],
+"orte": [
+"Verteron: Garden of the Illusion God",
+"Verteron: Eternal Isle",
+"Altgard: Spirit Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1170": {
+"art": "Cogni",
+"de": "Kerubian",
+"en": "Kerubian",
+"monster": [
+2101076,
+2101080,
+2400802
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1171": {
+"art": "Cogni",
+"de": "Kerubiel",
+"en": "Kerubiel",
+"monster": [
+2101077,
+2400803
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1172": {
+"art": "Varian",
+"de": "Arbeiter (Duduka)",
+"en": "Duduka Worker",
+"monster": [
+2400612
+],
+"orte": [
+"Altgard: Black Claw Village"
+]
+},
+"1173": {
+"art": "Varian",
+"de": "Duduka Trebuchet Worker",
+"en": "Duduka Trebuchet Worker",
+"monster": [
+2400613
+],
+"orte": [
+"Altgard: Black Claw Village"
+]
+},
+"1174": {
+"art": "Varian",
+"de": "Dranaverschlinger",
+"en": "Drana Predator",
+"monster": [
+2110505,
+2400010
+],
+"orte": [
+"Verteron: Crimson Isle",
+"Altgard: Dredgion Crash Site"
+]
+},
+"1175": {
+"art": "Varian",
+"de": "Verblasster Verschlinger",
+"en": "Faded Predator",
+"monster": [
+2400480
+],
+"orte": [
+"Altgard: Fafnite Deposit"
+]
+},
+"1176": {
+"art": "Varian",
+"de": "Mudthorn",
+"en": "Mudthorn",
+"monster": [
+2400481,
+2400707
+],
+"orte": [
+"Altgard: Fafnite Deposit",
+"Altgard: Impetusium Square"
+]
+},
+"1177": {
+"art": "Natura",
+"de": "Uralter Naturgeist",
+"en": "Ancient Spirit",
+"monster": [],
+"orte": []
+},
+"1178": {
+"art": "Natura",
+"de": "Wachkrieger des Geisterfürsten",
+"en": "Spirit King's Bodyguard Warrior",
+"monster": [
+2600066,
+2600466
+],
+"orte": [
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest"
+]
+},
+"1179": {
+"art": "Varian",
+"de": "Dranamutant",
+"en": "Drana Mutant",
+"monster": [
+2400001
+],
+"orte": [
+"Altgard: Dredgion Crash Site"
+]
+},
+"1180": {
+"art": "Varian",
+"de": "Verblasster Mutant",
+"en": "Faded Mutant",
+"monster": [
+2400477,
+2600430,
+2600505,
+2600534,
+2600540,
+2600554,
+2600560
+],
+"orte": [
+"Altgard: Fafnite Deposit",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1181": {
+"art": "Fera",
+"de": "Brax",
+"en": "Brax",
+"monster": [
+2000954,
+2100217,
+2100303,
+2100740,
+2400375,
+2400914
+],
+"orte": [
+"Altgard: Basfelt Ruins",
+"Verteron: Ellun River Midstream",
+"Verteron: Ellun River Meadow",
+"Verteron: Western Altamia Highland",
+"Altgard: Battlescar Mound",
+"Altgard: Sanctum Outpost"
+]
+},
+"1182": {
+"art": "Varian",
+"de": "Elite Soulless Corpse Gnat",
+"en": "Elite Soulless Corpse Gnat",
+"monster": [],
+"orte": []
+},
+"1183": {
+"art": "Varian",
+"de": "Seelenlose Leichenschnake",
+"en": "Soulless Corpse Gnat",
+"monster": [
+2400413
+],
+"orte": [
+"Altgard: Basfelt Ruins"
+]
+},
+"1184": {
+"art": "Cogni",
+"de": "Wächter (Drakan)",
+"en": "Drakan Watcher",
+"monster": [
+2100872,
+2400384,
+2400591
+],
+"orte": [
+"Verteron: Drana Processing Area",
+"Altgard: Dranactus",
+"Altgard: Eastern Gribade Highland"
+]
+},
+"1185": {
+"art": "Cogni",
+"de": "Knecht (Dratona)",
+"en": "Dratona Tinkerer",
+"monster": [],
+"orte": []
+},
+"1186": {
+"art": "Varian",
+"de": "Giftblut",
+"en": "Poison Blood",
+"monster": [
+2400311,
+2400743
+],
+"orte": [
+"Altgard: Purifying Forest",
+"Altgard: Spirit Isle"
+]
+},
+"1187": {
+"art": "Natura",
+"de": "Intermediate Fire Spirit",
+"en": "Intermediate Fire Spirit",
+"monster": [
+2101100,
+2400748,
+2400821
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Altgard: Spirit Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1188": {
+"art": "Fera",
+"de": "Vivel",
+"en": "Vivel",
+"monster": [
+2100583,
+2400057
+],
+"orte": [
+"Verteron: Western Altamia Highland",
+"Altgard: Nameless Cemetery"
+]
+},
+"1189": {
+"art": "Fera",
+"de": "Gezähmter Zaif",
+"en": "Tamed Zaif",
+"monster": [
+2100566,
+2600102,
+2600132,
+2600452,
+2600579,
+2600589
+],
+"orte": [
+"Verteron: Pilgrim's Ridge",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1190": {
+"art": "Natura",
+"de": "Elite Poisonous Spore Fungen",
+"en": "Elite Poisonous Spore Fungen",
+"monster": [],
+"orte": []
+},
+"1191": {
+"art": "Cogni",
+"de": "Rasender Feruk",
+"en": "Furious Feruk",
+"monster": [],
+"orte": []
+},
+"1192": {
+"art": "Varian",
+"de": "Silberklinge Rotan",
+"en": "Silver Blade Rotan",
+"monster": [
+2300310,
+2310310,
+2320310,
+2600003,
+2600013,
+2600403,
+2600413,
+2600481,
+2600491
+],
+"orte": [
+"Chaotic Lower Reshanta: Devastated Remnants",
+"Chaotic Lower Reshanta: Black Fragments Area",
+"Chaotic Middle Reshanta: Steel Titan's Grave",
+"Chaotic Middle Reshanta: Eroded Fragment Area"
+]
+},
+"1193": {
+"art": "Cogni",
+"de": "Vergifteter Kärrner (Shulak)",
+"en": "Addicted Shulak Cart Worker",
+"monster": [
+2400455
+],
+"orte": [
+"Altgard: Fafnite Deposit"
+]
+},
+"1194": {
+"art": "Varian",
+"de": "Guardite",
+"en": "Guardite",
+"monster": [
+2100712
+],
+"orte": [
+"Verteron: Contaminated Sanctum"
+]
+},
+"1195": {
+"art": "Cogni",
+"de": "Dracuni Herbalist",
+"en": "Dracuni Herbalist",
+"monster": [
+2100867,
+2400746
+],
+"orte": [
+"Verteron: Drana Processing Area",
+"Altgard: Spirit Isle"
+]
+},
+"1196": {
+"art": "Cogni",
+"de": "Elite Dratona",
+"en": "Elite Dratona",
+"monster": [
+2406035
+],
+"orte": [
+"Morheim: Patamor Plains"
+]
+},
+"1197": {
+"art": "Varian",
+"de": "Watcher Guardite",
+"en": "Watcher Guardite",
+"monster": [
+2100716
+],
+"orte": [
+"Verteron: Contaminated Sanctum"
+]
+},
+"1198": {
+"art": "Fera",
+"de": "Aschgrauer Basilisk",
+"en": "Ashen Basilisk",
+"monster": [],
+"orte": []
+},
+"1199": {
+"art": "Fera",
+"de": "Flammenbalgest",
+"en": "Flame Barghest",
+"monster": [],
+"orte": []
+},
+"1200": {
+"art": "Cogni",
+"de": "Elitepriester (Naga)",
+"en": "Naga Elite Priest",
+"monster": [
+2600042,
+2600442,
+2600536,
+2600556
+],
+"orte": [
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1201": {
+"art": "Cogni",
+"de": "Modifizierte Lupyllini",
+"en": "Modified Lupyllini",
+"monster": [
+2100815,
+2101086,
+2400814
+],
+"orte": [
+"Verteron: Kraka Footpath",
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle"
+]
+},
+"1202": {
+"art": "Cogni",
+"de": "Korrumpierte Lupyllini",
+"en": "Decomposed Lupyllini",
+"monster": [
+2100747,
+2400004,
+2400378,
+2400391,
+2400911
+],
+"orte": [
+"Verteron: Eastern Altamia Highland",
+"Altgard: Dredgion Crash Site",
+"Altgard: Battlescar Mound",
+"Altgard: Basfelt Ruins",
+"Altgard: Tranein Highland"
+]
+},
+"1203": {
+"art": "Fera",
+"de": "Gezähmter Karnif",
+"en": "Tamed Karnif",
+"monster": [
+2400257,
+2400503
+],
+"orte": [
+"Altgard: Uruthumheim",
+"Altgard: Western Gribade Highland"
+]
+},
+"1204": {
+"art": "Spezial",
+"de": "Pagati",
+"en": "Pagati",
+"monster": [],
+"orte": []
+},
+"1206": {
+"art": "Varian",
+"de": "Elite Guardite",
+"en": "Elite Guardite",
+"monster": [
+2100718
+],
+"orte": [
+"Verteron: Contaminated Sanctum"
+]
+},
+"1207": {
+"art": "Natura",
+"de": "Agrint",
+"en": "Agrint",
+"monster": [
+2100143,
+2100698,
+2100714,
+2101099,
+2400221,
+2400415,
+2400825,
+2600027,
+2600071,
+2600427,
+2600471,
+2600571,
+2600581
+],
+"orte": [
+"Verteron: Ellun River Midstream",
+"Verteron: Garden of the Illusion God",
+"Verteron: Contaminated Sanctum",
+"Verteron: Eternal Isle",
+"Altgard: Moslan Forest",
+"Altgard: Basfelt Ruins",
+"Altgard: Immortal Isle",
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Lower Reshanta: Reshanta's Root",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Corroded Heart",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1208": {
+"art": "Natura",
+"de": "Ashen Agrint",
+"en": "Ashen Agrint",
+"monster": [
+2400750
+],
+"orte": [
+"Altgard: Spirit Isle"
+]
+},
+"1209": {
+"art": "Natura",
+"de": "Kahler Agrint",
+"en": "Thin Agrint",
+"monster": [
+2110508,
+2400054,
+2600028,
+2600428,
+2600503,
+2600531,
+2600551
+],
+"orte": [
+"Verteron: Crimson Isle",
+"Altgard: Nameless Cemetery",
+"Chaotic Lower Reshanta: Sulfur Tree Island",
+"Chaotic Middle Reshanta: Contaminated Marsh",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1210": {
+"art": "Natura",
+"de": "Dry Leaf Agrint",
+"en": "Dry Leaf Agrint",
+"monster": [
+2100179,
+2600113,
+2600143
+],
+"orte": [
+"Verteron: Southern Tolbas Forest"
+]
+},
+"1213": {
+"art": "Natura",
+"de": "Lesser Fire Spirit",
+"en": "Lesser Fire Spirit",
+"monster": [
+2101087,
+2400325
+],
+"orte": [
+"Verteron: Eternal Isle",
+"Altgard: Purifying Forest"
+]
+},
+"1214": {
+"art": "Natura",
+"de": "Dunkler Naturgeist",
+"en": "Black Spirit",
+"monster": [
+2100460,
+2100807,
+2400708,
+2600069,
+2600469
+],
+"orte": [
+"Verteron: Contaminated Marsh",
+"Verteron: Kraka Footpath",
+"Altgard: Impetusium Square",
+"Chaotic Lower Reshanta: Reshanta's Root",
+"Chaotic Middle Reshanta: Corroded Heart"
+]
+},
+"1215": {
+"art": "Cogni",
+"de": "Verschlinger Saraswati",
+"en": "Predator Saraswati",
+"monster": [
+2300403,
+2310403,
+2320403
+],
+"orte": []
+},
+"1216": {
+"art": "Varian",
+"de": "Dark Spirit",
+"en": "Dark Spirit",
+"monster": [
+2100600,
+2100656
+],
+"orte": [
+"Verteron: Altamia Canyon",
+"Verteron: Garden of the Illusion God"
+]
+},
+"1217": {
+"art": "Varian",
+"de": "Geronnenes Drana",
+"en": "Congealed Drana",
+"monster": [
+2400009
+],
+"orte": [
+"Altgard: Dredgion Crash Site"
+]
+},
+"1218": {
+"art": "Varian",
+"de": "Faded Drana",
+"en": "Faded Drana",
+"monster": [
+2400478
+],
+"orte": [
+"Altgard: Fafnite Deposit"
+]
+},
+"1219": {
+"art": "Natura",
+"de": "Zelophi",
+"en": "Zelophi",
+"monster": [
+2100458,
+2101085,
+2400811,
+2600050,
+2600450,
+2600512,
+2600574,
+2600584
+],
+"orte": [
+"Verteron: Ellun River Marsh",
+"Verteron: Eternal Isle",
+"Altgard: Immortal Isle",
+"Chaotic Lower Reshanta: Archipelago of Siel's Wings",
+"Chaotic Middle Reshanta: Distorted Old Growth Forest",
+"Chaotic Middle Reshanta: Bölge ayrıntısı yok"
+]
+},
+"1240": {
+"art": "Spezial",
+"de": "White Bunny",
+"en": "White Bunny",
+"monster": [],
+"orte": []
+},
+"1278": {
+"art": "Spezial",
+"de": "Chonky Hamster",
+"en": "Chonky Hamster",
+"monster": [],
+"orte": []
+},
+"1299": {
+"art": "Spezial",
+"de": "Two",
+"en": "Two",
+"monster": [],
+"orte": []
+}
+}

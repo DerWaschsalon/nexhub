@@ -1,0 +1,32 @@
+{
+  "alle": {
+    "groggy": "Boss groggy (alle Dungeons)"
+  },
+  "dungeons": {
+    "Krao Cave": {},
+    "Urugugu Canyon": {},
+    "Feuertempel": {
+      "flamme": "Kromede: Todesmal / Teufelsflamme",
+      "regen": "Kromede: Regen des Hasses",
+      "klone": "Kromede: Klon-Phase",
+      "heulen": "Kromede: Heulende Flamme",
+      "flaechen": "Kromede: Flächenphase",
+      "sprung": "Kromede: Sprung",
+      "schwert": "Kromede: Schwertangriffe",
+      "ignus": "Ignus: Flammeneruption",
+      "murute": "Murute: Gigantisches Beben",
+      "bombe": "Ignus: Verzögerte Explosion (auf dir)"
+    },
+    "Draupnir": {},
+    "Dying Dramata's Nest": {},
+    "Deus Research Base": {},
+    "Shattered Arkanis": {},
+    "Vakron Sky Island": {},
+    "Ferocious Horn Den": {},
+    "Cradle of Nihility": {},
+    "Hall of Illusion": {},
+    "Azure Breath Island": {},
+    "Citadel of the Fallen Daeva": {},
+    "Consumed Deus Research Base": {}
+  }
+}
