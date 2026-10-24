@@ -104,9 +104,9 @@ function seite(ctx) {
 
 export default {
   tabs: [{ id: "radar", label: "Radar", icon: "radar" }],
-  status: () => (S.radar?.laeuft ? "" : "off"),
-  card() {
-    return el("div", { class: "row wrap" }, statusChip(S.radar));
+  status: (m) => (m.status?.laeuft ? "" : "off"),
+  card(m) {
+    return el("div", { class: "row wrap" }, statusChip(m.status));
   },
   render(_tab, ctx) {
     return seite(ctx);

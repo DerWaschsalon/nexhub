@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 import subprocess
 import time
@@ -63,7 +64,9 @@ def konfig_neu_laden() -> dict:
 def konfig_speichern(k: dict) -> None:
     try:
         KONFIG.parent.mkdir(parents=True, exist_ok=True)
-        KONFIG.write_text(json.dumps(k, indent=2))
+        tmp = KONFIG.with_suffix(".tmp")  # erst ganz schreiben, dann ersetzen: der Daemon liest nie eine halbe Datei
+        tmp.write_text(json.dumps(k, indent=2))
+        os.replace(tmp, KONFIG)
     except OSError:
         pass
 

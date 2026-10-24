@@ -1,4 +1,4 @@
-"""Start: python -m radar [--name Navonex] [--pcap datei.pcap] [--log]"""
+"""Start: python -m radar [--name <Charakter>] [--pcap datei.pcap] [--log] [--befehle]"""
 from __future__ import annotations
 
 import argparse
@@ -35,6 +35,8 @@ def main() -> int:
     ap.add_argument("--schnell", action="store_true", help="pcap ohne Echtzeit abspielen")
     ap.add_argument("--log", action="store_true", help=f"alle Spawns nach {LOG} schreiben")
     ap.add_argument("--karte", action="store_true", help="Kartenfenster beim Start zeigen")
+    ap.add_argument("--befehle", action="store_true",
+                    help="Befehle vom NexBoard-Daemon auf stdin lesen, beendet sich, wenn er weg ist")
     ap.add_argument("--id", type=int, action="append", default=[],
                     help="zusaetzliche Objekt-ID als Cube werten (mehrfach)")
     a = ap.parse_args()
@@ -99,7 +101,7 @@ def main() -> int:
         zentrale.an = k["warn_an"]
         ansagen_vorbereiten()  # falls die Sprache gewechselt hat
 
-    bote = befehle.starten({
+    bote = a.befehle and befehle.starten({
         "neu_laden": neu_laden,
         "ton_testen": ton_abspielen,
         "warnung_testen": fenster.warnung.test,
@@ -109,6 +111,7 @@ def main() -> int:
         "uebersicht_zeigen": fenster._uebersicht_zeigen,
         "aufnahme_start": lambda: quelle.aufnahme_starten(zustand.dungeon or "dungeon"),
         "aufnahme_stopp": quelle.aufnahme_stoppen,
+        "beenden": lambda: (fenster.close(), app.quit()),
     })
 
     if a.pcap:

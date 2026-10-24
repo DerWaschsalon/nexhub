@@ -181,7 +181,7 @@ class NexBoard:
         m.register("aion2.dps", self.dps.watch, hook=self._dps_toggled, status=self._dps_status)
         m.register("aion2.runs", self.runs.watch, status=self._runs_status)
         m.register("aion2.overlay", self.overlay.watch, hook=self.overlay.on_module, status=self._overlay_status)
-        m.register("aion2.radar", self.radar.watch, status=lambda: {"laeuft": self.radar.laeuft, "spiel": self.radar.spiel})
+        m.register("aion2.radar", self.radar.watch, status=lambda: {"laeuft": self.radar.laeuft, "spiel": self.radar.spiel, "aufnahme": self.radar.aufnahme})
         m.register("discord.bot", hook=self._bot_toggled, status=self._bot_status)
         m.register("hub", self.hub.watch, hook=self._hub_toggled, status=self._hub_status)
         m.register("updates", self.updates.watch, status=self._updates_status)

@@ -4,7 +4,7 @@ Pro Kampf: Boss, Dauer, eigene DPS, jeder eigene Tod mit Ursache und mit der
 Warnung, die das Radar zu dem Zeitpunkt gezeigt haette. Am Ende: wie frueh
 die Teufelsflamme angekuendigt wurde.
 
-Aufruf: python -m werkzeuge.auswertung mitschnitte/datei.pcap [--name Navonex]
+Aufruf: python -m werkzeuge.auswertung mitschnitte/datei.pcap [--name <Charakter>]
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def kaempfe_laden(name: str, von: float, bis: float) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("pcap")
-    ap.add_argument("--name", default="Navonex")
+    ap.add_argument("--name", default="")
     a = ap.parse_args()
     skillname = json.loads(SKILLNAMEN.read_text()) if SKILLNAMEN.exists() else {}
     skillname["1801116"] = "Regen des Hasses"  # die Ticks haben keinen eigenen Namen

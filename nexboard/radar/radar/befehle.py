@@ -1,7 +1,8 @@
 """Befehle vom NexBoard-Daemon: eine Textzeile pro Befehl auf stdin, z.B. "ton_testen".
 
 Gelesen wird in einem eigenen Thread, ausgefuehrt im Qt-Thread (Fenster duerfen nur dort
-angefasst werden). Unbekannte Befehle werden ignoriert.
+angefasst werden). Unbekannte Befehle werden ignoriert. Endet stdin (Daemon abgestuerzt), kommt
+"beenden", damit kein Radar mit tcpdump ohne Daemon weiterlaeuft.
 """
 from __future__ import annotations
 
@@ -30,6 +31,7 @@ def starten(aktionen: dict[str, Callable[[], None]]) -> QObject:
     def lesen() -> None:
         for zeile in sys.stdin:
             bote.zeile.emit(zeile)
+        bote.zeile.emit("beenden")
 
     threading.Thread(target=lesen, daemon=True).start()
     return bote

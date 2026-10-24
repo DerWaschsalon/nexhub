@@ -54,7 +54,7 @@ def test_kaputte_oder_fehlende_datei_gibt_standard(tmp_path):
     assert r.info()["einstellungen"]["groesse"] == 260
     r.konfig.write_text("{{")
     info = r.info()
-    assert info["einstellungen"]["name"] == "Navonex" and not info["laeuft"]
+    assert info["einstellungen"]["name"] == "" and not info["laeuft"]
     assert "Feuertempel" in info["meldungen"]["dungeons"]
 
 

@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 KONFIG = Path.home() / ".config" / "aion2-radar.json"
 ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
-PROGRAMM = ["/usr/bin/python3", "-m", "radar", "--log"]  # System-Python, dort ist PySide6
+PROGRAMM = ["/usr/bin/python3", "-m", "radar", "--log", "--befehle"]  # System-Python, dort ist PySide6
 POSITIONEN = {"x", "y"}  # stellt man durch Ziehen ein, nicht auf der Seite
 BEFEHLE = ("neu_laden", "ton_testen", "warnung_testen", "warnung_verschieben", "karte_zeigen",
            "karte_ausblenden", "uebersicht_zeigen", "aufnahme_start", "aufnahme_stopp")
@@ -96,15 +96,22 @@ class Radar:
             raise ValueError(f"unbekannter Befehl {name}")
         if not self.laeuft:
             raise RuntimeError("Radar läuft nicht")
-        self.prozess.stdin.write(name.encode() + b"\n")
-        await self.prozess.stdin.drain()
+        try:
+            self.prozess.stdin.write(name.encode() + b"\n")
+            await self.prozess.stdin.drain()
+        except OSError as e:  # gerade beendet
+            raise RuntimeError("Radar läuft nicht") from e
 
     async def _starten(self) -> None:
         name = self.einstellungen().get("name")
         log.info("AION 2 läuft, starte Radar")
-        self.prozess = await asyncio.create_subprocess_exec(
-            *self.programm, *(["--name", name] if name else []), cwd=self.arbeitsordner,
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
+        try:
+            self.prozess = await asyncio.create_subprocess_exec(
+                *self.programm, *(["--name", name] if name else []), cwd=self.arbeitsordner,
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
+        except OSError as e:
+            log.error("Radar startet nicht: %s", e)
+            return
         asyncio.create_task(self._ausgabe_lesen(self.prozess))
 
     async def _ausgabe_lesen(self, prozess: asyncio.subprocess.Process) -> None:
