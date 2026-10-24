@@ -31,6 +31,7 @@ from .dps import STATUS_TEXT, DpsFeed, DpsSettings
 from .mdns import Announcer
 from .modules import ModuleManager
 from .overlay import UNIT as OVERLAY_UNIT, Overlay
+from .radar import Radar
 from .updates import Updates
 from .runs import DungeonRuns, RunSettings, a2tools_dir, render_run
 from .media import Media
@@ -145,6 +146,7 @@ class NexBoard:
         self.overlay.listeners.append(self._overlay_changed)
         self.overlay.game_check = self._game_running
         self.overlay.ui_watching = lambda: bool(self.ui_clients)
+        self.radar = Radar(spiel_laeuft=self._game_running)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -179,6 +181,7 @@ class NexBoard:
         m.register("aion2.dps", self.dps.watch, hook=self._dps_toggled, status=self._dps_status)
         m.register("aion2.runs", self.runs.watch, status=self._runs_status)
         m.register("aion2.overlay", self.overlay.watch, hook=self.overlay.on_module, status=self._overlay_status)
+        m.register("aion2.radar", self.radar.watch, status=lambda: {"laeuft": self.radar.laeuft, "spiel": self.radar.spiel})
         m.register("discord.bot", hook=self._bot_toggled, status=self._bot_status)
         m.register("hub", self.hub.watch, hook=self._hub_toggled, status=self._hub_status)
         m.register("updates", self.updates.watch, status=self._updates_status)
@@ -1002,6 +1005,27 @@ class NexBoard:
             return web.json_response({"error": out or "Neustart ging nicht"}, status=500)
         return web.json_response({"ok": True, **self.overlay.info()})
 
+    async def api_get_radar(self, request: web.Request) -> web.Response:
+        return web.json_response(self.radar.info())
+
+    async def api_put_radar(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+            if not isinstance(data, dict):
+                raise ValueError("kein JSON-Objekt")
+            return web.json_response(await self.radar.speichern(data))
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def api_radar_befehl(self, request: web.Request) -> web.Response:
+        try:
+            await self.radar.befehl(str((await request.json())["befehl"]))
+        except (ValueError, KeyError, TypeError) as e:
+            return web.json_response({"error": str(e) or "erwartet {befehl}"}, status=400)
+        except RuntimeError as e:
+            return web.json_response({"error": str(e)}, status=409)
+        return web.json_response({"ok": True, **self.radar.info()})
+
     async def index(self, request: web.Request) -> web.FileResponse:
         return web.FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -1062,6 +1086,9 @@ def build_app(deck: NexBoard) -> web.Application:
     app.router.add_put("/api/overlay", deck.api_put_overlay)
     app.router.add_post("/api/overlay/command", deck.api_overlay_command)
     app.router.add_post("/api/overlay/restart", deck.api_overlay_service)
+    app.router.add_get("/api/radar", deck.api_get_radar)
+    app.router.add_put("/api/radar", deck.api_put_radar)
+    app.router.add_post("/api/radar/befehl", deck.api_radar_befehl)
     app.router.add_static("/static/", WEB_DIR)
 
     async def cleanup(_app: web.Application) -> None:
