@@ -88,6 +88,16 @@ def test_rename_and_merge():
     assert run.fights[0].players[0].name == "Mo***n"  # Kämpfe selbst bleiben unverändert
 
 
+def test_rename_keeps_only_this_runs_players():
+    """Alle je gesehenen Namen (über 500) liess das NexLog an der Grenze von 500 scheitern."""
+    tr = RunTracker(idle_ms=60_000)
+    tr.add(F(1, 0, names=("Mo***n", "Gamunex")))
+    [run] = tr.check_idle(T0 + 10**7)
+    fremde = {f"X{i}***|cleric": f"Fremd{i}" for i in range(800)}
+    run.rename({**fremde, "Mo***n|ranger": "Morgan"})
+    assert run.names == {"Mo***n|ranger": "Morgan"}
+
+
 def test_render_webp():
     tr = RunTracker(idle_ms=60_000)
     for i in range(4):
