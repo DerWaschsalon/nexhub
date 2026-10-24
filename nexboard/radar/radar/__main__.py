@@ -43,10 +43,12 @@ def main() -> int:
 
     # XWayland: nur so kann das Fenster seine Position setzen und oben bleiben
     os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+    from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
 
+    from . import befehle
     from .karte import KartenFenster
-    from .overlay import RadarFenster
+    from .overlay import RadarFenster, konfig_neu_laden, ton_abspielen
     from .punkte import PunkteDB
     from .quelle import Quelle
     from .warnung import STATUS_REGELN, WarnFenster, WarnZentrale, ansagen_vorbereiten
@@ -76,13 +78,47 @@ def main() -> int:
     fenster.show()
     if a.karte or fenster.k.get("karte_offen"):
         karte.show()
-    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    # Strg+C und Beenden durch den NexBoard-Daemon: Radar schliessen (stoppt auch tcpdump), dann die
+    # App, auch wenn noch andere Fenster offen sind. Der Timer gibt Python regelmaessig die Kontrolle,
+    # sonst kommt das Signal in Qt nicht an.
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, lambda *_: (fenster.close(), app.quit()))
+    wach = QTimer()
+    wach.timeout.connect(lambda: None)
+    wach.start(500)
+
+    def neu_laden() -> None:
+        """Einstellungen von der NexBoard-Seite uebernehmen. Was die Fenster beim Zeichnen lesen,
+        wirkt sofort, hier nur das, was sie beim Start setzen."""
+        k = konfig_neu_laden()
+        fenster.setWindowOpacity(k["deckkraft"])
+        fenster.resize(k["groesse"], k["groesse"] + 34)
+        fenster.update()
+        karte.setWindowOpacity(k["karte_deckkraft"])
+        karte.folgen = k["karte_folgen"]
+        zentrale.an = k["warn_an"]
+        ansagen_vorbereiten()  # falls die Sprache gewechselt hat
+
+    bote = befehle.starten({
+        "neu_laden": neu_laden,
+        "ton_testen": ton_abspielen,
+        "warnung_testen": fenster.warnung.test,
+        "warnung_verschieben": fenster.warnung.verschieben_umschalten,
+        "karte_zeigen": lambda: fenster._karte_umschalten(True),
+        "karte_ausblenden": lambda: fenster._karte_umschalten(False),
+        "uebersicht_zeigen": fenster._uebersicht_zeigen,
+        "aufnahme_start": lambda: quelle.aufnahme_starten(zustand.dungeon or "dungeon"),
+        "aufnahme_stopp": quelle.aufnahme_stoppen,
+    })
 
     if a.pcap:
         quelle.datei_starten(a.pcap, echtzeit=not a.schnell)
     else:
         quelle.live_starten()
-    return app.exec()
+    code = app.exec()
+    quelle.stoppen()
+    del bote
+    return code
 
 
 if __name__ == "__main__":

@@ -74,14 +74,16 @@ class Quelle:
 
     def aufnahme_starten(self, name: str = "dungeon") -> None:
         self.aufnahme_stoppen()
-        AUFNAHMEN.mkdir(exist_ok=True)
+        AUFNAHMEN.mkdir(parents=True, exist_ok=True)
         datei = AUFNAHMEN / f"{name.replace(' ', '_')}-{datetime.now():%Y%m%d-%H%M}.pcap"
         self.aufnahme = tcpdump_starten(datei=str(datei))
+        print("aufnahme an", flush=True)  # liest der NexBoard-Daemon fuer die Anzeige
 
     def aufnahme_stoppen(self) -> None:
         if self.aufnahme:
             self.aufnahme.terminate()
             self.aufnahme = None
+            print("aufnahme aus", flush=True)
 
     def stoppen(self) -> None:
         self.aufnahme_stoppen()

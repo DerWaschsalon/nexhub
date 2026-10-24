@@ -47,6 +47,19 @@ def konfig_laden() -> dict:
     return _konfig
 
 
+def konfig_neu_laden() -> dict:
+    """Datei neu lesen (nach einer Aenderung auf der NexBoard-Seite). Aendert dasselbe dict, das
+    alle Fenster halten."""
+    k = konfig_laden()
+    try:
+        neu = json.loads(KONFIG.read_text())
+    except (OSError, ValueError):
+        return k
+    k.clear()
+    k.update({**STANDARD, **neu})
+    return k
+
+
 def konfig_speichern(k: dict) -> None:
     try:
         KONFIG.parent.mkdir(parents=True, exist_ok=True)
