@@ -1,0 +1,23 @@
+{
+  "x": 40,
+  "y": 40,
+  "groesse": 260,
+  "reichweite": 150,
+  "ton": true,
+  "drehung": 0,
+  "spiegeln": false,
+  "deckkraft": 0.85,
+  "meldung_aus": [],
+  "warnton": {
+    "schwert": "aus",
+    "casts": "aus"
+  },
+  "sprache": "de",
+  "meldungen_dungeon": "Feuertempel",
+  "aufnahme_auto": true,
+  "feldboss_ansage": true,
+  "karte_deckkraft": 0.9,
+  "karte_folgen": false,
+  "warn_an": true,
+  "name": ""
+}

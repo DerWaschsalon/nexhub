@@ -9,3 +9,8 @@ test-tube timer-outline account-group chart-bar history download upload magnify 
 drag gamepad-variant layers star-four-points forum github web console-line file-document-outline
 pencil cursor-move flash circle-small arrow-right arrow-left format-list-bulleted lock lock-open
 gesture-tap usb wifi lan connection server tune-variant bell-ring account music fire
+radar
+volume-high
+stop
+record
+restart
