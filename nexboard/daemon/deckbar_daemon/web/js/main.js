@@ -8,12 +8,13 @@ import deck from "./modules/deck.js";
 import dps from "./modules/aion2-dps.js";
 import overlay from "./modules/aion2-overlay.js";
 import runs from "./modules/aion2-runs.js";
+import radar from "./modules/aion2-radar.js";
 import bot from "./modules/discord-bot.js";
 import hub from "./modules/hub.js";
 import updates from "./modules/updates.js";
 
 export const BRAND = "NexBoard";
-const UI = { deck, "aion2.dps": dps, "aion2.overlay": overlay, "aion2.runs": runs, "discord.bot": bot, hub, updates };
+const UI = { deck, "aion2.dps": dps, "aion2.overlay": overlay, "aion2.runs": runs, "aion2.radar": radar, "discord.bot": bot, hub, updates };
 const SYSTEM = [
   { id: "modules", name: "Module", icon: "puzzle" },
   { id: "settings", name: "Einstellungen", icon: "cog" },
