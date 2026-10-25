@@ -40,7 +40,7 @@ async def serve(args: argparse.Namespace) -> NexBoard:
             raise web.HTTPServiceUnavailable(text="Modul Overlay ist ausgeschaltet.")
         return await handler(request)
 
-    a2_runner = web.AppRunner(a2.app(local_only, overlay_on, routes=deck.overlay.add_routes), access_log=None,
+    a2_runner = web.AppRunner(a2.app(local_only, overlay_on, routes=deck.overlay_routes), access_log=None,
                               shutdown_timeout=SHUTDOWN_TIMEOUT)
     await a2_runner.setup()
     try:

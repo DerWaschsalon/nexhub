@@ -146,7 +146,7 @@ class NexBoard:
         self.overlay.listeners.append(self._overlay_changed)
         self.overlay.game_check = self._game_running
         self.overlay.ui_watching = lambda: bool(self.ui_clients)
-        self.radar = Radar(spiel_laeuft=self._game_running)
+        self.radar = Radar(lambda stand: self.overlay.publish("radar", stand), spiel_laeuft=self._game_running)
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)
@@ -1026,6 +1026,24 @@ class NexBoard:
             return web.json_response({"error": str(e)}, status=409)
         return web.json_response({"ok": True, **self.radar.info()})
 
+    async def api_radar_uebersicht(self, request: web.Request) -> web.Response:
+        return web.json_response(self.radar.uebersicht())
+
+    async def api_radar_karte(self, request: web.Request) -> web.Response:
+        return web.json_response(self.radar.karte())
+
+    async def api_radar_kartendatei(self, request: web.Request) -> web.FileResponse:
+        datei = self.radar.kartendatei(request.match_info["art"])
+        if not datei:
+            raise web.HTTPNotFound()
+        return web.FileResponse(datei)
+
+    def overlay_routes(self, app: web.Application) -> None:
+        """Routen der Overlay-Seite (eigener Port): Overlay und die Karte des Radars."""
+        self.overlay.add_routes(app)
+        app.router.add_get("/api/radar/karte", self.api_radar_karte)
+        app.router.add_get("/api/radar/karte/{art}", self.api_radar_kartendatei)
+
     async def index(self, request: web.Request) -> web.FileResponse:
         return web.FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
@@ -1089,6 +1107,7 @@ def build_app(deck: NexBoard) -> web.Application:
     app.router.add_get("/api/radar", deck.api_get_radar)
     app.router.add_put("/api/radar", deck.api_put_radar)
     app.router.add_post("/api/radar/befehl", deck.api_radar_befehl)
+    app.router.add_get("/api/radar/uebersicht", deck.api_radar_uebersicht)
     app.router.add_static("/static/", WEB_DIR)
 
     async def cleanup(_app: web.Application) -> None:
