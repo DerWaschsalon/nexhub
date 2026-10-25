@@ -13,6 +13,7 @@
   "aufnahme_auto": true,
   "feldboss_ansage": true,
   "karte_folgen": false,
+  "bei_karte_ausblenden": true,
   "warn_an": true,
   "name": "",
   "karte_name": ""

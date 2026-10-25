@@ -22,6 +22,7 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
   transition: opacity .25s ease;
 }
 .widget.idle { opacity: 0 !important; }
+body.karte-offen .widget { opacity: 0 !important; } /* Ingame-Karte offen */
 .hud {
   background: var(--hud);
   border: 1px solid var(--hud-line);
