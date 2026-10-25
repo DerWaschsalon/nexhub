@@ -2,6 +2,7 @@
 Cube-Route (die naechsten drei Fundorte, siehe route.py)."""
 from __future__ import annotations
 
+import json
 import math
 import time
 from pathlib import Path
@@ -19,6 +20,7 @@ from .zustand import RadarZustand
 
 KOPF = 26
 FRISCH_S = 5.0  # so alt darf die eigene Position beim Eichen hoechstens sein
+EINRASTEN_PX = 25  # so nah (Bildschirm) muss das Kreuz an einer Feder sein, damit es einrastet
 
 GLAS = QColor(14, 20, 32, 225)
 RAND = QColor(255, 255, 255, 40)
@@ -32,6 +34,7 @@ EICH = QColor(80, 170, 255)
 ROUTE = QColor(245, 185, 65)
 ROUTE_LEISE = QColor(245, 185, 65, 110)
 ROUTE_DUNKEL = QColor(20, 26, 40)
+FEDER = QColor(235, 70, 50)
 
 
 class KartenFenster(QWidget):
@@ -42,6 +45,7 @@ class KartenFenster(QWidget):
         self.k = konfig_laden()
         self.karte: Karte | None = None
         self.route: Route | None = None
+        self.federn: list[tuple[float, float]] = []  # Eichhilfe, in Kartenpixeln
         self.pixmap: QPixmap | None = None
         self.zoom = 1.0
         self.versatz = QPointF(0, 0)  # Bildpunkt, der in der Fenstermitte liegt
@@ -76,6 +80,10 @@ class KartenFenster(QWidget):
     def _karte_setzen(self, karte: Karte | None) -> None:
         self.karte = karte
         self.route = Route(karte.ordner / "route.json") if karte else None
+        try:
+            self.federn = [tuple(f) for f in json.loads((karte.ordner / "federn.json").read_text())]
+        except (AttributeError, OSError, ValueError):
+            self.federn = []
         self.pixmap = None
         if karte and karte.bild.exists():
             self.pixmap = QPixmap(str(karte.bild))
@@ -143,7 +151,7 @@ class KartenFenster(QWidget):
         if pos.y() < KOPF:
             self._ziehen = ("fenster", e.globalPosition(), QPointF(self.pos()))
         elif self.modus == "eichen" and self._eich_knopf().contains(pos):
-            self._klick_im_modus(self._mitte())
+            self._klick_im_modus(self._eingerastet(self._mitte()))
         elif self.modus == "punkt" and self.pixmap:
             self._klick_im_modus(pos)
         elif self.pixmap:
@@ -185,6 +193,14 @@ class KartenFenster(QWidget):
     def _eich_knopf(self) -> QRectF:
         """Knopf unten in der Mitte: setzt den Eichpunkt dort, wo das Fadenkreuz liegt."""
         return QRectF(self.width() / 2 - 70, self.height() - 84, 140, 30)
+
+    def _eingerastet(self, pos: QPointF) -> QPointF:
+        """Naechste Feder, wenn sie nah genug am Kreuz liegt, sonst das Kreuz selbst."""
+        nah = [self._bild_zu_schirm(u, v) for u, v in self.federn]
+        nah = [q for q in nah if math.dist((q.x(), q.y()), (pos.x(), pos.y())) <= EINRASTEN_PX]
+        if not nah:
+            return pos
+        return min(nah, key=lambda q: math.dist((q.x(), q.y()), (pos.x(), pos.y())))
 
     def _klick_im_modus(self, pos: QPointF) -> None:
         u, v = self._schirm_zu_bild(pos)
@@ -263,7 +279,7 @@ class KartenFenster(QWidget):
         self.modus = modus
         if modus == "eichen":
             self.folgen = False
-            self._melden("Kreuz auf deinen Standort schieben, kurz springen, Knopf drücken", 10)
+            self._melden("Auf eine Feder stellen, springen, Kreuz auf die rote Feder, Knopf", 10)
         elif modus == "punkt":
             self._melden("Auf die Karte klicken, um Spawnpunkte einzutragen", 6)
 
@@ -397,7 +413,11 @@ class KartenFenster(QWidget):
             p.drawEllipse(q, 5.5, 5.5)
 
     def _eichen_zeichnen(self, p: QPainter) -> None:
-        """Bisherige Eichpunkte, Fadenkreuz in der Mitte und der Knopf zum Setzen."""
+        """Federn als Eichhilfe, bisherige Eichpunkte, Fadenkreuz in der Mitte und der Knopf."""
+        p.setPen(QPen(QColor(255, 255, 255, 200), 1))
+        p.setBrush(FEDER)
+        for u, v in self.federn:
+            p.drawEllipse(self._bild_zu_schirm(u, v), 3, 3)
         p.setPen(QPen(EICH, 2))
         for *_, u, v in self.karte.eichung.paare:
             q = self._bild_zu_schirm(u, v)
