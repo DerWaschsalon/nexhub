@@ -68,7 +68,7 @@ function einstellungen(ctx) {
           settingsRow("Spiegeln (Ost/West)", null, sw(k.spiegeln, (v) => setzen("spiegeln", v)))),
         card("Karte", "Cube-Fundorte, Teleporter, gesehene Spawnpunkte und deine Position", null,
           settingsRow("Karte", null, select(karten, k.karte_name || "", (v) => setzen("karte_name", v))),
-          settingsRow("Spieler folgen", "Ziehen auf der Karte pausiert es", sw(k.karte_folgen, (v) => setzen("karte_folgen", v))))),
+          settingsRow("Spieler folgen", "Ziehen pausiert es, Doppelklick auf die Karte folgt wieder", sw(k.karte_folgen, (v) => setzen("karte_folgen", v))))),
       card("Boss-Warnungen", null, sw(k.warn_an, (v) => setzen("warn_an", v)),
         el("div", { class: "row wrap" },
           knopf("Testen", "warnung_testen", "bell-ring", "Testwarnung gezeigt"),

@@ -4,7 +4,8 @@
  *
  * Radar:      zeigt sich nur, solange ein Cube in Sicht ist
  * Warnungen:  nur, solange eine läuft oder eine Vorhersage ansteht
- * Karte:      ziehen = verschieben, Mausrad = Zoom (um die eigene Position, wenn bekannt) */
+ * Karte:      ziehen = verschieben, Mausrad = Zoom (um die eigene Position, wenn bekannt),
+ *             Doppelklick = wieder der eigenen Position folgen */
 "use strict";
 
 const FARBE = {
@@ -379,12 +380,20 @@ function radarStart() {
   });
   el.addEventListener("pointermove", (e) => {
     if (!karte.ziehen) return teleporterTipp(e);
-    karte.folgen = false;
     const z = karte.ziehen;
+    // Zittern beim Klicken ist kein Ziehen und soll das Folgen nicht beenden
+    z.bewegt ||= Math.hypot(e.clientX - z.x, e.clientY - z.y) > 4;
+    if (!z.bewegt) return;
+    karte.folgen = false;
     karte.versatz = [z.versatz[0] - (e.clientX - z.x) / s() / karte.zoom, z.versatz[1] - (e.clientY - z.y) / s() / karte.zoom];
     zeichneKarte();
   });
   el.addEventListener("pointerup", () => { karte.ziehen = null; });
+  el.addEventListener("dblclick", () => {
+    if (mode === "edit") return;
+    karte.folgen = true;
+    karteAktualisieren();
+  });
   el.addEventListener("wheel", (e) => {
     if (mode === "edit" || !karte.bild) return;
     e.preventDefault();
