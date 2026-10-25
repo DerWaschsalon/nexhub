@@ -11,9 +11,11 @@ Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel 
   nach `~/.local/share/aion2-radar/karten/Altgard/` (nicht im Repo) und setzt die Eichung (aion2hub-Karte:
   1 px = 1 m, Ursprung in der Mitte), Eichen im Spiel ist nicht nötig. Die Fundorte stehen als blasse Punkte
   auf der Karte, die Teleporter mit dem Symbol aus dem Spiel (Name beim Drüberfahren). Ist nur eine Karte
-  vorhanden, lädt das Kartenfenster sie von selbst. Statt das Werkzeug
-  laufen zu lassen, kann man auch den fertigen Ordner `Altgard` von
-  einem Mitspieler nach `~/.local/share/aion2-radar/karten/` kopieren.
+  vorhanden, lädt das Kartenfenster sie von selbst. Altgard liegt fertig unter `karten/Altgard/` im Repo
+  (Bild als WebP, 1,5 MB) und wird beim ersten Start in den eigenen Kartenordner kopiert, eine vorhandene
+  Karte bleibt. Das Werkzeug braucht man nur für andere Karten oder wenn sich aion2hub ändert.
+  **Herkunft:** Kartenbild, Teleporter-Symbol und Marker in `karten/` stammen von aion2hub.com bzw. aus
+  AION 2 (NCSoft). Sie fallen nicht unter die GPL dieses Repos.
 - **Boss-Warnungen (Kromedes Gier):** Todesmal, Regen des Hasses, Vorhersage nach der Flächenphase,
   Zeitfenster für den nächsten Regen. Rechtsklick aufs Radar > Boss-Warnungen.
   Unter „Meldungen auswählen …“ Dungeon wählen, dann jede Warnung einzeln an/aus und mit/ohne Ton.
@@ -62,7 +64,7 @@ stehen in `radar/standard.json` und `radar/meldungen.json` (liest auch der Daemo
 | `radar/uebersicht.py` | Fenster Feldbosse und Vertraute, Feldboss-Ansagen |
 | `radar/daten.py` | Namen (A2Tools, Vertraute), gespeicherte Zustände |
 | `radar/punkte.py`, `radar/karte.py` | Spawnpunkte, Eichung, Kartenfenster |
-| `werkzeuge/cubekarte.py` | Kartenbild und Cube-Fundorte von aion2hub |
+| `werkzeuge/cubekarte.py`, `karten/` | Kartenbild, Cube-Fundorte und Teleporter von aion2hub |
 | `werkzeuge/auswertung.py` | Kämpfe auswerten: Tode, Ursachen, Vorwarnzeiten |
 | `werkzeuge/analyse.py` | Opcode-Statistik eines Mitschnitts |
 | `radar/befehle.py` | Befehle vom NexBoard-Daemon (stdin) |

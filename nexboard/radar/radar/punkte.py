@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 DATEN = Path.home() / ".local" / "share" / "aion2-radar"
 PUNKTE = DATEN / "cubepunkte.json"
 KARTEN = DATEN / "karten"
+MITGELIEFERT = Path(__file__).parent.parent / "karten"  # fertige Karten im Repo (aion2hub)
 GLEICH_CM = 300.0  # naeher als 3 m = derselbe Spawnpunkt
 
 
@@ -163,7 +165,9 @@ class Karte:
     def __init__(self, name: str) -> None:
         self.name = name
         self.ordner = KARTEN / name
-        self.bild = self.ordner / "bild.png"
+        # bild.png (eigener Screenshot, werkzeuge.cubekarte) oder bild.webp (mitgeliefert, kleiner)
+        self.bild = next((b for b in (self.ordner / "bild.png", self.ordner / "bild.webp") if b.exists()),
+                         self.ordner / "bild.png")
         try:
             paare = json.loads((self.ordner / "eichung.json").read_text()).get("paare", [])
         except (OSError, ValueError):
@@ -176,6 +180,16 @@ class Karte:
 
     @staticmethod
     def alle() -> list["Karte"]:
+        _mitgelieferte_kopieren()
         if not KARTEN.exists():
             return []
-        return [Karte(o.name) for o in sorted(KARTEN.iterdir()) if (o / "bild.png").exists()]
+        return [k for k in (Karte(o.name) for o in sorted(KARTEN.iterdir())) if k.bild.exists()]
+
+
+def _mitgelieferte_kopieren() -> None:
+    """Karten aus dem Repo einmalig in den eigenen Kartenordner kopieren, vorhandene bleiben."""
+    if not MITGELIEFERT.is_dir():
+        return
+    for ordner in MITGELIEFERT.iterdir():
+        if ordner.is_dir() and not (KARTEN / ordner.name).exists():
+            shutil.copytree(ordner, KARTEN / ordner.name)
