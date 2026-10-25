@@ -3,8 +3,7 @@
     python3 -m werkzeuge.cubekarte            # Altgard
     python3 -m werkzeuge.cubekarte --neu      # Route neu anlegen, Fortschritt geht verloren
 
-Legt unter ~/.local/share/aion2-radar/karten/Altgard/ bild.png, route.json und federn.json an.
-Die Federn (bei aion2hub „Monolith Material“) dienen im Kartenfenster als Eichpunkte.
+Legt unter ~/.local/share/aion2-radar/karten/Altgard/ bild.png und route.json an.
 Nichts davon kommt ins Repo (Daten und Bilder gehoeren aion2hub). Danach im Kartenfenster:
 Rechtsklick > Karte wählen > Altgard, dann einmal im Spiel eichen. Die Eichung bleibt bei einem
 erneuten Aufruf erhalten.
@@ -15,7 +14,6 @@ bei jedem Update der Seite, deshalb wird er ueber die Ladetabelle DATA_LOADERS g
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 import urllib.request
@@ -56,10 +54,9 @@ def daten_skript(karte: str) -> str:
     raise SystemExit("Ladetabelle der Karten nicht gefunden, hat sich die Seite geändert?")
 
 
-def marker(skript: str, art: str) -> list[tuple[int, int]]:
-    """Positionen einer Marker-Art, z.B. hiddenCube oder monolithMaterial (Federn)."""
-    funde = re.findall(r'"s":"' + art + r'","x":(-?\d+),"y":(-?\d+)', skript)
-    return sorted({(int(x), int(y)) for x, y in funde})  # die Seite fuehrt manche Marker doppelt
+def cubes(skript: str) -> list[tuple[int, int]]:
+    funde = re.findall(r'"s":"hiddenCube","x":(-?\d+),"y":(-?\d+)', skript)
+    return sorted({(int(x), int(y)) for x, y in funde})  # die Seite fuehrt manche Cubes doppelt
 
 
 def kartenbild(karte: str) -> QImage:
@@ -84,25 +81,21 @@ def main() -> int:
     karte = Karte(a.karte)
     massstab = KACHEL_PX / KACHEL_ORIGINAL
 
-    print("Cube-Fundorte und Federn laden …")
-    skript = daten_skript(karte_id)
-    funde = marker(skript, "hiddenCube")
-    federn = marker(skript, "monolithMaterial")
-    print(f"  {len(funde)} Cubes, {len(federn)} Federn")
+    print("Cube-Fundorte laden …")
+    funde = cubes(daten_skript(karte_id))
+    print(f"  {len(funde)} Cubes")
     if not karte.bild.exists():
         print("Kartenbild laden …")
         karte.ordner.mkdir(parents=True, exist_ok=True)
         kartenbild(karte_id).save(str(karte.bild), "PNG")
-
-    (karte.ordner / "federn.json").write_text(json.dumps([[u * massstab, v * massstab] for u, v in federn]))
 
     route = karte.ordner / "route.json"
     if a.neu or not route.exists():
         Route.anlegen(route, [(u * massstab, v * massstab) for u, v in funde])
         print(f"Route mit {len(funde)} Punkten angelegt.")
     if not karte.eichung.fertig:
-        print("Noch nicht geeicht: im Kartenfenster Rechtsklick > Eichen, an 2-3 Federn weit auseinander"
-              " hinfliegen, kurz springen, Kreuz auf die Feder schieben, „Standort hier“.")
+        print("Noch nicht geeicht: im Kartenfenster Rechtsklick > Eichen, an 2-3 Stellen hinfliegen,"
+              " kurz sprinten und auf den eigenen Standort klicken.")
     print(f"Fertig: {karte.ordner}")
     return 0
 

@@ -9,8 +9,7 @@ Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel 
   Zeigt gesehene Spawnpunkte, aktive Cubes und die eigene Position. Rechtsklick aufs Radar > Karte.
 - **Cube-Route:** `python3 -m werkzeuge.cubekarte` holt Kartenbild und Cube-Fundorte von aion2hub (Altgard)
   nach `~/.local/share/aion2-radar/karten/Altgard/` und legt einen kurzen Rundweg an (nicht im Repo). Im
-  Kartenfenster Karte „Altgard“ wählen und einmal im Spiel eichen: Im Eichmodus stehen die Federn von aion2hub
-  („Monolith Material“) auf der Karte, auf eine stellen, springen, Kreuz drauf, „Standort hier“ (rastet ein). Dann stehen die nächsten drei Fundorte
+  Kartenfenster Karte „Altgard“ wählen und einmal im Spiel eichen. Dann stehen die nächsten drei Fundorte
   gold mit 1-2-3 auf der Karte, der Rest blass. Ein Fundort gilt als erledigt, sobald man nah genug dran war
   (Abstand auf der NexBoard-Seite, Standard 60 m), auch wenn dort gerade kein Cube lag. Rechtsklick auf die
   Karte: Punkt überspringen, Route neu starten. `--neu` legt die Route neu an.
