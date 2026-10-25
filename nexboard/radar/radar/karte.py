@@ -1,4 +1,5 @@
-"""Karten-Overlay: Kartenbild mit gesehenen Spawnpunkten, aktiven Cubes und eigener Position."""
+"""Karten-Overlay: Kartenbild mit gesehenen Spawnpunkten, aktiven Cubes, eigener Position und
+Cube-Route (die naechsten drei Fundorte, siehe route.py)."""
 from __future__ import annotations
 
 import math
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (QFileDialog, QInputDialog, QMenu, QMessageBox, QS
 
 from .overlay import konfig_laden, konfig_speichern
 from .punkte import Karte, PunkteDB
+from .route import Route
 from .zustand import RadarZustand
 
 KOPF = 26
@@ -27,6 +29,9 @@ CUBE = QColor(255, 82, 82)
 PUNKT_RADAR = QColor(255, 196, 0)
 PUNKT_HAND = QColor(200, 210, 230)
 EICH = QColor(80, 170, 255)
+ROUTE = QColor(245, 185, 65)
+ROUTE_LEISE = QColor(245, 185, 65, 110)
+ROUTE_DUNKEL = QColor(20, 26, 40)
 
 
 class KartenFenster(QWidget):
@@ -36,6 +41,7 @@ class KartenFenster(QWidget):
         self.punkte = punkte
         self.k = konfig_laden()
         self.karte: Karte | None = None
+        self.route: Route | None = None
         self.pixmap: QPixmap | None = None
         self.zoom = 1.0
         self.versatz = QPointF(0, 0)  # Bildpunkt, der in der Fenstermitte liegt
@@ -67,6 +73,7 @@ class KartenFenster(QWidget):
 
     def _karte_setzen(self, karte: Karte | None) -> None:
         self.karte = karte
+        self.route = Route(karte.ordner / "route.json") if karte else None
         self.pixmap = None
         if karte and karte.bild.exists():
             self.pixmap = QPixmap(str(karte.bild))
@@ -78,11 +85,23 @@ class KartenFenster(QWidget):
         self.update()
 
     def _takt(self) -> None:
-        if self.folgen and self._eich_fertig():
-            s = self.zustand.schnappschuss()
-            if s["position"]:
-                self.versatz = QPointF(*self.karte.eichung.welt_zu_bild(*s["position"][:2]))
+        ich = self._ich_im_bild()
+        if ich and self.folgen:
+            self.versatz = QPointF(*ich)
+        if ich and self.route and self.zustand.schnappschuss()["position_alter"] <= FRISCH_S:
+            self.route.position(ich, self._meter_in_px(self.k["route_abstand"]))
         self.update()
+
+    def _ich_im_bild(self) -> tuple[float, float] | None:
+        """Eigene Position in Kartenpixeln, falls bekannt und die Karte geeicht ist."""
+        position = self.zustand.schnappschuss()["position"]
+        if not position or not self._eich_fertig():
+            return None
+        return self.karte.eichung.welt_zu_bild(*position[:2])
+
+    def _meter_in_px(self, meter: float) -> float:
+        e = self.karte.eichung
+        return math.dist(e.welt_zu_bild(0, 0), e.welt_zu_bild(meter * 100, 0))
 
     def _eich_fertig(self) -> bool:
         return bool(self.karte and self.karte.eichung.fertig)
@@ -217,6 +236,9 @@ class KartenFenster(QWidget):
                 m.addAction(p1)
                 m.addAction("Nächsten Spawnpunkt hier löschen",
                             lambda: self._punkt_loeschen(QPointF(klick)))
+                if self.route and self.route.da:
+                    m.addAction("Route: Punkt überspringen", self.route.ueberspringen)
+                    m.addAction("Route neu starten", self.route.neu_starten)
                 f = QAction("Mir folgen", m, checkable=True, checked=self.folgen)
                 f.toggled.connect(self._folgen)
                 m.addAction(f)
@@ -297,6 +319,8 @@ class KartenFenster(QWidget):
                          QRectF(self.pixmap.rect()))
             if self._eich_fertig():
                 self._inhalt_zeichnen(p)
+            if self.route:
+                self._route_zeichnen(p)
             if self.modus == "eichen":
                 p.setPen(QPen(EICH, 2))
                 for *_, u, v in self.karte.eichung.paare:
@@ -367,6 +391,30 @@ class KartenFenster(QWidget):
             p.setBrush(farbe)
             p.drawEllipse(q, 5.5, 5.5)
 
+    def _route_zeichnen(self, p: QPainter) -> None:
+        """Offene Fundorte blass, die naechsten drei gold mit 1-2-3, verbunden ab der eigenen
+        Position. Ohne Eichung nur die Punkte, die Reihenfolge haengt dann noch an der Position."""
+        naechste = self.route.naechste(3)
+        p.setPen(Qt.NoPen)
+        p.setBrush(ROUTE_LEISE)
+        for u, v in self.route.offene()[len(naechste):]:
+            p.drawEllipse(self._bild_zu_schirm(u, v), 3.5, 3.5)
+        if not naechste:
+            return
+        ich = self._ich_im_bild()
+        linie = ([self._bild_zu_schirm(*ich)] if ich else []) + [self._bild_zu_schirm(u, v) for u, v in naechste]
+        p.setPen(QPen(ROUTE, 2))
+        p.drawPolyline(linie)
+        p.setFont(QFont("Sans", 8, QFont.Bold))
+        for nummer, (u, v) in enumerate(naechste, 1):
+            q = self._bild_zu_schirm(u, v)
+            erster = nummer == 1
+            p.setPen(QPen(ROUTE, 1.5))
+            p.setBrush(ROUTE if erster else ROUTE_DUNKEL)
+            p.drawEllipse(q, 8, 8)
+            p.setPen(ROUTE_DUNKEL if erster else ROUTE)
+            p.drawText(QRectF(q.x() - 8, q.y() - 8, 16, 16), Qt.AlignCenter, str(nummer))
+
     def _kopf_status(self) -> str:
         if self.modus == "eichen":
             n = len(self.karte.eichung.paare) if self.karte else 0
@@ -375,8 +423,11 @@ class KartenFenster(QWidget):
             return "Punkte setzen"
         if self.karte and not self.karte.eichung.fertig:
             return "nicht geeicht"
-        n = len(self.punkte.alle())
         aktiv = len(self.zustand.schnappschuss()["cubes"])
+        if self.route and self.route.da:
+            gesamt = len(self.route.punkte)
+            return f"Route {gesamt - self.route.uebrig}/{gesamt} · {aktiv} aktiv"
+        n = len(self.punkte.alle())
         return f"{n} Spawnpunkte · {aktiv} aktiv"
 
     def closeEvent(self, e) -> None:
