@@ -41,6 +41,23 @@
   <div class="timer-list" id="timer-list"></div>
 </section>
 
+<section class="widget" id="w-radar" data-id="radar" data-title="Radar">
+  <canvas id="radar-bild" width="520" height="520"></canvas>
+  <div class="radar-info hud"><div id="radar-cube"></div><div id="radar-status"></div></div>
+</section>
+
+<section class="widget" id="w-warnung" data-id="warnung" data-title="Boss-Warnungen">
+  <div class="warn-vorschau" id="warn-vorschau" hidden></div>
+  <div id="warn-liste"></div>
+</section>
+
+<section class="widget hud" id="w-karte" data-id="karte" data-title="Karte" data-click>
+  <div class="karte-kopf"><span id="karte-name">Karte</span><span id="karte-status"></span></div>
+  <canvas id="karte-bild"></canvas>
+  <div class="karte-tipp" id="karte-tipp" hidden></div>
+</section>
+
+<script src="radar.js"></script>
 <script src="overlay.js"></script>
 </body>
 </html>

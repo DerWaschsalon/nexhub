@@ -1,33 +1,35 @@
-"""AION 2 · Radar: startet das Radar (nexboard/radar, eigenes Qt-Programm), solange AION 2 läuft,
-und verwaltet seine Einstellungen für die Web-UI.
+"""AION 2 · Radar: läuft im Daemon, solange AION 2 läuft, und zeigt sich als Widgets im Overlay.
 
-Die Einstellungen stehen in ~/.config/aion2-radar.json. Die Datei schreibt auch das Radar selbst
-(Verschieben, Rechtsklick-Menü), deshalb liest der Daemon sie vor jedem Speichern neu und ändert
-nur, was die Seite schickt. Standardwerte und Warnungsliste kommen aus radar/standard.json und
-radar/meldungen.json, denselben Dateien, die das Radar nutzt.
+Mitschnitt und Auswertung stecken in nexboard/radar (RadarDienst, ohne Fenster). Der Daemon ruft
+dessen Takt mehrmals pro Sekunde auf und schickt den Stand als Overlay-Ereignis „radar“. Das
+Radar-Widget zeigt sich dort nur, solange ein Cube in Sicht ist.
 
-Befehle gehen als Textzeile über stdin an das Radar (radar/befehle.py). Das Radar meldet seine
-Aufnahme als Zeile auf stdout ("aufnahme an" / "aufnahme aus").
+Die Einstellungen stehen in ~/.config/aion2-radar.json. Standardwerte und Warnungsliste kommen aus
+radar/standard.json und radar/meldungen.json, denselben Dateien, die das Radar nutzt.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import sys
+import time
 from pathlib import Path
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from .capture import aion2_running
 from .config import _atomic_write
 
+ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
+sys.path.insert(0, str(ORDNER))  # Paket „radar“ liegt dort, nicht im Daemon
+from radar import daten, konfig, uebersicht  # noqa: E402
+from radar.dienst import RadarDienst  # noqa: E402
+from radar.punkte import Karte  # noqa: E402
+
 log = logging.getLogger(__name__)
 
-KONFIG = Path.home() / ".config" / "aion2-radar.json"
-ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
-PROGRAMM = ["/usr/bin/python3", "-m", "radar", "--log", "--befehle"]  # System-Python, dort ist PySide6
-POSITIONEN = {"x", "y"}  # stellt man durch Ziehen ein, nicht auf der Seite
-BEFEHLE = ("neu_laden", "ton_testen", "warnung_testen", "warnung_verschieben", "karte_zeigen",
-           "karte_ausblenden", "uebersicht_zeigen", "aufnahme_start", "aufnahme_stopp")
+TAKT_S = 0.2  # so oft zeichnen die Widgets neu, Warnungen zählen in Zehntelsekunden
+BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart")
 
 
 async def _aion2_laeuft() -> bool:
@@ -36,121 +38,138 @@ async def _aion2_laeuft() -> bool:
 
 def _json(pfad: Path) -> dict:
     try:
-        daten = json.loads(pfad.read_text())
+        inhalt = json.loads(pfad.read_text())
     except (OSError, ValueError):
         return {}
-    return daten if isinstance(daten, dict) else {}
+    return inhalt if isinstance(inhalt, dict) else {}
 
 
 class Radar:
-    def __init__(self, konfig: Path = KONFIG, arbeitsordner: Path = ORDNER, programm: list[str] = PROGRAMM,
-                 spiel_laeuft: Callable[[], Awaitable[bool]] = _aion2_laeuft, abfrage_s: float = 5,
-                 nachlauf_s: float = 30) -> None:
-        self.konfig = konfig
-        self.arbeitsordner = arbeitsordner
-        self.programm = programm
+    def __init__(self, veroeffentlichen: Callable[[dict], Awaitable[None]],
+                 spiel_laeuft: Callable[[], Awaitable[bool]] = _aion2_laeuft,
+                 dienst: Callable[[str], Any] = RadarDienst, abfrage_s: float = 5, nachlauf_s: float = 30) -> None:
+        self.veroeffentlichen = veroeffentlichen  # Overlay-Ereignis „radar“
         self.spiel_laeuft = spiel_laeuft
+        self.neuer_dienst = dienst
         self.abfrage_s = abfrage_s
         self.nachlauf_s = nachlauf_s  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
-        self.standard = _json(ORDNER / "radar" / "standard.json")
         self.meldungen = _json(ORDNER / "radar" / "meldungen.json")
-        self.prozess: asyncio.subprocess.Process | None = None
-        self.aufnahme = False
+        self.dienst: RadarDienst | None = None
         self.spiel = False
 
     @property
     def laeuft(self) -> bool:
-        return self.prozess is not None and self.prozess.returncode is None
+        return self.dienst is not None
+
+    @property
+    def aufnahme(self) -> bool:
+        return bool(self.dienst and self.dienst.aufnahme)
 
     def einstellungen(self) -> dict:
-        return {**self.standard, **_json(self.konfig)}
+        return {**konfig.STANDARD, **_json(konfig.KONFIG)}
 
     def info(self) -> dict:
         return {"einstellungen": self.einstellungen(), "meldungen": self.meldungen,
+                "karten": [k.name for k in Karte.alle()],
                 "laeuft": self.laeuft, "aufnahme": self.aufnahme, "spiel": self.spiel}
 
     def _pruefen(self, aenderung: dict) -> None:
         for schluessel, wert in aenderung.items():
-            if schluessel not in self.standard or schluessel in POSITIONEN:
+            if schluessel not in konfig.STANDARD:
                 raise ValueError(f"unbekannte Einstellung {schluessel}")
-            soll = type(self.standard[schluessel])
+            soll = type(konfig.STANDARD[schluessel])
             erlaubt = (int, float) if soll is float else soll  # 1 statt 1.0 ist in Ordnung
             if isinstance(wert, bool) != (soll is bool) or not isinstance(wert, erlaubt):
                 raise ValueError(f"{schluessel}: erwartet {soll.__name__}")
 
     async def speichern(self, aenderung: dict) -> dict:
+        """Ändert nur, was die Seite schickt; fremde Schlüssel in der Datei bleiben."""
         self._pruefen(aenderung)
-        daten = {**_json(self.konfig), **aenderung}
-        _atomic_write(self.konfig, json.dumps(daten, indent=2, ensure_ascii=False))
-        if self.laeuft:
-            await self.befehl("neu_laden")
+        inhalt = {**_json(konfig.KONFIG), **aenderung}
+        _atomic_write(konfig.KONFIG, json.dumps(inhalt, indent=2, ensure_ascii=False))
+        konfig.konfig_neu_laden()
+        if self.dienst:
+            self.dienst.neu_laden()
         return self.info()
 
     async def befehl(self, name: str) -> None:
-        if name == "neustart":  # z.B. nach neuem Charakternamen, den liest das Radar nur beim Start
-            await self._beenden()
-            if self.spiel:
-                await self._starten()
-            return
         if name not in BEFEHLE:
             raise ValueError(f"unbekannter Befehl {name}")
-        if not self.laeuft:
+        if name == "neustart":  # z.B. nach neuem Charakternamen, den liest das Radar nur beim Start
+            self._beenden()
+            if self.spiel:
+                self._starten()
+            return
+        if not self.dienst:
             raise RuntimeError("Radar läuft nicht")
-        try:
-            self.prozess.stdin.write(name.encode() + b"\n")
-            await self.prozess.stdin.drain()
-        except OSError as e:  # gerade beendet
-            raise RuntimeError("Radar läuft nicht") from e
+        aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
+                    "aufnahme_start": self.dienst.aufnahme_starten,
+                    "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen}
+        aktionen[name]()
 
-    async def _starten(self) -> None:
-        name = self.einstellungen().get("name")
+    def uebersicht(self) -> dict:
+        """Feldbosse, Termine und Vertraute für die NexBoard-Seite. Ohne laufendes Radar aus den
+        gespeicherten Ständen."""
+        if self.dienst:
+            z = self.dienst.zustand
+            plaetze, zone, vertraute = z.feldbosse, z.zone, z.vertraute
+        else:
+            plaetze, zone, vertraute = daten.laden("feldbosse.json"), None, daten.laden("vertraute.json")
+        return {"termine": uebersicht.termine(time.time()), "feldbosse": uebersicht.feldbosse(plaetze, zone),
+                "vertraute": uebersicht.vertraute(vertraute)}
+
+    def karte(self) -> dict:
+        return self.dienst.karte() if self.dienst else {"name": ""}
+
+    def kartendatei(self, art: str) -> Path | None:
+        """Bild oder Teleporter-Symbol der gezeigten Karte, für die Overlay-Seite."""
+        name = self.karte()["name"]
+        if not name or art not in ("bild", "symbol"):
+            return None
+        karte = Karte(name)
+        datei = karte.bild if art == "bild" else karte.symbol
+        return datei if datei.exists() else None
+
+    def _starten(self) -> None:
         log.info("AION 2 läuft, starte Radar")
-        try:
-            self.prozess = await asyncio.create_subprocess_exec(
-                *self.programm, *(["--name", name] if name else []), cwd=self.arbeitsordner,
-                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
-        except OSError as e:
-            log.error("Radar startet nicht: %s", e)
-            return
-        asyncio.create_task(self._ausgabe_lesen(self.prozess))
+        self.dienst = self.neuer_dienst(self.einstellungen()["name"])
+        self.dienst.starten()
 
-    async def _ausgabe_lesen(self, prozess: asyncio.subprocess.Process) -> None:
-        async for zeile in prozess.stdout:
-            if zeile.strip() in (b"aufnahme an", b"aufnahme aus"):
-                self.aufnahme = zeile.strip() == b"aufnahme an"
-        if prozess is self.prozess:
-            self.aufnahme = False  # Radar beendet
+    def _beenden(self) -> None:
+        if self.dienst:
+            log.info("Radar wird beendet")
+            self.dienst.stoppen()
+            self.dienst = None
 
-    async def _beenden(self) -> None:
-        p = self.prozess
-        if p is None or p.returncode is not None:
-            return
-        log.info("Radar wird beendet")
-        p.terminate()
-        try:
-            await asyncio.wait_for(p.wait(), 3)
-        except TimeoutError:
-            p.kill()
-            await p.wait()
-        self.aufnahme = False
+    async def _spiel_pruefen(self, weg: float) -> float:
+        """Radar mit dem Spiel starten und nachlauf_s nach Spielende beenden. Gibt zurück, wie lange
+        das Spiel schon weg ist."""
+        if await self.spiel_laeuft():
+            if not self.spiel:
+                self.spiel = True
+                self._starten()
+            return 0
+        if self.spiel:
+            weg += self.abfrage_s
+            if weg >= self.nachlauf_s:
+                self.spiel = False
+                self._beenden()
+                await self.veroeffentlichen({"aktiv": False})
+        return weg
 
     async def watch(self) -> None:
-        """Modul-Aufgabe: Radar mit dem Spiel starten und nachlauf_s nach Spielende beenden. Gehandelt
-        wird nur beim Wechsel: wer das Radar mitten im Spiel schließt, behält das."""
-        weg = 0.0
+        """Modul-Aufgabe: Spiel alle abfrage_s prüfen, dazwischen Takt und Stand fürs Overlay."""
+        weg, pruefen_um = 0.0, 0.0
         try:
             while True:
-                if await self.spiel_laeuft():
-                    weg = 0
-                    if not self.spiel:
-                        self.spiel = True
-                        await self._starten()
-                elif self.spiel:
-                    weg += self.abfrage_s
-                    if weg >= self.nachlauf_s:
-                        self.spiel = False
-                        await self._beenden()
-                await asyncio.sleep(self.abfrage_s)
+                if time.monotonic() >= pruefen_um:
+                    pruefen_um = time.monotonic() + self.abfrage_s
+                    weg = await self._spiel_pruefen(weg)
+                if self.dienst:
+                    self.dienst.takt()
+                    await self.veroeffentlichen({"aktiv": True, **self.dienst.stand()})
+                await asyncio.sleep(TAKT_S)
         finally:
             self.spiel = False
-            await asyncio.shield(self._beenden())
+            self._beenden()
+            await self.veroeffentlichen({"aktiv": False})

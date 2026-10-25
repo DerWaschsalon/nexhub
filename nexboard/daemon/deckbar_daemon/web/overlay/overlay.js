@@ -1,7 +1,8 @@
 /* NexBoard-Overlay: Widgets über dem Spiel. Läuft im Overlay-Programm (layer-shell-Fläche, Qt
  * WebEngine) und zum Ausprobieren auch im Browser (http://127.0.0.1:<Port+1>/__deckbar__/overlay/).
  *
- * Daten:   GET /api/overlay/events (SSE: layout, dps), PUT /api/overlay/layout (Positionen, Effekt)
+ * Daten:   GET /api/overlay/events (SSE: layout, dps, radar), PUT /api/overlay/layout (Positionen, Effekt)
+ * Radar:   Widgets Radar, Boss-Warnungen und Karte in radar.js (lädt vor dieser Datei)
  * Host:    QWebChannel-Objekt „bridge“ (overlay/Overlay.qml): mode, setRegions, requestMode,
  *          finishEdit, call (Fenster-Befehle der Meter-Oberfläche)
  * Meter:   die Oberfläche des A2Tools-Meters als iframe (gleicher Ursprung). Ihr Shim
@@ -17,6 +18,9 @@ const DEFAULT_POS = {
   meter: () => [48, Math.max(40, innerHeight - 380)],
   boss: () => [Math.round(innerWidth / 2 - 210), 72],
   timers: () => [innerWidth - 300, 160],
+  radar: () => [innerWidth - 300, 40],
+  warnung: () => [Math.round(innerWidth / 2 - 230), 140],
+  karte: () => [innerWidth - 460, 400],
 };
 
 let bridge = null;
@@ -94,6 +98,7 @@ function applyLayout(next) {
   applyFx();
   renderBoss();
   renderTimers();
+  radarNeuZeichnen();
   if (first || $("toggles").childElementCount === 0) buildToolbar();
   syncToolbar();
   const meter = $("meter");
@@ -142,6 +147,7 @@ function setMode(m) {
   document.body.dataset.mode = m;
   if (m !== "edit") hideGuides();
   renderBoss();
+  radarNeuZeichnen();
   regionsSoon();
 }
 
@@ -529,6 +535,7 @@ function connect() {
   let offlineTimer = 0;
   es.addEventListener("layout", (e) => applyLayout(JSON.parse(e.data)));
   es.addEventListener("dps", (e) => onDps(JSON.parse(e.data)));
+  es.addEventListener("radar", (e) => onRadar(JSON.parse(e.data)));
   es.onopen = () => { clearTimeout(offlineTimer); $("offline").hidden = true; };
   es.onerror = () => {
     clearTimeout(offlineTimer);
@@ -537,6 +544,7 @@ function connect() {
 }
 
 function start() {
+  radarStart();
   setMode(mode);
   connect();
   setInterval(renderTimers, 1000);

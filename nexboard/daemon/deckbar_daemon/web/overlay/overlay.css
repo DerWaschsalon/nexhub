@@ -111,3 +111,42 @@ body.edit #guides { display: block; }
   position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
   padding: 8px 14px; border-radius: 999px; background: rgba(9, 13, 24, .85); color: var(--warn); font-size: 13px;
 }
+
+/* ------------------------------------------------------------ Radar (Modul AION 2 · Radar) */
+#w-radar { width: 260px; }
+#radar-bild { width: 260px; height: 260px; display: block; }
+.radar-info { margin: -2px 8px 0; padding: 5px 10px 6px; text-align: center; }
+#radar-cube { font-weight: 650; font-size: 12.5px; color: var(--bad); white-space: nowrap; }
+#radar-cube.oeffnet { color: var(--warn); }
+#radar-status { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+#w-warnung { width: 460px; }
+.warn-vorschau {
+  margin: 0 auto 6px; width: fit-content; max-width: 100%; padding: 4px 14px; border-radius: 10px;
+  background: rgba(14, 20, 32, .8); font-weight: 600; font-size: 13px; white-space: nowrap;
+}
+.warn-vorschau.offen { color: #ffa028; }
+.warn {
+  position: relative; margin-bottom: 8px; padding: 8px 16px 14px; border-radius: 14px;
+  background: rgba(14, 20, 32, .88); border: 2px solid var(--farbe);
+}
+.warn.blinkt { background: color-mix(in srgb, var(--farbe) 47%, transparent); }
+.warn-kopf { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.warn-titel { font-size: 22px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.warn-zeit { font-size: 28px; font-weight: 700; color: var(--farbe); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.warn-hinweis { font-size: 13px; color: #dce4f0; }
+.warn-balken { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 4px; }
+.warn-balken div { height: 100%; border-radius: 2px; background: var(--farbe); transform-origin: 0 50%; }
+
+#w-karte { width: 420px; height: 420px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.karte-kopf {
+  display: flex; justify-content: space-between; gap: 12px; padding: 5px 12px; font-size: 12px;
+  border-bottom: 1px solid var(--hud-line); background: rgba(10, 14, 24, .8);
+}
+#karte-name { font-weight: 650; }
+#karte-status { color: var(--muted); }
+#karte-bild { flex: 1; min-height: 0; width: 100%; display: block; cursor: grab; }
+.karte-tipp {
+  position: absolute; padding: 3px 8px; border-radius: 6px; font-size: 12px; pointer-events: none;
+  background: rgba(10, 14, 24, .92); border: 1px solid var(--hud-line);
+}

@@ -15,8 +15,8 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
 - **Mehrere Seiten** mit Wischgesten, Hintergrund wählbar (Standard, Desktop-Hintergrund, eigenes Bild)
 - **AION 2:** DPS-Meter der Gruppe als eigene Seite, ein Overlay über dem Spiel (Meter, Boss-Leiste,
   Event-Timer, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
-- **AION-2-Radar:** Hidden Cubes, Karte, Boss-Warnungen, Feldbosse und Vertraute in eigenen Fenstern
-  (`radar/`), startet mit dem Spiel, alle Einstellungen in der Web-UI
+- **AION-2-Radar:** Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse und Vertraute
+  in der Web-UI (`radar/`), läuft im Daemon mit dem Spiel, alle Einstellungen in der Web-UI
 - **Discord-Bot:** Gruppen-DPS und Run-Ergebnisse an einen Bot, der Meldungen mehrerer Spieler zusammenführt
 - **Verbindung** per WLAN, bei Bedarf per USB-Kabel als Rückfall
 - **Ruhemodus:** Ist 30 s lang kein PC verbunden (weder WLAN noch USB), blendet das Display aus und
