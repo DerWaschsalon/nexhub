@@ -1,9 +1,9 @@
-"""Cube-Karte von aion2hub holen: Kartenbild, Cube-Fundorte und Rundweg fuer das Kartenfenster.
+"""Cube-Karte von aion2hub holen: Kartenbild und Cube-Fundorte fuer das Kartenfenster.
 
     python3 -m werkzeuge.cubekarte            # Altgard
-    python3 -m werkzeuge.cubekarte --neu      # Route neu anlegen, Fortschritt geht verloren
+    python3 -m werkzeuge.cubekarte --neu      # Eichung neu setzen (eigene Eichung weg)
 
-Legt unter ~/.local/share/aion2-radar/karten/Altgard/ bild.png und route.json an.
+Legt unter ~/.local/share/aion2-radar/karten/Altgard/ bild.png, eichung.json und fundorte.json an.
 Nichts davon kommt ins Repo (Daten und Bilder gehoeren aion2hub). Danach im Kartenfenster:
 Rechtsklick > Karte wählen > Altgard. Eichen ist nicht noetig, die Umrechnung steht fest (MITTE_PX).
 
@@ -13,6 +13,7 @@ bei jedem Update der Seite, deshalb wird er ueber die Ladetabelle DATA_LOADERS g
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 import urllib.request
@@ -20,7 +21,6 @@ import urllib.request
 from PySide6.QtGui import QImage, QPainter
 
 from radar.punkte import Karte
-from radar.route import Route
 
 SEITE = "https://aion2hub.com"
 KARTEN = {"Altgard": "World_D_A"}
@@ -90,7 +90,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--karte", default="Altgard", choices=sorted(KARTEN))
     ap.add_argument("--neu", action="store_true",
-                    help="Route und Eichung neu anlegen (Fortschritt und eigene Eichung weg)")
+                    help="Eichung neu setzen (eigene Eichung weg)")
     a = ap.parse_args()
     karte_id = KARTEN[a.karte]
     karte = Karte(a.karte)
@@ -104,10 +104,7 @@ def main() -> int:
         karte.ordner.mkdir(parents=True, exist_ok=True)
         kartenbild(karte_id).save(str(karte.bild), "PNG")
 
-    route = karte.ordner / "route.json"
-    if a.neu or not route.exists():
-        Route.anlegen(route, [(u * massstab, v * massstab) for u, v in funde])
-        print(f"Route mit {len(funde)} Punkten angelegt.")
+    (karte.ordner / "fundorte.json").write_text(json.dumps([[u * massstab, v * massstab] for u, v in funde]))
     if a.neu or not karte.eichung.fertig:
         eichen(karte, massstab)
         print("Eichung gesetzt.")
