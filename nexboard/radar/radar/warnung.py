@@ -100,6 +100,9 @@ REGELN.update({
     1802383: Regel("Dritte Linie", "Zur dritten Zone, danach unter den Boss", 1.5, BLAU, "zikel_linien"),
     # Ende der langen Linienphase: Donut, sicher nur direkt unter dem Boss (Zeit noch geschaetzt)
     1802391: Regel("Donut", "Unter den Boss!", 1.0, ROT, "zikel_linien"),
+    # weitere harte Schlaege (ca. 8.000 Schaden), 1802435 trifft nur jedes fuenfte Mal: grau, ohne Ton
+    1802435: Regel("Schlag", "Ausweichen", 0.8, GRAU, "zikel_angriffe"),
+    1802433: Regel("Schlag", "Ausweichen", 1.3, GRAU, "zikel_angriffe"),
 })
 
 # Status-Effekte (0x382A) auf dem eigenen Charakter. Gefunden 2026-10-24: 0,1 s nach Ignus'
@@ -111,6 +114,10 @@ STATUS_REGELN: dict[int, Regel] = {
 }
 # Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
 GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
+# Eigene HP unter die Haelfte gefallen (nur im Dungeon). Bei Zikel kamen fast alle Tode als zweiter
+# Treffer wenige Sekunden nach dem ersten.
+WENIG_HP = Regel("Heilen!", "Wenig HP: erst heilen, dann angreifen", 2.0, ROT, "hp")
+HP_TIEF, HP_WIEDER = 0.5, 0.65   # warnen unter 50 %, erneut erst nach ueber 65 %
 
 # Meldungen je Dungeon: Dungeon -> {Gruppe: Name}, steht in meldungen.json (liest auch die
 # NexBoard-Seite). Ohne Eintraege = noch keine Warnungen ("fehlt").
@@ -169,6 +176,10 @@ ENGLISCH = {
     "Dritte Linie": "Third Line", "Zur dritten Zone, danach unter den Boss": "To the third zone, then under the boss",
     "Donut": "Donut", "Unter den Boss!": "Get under the boss!",
     "Blutung": "Bleeding", "Trank nehmen!": "Drink a potion!",
+    "Zikel: weitere Schläge (grau, ohne Ton)": "Zikel: other strikes (grey, silent)",
+    "Schlag": "Strike", "Ausweichen": "Dodge",
+    "Wenig HP: heilen (alle Dungeons)": "Low HP: heal (all dungeons)", "Heilen!": "Heal!",
+    "Wenig HP: erst heilen, dann angreifen": "Low HP: heal first, then attack",
     "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
 }
 
@@ -208,6 +219,8 @@ class WarnZentrale:
         self.laut: list[tuple[str, str]] = []  # (art, text): Piepton oder Ansage, spielt der RadarDienst ab
         self.k = konfig_laden()
         self.an = self.k["warn_an"]
+        self.hp_max = 0
+        self.hp_tief = False
 
     def cast(self, caster: int, skill: int, ziel: int | None) -> None:
         regel = REGELN.get(skill)
@@ -237,6 +250,17 @@ class WarnZentrale:
         if self.an and ziel == self.zustand.eigene_eid:
             with self.lock:
                 self._hinzufuegen(STATUS_REGELN[sid], self.uhr(), ich=True)
+
+    def hp(self, wert: int) -> None:
+        """Eigene HP: einmal warnen, wenn sie unter die Haelfte fallen."""
+        self.hp_max = max(self.hp_max, wert)
+        if wert == 0 or wert > self.hp_max * HP_WIEDER:
+            self.hp_tief = False
+        elif wert < self.hp_max * HP_TIEF and not self.hp_tief:
+            self.hp_tief = True
+            if self.an and self.zustand.dungeon:
+                with self.lock:
+                    self._hinzufuegen(WENIG_HP, self.uhr())
 
     def groggy(self, boss: int) -> None:
         if self.an:
@@ -318,7 +342,7 @@ def ansage(text: str) -> None:
 
 def ansagen_vorbereiten() -> None:
     """Alle festen Ansagen vorab erzeugen, damit sie im Kampf sofort kommen."""
-    titel = {r.titel for r in (*REGELN.values(), *STATUS_REGELN.values(), GROGGY)} | {flamme(0).titel,
+    titel = {r.titel for r in (*REGELN.values(), *STATUS_REGELN.values(), GROGGY, WENIG_HP)} | {flamme(0).titel,
                                                                                     REGEN_KOMMT.titel}
     texte = [tr(t) for t in titel] + [tr(REGELN[TODESMAL].titel) + tr(" auf dir")]
     threading.Thread(target=lambda: [gesprochen(t) for t in texte], daemon=True).start()

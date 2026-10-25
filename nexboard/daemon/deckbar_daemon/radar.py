@@ -66,7 +66,7 @@ class Radar:
         return bool(self.dienst and self.dienst.aufnahme)
 
     def einstellungen(self) -> dict:
-        return {**konfig.STANDARD, **_json(konfig.KONFIG)}
+        return konfig.mit_standard(_json(konfig.KONFIG))
 
     def info(self) -> dict:
         return {"einstellungen": self.einstellungen(), "meldungen": self.meldungen,

@@ -59,6 +59,24 @@ class WarnungTest(unittest.TestCase):
         self.z.cast(1, 1802445, 5)  # Ziel bin ich: ohne eigenen Namen
         self.assertEqual(self.z.laut[-1], ("ansage", "Blutschlag"))
 
+    def test_wenig_hp_einmal_und_nur_im_dungeon(self):
+        self.z.hp(20000)
+        self.z.hp(9000)
+        self.assertEqual(self.titel(), [])  # kein Dungeon
+        self.zustand.dungeon = "Albtraum"
+        self.z.hp(20000)
+        self.z.hp(9000)
+        self.z.hp(8000)
+        self.z.hp(11000)  # unter 65 %: keine neue Warnung beim naechsten Fall
+        self.z.hp(9000)
+        self.assertEqual(self.z.laut, [("ansage", "Heilen!")])
+
+    def test_zikel_graue_schlaege_ohne_ton(self):
+        self.zustand.dungeon = "Albtraum"
+        self.z.k["warnton"] = {"zikel_angriffe": "aus"}
+        self.z.cast(1, 1802435, 5)
+        self.assertEqual((self.titel(), self.z.laut), (["Schlag"], []))
+
     def test_groggy(self):
         self.z.groggy(7)
         self.assertEqual(self.titel(), ["Boss groggy"])

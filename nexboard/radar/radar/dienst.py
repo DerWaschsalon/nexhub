@@ -31,6 +31,7 @@ class RadarDienst:
         self.zustand.bei_cast.append(self.zentrale.cast)
         self.zustand.bei_status.append(self.zentrale.status)
         self.zustand.bei_groggy.append(self.zentrale.groggy)
+        self.zustand.bei_hp.append(self.zentrale.hp)
         self.zustand.status_ids = set(STATUS_REGELN)
         self._ton_faellig = False
         self._dungeon: str | None = None
