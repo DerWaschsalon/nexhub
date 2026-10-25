@@ -17,6 +17,13 @@ class FeldbosseVertrauteTest(unittest.TestCase):
     def setUp(self):
         self.z = RadarZustand()  # speichert nichts
 
+    def test_karte_offen(self):
+        self.assertFalse(self.z.schnappschuss()["karte_offen"])
+        self.z.verarbeiten(OP_FELDBOSSE, b"\0\0" + struct.pack("<IB", 1110, 0))
+        self.assertTrue(self.z.schnappschuss()["karte_offen"])
+        self.z.karte_offen_zeit -= 3  # keine Abfrage mehr: Karte zu
+        self.assertFalse(self.z.schnappschuss()["karte_offen"])
+
     def test_feldboss_liste(self):
         p = (b"\0\0" + struct.pack("<IB", 1110, 2)
              + b"\x01" + varint(111001) + struct.pack("<fffQ", 100.0, 200.0, 300.0, 1792745536509)
