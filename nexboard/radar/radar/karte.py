@@ -142,7 +142,9 @@ class KartenFenster(QWidget):
             return
         if pos.y() < KOPF:
             self._ziehen = ("fenster", e.globalPosition(), QPointF(self.pos()))
-        elif self.modus and self.pixmap:
+        elif self.modus == "eichen" and self._eich_knopf().contains(pos):
+            self._klick_im_modus(self._mitte())
+        elif self.modus == "punkt" and self.pixmap:
             self._klick_im_modus(pos)
         elif self.pixmap:
             self._ziehen = ("karte", pos, QPointF(self.versatz))
@@ -179,6 +181,10 @@ class KartenFenster(QWidget):
         self.k.update(karte_x=self.x(), karte_y=self.y(),
                       karte_b=self.width(), karte_h=self.height())
         konfig_speichern(self.k)
+
+    def _eich_knopf(self) -> QRectF:
+        """Knopf unten in der Mitte: setzt den Eichpunkt dort, wo das Fadenkreuz liegt."""
+        return QRectF(self.width() / 2 - 70, self.height() - 84, 140, 30)
 
     def _klick_im_modus(self, pos: QPointF) -> None:
         u, v = self._schirm_zu_bild(pos)
@@ -256,7 +262,8 @@ class KartenFenster(QWidget):
     def _modus(self, modus: str | None) -> None:
         self.modus = modus
         if modus == "eichen":
-            self._melden("Hinlaufen, kurz sprinten, dann auf der Karte auf deinen Standort klicken", 10)
+            self.folgen = False
+            self._melden("Kreuz auf deinen Standort schieben, kurz springen, Knopf drücken", 10)
         elif modus == "punkt":
             self._melden("Auf die Karte klicken, um Spawnpunkte einzutragen", 6)
 
@@ -324,11 +331,7 @@ class KartenFenster(QWidget):
             if self.route:
                 self._route_zeichnen(p)
             if self.modus == "eichen":
-                p.setPen(QPen(EICH, 2))
-                for *_, u, v in self.karte.eichung.paare:
-                    q = self._bild_zu_schirm(u, v)
-                    p.drawLine(q + QPointF(-6, 0), q + QPointF(6, 0))
-                    p.drawLine(q + QPointF(0, -6), q + QPointF(0, 6))
+                self._eichen_zeichnen(p)
         else:
             p.setPen(LEISE)
             p.setFont(QFont("Sans", 9))
@@ -392,6 +395,27 @@ class KartenFenster(QWidget):
             p.setPen(QPen(QColor(255, 255, 255, 200), 1.5))
             p.setBrush(farbe)
             p.drawEllipse(q, 5.5, 5.5)
+
+    def _eichen_zeichnen(self, p: QPainter) -> None:
+        """Bisherige Eichpunkte, Fadenkreuz in der Mitte und der Knopf zum Setzen."""
+        p.setPen(QPen(EICH, 2))
+        for *_, u, v in self.karte.eichung.paare:
+            q = self._bild_zu_schirm(u, v)
+            p.drawLine(q + QPointF(-6, 0), q + QPointF(6, 0))
+            p.drawLine(q + QPointF(0, -6), q + QPointF(0, 6))
+        m = self._mitte()
+        p.setPen(QPen(EICH, 1.5))
+        p.drawLine(m + QPointF(-14, 0), m + QPointF(-4, 0))
+        p.drawLine(m + QPointF(4, 0), m + QPointF(14, 0))
+        p.drawLine(m + QPointF(0, -14), m + QPointF(0, -4))
+        p.drawLine(m + QPointF(0, 4), m + QPointF(0, 14))
+        knopf = self._eich_knopf()
+        p.setPen(Qt.NoPen)
+        p.setBrush(EICH)
+        p.drawRoundedRect(knopf, 10, 10)
+        p.setPen(QColor(255, 255, 255))
+        p.setFont(QFont("Sans", 9, QFont.DemiBold))
+        p.drawText(knopf, Qt.AlignCenter, "Standort hier")
 
     def _route_zeichnen(self, p: QPainter) -> None:
         """Offene Fundorte blass, die naechsten drei gold mit 1-2-3, verbunden ab der eigenen
