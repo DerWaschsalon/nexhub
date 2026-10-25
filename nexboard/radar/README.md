@@ -9,10 +9,11 @@ Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel 
   Zeigt gesehene Spawnpunkte, aktive Cubes und die eigene Position. Rechtsklick aufs Radar > Karte.
 - **Cube-Route:** `python3 -m werkzeuge.cubekarte` holt Kartenbild und Cube-Fundorte von aion2hub (Altgard)
   nach `~/.local/share/aion2-radar/karten/Altgard/` und legt einen kurzen Rundweg an (nicht im Repo). Im
-  Kartenfenster Karte „Altgard“ wählen und einmal im Spiel eichen. Dann stehen die nächsten drei Fundorte
+  Kartenfenster Karte „Altgard“ wählen, Eichen ist nicht nötig (aion2hub-Karte: 1 px = 1 m, Ursprung in
+  der Mitte). Dann stehen die nächsten drei Fundorte
   gold mit 1-2-3 auf der Karte, der Rest blass. Ein Fundort gilt als erledigt, sobald man nah genug dran war
   (Abstand auf der NexBoard-Seite, Standard 60 m), auch wenn dort gerade kein Cube lag. Rechtsklick auf die
-  Karte: Punkt überspringen, Route neu starten. `--neu` legt die Route neu an.
+  Karte: Punkt überspringen, Route neu starten. `--neu` legt Route und Eichung neu an.
 - **Boss-Warnungen (Kromedes Gier):** Todesmal, Regen des Hasses, Vorhersage nach der Flächenphase,
   Zeitfenster für den nächsten Regen. Rechtsklick aufs Radar > Boss-Warnungen.
   Unter „Meldungen auswählen …“ Dungeon wählen, dann jede Warnung einzeln an/aus und mit/ohne Ton.
