@@ -13,7 +13,7 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
   NexBoard-Seite „Radar“; Position und Größe im Bearbeiten-Modus des Overlays.
 - **Karte:** Widget im Overlay (unter Overlay → Widgets einschalten): Kartenbild mit gesehenen Spawnpunkten,
   aktiven Cubes und der eigenen Position. Ziehen = verschieben, Mausrad = Zoom um die eigene Position,
-  „Spieler folgen“ und die Kartenwahl auf der Seite „Radar“.
+  „Spieler folgen“ (Ziehen pausiert es, Doppelklick folgt wieder) und die Kartenwahl auf der Seite „Radar“.
 - **Cube-Fundorte:** `python3 -m werkzeuge.cubekarte` holt Kartenbild und Cube-Fundorte von aion2hub (Altgard)
   nach `~/.local/share/aion2-radar/karten/Altgard/` (nicht im Repo) und setzt die Eichung (aion2hub-Karte:
   1 px = 1 m, Ursprung in der Mitte), Eichen im Spiel ist nicht nötig. Die Fundorte stehen als blasse Punkte
