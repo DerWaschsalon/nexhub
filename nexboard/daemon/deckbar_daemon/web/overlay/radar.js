@@ -24,6 +24,8 @@ const karte = { daten: null, bild: null, symbol: null, schluessel: "", laedt: fa
 /** Vom Daemon: neuer Stand (oder {aktiv: false}, wenn das Spiel weg ist). */
 function onRadar(stand) {
   radar = stand;
+  // Ingame-Karte offen: ganzes Overlay ausblenden (nicht beim Anordnen)
+  document.body.classList.toggle("karte-offen", !!stand.karte_offen && mode !== "edit");
   radarNeuZeichnen();
 }
 
