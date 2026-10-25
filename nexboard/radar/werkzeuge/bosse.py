@@ -12,6 +12,7 @@ from pathlib import Path
 
 DATEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n")
 UMBENENNEN = {"Fire Temple": "Feuertempel", "the Hall of Illusion": "Hall of Illusion"}
+NACHTRAG = {"200003": {"name": "Albtraum"}}  # fehlt in den A2Tools-Dungeons (Zikel, Sura, Hohepriesterin, ...)
 # Katalog der 207 Vertrauten aus dem Projekt aion2pettracker (GPL-3.0, Daten von questlog.gg, Namen (c) NCSOFT):
 # englischer Name, Kategorie, Fundgebiete und die Monster, die die Seele fallen lassen
 VERTRAUTE = ("https://raw.githubusercontent.com/keytftw/aion2pettracker/main/data/pet-catalog.json")
@@ -19,7 +20,7 @@ ARTEN = {"Special": "Spezial"}  # Cogni, Fera, Natura, Varian heissen im Spiel g
 
 
 def main() -> None:
-    dungeons = json.loads((DATEN / "dungeons/en.json").read_text())
+    dungeons = json.loads((DATEN / "dungeons/en.json").read_text()) | NACHTRAG
     npcs = json.loads((DATEN / "npcs/en.json").read_text())
     bosse = {}
     for npc, v in npcs.items():

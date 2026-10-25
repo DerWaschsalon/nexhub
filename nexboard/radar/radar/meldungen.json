@@ -17,6 +17,12 @@
       "murute": "Murute: Gigantisches Beben",
       "bombe": "Ignus: Verzögerte Explosion (auf dir)"
     },
+    "Albtraum": {
+      "zikel_schlag": "Zikel: Blutschlag",
+      "zikel_springen": "Zikel: Boden zerschmettern",
+      "zikel_linien": "Zikel: Linienphase und Donut",
+      "blutung": "Blutung (auf dir)"
+    },
     "Draupnir": {},
     "Dying Dramata's Nest": {},
     "Deus Research Base": {},

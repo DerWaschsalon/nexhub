@@ -42,6 +42,23 @@ class WarnungTest(unittest.TestCase):
         self.z.status(5, 16008401)
         self.assertEqual(self.z.laut, [("ansage", "Verzögerte Explosion auf dir")])
 
+    def test_zikel_blutung_nur_auf_mir_und_linie_nur_im_albtraum(self):
+        self.z.status(9, 12000151)
+        self.assertEqual(self.titel(), [])
+        self.z.status(5, 12000151)
+        self.assertEqual(self.z.laut, [("ansage", "Blutung auf dir")])
+        self.zustand.dungeon = "Feuertempel"
+        self.z.cast(1, 1802380, 1)
+        self.assertEqual(self.titel(), ["Blutung"])
+        self.zustand.dungeon = "Albtraum"
+        self.z.cast(1, 1802380, 1)
+        self.t[0] += 5
+        self.z.cast(1, 1802381, 1)  # zweite Linie ersetzt die erste
+        self.assertEqual(self.titel(), ["Zweite Linie"])
+        self.zustand.spieler[5] = "Ich"
+        self.z.cast(1, 1802445, 5)  # Ziel bin ich: ohne eigenen Namen
+        self.assertEqual(self.z.laut[-1], ("ansage", "Blutschlag"))
+
     def test_groggy(self):
         self.z.groggy(7)
         self.assertEqual(self.titel(), ["Boss groggy"])

@@ -87,10 +87,27 @@ SCHWERT = Regel("Schwert", "Hinter sie gehen", 1.0, GRAU, "schwert")
 for _skill in (1801030, 1801040, 1801050, 1801060, 1801080, 1801090):
     REGELN[_skill] = SCHWERT
 
+# Albtraum, Zikels Schemen (2980221). Ausgewertet 2026-10-25 an 5 Kaempfen, Ablauf nach dem Guide
+# "Zikel's Apparition Guide" (NoBS Game Guides). Skill-Namen fehlen in den A2Tools-Daten.
+REGELN.update({
+    # harter Schlag nach 1,0 s, bringt Blutung (12000151) und Verlangsamung
+    1802445: Regel("Blutschlag", "Ausweichen, sonst Blutung", 1.0, ROT, "zikel_schlag"),
+    # Boden zerschmettern: Treffer nach 1,95 s, wer nicht springt, bekommt Gebrechlichkeit
+    1802501: Regel("Boden zerschmettern", "Kurz vor Ende springen", 1.8, GELB, "zikel_springen"),
+    # Linienphase: Sprung an den Rand, Linie trifft 1,5 s nach dem Cast, danach sichere Zone
+    1802380: Regel("Linie", "Treffer abwarten, dann in die sichere Zone", 1.5, BLAU, "zikel_linien"),
+    1802381: Regel("Zweite Linie", "Zur nächsten sicheren Zone", 1.5, BLAU, "zikel_linien"),
+    1802383: Regel("Dritte Linie", "Zur dritten Zone, danach unter den Boss", 1.5, BLAU, "zikel_linien"),
+    # Ende der langen Linienphase: Donut, sicher nur direkt unter dem Boss (Zeit noch geschaetzt)
+    1802391: Regel("Donut", "Unter den Boss!", 1.0, ROT, "zikel_linien"),
+})
+
 # Status-Effekte (0x382A) auf dem eigenen Charakter. Gefunden 2026-10-24: 0,1 s nach Ignus'
 # Flammenbombe (1600840) bekommen zwei Spieler 16008401 fuer 3 s, danach entsteht die Feuerpfuetze.
 STATUS_REGELN: dict[int, Regel] = {
     16008401: Regel("Verzögerte Explosion", "Pfütze kommt unter dir", 3.0, GRUEN, "bombe"),
+    # Blutung, 20 s, ca. 1.900 Schaden alle 2 s (Zikels Blutschlag). Der Heiltrank entfernt sie.
+    12000151: Regel("Blutung", "Trank nehmen!", 3.0, ROT, "blutung"),
 }
 # Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
 GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
@@ -143,6 +160,15 @@ ENGLISCH = {
     "Ganz nah an den Boss oder ganz weit weg": "Hug the boss or go far away",
     "Drei Treffer, alle 2 s ausweichen": "Three hits, dodge every 2 s",
     "Hinter sie gehen": "Get behind her",
+    "Zikel: Blutschlag": "Zikel: Bleeding Strike", "Zikel: Boden zerschmettern": "Zikel: Shatter Ground",
+    "Zikel: Linienphase und Donut": "Zikel: Line Phase and Donut", "Blutung (auf dir)": "Bleeding (on you)",
+    "Blutschlag": "Bleeding Strike", "Ausweichen, sonst Blutung": "Dodge or you bleed",
+    "Boden zerschmettern": "Shatter Ground", "Kurz vor Ende springen": "Jump right before it ends",
+    "Linie": "Line", "Treffer abwarten, dann in die sichere Zone": "Wait for the hit, then into the safe zone",
+    "Zweite Linie": "Second Line", "Zur nächsten sicheren Zone": "To the next safe zone",
+    "Dritte Linie": "Third Line", "Zur dritten Zone, danach unter den Boss": "To the third zone, then under the boss",
+    "Donut": "Donut", "Unter den Boss!": "Get under the boss!",
+    "Blutung": "Bleeding", "Trank nehmen!": "Drink a potion!",
     "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
 }
 
@@ -196,7 +222,7 @@ class WarnZentrale:
         if skill == REGEN:
             self.regen_zuletzt = jetzt
         ich = skill == TODESMAL and ziel is not None and ziel == self.zustand.eigene_eid
-        name = "" if ich else self.zustand.spieler.get(ziel, "")
+        name = "" if ich or ziel == self.zustand.eigene_eid else self.zustand.spieler.get(ziel, "")
         with self.lock:
             # ein echter Cast ersetzt geplante Vorhersagen derselben Gruppen
             gruppen = {r.gruppe for r in (regel, *regel.danach)}
