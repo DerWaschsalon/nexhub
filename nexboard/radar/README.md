@@ -10,7 +10,9 @@ Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel 
 - **Cube-Fundorte:** `python3 -m werkzeuge.cubekarte` holt Kartenbild und Cube-Fundorte von aion2hub (Altgard)
   nach `~/.local/share/aion2-radar/karten/Altgard/` (nicht im Repo) und setzt die Eichung (aion2hub-Karte:
   1 px = 1 m, Ursprung in der Mitte), Eichen im Spiel ist nicht nötig. Die Fundorte stehen als blasse Punkte
-  auf der Karte. Ist nur eine Karte vorhanden, lädt das Kartenfenster sie von selbst.
+  auf der Karte. Ist nur eine Karte vorhanden, lädt das Kartenfenster sie von selbst. Statt das Werkzeug
+  laufen zu lassen, kann man auch den fertigen Ordner `Altgard` (bild.png, eichung.json, fundorte.json) von
+  einem Mitspieler nach `~/.local/share/aion2-radar/karten/` kopieren.
 - **Boss-Warnungen (Kromedes Gier):** Todesmal, Regen des Hasses, Vorhersage nach der Flächenphase,
   Zeitfenster für den nächsten Regen. Rechtsklick aufs Radar > Boss-Warnungen.
   Unter „Meldungen auswählen …“ Dungeon wählen, dann jede Warnung einzeln an/aus und mit/ohne Ton.
