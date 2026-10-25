@@ -27,9 +27,10 @@ KARTEN = {"Altgard": "World_D_A"}
 KACHELN = 8          # 8 x 8 Kacheln zu je 1024 px
 KACHEL_PX = 512      # verkleinert gespeichert: 4096 px Kantenlaenge reichen und sparen Speicher
 KACHEL_ORIGINAL = 1024
-# aion2hub-Karten: 1 px = 1 m, Weltursprung in der Kartenmitte, +y zeigt nach oben. Gemessen an
-# drei Teleportern in Altgard (Nornir Assembly, Shulak Street Stall, Basfelt Waterfall): Massstab
-# 0,997, Drehung -0,7 Grad, Abweichung 7-14 m. Damit braucht es keine Eichung im Spiel.
+# aion2hub-Karten: 1 px = 1 m, Weltursprung in der Kartenmitte, Welt-y zeigt im Bild nach unten.
+# Gemessen an drei Teleportern in Altgard (Nornir Assembly, Shulak Street Stall, Basfelt Waterfall):
+# Massstab 0,997, Drehung -0,7 Grad, Abweichung 7-14 m. Damit braucht es keine Eichung im Spiel.
+# Die Marker der Seite zaehlen y von unten (Leaflet), das Bild von oben, daher v = Kante - y.
 MITTE_PX = KACHELN * KACHEL_ORIGINAL / 2
 
 
@@ -58,7 +59,8 @@ def daten_skript(karte: str) -> str:
 
 def cubes(skript: str) -> list[tuple[int, int]]:
     funde = re.findall(r'"s":"hiddenCube","x":(-?\d+),"y":(-?\d+)', skript)
-    return sorted({(int(x), int(y)) for x, y in funde})  # die Seite fuehrt manche Cubes doppelt
+    kante = 2 * MITTE_PX
+    return sorted({(int(x), kante - int(y)) for x, y in funde})  # die Seite fuehrt manche Cubes doppelt
 
 
 def kartenbild(karte: str) -> QImage:
@@ -79,7 +81,7 @@ def eichen(karte: Karte, massstab: float) -> None:
     karte.eichung.zuruecksetzen()
     for x, y in ((0, 0), (100_000, 0), (0, 100_000)):
         u = (MITTE_PX + x / 100) * massstab
-        v = (MITTE_PX - y / 100) * massstab
+        v = (MITTE_PX + y / 100) * massstab
         karte.eichung.hinzufuegen(x, y, u, v)
     karte.speichern()
 
