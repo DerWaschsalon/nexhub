@@ -7,6 +7,12 @@ Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel 
   Rechtsklick = Menü.
 - **Karte:** Screenshot der Ingame-Karte, an 2–3 Stellen geeicht (hinlaufen, auf den eigenen Standort klicken).
   Zeigt gesehene Spawnpunkte, aktive Cubes und die eigene Position. Rechtsklick aufs Radar > Karte.
+- **Cube-Route:** `python3 -m werkzeuge.cubekarte` holt Kartenbild und Cube-Fundorte von aion2hub (Altgard)
+  nach `~/.local/share/aion2-radar/karten/Altgard/` und legt einen kurzen Rundweg an (nicht im Repo). Im
+  Kartenfenster Karte „Altgard“ wählen und einmal im Spiel eichen. Dann stehen die nächsten drei Fundorte
+  gold mit 1-2-3 auf der Karte, der Rest blass. Ein Fundort gilt als erledigt, sobald man nah genug dran war
+  (Abstand auf der NexBoard-Seite, Standard 60 m), auch wenn dort gerade kein Cube lag. Rechtsklick auf die
+  Karte: Punkt überspringen, Route neu starten. `--neu` legt die Route neu an.
 - **Boss-Warnungen (Kromedes Gier):** Todesmal, Regen des Hasses, Vorhersage nach der Flächenphase,
   Zeitfenster für den nächsten Regen. Rechtsklick aufs Radar > Boss-Warnungen.
   Unter „Meldungen auswählen …“ Dungeon wählen, dann jede Warnung einzeln an/aus und mit/ohne Ton.
@@ -55,6 +61,7 @@ stehen in `radar/standard.json` und `radar/meldungen.json` (liest auch der Daemo
 | `radar/uebersicht.py` | Fenster Feldbosse und Vertraute, Feldboss-Ansagen |
 | `radar/daten.py` | Namen (A2Tools, Vertraute), gespeicherte Zustände |
 | `radar/punkte.py`, `radar/karte.py` | Spawnpunkte, Eichung, Kartenfenster |
+| `radar/route.py`, `werkzeuge/cubekarte.py` | Cube-Route, Import von aion2hub |
 | `werkzeuge/auswertung.py` | Kämpfe auswerten: Tode, Ursachen, Vorwarnzeiten |
 | `werkzeuge/analyse.py` | Opcode-Statistik eines Mitschnitts |
 | `radar/befehle.py` | Befehle vom NexBoard-Daemon (stdin) |

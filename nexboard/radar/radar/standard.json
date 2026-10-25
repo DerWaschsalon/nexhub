@@ -18,6 +18,7 @@
   "feldboss_ansage": true,
   "karte_deckkraft": 0.9,
   "karte_folgen": false,
+  "route_abstand": 60,
   "warn_an": true,
   "name": ""
 }
