@@ -1,9 +1,10 @@
-"""Cube-Karte von aion2hub holen: Kartenbild und Cube-Fundorte fuer das Kartenfenster.
+"""Cube-Karte von aion2hub holen: Kartenbild, Cube-Fundorte und Teleporter fuer das Kartenfenster.
 
     python3 -m werkzeuge.cubekarte            # Altgard
     python3 -m werkzeuge.cubekarte --neu      # Eichung neu setzen (eigene Eichung weg)
 
-Legt unter ~/.local/share/aion2-radar/karten/Altgard/ bild.png, eichung.json und fundorte.json an.
+Legt unter ~/.local/share/aion2-radar/karten/Altgard/ bild.png, eichung.json, fundorte.json,
+teleporter.json und teleporter.png (Symbol aus dem Spiel) an.
 Nichts davon kommt ins Repo (Daten und Bilder gehoeren aion2hub). Danach im Kartenfenster:
 Rechtsklick > Karte wählen > Altgard. Eichen ist nicht noetig, die Umrechnung steht fest (MITTE_PX).
 
@@ -32,6 +33,7 @@ KACHEL_ORIGINAL = 1024
 # Massstab 0,997, Drehung -0,7 Grad, Abweichung 7-14 m. Damit braucht es keine Eichung im Spiel.
 # Die Marker der Seite zaehlen y von unten (Leaflet), das Bild von oben, daher v = Kante - y.
 MITTE_PX = KACHELN * KACHEL_ORIGINAL / 2
+TELEPORTER_SYMBOL = "/maps-assets/UI/Resource/Texture/Icon/UT_Marker_TeleportArtifact_Dark_Engraved.webp"
 
 
 def laden(pfad: str) -> bytes:
@@ -57,10 +59,12 @@ def daten_skript(karte: str) -> str:
     raise SystemExit("Ladetabelle der Karten nicht gefunden, hat sich die Seite geändert?")
 
 
-def cubes(skript: str) -> list[tuple[int, int]]:
-    funde = re.findall(r'"s":"hiddenCube","x":(-?\d+),"y":(-?\d+)', skript)
+def marker(skript: str, art: str) -> list[tuple[str, int, int]]:
+    """Name und Bildposition aller Marker einer Art, z.B. hiddenCube oder teleport."""
+    funde = re.findall(r'"n":"((?:[^"\\]|\\.)*)","c":"\w+","s":"' + art + r'","x":(-?\d+),"y":(-?\d+)', skript)
     kante = 2 * MITTE_PX
-    return sorted({(int(x), kante - int(y)) for x, y in funde})  # die Seite fuehrt manche Cubes doppelt
+    # Namen stehen als JS-Text drin (Galorik\\'s); manche Marker stehen doppelt drin
+    return sorted({(n.replace("\\'", "'"), int(x), kante - int(y)) for n, x, y in funde})
 
 
 def kartenbild(karte: str) -> QImage:
@@ -96,15 +100,20 @@ def main() -> int:
     karte = Karte(a.karte)
     massstab = KACHEL_PX / KACHEL_ORIGINAL
 
-    print("Cube-Fundorte laden …")
-    funde = cubes(daten_skript(karte_id))
-    print(f"  {len(funde)} Cubes")
+    print("Cube-Fundorte und Teleporter laden …")
+    skript = daten_skript(karte_id)
+    funde = marker(skript, "hiddenCube")
+    teleporter = marker(skript, "teleport")
+    print(f"  {len(funde)} Cubes, {len(teleporter)} Teleporter")
     if not karte.bild.exists():
         print("Kartenbild laden …")
         karte.ordner.mkdir(parents=True, exist_ok=True)
         kartenbild(karte_id).save(str(karte.bild), "PNG")
 
-    (karte.ordner / "fundorte.json").write_text(json.dumps([[u * massstab, v * massstab] for u, v in funde]))
+    (karte.ordner / "fundorte.json").write_text(json.dumps([[u * massstab, v * massstab] for _, u, v in funde]))
+    (karte.ordner / "teleporter.json").write_text(
+        json.dumps([[name, u * massstab, v * massstab] for name, u, v in teleporter], ensure_ascii=False))
+    QImage.fromData(laden(TELEPORTER_SYMBOL)).save(str(karte.ordner / "teleporter.png"), "PNG")
     if a.neu or not karte.eichung.fertig:
         eichen(karte, massstab)
         print("Eichung gesetzt.")

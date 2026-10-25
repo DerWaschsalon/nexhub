@@ -1,5 +1,5 @@
 """Karten-Overlay: Kartenbild mit gesehenen Spawnpunkten, aktiven Cubes, eigener Position und den
-Cube-Fundorten von aion2hub (siehe werkzeuge/cubekarte.py)."""
+Cube-Fundorten und Teleportern von aion2hub (siehe werkzeuge/cubekarte.py)."""
 from __future__ import annotations
 
 import json
@@ -11,7 +11,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (QAction, QColor, QFont, QImage, QPainter, QPainterPath,
                            QPen, QPixmap)
 from PySide6.QtWidgets import (QFileDialog, QInputDialog, QMenu, QMessageBox, QSizeGrip,
-                               QWidget)
+                               QToolTip, QWidget)
 
 from .overlay import konfig_laden, konfig_speichern
 from .punkte import Karte, PunkteDB
@@ -30,6 +30,15 @@ PUNKT_RADAR = QColor(255, 196, 0)
 PUNKT_HAND = QColor(200, 210, 230)
 EICH = QColor(80, 170, 255)
 FUNDORT = QColor(245, 185, 65, 130)
+SYMBOL_PX = 20  # Teleporter-Symbol, bleibt beim Zoomen gleich gross
+
+
+def _liste(karte: Karte | None, datei: str) -> list:
+    """JSON-Liste aus dem Kartenordner, leer wenn es sie (noch) nicht gibt."""
+    try:
+        return json.loads((karte.ordner / datei).read_text())
+    except (AttributeError, OSError, ValueError):
+        return []
 
 
 class KartenFenster(QWidget):
@@ -40,6 +49,8 @@ class KartenFenster(QWidget):
         self.k = konfig_laden()
         self.karte: Karte | None = None
         self.fundorte: list[tuple[float, float]] = []  # in Kartenpixeln
+        self.teleporter: list[tuple[str, float, float]] = []  # Name, Kartenpixel
+        self.symbol: QPixmap | None = None
         self.pixmap: QPixmap | None = None
         self.zoom = 1.0
         self.versatz = QPointF(0, 0)  # Bildpunkt, der in der Fenstermitte liegt
@@ -73,10 +84,11 @@ class KartenFenster(QWidget):
 
     def _karte_setzen(self, karte: Karte | None) -> None:
         self.karte = karte
-        try:
-            self.fundorte = [tuple(f) for f in json.loads((karte.ordner / "fundorte.json").read_text())]
-        except (AttributeError, OSError, ValueError):
-            self.fundorte = []
+        self.fundorte = [tuple(f) for f in _liste(karte, "fundorte.json")]
+        self.teleporter = [tuple(t) for t in _liste(karte, "teleporter.json")]
+        symbol = karte.ordner / "teleporter.png" if karte else None
+        self.symbol = QPixmap(str(symbol)).scaled(SYMBOL_PX, SYMBOL_PX, Qt.KeepAspectRatio,
+                                                  Qt.SmoothTransformation) if symbol and symbol.exists() else None
         self.pixmap = None
         if karte and karte.bild.exists():
             self.pixmap = QPixmap(str(karte.bild))
@@ -140,6 +152,7 @@ class KartenFenster(QWidget):
 
     def mouseMoveEvent(self, e) -> None:
         if not self._ziehen:
+            self._teleporter_name(e)
             return
         art, start, wert = self._ziehen
         if art == "fenster":
@@ -158,11 +171,16 @@ class KartenFenster(QWidget):
     def wheelEvent(self, e) -> None:
         if not self.pixmap:
             return
-        unter = self._schirm_zu_bild(e.position())
+        # Zoom um die eigene Position, solange sie bekannt ist, sonst um den Punkt unter der Maus
+        position = self.zustand.schnappschuss()["position"]
+        if position and self._eich_fertig():
+            anker = self._welt_zu_schirm(*position[:2])
+        else:
+            anker = e.position()
+        unter = self._schirm_zu_bild(anker)
         faktor = 1.2 if e.angleDelta().y() > 0 else 1 / 1.2
         self.zoom = max(0.05, min(8.0, self.zoom * faktor))
-        # Punkt unter der Maus bleibt stehen
-        neu = self._schirm_zu_bild(e.position())
+        neu = self._schirm_zu_bild(anker)
         self.versatz += QPointF(unter[0] - neu[0], unter[1] - neu[1])
         self.update()
 
@@ -313,6 +331,7 @@ class KartenFenster(QWidget):
                                 self.pixmap.height() * self.zoom), self.pixmap,
                          QRectF(self.pixmap.rect()))
             self._fundorte_zeichnen(p)
+            self._teleporter_zeichnen(p)
             if self._eich_fertig():
                 self._inhalt_zeichnen(p)
             if self.modus == "eichen":
@@ -408,6 +427,23 @@ class KartenFenster(QWidget):
         p.setBrush(FUNDORT)
         for u, v in self.fundorte:
             p.drawEllipse(self._bild_zu_schirm(u, v), 3.5, 3.5)
+
+    def _teleporter_zeichnen(self, p: QPainter) -> None:
+        if not self.symbol:
+            return
+        for _, u, v in self.teleporter:
+            q = self._bild_zu_schirm(u, v)
+            p.drawPixmap(QPointF(q.x() - self.symbol.width() / 2, q.y() - self.symbol.height() / 2), self.symbol)
+
+    def _teleporter_name(self, e) -> None:
+        """Name des Teleporters unter der Maus als Tooltip."""
+        pos = e.position()
+        for name, u, v in self.teleporter:
+            q = self._bild_zu_schirm(u, v)
+            if abs(q.x() - pos.x()) <= SYMBOL_PX / 2 and abs(q.y() - pos.y()) <= SYMBOL_PX / 2:
+                QToolTip.showText(e.globalPosition().toPoint(), name, self)
+                return
+        QToolTip.hideText()
 
     def _kopf_status(self) -> str:
         if self.modus == "eichen":
