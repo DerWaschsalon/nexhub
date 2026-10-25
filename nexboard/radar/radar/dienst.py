@@ -107,6 +107,7 @@ class RadarDienst:
             "vorschau": [[tr(text), rest] for text, rest in self.zentrale.vorschau()],
             "jetzt_text": tr("JETZT"),
             "karte": self.k["karte_name"] or "",
+            "karte_offen": s["karte_offen"] and self.k["bei_karte_ausblenden"],  # Overlay ausblenden
             "punkte": len(self.punkte.punkte),  # aendert sich die Zahl, laedt die Karte die Punkte neu
             "einstellungen": {k: self.k[k] for k in ("reichweite", "drehung", "spiegeln", "karte_folgen")},
         }

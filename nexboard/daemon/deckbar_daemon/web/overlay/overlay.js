@@ -112,7 +112,7 @@ function rectOf(el) {
 }
 
 function regions() {
-  const visible = (w) => !w.hidden && !w.classList.contains("idle");
+  const visible = (w) => !w.hidden && !w.classList.contains("idle") && !document.body.classList.contains("karte-offen");
   const click = WIDGETS.filter((w) => visible(w) && w.hasAttribute("data-click")).map(rectOf);
   let lock = [];
   if (cardOpen && visible(W.meter)) lock = [rectOf(W.meter)];
