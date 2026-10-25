@@ -171,11 +171,16 @@ class KartenFenster(QWidget):
     def wheelEvent(self, e) -> None:
         if not self.pixmap:
             return
-        unter = self._schirm_zu_bild(e.position())
+        # Zoom um die eigene Position, solange sie bekannt ist, sonst um den Punkt unter der Maus
+        position = self.zustand.schnappschuss()["position"]
+        if position and self._eich_fertig():
+            anker = self._welt_zu_schirm(*position[:2])
+        else:
+            anker = e.position()
+        unter = self._schirm_zu_bild(anker)
         faktor = 1.2 if e.angleDelta().y() > 0 else 1 / 1.2
         self.zoom = max(0.05, min(8.0, self.zoom * faktor))
-        # Punkt unter der Maus bleibt stehen
-        neu = self._schirm_zu_bild(e.position())
+        neu = self._schirm_zu_bild(anker)
         self.versatz += QPointF(unter[0] - neu[0], unter[1] - neu[1])
         self.update()
 
