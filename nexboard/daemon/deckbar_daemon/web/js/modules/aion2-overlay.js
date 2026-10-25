@@ -81,6 +81,10 @@ function widgetsTab(ctx) {
           settingsRow("Kill-Prognose", "Restzeit aus dem HP-Verlauf der letzten 40 s", sw(w.boss.show_ttk, (v) => set("boss", { show_ttk: v }))),
           settingsRow("Außerhalb von Kämpfen ausblenden", null, sw(w.boss.hide_idle, (v) => set("boss", { hide_idle: v }))),
           ...common("boss"))),
+      el("div", { class: "cols" },
+        card("Radar", "Modul AION 2 · Radar: erscheint nur, solange ein Cube in Sicht ist", sw(w.radar.enabled, (v) => set("radar", { enabled: v })), ...common("radar")),
+        card("Boss-Warnungen", "Modul AION 2 · Radar: nur während einer Warnung", sw(w.warnung.enabled, (v) => set("warnung", { enabled: v })), ...common("warnung")),
+        card("Karte", "Modul AION 2 · Radar: ziehen = verschieben, Mausrad = Zoom", sw(w.karte.enabled, (v) => set("karte", { enabled: v })), ...common("karte"))),
       eventsCard(w, set));
   };
   // nicht neu aufbauen, solange ein Regler oder Feld in Benutzung ist (sonst bricht das Ziehen ab)

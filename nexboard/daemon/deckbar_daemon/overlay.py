@@ -5,7 +5,7 @@ Das Programm (overlay/deckbar-overlay, Qt) legt unter Wayland eine durchsichtige
 Meter-Oberfläche). Die Seite holt hier:
 
     GET  /api/overlay/layout     Layout (OverlayLayout), PUT speichert (nach Ziehen im Bearbeiten-Modus)
-    GET  /api/overlay/events     Server-Sent Events: layout, dps (State dps + dps_active)
+    GET  /api/overlay/events     Server-Sent Events: layout, dps (State dps + dps_active), radar
 
 Die Web-UI (Port 8765) nutzt dieselben Daten über /api/overlay und schickt Befehle an das
 Programm (Bearbeiten, Sperren, Ein-/Ausblenden) über dessen Socket im Laufzeitordner.
@@ -91,6 +91,10 @@ class Widgets(_Strict):
     meter: Widget = Field(default_factory=Widget)
     boss: BossWidget = Field(default_factory=BossWidget)
     timers: TimersWidget = Field(default_factory=TimersWidget)
+    # Modul AION 2 · Radar: das Radar zeigt sich nur mit einem Cube in Sicht, die Warnungen nur bei einer
+    radar: Widget = Field(default_factory=Widget)
+    warnung: Widget = Field(default_factory=Widget)
+    karte: Widget = Field(default_factory=lambda: Widget(enabled=False))
 
 
 class OverlayLayout(_Strict):
