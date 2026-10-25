@@ -10,7 +10,7 @@ from nexhub_api.aion2 import NC
 from nexhub_api.armory import Armory
 from nexhub_api.models import Character, CharacterDay
 
-from .conftest import ADMIN, MEMBER, log_in
+from .conftest import ADMIN, BASE, MEMBER, log_in
 from .fake_nc import info, search_row
 from .test_characters import with_servers
 from .test_devices import ORIGIN, pair
@@ -195,6 +195,60 @@ def test_live_ohne_speichern(make_client, fake, database_url):
 
 def test_live_nur_mit_login(client):
     assert client.get("/api/armory/live", params={"server_id": 2302, "name": "Testheld"}).status_code == 401
+
+
+def share(c, left, name="Testheld"):
+    return c.post("/api/armory/compare/share", json={"left": left, "server_id": 2302, "name": name}, headers=ORIGIN)
+
+
+def test_vergleich_teilen(make_client, fake, database_url):
+    member = login(make_client, fake, MEMBER)
+    cid = member.post("/api/armory", json=NEW, headers=ORIGIN).json()["id"]
+    url = share(member, cid).json()["share_url"]
+    assert url.startswith(f"{BASE}/v/")
+    assert share(member, cid).json()["share_url"] == url  # derselbe Vergleich, derselbe Link
+    token = url.rsplit("/", 1)[1]
+
+    anyone = make_client(**ON)  # ohne Login
+    anyone.__enter__()
+    r = anyone.get(f"/api/public/vergleich/{token}", params={"lang": "de"})
+    assert r.status_code == 200 and "noindex" in r.headers["x-robots-tag"]
+    body = r.json()
+    assert (body["left"]["name"], body["left"]["class_name"]) == ("Testheld", "Waldläufer")
+    assert body["left"]["data"]["de"]["equipment"][0]["name"] == "Testbogen" and "owner" not in body["left"]
+    # rechts live, nichts dazu gespeichert
+    assert body["right"]["data"]["profile"]["class"] == "Waldläufer" and body["right_error"] is None
+    assert db_run(database_url, lambda db: db.scalar(select(func.count()).select_from(Character))) == 1
+
+    # rechts nicht (mehr) zu finden: links steht trotzdem da
+    gone = share(member, cid, name="Niemand").json()["share_url"].rsplit("/", 1)[1]
+    body = anyone.get(f"/api/public/vergleich/{gone}").json()
+    assert body["right"] is None and body["right_error"] and body["left"]["name"] == "Testheld"
+
+    assert member.delete(f"/api/armory/compare/share/{token}", headers=ORIGIN).json() == {"share_url": None}
+    assert anyone.get(f"/api/public/vergleich/{token}").status_code == 404
+    assert share(member, cid).json()["share_url"] != url  # neu geteilt, neuer Link
+
+
+def test_vergleich_teilen_rechte(make_client, fake, database_url):
+    member = login(make_client, fake, MEMBER)
+    cid = member.post("/api/armory", json=NEW, headers=ORIGIN).json()["id"]
+    token = share(member, cid).json()["share_url"].rsplit("/", 1)[1]
+    assert share(member, 999).status_code == 404
+    assert member.post("/api/armory/compare/share", json={"left": cid, "server_id": 9999, "name": "X"},
+                       headers=ORIGIN).status_code == 422
+
+    fake.roles[444] = fake.roles[MEMBER]
+    other = login(make_client, fake, 444)
+    assert other.delete(f"/api/armory/compare/share/{token}", headers=ORIGIN).status_code == 403
+    # Charakter ausgetragen: der Link ist weg
+    assert member.delete(f"/api/armory/{cid}", headers=ORIGIN).status_code == 204
+    assert other.get(f"/api/public/vergleich/{token}").status_code == 404
+
+
+def test_vergleich_teilen_nur_mit_login(client):
+    assert client.post("/api/armory/compare/share", json={"left": 1, "server_id": 2302, "name": "X"}).status_code == 401
+    assert client.get("/api/public/vergleich/gibtsnicht").status_code == 404
 
 
 def test_suche_ohne_klassentabelle(make_client, fake):

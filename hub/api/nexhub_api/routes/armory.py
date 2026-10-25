@@ -6,11 +6,17 @@
     GET    /api/armory/{id}                      Momentaufnahme und Verlauf
     DELETE /api/armory/{id}                      austragen (wer eingetragen hat oder ein Admin)
     POST   /api/armory/{id}/refresh              jetzt neu abrufen (alle, höchstens alle 10 Minuten)
+    POST   /api/armory/compare/share             Teilen-Link für einen Vergleich (öffentlich unter /v/<token>)
+    POST   /api/armory/{id}/check                Build-Check starten (gegen die Top-Spieler, buildcheck.py)
+    GET    /api/armory/{id}/check                letzter Build-Check: Stand, Fortschritt, Ergebnis
+    POST   /api/armory/{id}/check/share          Teilen-Link (öffentlich unter /c/<token>); DELETE zieht zurück
+    DELETE /api/armory/compare/share/{token}     Teilen-Link zurückziehen (wer geteilt hat, oder ein Admin)
 
 Abruf und Format wie bei den Mitspielern eines Runs (characters.py, routes/characters.py).
 """
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
@@ -20,9 +26,12 @@ from sqlalchemy.orm import defer
 
 from ..aion2 import LANGS, NC, NCError, NotFound, localized, shard_of
 from ..armory import Armory
-from ..deps import DB, CurrentUser
-from ..models import Character, CharacterDay, User
+from ..buildcheck import STALE, BuildChecker, aware
+from ..config import Settings
+from ..deps import DB, CurrentUser, SettingsDep
+from ..models import BuildCheck, Character, CharacterDay, Comparison, User
 from .characters import CharacterOut, _out
+from .runs import Shared
 
 router = APIRouter(prefix="/api/armory", tags=["armory"])
 
@@ -131,8 +140,7 @@ class Live(BaseModel):
     data: dict  # eine Sprache, Format aus aion2.py; die Klasse steht in data["profile"]["class"]
 
 
-@router.get("/live")
-async def live(name: str, server_id: int, request: Request, user: CurrentUser, lang: str = "en") -> Live:
+async def fetch_live(request: Request, name: str, server_id: int, lang: str) -> Live:
     """Beliebigen Charakter jetzt von der Website holen, zum Vergleichen. Wird nicht gespeichert,
     damit sich keine Daten fremder Charaktere ansammeln."""
     nc = _nc(request)
@@ -144,6 +152,78 @@ async def live(name: str, server_id: int, request: Request, user: CurrentUser, l
     except NCError as e:
         raise HTTPException(502, f"AION-2-Website: {e}") from e
     return Live(name=(data.get("profile") or {}).get("name") or name, server_id=server_id, data=data)
+
+
+@router.get("/live")
+async def live(name: str, server_id: int, request: Request, user: CurrentUser, lang: str = "en") -> Live:
+    return await fetch_live(request, name, server_id, lang)
+
+
+class CompareShare(BaseModel):
+    left: int  # Charakter aus der Armory
+    server_id: int  # rechts: Server und Name wie in der Adresse der Vergleichsseite
+    name: str = Field(min_length=1, max_length=64)
+
+
+class Side(BaseModel):
+    """Linke Seite eines geteilten Vergleichs: nur, was die Ansicht braucht, nicht wer eingetragen hat."""
+    name: str
+    cls: str | None
+    class_name: str | None
+    data: dict | None
+
+
+class ComparisonOut(BaseModel):
+    left: Side
+    right: Live | None
+    right_error: str | None  # rechts nicht gefunden oder Website weg; links steht trotzdem da
+
+
+def comparison_url(settings: Settings, row: Comparison) -> str:
+    return f"{settings.hub_base_url}/v/{row.token}"
+
+
+async def load_comparison(request: Request, db: DB, row: Comparison, lang: str) -> ComparisonOut:
+    """Einen geteilten Vergleich laden: links aus der Armory, rechts live von der Website."""
+    left, _ = await _get(db, row.left_id)
+    side = Side(name=left.name, cls=left.cls, class_name=_profile_of(left)["class_name"], data=left.data)
+    try:
+        return ComparisonOut(left=side, right=await fetch_live(request, row.right_name, row.right_server_id, lang),
+                             right_error=None)
+    except HTTPException as e:
+        if e.status_code == 503:  # Charakterprofile ausgeschaltet: die ganze Seite geht nicht
+            raise
+        return ComparisonOut(left=side, right=None, right_error=e.detail)
+
+
+@router.post("/compare/share")
+async def share_comparison(body: CompareShare, user: CurrentUser, db: DB, settings: SettingsDep) -> Shared:
+    """Teilen-Link erzeugen; teilt dasselbe Konto denselben Vergleich noch einmal, bleibt es beim Link."""
+    await _get(db, body.left)
+    if shard_of(body.server_id) is None:
+        raise HTTPException(422, "Server nicht unterstützt")
+    name = body.name.strip()
+    row = await db.scalar(select(Comparison).where(
+        Comparison.user_id == user.id, Comparison.left_id == body.left,
+        Comparison.right_server_id == body.server_id, Comparison.right_name == name))
+    if row is None:
+        row = Comparison(token=secrets.token_urlsafe(16), user_id=user.id, left_id=body.left,
+                         right_server_id=body.server_id, right_name=name)
+        db.add(row)
+        await db.commit()
+    return Shared(share_url=comparison_url(settings, row))
+
+
+@router.delete("/compare/share/{token}")
+async def unshare_comparison(token: str, user: CurrentUser, db: DB) -> Shared:
+    row = await db.scalar(select(Comparison).where(Comparison.token == token))
+    if row is None:
+        raise HTTPException(404, "Link ungültig oder schon zurückgezogen")
+    if row.user_id != user.id and user.role != "admin":
+        raise HTTPException(403, "Nur wer geteilt hat, oder ein Admin")
+    await db.delete(row)
+    await db.commit()
+    return Shared(share_url=None)
 
 
 @router.get("")
@@ -188,10 +268,12 @@ async def get_character(character_id: int, user: CurrentUser, db: DB) -> ArmoryD
 @router.delete("/{character_id}", status_code=204)
 async def remove(character_id: int, user: CurrentUser, db: DB) -> None:
     row, _ = await _get(db, character_id)
-    if row.user_id != user.id and user.role != "admin":
+    if not _may_manage(row, user):
         raise HTTPException(403, "Nur wer eingetragen hat, oder ein Admin")
     # ausdrücklich, weil SQLite (Tests) ON DELETE CASCADE ohne PRAGMA foreign_keys nicht ausführt
     await db.execute(delete(CharacterDay).where(CharacterDay.character_id == row.id))
+    await db.execute(delete(Comparison).where(Comparison.left_id == row.id))
+    await db.execute(delete(BuildCheck).where(BuildCheck.character_id == row.id))
     await db.delete(row)
     await db.commit()
 
@@ -207,11 +289,113 @@ async def refresh(character_id: int, request: Request, user: CurrentUser, db: DB
     row, _ = await _get(db, character_id)
     if row.status == "offen" or character_id in armory.running:
         raise HTTPException(409, "Wird gerade abgerufen")
-    # SQLite (Tests) gibt Zeitpunkte ohne Zeitzone zurück; gespeichert wird immer UTC
-    last = row.fetched_at.replace(tzinfo=row.fetched_at.tzinfo or UTC) if row.fetched_at else None
+    last = aware(row.fetched_at) if row.fetched_at else None
     if last and datetime.now(UTC) - last < REFRESH_EVERY:
         raise HTTPException(429, "Höchstens alle 10 Minuten")
     row.status = "offen"
     await db.commit()
     background.add_task(armory.refresh, row.id)
     return Started(started=True)
+
+
+def _checker(request: Request) -> BuildChecker:
+    _armory(request)  # gleiche Meldung, wenn Charakterprofile ausgeschaltet sind
+    return request.app.state.buildcheck
+
+
+def _may_manage(row: Character, user: User) -> bool:
+    return row.user_id == user.id or user.role == "admin"
+
+
+class CheckOut(BaseModel):
+    status: str  # läuft, fertig, fehler
+    progress: int
+    size: int | None  # so viele Top-Spieler im Ergebnis
+    error: str | None
+    result: dict | None
+    started_at: datetime
+    finished_at: datetime | None
+    share_url: str | None
+
+
+def check_url(settings: Settings, check: BuildCheck) -> str | None:
+    return f"{settings.hub_base_url}/c/{check.share_token}" if check.share_token else None
+
+
+async def _check(db: DB, character_id: int) -> BuildCheck:
+    check = await db.scalar(select(BuildCheck).where(BuildCheck.character_id == character_id))
+    if check is None:
+        raise HTTPException(404, "Noch kein Build-Check")
+    return check
+
+
+@router.post("/{character_id}/check", status_code=202)
+async def start_check(character_id: int, request: Request, user: CurrentUser, db: DB,
+                      background: BackgroundTasks) -> Started:
+    checker = _checker(request)
+    row, _ = await _get(db, character_id)
+    if not row.data:
+        raise HTTPException(422, "Der Charakter hat noch keine Daten von der AION-2-Website, erst abrufen")
+    check = await db.scalar(select(BuildCheck).where(BuildCheck.character_id == character_id))
+    now = datetime.now(UTC)
+    if check is None:
+        check = BuildCheck(character_id=character_id)
+        db.add(check)
+    elif check.status == "läuft" and now - aware(check.started_at) < STALE:
+        raise HTTPException(409, "Build-Check läuft gerade")
+    elif check.status != "läuft" and now - aware(check.started_at) < REFRESH_EVERY:
+        raise HTTPException(429, "Höchstens alle 10 Minuten")
+    check.status, check.progress, check.error, check.started_at = "läuft", 0, None, now
+    await db.commit()
+    background.add_task(checker.run, character_id)
+    return Started(started=True)
+
+
+@router.get("/{character_id}/check")
+async def get_check(character_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> CheckOut:
+    check = await _check(db, character_id)
+    status, error = check.status, check.error
+    if status == "läuft" and datetime.now(UTC) - aware(check.started_at) >= STALE:
+        # ein Neustart des Hubs hat den Lauf beendet; als Fehler gemeldet, damit „Neu prüfen“ erscheint
+        status, error = "fehler", "Build-Check abgebrochen (Hub neu gestartet), bitte neu starten"
+    return CheckOut(status=status, progress=check.progress, size=(check.result or {}).get("size"),
+                    error=error, result=check.result, started_at=check.started_at,
+                    finished_at=check.finished_at, share_url=check_url(settings, check))
+
+
+@router.post("/{character_id}/check/share")
+async def share_check(character_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> Shared:
+    """Teilen-Link erzeugen; ist schon einer da, bleibt er. Gleiche Rechte wie Austragen."""
+    row, _ = await _get(db, character_id)
+    if not _may_manage(row, user):
+        raise HTTPException(403, "Nur wer eingetragen hat, oder ein Admin")
+    check = await _check(db, character_id)
+    if check.result is None:
+        raise HTTPException(409, "Noch kein Ergebnis")
+    if not check.share_token:
+        check.share_token = secrets.token_urlsafe(16)
+        await db.commit()
+    return Shared(share_url=check_url(settings, check))
+
+
+@router.delete("/{character_id}/check/share")
+async def unshare_check(character_id: int, user: CurrentUser, db: DB) -> Shared:
+    row, _ = await _get(db, character_id)
+    if not _may_manage(row, user):
+        raise HTTPException(403, "Nur wer eingetragen hat, oder ein Admin")
+    check = await _check(db, character_id)
+    check.share_token = None
+    await db.commit()
+    return Shared(share_url=None)
+
+
+class SharedCheck(Side):
+    result: dict
+    finished_at: datetime | None
+
+
+async def load_shared_check(db: DB, check: BuildCheck) -> SharedCheck:
+    """Geteilter Build-Check: der Charakter wie im Vergleich (ohne wer eingetragen hat) und das Ergebnis."""
+    row, _ = await _get(db, check.character_id)
+    return SharedCheck(name=row.name, cls=row.cls, class_name=_profile_of(row)["class_name"], data=row.data,
+                       result=check.result or {}, finished_at=check.finished_at)

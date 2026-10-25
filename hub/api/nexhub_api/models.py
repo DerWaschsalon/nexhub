@@ -166,3 +166,35 @@ class CharacterDay(Base):
     day: Mapped[date] = mapped_column(Date)
     combat_power: Mapped[int | None] = mapped_column(BigInteger)
     item_level: Mapped[int | None] = mapped_column(Integer)
+
+
+class Comparison(Base):
+    """Geteilter Vergleich: wer den Link /v/<token> kennt, sieht ihn ohne Login. Gespeichert ist nur, wer
+    mit wem verglichen wird; die Werte holt der Hub beim Öffnen (der rechte live von der Website)."""
+
+    __tablename__ = "comparisons"
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    token: Mapped[str] = mapped_column(String(32), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    left_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    right_server_id: Mapped[int] = mapped_column(Integer)
+    right_name: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class BuildCheck(Base):
+    """Letzter Build-Check eines Armory-Charakters (buildcheck.py). `result` ist die Auswertung aus
+    evaluation.py, ohne Namen der Top-Spieler. Geteilt: wer /c/<share_token> kennt, sieht ihn ohne Login."""
+
+    __tablename__ = "build_checks"
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), unique=True)
+    status: Mapped[str] = mapped_column(String(16))  # läuft, fertig, fehler
+    progress: Mapped[int] = mapped_column(Integer, default=0)  # Profile der Gruppe schon geholt
+    error: Mapped[str | None] = mapped_column(String(200))
+    result: Mapped[dict | None] = mapped_column(JSON)
+    share_token: Mapped[str | None] = mapped_column(String(32), unique=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

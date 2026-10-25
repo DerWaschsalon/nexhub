@@ -74,6 +74,9 @@
 {/if}
 
 <style>
+	.page-head .btn {
+		margin-top: 10px;
+	}
 	.add {
 		margin-bottom: 22px;
 	}

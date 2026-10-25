@@ -70,6 +70,12 @@ MODULES: tuple[ModuleInfo, ...] = (
         requires=("aion2.dps",), tags=("AION 2", "Discord"),
     ),
     ModuleInfo(
+        "aion2.radar", "AION 2 · Radar", "games", "radar",
+        "Hidden Cubes, Karte, Boss-Warnungen, Feldbosse und Vertraute in eigenen Fenstern. Startet "
+        "mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
+        tags=("AION 2", "Desktop"),
+    ),
+    ModuleInfo(
         "discord.bot", "Discord-Bot", "community", "robot",
         "Schickt Gruppen-DPS nach Bosskämpfen und Run-Ergebnisse an einen Discord-Bot "
         "(z. B. TheWashBot), der Meldungen mehrerer Spieler zusammenführt.",

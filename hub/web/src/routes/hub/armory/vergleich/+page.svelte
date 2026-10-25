@@ -1,30 +1,52 @@
-<!-- Zwei Charaktere vergleichen: links aus der Armory, rechts über die Suche (live, nicht gespeichert). -->
+<!-- Zwei Charaktere vergleichen: links aus der Armory, rechts über die Suche (live, nicht gespeichert).
+     Teilen gibt einen öffentlichen Link (/v/<token>), der beim Öffnen die Werte neu holt. -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { api, send } from '#lib/api.ts';
+	import ShareLink from '#lib/components/ShareLink.svelte';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import type { ArmoryHit } from '#modules/armory/api.ts';
 	import CharacterSearch from '#modules/armory/components/CharacterSearch.svelte';
 	import CompareView from '#modules/armory/components/CompareView.svelte';
-	import { localized } from '#modules/logs/api.ts';
-	import { classFromName } from '#modules/logs/classes.ts';
+	import { armorySide, liveSide } from '#modules/armory/compare.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	const left = $derived.by(() => {
-		const c = data.left;
-		return c?.data ? { name: c.name, cls: c.cls ?? classFromName(c.class_name), data: localized(c.data, i18n.lang) } : null;
-	});
-	const right = $derived(
-		data.right ? { name: data.right.name, cls: classFromName(data.right.data.profile.class), data: data.right.data } : null
-	);
+	const left = $derived(data.left ? armorySide(data.left, i18n.lang) : null);
+	const right = $derived(data.right ? liveSide(data.right) : null);
+
+	let shareUrl = $state<string | null>(null);
+	let error = $state('');
 
 	/** Auswahl in die Adresse schreiben; die Seite lädt dann neu (+page.ts) */
 	function choose(key: 'links' | 'rechts', value: string) {
+		shareUrl = null; // der Link gehört zum vorigen Vergleich
 		const url = new URL(page.url.href);
 		url.searchParams.set(key, value);
 		goto(url, { replace: true, reset: false });
+	}
+
+	async function share() {
+		error = '';
+		try {
+			const body = { left: data.left?.id, server_id: data.right?.server_id, name: data.right?.name };
+			shareUrl = (await send<{ share_url: string }>('/api/armory/compare/share', 'POST', body)).share_url;
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function unshare() {
+		if (!shareUrl || !confirm(t('armory.compare.confirmUnshare'))) return;
+		error = '';
+		try {
+			await api<unknown>(`/api/armory/compare/share/${shareUrl.split('/').pop()}`, { method: 'DELETE' });
+			shareUrl = null;
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		}
 	}
 </script>
 
@@ -56,8 +78,13 @@
 </section>
 
 {#if left && right}
+	{#if error}<p class="notice error" role="alert">{error}</p>{/if}
+	{#if shareUrl}
+		<ShareLink url={shareUrl} text={t('armory.compare.sharedText')} onunshare={unshare} />
+	{:else}
+		<p class="share"><button class="btn small" onclick={share}>{t('share.button')}</button></p>
+	{/if}
 	<CompareView {left} {right} />
-	<p class="dim small">{t('armory.compare.share')}</p>
 {:else if !data.characters.length}
 	<p class="dim">{t('armory.none')}</p>
 {:else}
@@ -76,7 +103,7 @@
 		color: var(--dim);
 		margin-bottom: 6px;
 	}
-	.small {
-		font-size: 12px;
+	.share {
+		margin-bottom: 16px;
 	}
 </style>

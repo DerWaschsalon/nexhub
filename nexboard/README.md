@@ -15,6 +15,8 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
 - **Mehrere Seiten** mit Wischgesten, Hintergrund wählbar (Standard, Desktop-Hintergrund, eigenes Bild)
 - **AION 2:** DPS-Meter der Gruppe als eigene Seite, ein Overlay über dem Spiel (Meter, Boss-Leiste,
   Event-Timer, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
+- **AION-2-Radar:** Hidden Cubes, Karte, Boss-Warnungen, Feldbosse und Vertraute in eigenen Fenstern
+  (`radar/`), startet mit dem Spiel, alle Einstellungen in der Web-UI
 - **Discord-Bot:** Gruppen-DPS und Run-Ergebnisse an einen Bot, der Meldungen mehrerer Spieler zusammenführt
 - **Verbindung** per WLAN, bei Bedarf per USB-Kabel als Rückfall
 - **Ruhemodus:** Ist 30 s lang kein PC verbunden (weder WLAN noch USB), blendet das Display aus und
@@ -22,7 +24,7 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
   (`DECKBAR_SLEEP_AFTER_S`, `DECKBAR_SLEEP_PEEK_S` in `firmware/include/deckbar_config.h`)
 - **Web-UI** mit Dashboard und einer Seite je Modul, Leisten-Editor mit Drag & Drop und
   Live-Vorschau, dazu ein SDL-Simulator zum Testen ohne Gerät
-- **Modular:** Jeder Teil (Touch-Leiste, AION-2-Mitschnitt, Overlay, Runs, Discord-Bot, Updates)
+- **Modular:** Jeder Teil (Touch-Leiste, AION-2-Mitschnitt, Overlay, Runs, Radar, Discord-Bot, Updates)
   lässt sich in der Web-UI einzeln ein- und ausschalten, ohne Neustart
 
 ```

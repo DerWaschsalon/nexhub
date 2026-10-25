@@ -12,7 +12,7 @@ teilen, TheWashBot steuern. Oberfläche auf Englisch und Deutsch.
 
 | Bereich | Web | API | Wer |
 |---|---|---|---|
-| öffentlich | `/`, `/login`, geteilte Runs `/r/<token>` | `/api/public/…` | alle |
+| öffentlich | `/`, `/login`, geteilte Runs `/r/<token>`, geteilte Vergleiche `/v/<token>` | `/api/public/…` | alle |
 | Hub | `/hub/…` | `/api/…` | angemeldete Admins und Mitglieder |
 | Admin | `/hub/admin/…` | `/api/admin/…` | nur Admins |
 
@@ -53,10 +53,13 @@ Formatierung (`lib/format.ts`, folgt der Sprache) und den API-Zugriff (`lib/api.
 
 Ein **Modul** bringt nur seinen Inhalt mit, in `web/src/modules/<id>/`:
 
-- `module.ts`: Menüeinträge (`nav`, Beschriftung als Textschlüssel, `admin: true` nur für Admins)
-  und Texte (`texts`), Typ `HubModule` aus `lib/module.ts`. Jeder Menüeintrag ist auch eine Kachel
-  auf der Übersicht (`routes/hub/+page.svelte`); mit `overview: <Komponente>` zeigt die Kachel
-  eine Vorschau, die ihre Daten selbst holt (z. B. `logs/components/RecentRuns.svelte`)
+- `module.ts`: Menüeinträge (`nav`, Beschriftung als Textschlüssel, `admin: true` nur für Admins,
+  `game: 'game.aion2'` für Seiten eines Spiels) und Texte (`texts`), Typ `HubModule` aus `lib/module.ts`.
+  Einträge desselben Spiels zeigt die Seitenleiste als einen Eintrag („AION 2“), ihre Seiten als
+  Reiter über dem Inhalt (`menu` in `lib/modules.ts`). Ein neues Spiel braucht nur `game` und einen
+  Text `game.<spiel>` in `lib/texts.ts`. Jeder Eintrag der Seitenleiste ist auch eine Kachel auf der
+  Übersicht (`routes/hub/+page.svelte`), ein Spiel also eine Kachel für alle seine Seiten; mit `overview: <Komponente>` zeigt die Kachel eine Vorschau, die ihre
+  Daten selbst holt (z. B. `logs/components/RecentRuns.svelte`)
 - `texts.ts`: `defineTexts(en, de)` – svelte-check meldet, wenn auf Deutsch ein Schlüssel fehlt;
   Schlüssel mit dem Modulnamen davor (`logs.…`)
 - Typen der API, Komponenten mit eigenem `<style>` (Svelte begrenzt das auf die Komponente), Daten
@@ -68,7 +71,7 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 | Modul | Menü | Seiten |
 |---|---|---|
 | `logs` | Runs | `hub/runs/…`, geteilt `(public)/r/<token>/…` |
-| `armory` | Armory | `hub/armory/…` – Profilansicht aus `logs` |
+| `armory` | Armory | `hub/armory/…`, geteilter Vergleich `(public)/v/<token>` – Profilansicht aus `logs` |
 | `devices` | Geräte | `hub/geraete/` |
 | `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 
@@ -211,7 +214,29 @@ und die Typen aus `modules/logs`.
   der Armory, rechts ein beliebiger, den `GET /api/armory/live?server_id=…&name=…` jetzt von der
   Website holt und **nicht speichert**. Kampfkraft, Werte, Ausrüstung je Platz und Skills mit
   Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
-  rot umrandet ist, was der andere schon offen hat. Die Adresse lässt sich teilen.
+  rot umrandet ist, was der andere schon offen hat. Die Adresse zeigt Angemeldeten denselben Vergleich.
+- Teilen ohne Login: `POST /api/armory/compare/share` (`left`, `server_id`, `name`) speichert nur das
+  Paar (`models.Comparison`) und gibt einen Link `/v/<token>`; derselbe Vergleich vom selben Konto
+  gibt denselben Link. `DELETE /api/armory/compare/share/{token}` zieht ihn zurück (wer geteilt hat
+  oder ein Admin), Austragen des Armory-Charakters ebenso. `GET /api/public/vergleich/{token}`
+  liefert links die Momentaufnahme ohne Besitzer, rechts holt es live (`fetch_live`, wie
+  `/api/armory/live`); fehlt der rechte, steht `right_error` da und links trotzdem.
+  Kasten mit Link, Kopieren und Zurückziehen: `lib/components/ShareLink.svelte`, wie bei Runs.
+- Build-Check (`hub/armory/<id>/check`): der Charakter gegen die 15 besten Spieler seiner Klasse in
+  der EU mit ähnlicher Kampfkraft (±15 %), nur auf Klick (`POST /api/armory/{id}/check`, höchstens
+  alle 10 Minuten). Die Top-Spieler kommen aus der Rangliste von **Abyss Logs** (`abysslogs.py`,
+  `api.abysslogs.com/v1/leaderboards`, inoffiziell und nicht dokumentiert) an den Bossen der
+  höchsten Transzendenz-Stufe, Kämpfe ab 30 s. Die Rangliste nennt keinen Server; `buildcheck.py`
+  sucht ihn über die NC-Suche (Name und Klasse, bei mehreren Treffern die nächstliegende
+  Kampfkraft) und holt die Profile mit Gegenständen, vier gleichzeitig (je Profil rund 40
+  Anfragen). Das dauert etwa sechs Minuten, der Stand steht in `GET …/check` (`progress`). `evaluation.py` vergleicht Feld für Feld: Zahlen gegen den
+  Median, Auswahlen gegen die zwei häufigsten (ohne Mehrheit von einem Drittel keine Empfehlung);
+  Zusatzwerte, Manasteine, Gottsteine und verstärkte Skills erst, wenn zwei Drittel sie haben.
+  Ampel und „Zuerst“ nach „wie viele haben es besser“, „Zuerst“ ohne Kampfkraft und Stufe.
+  Gespeichert wird nur das Ergebnis (`build_checks`, je Charakter der letzte), keine Namen und
+  keine Profile der Top-Spieler. Geht etwas schief, bleibt das vorige Ergebnis mit `error`.
+  Teilen wie beim Vergleich (`POST/DELETE …/check/share`, öffentlich `GET /api/public/check/{token}`,
+  Seite `/c/<token>`).
 
 ## Bot
 

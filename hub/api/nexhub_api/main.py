@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from .aion2 import NC
 from .armory import Armory
+from .buildcheck import BuildChecker
 from .characters import Fetcher
 from .config import Settings
 from .deps import DB, SESSION_COOKIE
@@ -33,11 +34,12 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         app.state.http = http or httpx.AsyncClient(timeout=10)
         if not settings.discord_configured:
             log.warning("DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET fehlen – Login ist aus")
-        app.state.characters, app.state.armory, tasks = None, None, []
+        app.state.characters, app.state.armory, app.state.buildcheck, tasks = None, None, None, []
         if settings.hub_aion2_enabled:
             nc = NC(app.state.http, settings.hub_aion2_pause)
             app.state.characters = Fetcher(app.state.sessionmaker, nc)
             app.state.armory = Armory(app.state.sessionmaker, nc)
+            app.state.buildcheck = BuildChecker(app.state.sessionmaker, app.state.armory, app.state.http)
             # liegengebliebene Abrufe vom letzten Lauf und der tägliche Armory-Abruf; laufen neben dem Webserver
             tasks = [asyncio.create_task(app.state.characters.resume()),
                      asyncio.create_task(app.state.armory.daily())]
