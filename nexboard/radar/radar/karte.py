@@ -62,7 +62,9 @@ class KartenFenster(QWidget):
         self.griff = QSizeGrip(self)
         self.griff.resize(16, 16)
 
-        name = self.k.get("karte_name")
+        alle = Karte.alle()
+        # noch keine Karte gewaehlt, aber genau eine vorhanden (z.B. von werkzeuge.cubekarte): die nehmen
+        name = self.k.get("karte_name") or (alle[0].name if len(alle) == 1 else None)
         if name:
             self._karte_setzen(Karte(name))
         self.timer = QTimer(self)
