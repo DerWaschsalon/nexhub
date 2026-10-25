@@ -2,7 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from radar.punkte import Eichung, PunkteDB
+from radar import punkte
+from radar.punkte import Eichung, Karte, PunkteDB
 
 
 def nord_oben(x, y):
@@ -51,6 +52,25 @@ class PunkteTest(unittest.TestCase):
             self.assertTrue(db.entfernen(1200, 1000, 500))
             self.assertFalse(db.entfernen(1200, 1000, 500))
             self.assertEqual(len(db.alle()), 1)
+
+
+
+class MitgelieferteKartenTest(unittest.TestCase):
+    def test_werden_einmal_kopiert(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            quelle, ziel = Path(tmp) / "repo", Path(tmp) / "eigen"
+            (quelle / "Testland").mkdir(parents=True)
+            (quelle / "Testland" / "bild.webp").write_bytes(b"x")
+            alt = punkte.MITGELIEFERT, punkte.KARTEN
+            punkte.MITGELIEFERT, punkte.KARTEN = quelle, ziel
+            try:
+                self.assertEqual([k.name for k in Karte.alle()], ["Testland"])
+                self.assertEqual(Karte("Testland").bild.name, "bild.webp")
+                (ziel / "Testland" / "bild.webp").write_bytes(b"eigen")
+                Karte.alle()  # vorhandene Karte wird nicht ueberschrieben
+                self.assertEqual((ziel / "Testland" / "bild.webp").read_bytes(), b"eigen")
+            finally:
+                punkte.MITGELIEFERT, punkte.KARTEN = alt
 
 
 if __name__ == "__main__":
