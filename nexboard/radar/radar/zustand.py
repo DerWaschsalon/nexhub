@@ -108,6 +108,7 @@ class RadarZustand:
         self.bei_cast: list[Callable[[int, int, int | None], None]] = []
         self.bei_status: list[Callable[[int, int], None]] = []  # (Ziel, Status-ID), nur IDs aus status_ids
         self.bei_groggy: list[Callable[[int], None]] = []       # Boss-Entity, deren Stagger-Leiste bricht
+        self.bei_hp: list[Callable[[int], None]] = []           # eigene aktuelle HP
         self.status_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)
 
@@ -124,8 +125,13 @@ class RadarZustand:
                 self.spieler[eid] = p[n + 6:n + 6 + p[n + 5]].decode("utf-8", "replace")
                 if op == OP_CHARAKTER and any(name in p[:64] for name in self.namen):
                     self.eigene_eid, self.eid_ueber_name = eid, True
-            elif op == OP_SYNC and not self.eid_ueber_name:
-                self._sync(eid)
+            elif op == OP_SYNC:
+                if not self.eid_ueber_name:
+                    self._sync(eid)
+                # eigene aktuelle HP, nur bei sicher erkanntem Charakter (sonst evtl. der Boss)
+                if self.eid_ueber_name and eid == self.eigene_eid and p[n:n + 3] == b"\x02\x01\x00":
+                    for f in self.bei_hp:
+                        f(struct.unpack_from("<I", p, n + 3)[0])
             elif op == OP_TELEPORT:
                 # Entity-IDs gelten nur bis zum naechsten Teleport/Zonenwechsel
                 with self.lock:

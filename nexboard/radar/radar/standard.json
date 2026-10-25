@@ -6,7 +6,8 @@
   "meldung_aus": [],
   "warnton": {
     "schwert": "aus",
-    "casts": "aus"
+    "casts": "aus",
+    "zikel_angriffe": "aus"
   },
   "sprache": "de",
   "meldungen_dungeon": "Feuertempel",

@@ -1,6 +1,7 @@
 {
   "alle": {
-    "groggy": "Boss groggy (alle Dungeons)"
+    "groggy": "Boss groggy (alle Dungeons)",
+    "hp": "Wenig HP: heilen (alle Dungeons)"
   },
   "dungeons": {
     "Krao Cave": {},
@@ -21,6 +22,7 @@
       "zikel_schlag": "Zikel: Blutschlag",
       "zikel_springen": "Zikel: Boden zerschmettern",
       "zikel_linien": "Zikel: Linienphase und Donut",
+      "zikel_angriffe": "Zikel: weitere Schläge (grau, ohne Ton)",
       "blutung": "Blutung (auf dir)"
     },
     "Draupnir": {},
