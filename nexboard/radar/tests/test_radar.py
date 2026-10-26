@@ -68,6 +68,19 @@ class Tcp(unittest.TestCase):
 
 
 class Zustand(unittest.TestCase):
+    def test_eigene_id_ueber_mp(self):
+        """Im Massen-PvP tragen fast alle 0x8D00 fremde HP; nur der eigene Charakter bekommt MP/SP."""
+        z = RadarZustand()
+        hp = varint(5) + b"\x02\x01\x00" + struct.pack("<q", 1000)    # Flag 2: HP (i64) einer fremden Entity
+        mp = varint(42) + b"\x01\x01\x01" + struct.pack("<i", 300)    # Flag 1: MP (i32)
+        for _ in range(150):
+            z.verarbeiten(0x8D00, hp)
+        self.assertEqual((z.eigene_eid, z.eid_sicher), (5, False))     # geschaetzt
+        z.verarbeiten(0x8D00, mp)
+        for _ in range(150):
+            z.verarbeiten(0x8D00, hp)
+        self.assertEqual((z.eigene_eid, z.eid_sicher), (42, True))
+
     def test_cube_und_position(self):
         z = RadarZustand("Navonex")
         neu = []
@@ -81,7 +94,7 @@ class Zustand(unittest.TestCase):
             z.verarbeiten(op, p)
         s = z.schnappschuss()
         self.assertEqual(s["eid"], 8956)
-        self.assertTrue(s["eid_ueber_name"])
+        self.assertTrue(s["eid_sicher"])
         self.assertEqual(s["position"], (1000.0, 2000.0, 50.0))
         self.assertEqual([c.eid for c in s["cubes"]], [77])
         self.assertEqual(len(neu), 1)

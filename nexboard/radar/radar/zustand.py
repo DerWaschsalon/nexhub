@@ -17,8 +17,9 @@ from pathlib import Path
 from typing import Callable
 
 from . import daten
-from .protokoll import uvarint
-from .pvp import OPCODES as PVP_OPCODES, PvpSitzung
+from .protokoll import Leser, uvarint
+from .pvp import OPCODES as PVP_OPCODES
+from .pvp import PvpSitzung
 
 OP_SPAWN = 0x3634     # Objekt erscheint: Entity, 2 Byte, Objekt-ID u32, x/y/z, 8 Byte, 01 01, Zustand u8,
                       # seit u64 ms (Format aus a2kit, am Cube geprueft)
@@ -29,7 +30,9 @@ OP_POSITION = 0x382B  # Status-Variante mit Position am Ende, wie 0x382A (verdop
 OP_BEWEGUNG = 0x371A  # Bewegung: Entity, 2 Byte, x/y/z
 OP_CHARAKTER = 0x3633 # Spieler erscheint, enthaelt den Namen (geprueft)
 OP_TELEPORT = 0x3623  # eigener Teleport/Zonenwechsel mit Position ab Byte 6 (geprueft)
-OP_SYNC = 0x8D00      # traegt meist die eigene Entity-ID (geprueft)
+OP_SYNC = 0x8D00      # Punkte einer Entity (HP, MP, ...): Entity, Flags u8, bei Flag 1 Varint N, N x (Art u8, i32).
+                      # MP und SP (Art 1, 3) schickt der Server nur fuer den eigenen Charakter (geprueft)
+EIGENE_PUNKTE = {1, 3}
 OP_CAST = 0x3802      # Cast-Beginn: Caster, 00, Skill u32, 2 Byte, Ziel (geprueft)
 OP_ZONE = 0x4002      # eigener Zonenwechsel: Zonen-ID u32, im Dungeon die Dungeon-ID (geprueft)
 OP_NPC = 0x3641       # NPC erscheint: Entity, 3 Byte, NPC-ID u32 (geprueft)
@@ -88,7 +91,7 @@ class RadarZustand:
         self.cube_ids = CUBE_IDS | set(extra_ids)
         self.spawn_log = spawn_log
         self.eigene_eid: int | None = None
-        self.eid_ueber_name = False
+        self.eid_sicher = False
         self._sync_zaehler: Counter[int] = Counter()
         self.position: tuple[float, float, float] | None = None
         self.position_zeit = 0.0
@@ -126,14 +129,14 @@ class RadarZustand:
             elif op in (OP_CHARAKTER, OP_SPIELER):
                 self.spieler[eid] = p[n + 6:n + 6 + p[n + 5]].decode("utf-8", "replace")
                 if op == OP_CHARAKTER and any(name in p[:64] for name in self.namen):
-                    self.eigene_eid, self.eid_ueber_name = eid, True
-            elif op == OP_SYNC and not self.eid_ueber_name:
-                self._sync(eid)
+                    self.eigene_eid, self.eid_sicher = eid, True
+            elif op == OP_SYNC:
+                self._sync(eid, p, n)
             elif op == OP_TELEPORT:
                 # Entity-IDs gelten nur bis zum naechsten Teleport/Zonenwechsel
                 with self.lock:
                     self.cubes.clear()
-                self.eigene_eid, self.eid_ueber_name = None, False
+                self.eigene_eid, self.eid_sicher = None, False
                 self._position(*struct.unpack_from("<fff", p, n + 5))
             elif op == OP_ZONE:
                 self.zone = struct.unpack_from("<I", p, 0)[0]
@@ -273,12 +276,30 @@ class RadarZustand:
         if self.speichern:
             daten.speichern(name, inhalt)
 
-    def _sync(self, eid: int) -> None:
-        """Ohne Namenstreffer: die haeufigste Entity-ID in 0x8D00 ist die eigene."""
+    def _sync(self, eid: int, p: bytes, n: int) -> None:
+        """MP oder SP gibt es nur fuer den eigenen Charakter: dann ist die ID sicher. Bis dahin gilt die
+        haeufigste Entity-ID in 0x8D00 (im Massen-PvP oft falsch, dort tragen alle Spieler HP)."""
+        if self._eigene_punkte(p, n):
+            self.eigene_eid, self.eid_sicher = eid, True
+            return
+        if self.eid_sicher:
+            return
         self._sync_zaehler[eid] += 1
         if sum(self._sync_zaehler.values()) >= 100:
             self.eigene_eid = self._sync_zaehler.most_common(1)[0][0]
             self._sync_zaehler.clear()
+
+    @staticmethod
+    def _eigene_punkte(p: bytes, n: int) -> bool:
+        r = Leser(p)
+        r.pos = n
+        if not r.u8() & 1:
+            return False
+        arten = []
+        for _ in range(r.varint()):
+            arten.append(r.u8())
+            r.i32()
+        return bool(EIGENE_PUNKTE & set(arten))
 
     def _position(self, x: float, y: float, z: float) -> None:
         if gueltig(x, y, z):
@@ -299,7 +320,7 @@ class RadarZustand:
         with self.lock:
             return {
                 "eid": self.eigene_eid,
-                "eid_ueber_name": self.eid_ueber_name,
+                "eid_sicher": self.eid_sicher,
                 "position": self.position,
                 "position_alter": time.time() - self.position_zeit if self.position else None,
                 "cubes": list(self.cubes.values()),

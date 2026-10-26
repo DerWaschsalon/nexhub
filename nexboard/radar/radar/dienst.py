@@ -132,7 +132,7 @@ class RadarDienst:
         alter = s["position_alter"]
         pos = "keine Position" if alter is None else (
             "Position aktuell" if alter < 5 else f"Position vor {alter:.0f} s")
-        quelle = "Name" if s["eid_ueber_name"] else "geschätzt"
+        quelle = "sicher" if s["eid_sicher"] else "geschätzt"
         text = f"ID {s['eid']} ({quelle}) · {pos}"
         if s["dungeon"]:
             ende = self.zustand.dungeon_ende
