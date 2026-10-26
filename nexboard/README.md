@@ -233,7 +233,17 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Kämpfen ausgeblendet.
 - **Event-Timer:** Countdown bis zum nächsten Start (Shugo-Festival, Spacetime Rift, Resets …),
   Ereignisse frei einstellbar in der Web-UI.
+- **PvP** (Daten vom Modul „AION 2 · Radar“): Kills und Tode der Sitzung live, dazu Assists,
+  Abyss-Rangpunkte und Rang aus der Saisonwertung des Servers (rechnet etwa stündlich neu, daher
+  „Stand“). Neu beginnen: Web-UI → Radar → „PvP neu beginnen“. Details in `radar/README.md`.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
+
+**Profile** legen fest, welche Widgets sichtbar sind (Standard: PvE und PvP). Wechsel in der
+Bearbeiten-Leiste, in der Web-UI (Overlay → Widgets → Profile) oder per `--profil NAME`; das aktive
+Profil merkt sich jedes Ein- und Ausblenden. `--widget ID` blendet ein einzelnes Widget ein oder aus
+(meter, boss, timers, radar, warnung, karte, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
+also sofort. Der Daemon trägt je Profil und Widget eine Aktion in den Starter „NexBoard Overlay
+ein/aus“ ein; dort in den Systemeinstellungen (Kurzbefehle) eine Taste zuweisen.
 
 Die Fläche bekommt nie die Tastatur und nimmt Klicks nur dort an, wo es nötig ist:
 

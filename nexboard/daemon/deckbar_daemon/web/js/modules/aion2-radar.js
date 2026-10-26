@@ -56,12 +56,13 @@ function einstellungen(ctx) {
     const karten = Object.fromEntries([["", "automatisch"], ...r.karten.map((n) => [n, n])]);
 
     fill(box,
-      callout("info", "information-outline", "Radar, Boss-Warnungen und Karte erscheinen im Overlay. Das Radar zeigt sich nur, solange ein Cube in Sicht ist. Ein- und ausschalten, Deckkraft und Position unter Overlay → Widgets."),
+      callout("info", "information-outline", "Radar, Boss-Warnungen, Karte und PvP erscheinen im Overlay. Das Radar zeigt sich nur, solange ein Cube in Sicht ist. Ein- und ausschalten, Deckkraft und Position unter Overlay → Widgets."),
       el("div", { class: "cols" },
         card("Radar", "Läuft mit AION 2 und endet 30 s nach dem Spiel", statusChip(r),
           el("div", { class: "row wrap" },
             button("Neu starten", () => befehl("neustart", "Radar startet neu"), "sm", "restart", { disabled: !r.spiel }),
-            knopf("Ton testen", "ton_testen", "volume-high", "Ton gespielt")),
+            knopf("Ton testen", "ton_testen", "volume-high", "Ton gespielt"),
+            knopf("PvP neu beginnen", "pvp_neu", "sword-cross", "PvP-Sitzung beginnt neu")),
           settingsRow("Ton bei neuem Cube", null, sw(k.ton, (v) => setzen("ton", v))),
           settingsRow("Reichweite", null, select(REICHWEITEN, String(k.reichweite), (v) => setzen("reichweite", Number(v)))),
           settingsRow("Ausrichtung drehen", null, select(DREHUNG, String(k.drehung), (v) => setzen("drehung", Number(v)))),

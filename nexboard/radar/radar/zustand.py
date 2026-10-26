@@ -18,6 +18,7 @@ from typing import Callable
 
 from . import daten
 from .protokoll import uvarint
+from .pvp import OPCODES as PVP_OPCODES, PvpSitzung
 
 OP_SPAWN = 0x3634     # Objekt erscheint: Entity, 2 Byte, Objekt-ID u32, x/y/z, 8 Byte, 01 01, Zustand u8,
                       # seit u64 ms (Format aus a2kit, am Cube geprueft)
@@ -82,6 +83,7 @@ class RadarZustand:
     def __init__(self, charname: str = "", spawn_log: Path | None = None,
                  extra_ids: set[int] = frozenset(), speichern: bool = False) -> None:
         self.lock = threading.Lock()
+        self.charname = charname
         self.namen = (charname.encode(), charname.encode("utf-16le")) if charname else ()
         self.cube_ids = CUBE_IDS | set(extra_ids)
         self.spawn_log = spawn_log
@@ -110,6 +112,7 @@ class RadarZustand:
         self.bei_groggy: list[Callable[[int], None]] = []       # Boss-Entity, deren Stagger-Leiste bricht
         self.status_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)
+        self.pvp = PvpSitzung(self)
 
     def verarbeiten(self, op: int, p: bytes) -> None:
         self.nachrichten += 1
@@ -169,6 +172,8 @@ class RadarZustand:
             elif op == OP_DUNGEON:
                 laeuft = p[4] == 2
                 self.dungeon_ende = struct.unpack_from("<Q", p, 13)[0] / 1000 if laeuft else None
+            elif op in PVP_OPCODES:
+                self.pvp.verarbeiten(op, p)
             elif op == OP_CAST and self.bei_cast:
                 skill = struct.unpack_from("<I", p, n + 1)[0]
                 ziel = uvarint(p, n + 7)[0] if len(p) > n + 7 else None
