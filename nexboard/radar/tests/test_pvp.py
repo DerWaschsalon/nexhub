@@ -29,7 +29,7 @@ def saison(rang: int, punkte: int, kills: int, tode: int, assists: int, art: int
 class Sitzung(unittest.TestCase):
     def setUp(self):
         self.z = RadarZustand("Navonex")
-        self.z.eigene_eid = 100
+        self.z.eigene_eid, self.z.eid_sicher = 100, True
         self.z.spieler = {100: "Navonex", 200: "Feind", 300: "Freund"}
 
     def test_kills_und_tode_nur_gegen_spieler(self):
@@ -43,6 +43,11 @@ class Sitzung(unittest.TestCase):
         s = z.pvp.stand()
         self.assertEqual((s["kills"], s["tode"], s["assists"]), (2, 1, None))
         self.assertEqual(s["letzte"], [("tod", "Feind"), ("kill", "Freund"), ("kill", "Feind")])
+
+    def test_geschaetzte_eigene_id_zaehlt_keine_tode(self):
+        self.z.eid_sicher = False
+        self.z.verarbeiten(OP_TOD, tod(100, 777, "Feind"))
+        self.assertEqual(self.z.pvp.stand()["tode"], 0)
 
     def test_saisonwertung_liefert_zuwachs(self):
         z = self.z

@@ -101,10 +101,11 @@ class PvpSitzung:
         if not name:
             return  # kein Spieler als Taeter: zaehlt nicht als PvP
         z = self.zustand
-        if opfer == z.eigene_eid:
+        ich = z.eigene_eid if z.eid_sicher else None  # eine geschaetzte ID zaehlte fremde Tode mit
+        if opfer == ich:
             self.tode += 1
             self.letzte.appendleft(("tod", name))
-        elif opfer in z.spieler and (taeter == z.eigene_eid or name == z.charname):
+        elif opfer in z.spieler and (taeter == ich or name == z.charname):
             self.kills += 1
             self.letzte.appendleft(("kill", z.spieler[opfer]))
 
