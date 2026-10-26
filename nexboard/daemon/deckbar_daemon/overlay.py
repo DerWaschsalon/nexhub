@@ -20,10 +20,10 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Literal
+from typing import Annotated, Any, Awaitable, Callable, Literal
 
 from aiohttp import web
-from pydantic import Field, ValidationError
+from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from .capture import aion2_running
 from .config import _atomic_write, _Strict
@@ -32,6 +32,7 @@ log = logging.getLogger(__name__)
 
 UNIT = "deckbar-overlay.service"
 PAGE_DIR = Path(__file__).resolve().parent / "web" / "overlay"
+LAUNCHER = Path(__file__).resolve().parents[2] / "overlay" / "deckbar-overlay.desktop"
 QUEUE_MAX = 32
 GAME_POLL_S = 5
 GAME_GRACE_S = 30  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
@@ -39,6 +40,12 @@ UNIT_POLL_S = 30   # Dienststatus fürs Dashboard auffrischen (nur mit Spiel ode
 COMMANDS = ("toggle", "show", "hide", "edit", "lock", "click", "reload", "details", "history", "settings",
             "autohide-on", "autohide-off")
 FX = Literal["", "glanz", "brennen", "gold", "frost", "holo", "leere"]
+
+
+def launcher_path() -> Path:
+    """Starter „NexBoard Overlay ein/aus“, den overlay/install.sh anlegt (Vorlage im Repo)."""
+    base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
+    return Path(base) / "applications" / LAUNCHER.name
 
 
 def socket_path() -> Path:
@@ -88,13 +95,22 @@ class TimersWidget(Widget):
 
 
 class Widgets(_Strict):
-    meter: Widget = Field(default_factory=Widget)
-    boss: BossWidget = Field(default_factory=BossWidget)
-    timers: TimersWidget = Field(default_factory=TimersWidget)
+    # title: Name in den Tastenkürzeln (KDE-Starter)
+    meter: Widget = Field(default_factory=Widget, title="DPS-Meter")
+    boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste")
+    timers: TimersWidget = Field(default_factory=TimersWidget, title="Event-Timer")
     # Modul AION 2 · Radar: das Radar zeigt sich nur mit einem Cube in Sicht, die Warnungen nur bei einer
-    radar: Widget = Field(default_factory=Widget)
-    warnung: Widget = Field(default_factory=Widget)
-    karte: Widget = Field(default_factory=lambda: Widget(enabled=False))
+    radar: Widget = Field(default_factory=Widget, title="Radar")
+    warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen")
+    karte: Widget = Field(default_factory=lambda: Widget(enabled=False), title="Karte")
+    pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP")
+
+
+WIDGET_IDS = tuple(Widgets.model_fields)
+WIDGET_TITEL = {wid: Widgets.model_fields[wid].title for wid in WIDGET_IDS}
+# Profil = welche Widgets sichtbar sind; die Positionen gelten für alle Profile
+ProfilName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{1,24}$")]  # auch Aktions-ID im Starter
+DEFAULT_PROFILE = {"PvE": ["meter", "boss", "timers", "radar", "warnung"], "PvP": ["meter", "pvp"]}
 
 
 class OverlayLayout(_Strict):
@@ -105,6 +121,30 @@ class OverlayLayout(_Strict):
     gpu: bool = True  # Chromium-GPU-Compositing (unter layer-shell ohne Transparenzfehler)
     hide_unfocused: bool = True  # Fläche nur zeigen, solange AION 2 das aktive Fenster ist (KWin)
     widgets: Widgets = Field(default_factory=Widgets)
+    profil: str = Field("", max_length=24)  # aktives Profil, leer = keins
+    profile: dict[ProfilName, list[str]] = Field(default_factory=lambda: dict(DEFAULT_PROFILE), max_length=12)
+
+    @field_validator("profile")
+    @classmethod
+    def _bekannte_widgets(cls, profile: dict[str, list[str]]) -> dict[str, list[str]]:
+        for name, ids in profile.items():
+            if not set(ids) <= set(WIDGET_IDS):
+                raise ValueError(f"Profil {name}: unbekanntes Widget")
+        return profile
+
+    @model_validator(mode="after")
+    def _bekanntes_profil(self) -> OverlayLayout:
+        if self.profil and self.profil not in self.profile:
+            raise ValueError(f"Profil {self.profil} gibt es nicht")
+        return self
+
+    def sichtbar(self) -> list[str]:
+        return [wid for wid in WIDGET_IDS if getattr(self.widgets, wid).enabled]
+
+    def profil_anwenden(self) -> None:
+        """Sichtbarkeit der Widgets aus dem aktiven Profil übernehmen."""
+        for wid in WIDGET_IDS:
+            getattr(self.widgets, wid).enabled = wid in self.profile[self.profil]
 
 
 def merge(base: dict, patch: dict) -> dict:
@@ -148,9 +188,16 @@ class Overlay:
         self.layout = layout
 
     async def update(self, patch: dict) -> OverlayLayout:
-        layout = OverlayLayout.model_validate(merge(self.layout.model_dump(), patch))
+        base = self.layout.model_dump()
+        if "profile" in patch:
+            base["profile"] = {}  # die Liste kommt immer ganz, sonst ließe sich kein Profil löschen
+        layout = OverlayLayout.model_validate(merge(base, patch))
+        self._profil_abgleichen(layout)
         autohide = layout.hide_unfocused != self.layout.hide_unfocused
+        profile_neu = layout.profile != self.layout.profile
         self.save(layout)
+        if profile_neu:
+            self.write_launcher()
         if autohide and socket_path().exists():
             try:  # sofort ans laufende Programm, sonst gilt es beim nächsten Start
                 await self.command("autohide-on" if layout.hide_unfocused else "autohide-off")
@@ -161,8 +208,35 @@ class Overlay:
             await fn()
         return layout
 
+    def _profil_abgleichen(self, layout: OverlayLayout) -> None:
+        """Profilwechsel blendet die Widgets des Profils ein. Sonst merkt sich das aktive Profil jede
+        Änderung der Sichtbarkeit (Bearbeiten-Modus, Web-UI, Tastenkürzel)."""
+        if not layout.profil:
+            return
+        if layout.profil != self.layout.profil:
+            layout.profil_anwenden()
+        else:
+            layout.profile[layout.profil] = layout.sichtbar()
+
+    def write_launcher(self) -> None:
+        """Tastenkürzel: der Starter bekommt je Profil und Widget eine Aktion, der man unter KDE
+        (Systemeinstellungen → Kurzbefehle → NexBoard Overlay) eine Taste gibt. Nur wenn das Overlay
+        eingerichtet ist und nie aus Testinstanzen."""
+        ziel = launcher_path()
+        if not self.manage_unit or not ziel.exists():
+            return
+        aktionen = [(f"profil-{name}", f"Profil {name}", f"--profil {name}") for name in self.layout.profile]
+        for wid in WIDGET_IDS:
+            aktionen.append((f"widget-{wid}", f"{WIDGET_TITEL[wid]} ein/aus", f"--widget {wid}"))
+        text = LAUNCHER.read_text().rstrip("\n") + "\nActions=" + ";".join(a[0] for a in aktionen) + ";\n"
+        for aktion, name, argumente in aktionen:
+            text += f"\n[Desktop Action {aktion}]\nName={name}\nExec=deckbar-overlay {argumente}\n"
+        if ziel.read_text() != text:
+            _atomic_write(ziel, text)
+
     def info(self) -> dict:
-        return {"layout": self.layout.model_dump(), "unit": self.unit, "socket": socket_path().exists(),
+        return {"layout": self.layout.model_dump(), "widget_titel": WIDGET_TITEL,
+                "unit": self.unit, "socket": socket_path().exists(),
                 "clients": len(self.clients), "screens": self.screens, "game": self.game}
 
     async def refresh_screens(self) -> list[dict]:
@@ -238,6 +312,8 @@ class Overlay:
         (frühere Einrichtung) wird in beiden Fällen abgeschaltet."""
         self.enabled = on
         await self.refresh_unit()
+        if on:
+            self.write_launcher()  # Profile von früheren Starts oder einer älteren Version nachtragen
         if self.unit["installed"] and self.manage_unit:
             if self.unit.get("autostart"):
                 log.info("deckbar-overlay: Autostart beim Login aus, startet jetzt mit AION 2")

@@ -38,6 +38,13 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
   Weitere Effekte in `STATUS_REGELN` (`radar/warnung.py`), IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
 - **Dungeon-Restzeit** (`0x6100`) in der Statuszeile unter dem Radar.
+- **PvP der Sitzung** (`radar/pvp.py`, Widget „PvP“ im Overlay): Kills und Tode zählt `0x8D04`
+  (Tod mit Täter und dessen Namen, nur bei Spielern als Täter), Kills über die eigene Entity oder den
+  eigenen Namen (auch Begleiter). Assists, Abyss-Rangpunkte, Rang und Grad kommen aus der eigenen
+  Saisonwertung `0x8D57` (JSON mit kill/death/assist_count); das Spiel schickt sie beim Einloggen und
+  nach manchen Zonenwechseln, der Server rechnet etwa stündlich neu. Gezeigt wird der Zuwachs seit
+  Spielstart bzw. „PvP neu beginnen“. Opcodes und Formate nach dem Desktop-Programm von questlog.gg,
+  an eigenen Mitschnitten geprüft; PvP-Kills selbst sind noch nicht live geprüft.
 - **Feldbosse und Vertraute** (NexBoard-Seite „Radar“, Reiter „Feldbosse und Vertraute“): Respawn-Timer aller gesehenen
   Feldbosse (`0x9101`), Ansage 5 Minuten vorher und beim Respawn (nur aktuelle Karte), lebende Feldbosse
   als lila Raute auf dem Radar. Namen lernt das Radar, sobald ein Boss neben dem Platz erscheint.

@@ -150,3 +150,21 @@ body.edit #guides { display: block; }
   position: absolute; padding: 3px 8px; border-radius: 6px; font-size: 12px; pointer-events: none;
   background: rgba(10, 14, 24, .92); border: 1px solid var(--hud-line);
 }
+
+/* ------------------------------------------------------------ PvP (Daten vom Modul AION 2 · Radar) */
+#w-pvp { min-width: 250px; }
+.pvp-kopf { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; color: var(--muted); }
+.pvp-kopf span:first-child { font-weight: 650; color: var(--text); }
+.pvp-kda { display: flex; gap: 18px; margin: 6px 0 4px; }
+.pvp-kda div { display: flex; flex-direction: column; align-items: center; min-width: 34px; }
+.pvp-kda b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
+.pvp-kda span { font-size: 10.5px; color: var(--muted); }
+.pvp-kda div:first-child b { color: var(--ok); }
+.pvp-kda div:nth-child(2) b { color: var(--bad); }
+.pvp-punkte { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pvp-punkte .plus { color: var(--ok); font-weight: 650; }
+.pvp-punkte .leise { color: var(--muted); font-size: 11px; }
+.pvp-letzte { margin-top: 4px; font-size: 12px; }
+.pvp-letzte:empty { display: none; }
+.pvp-letzte .kill { color: var(--ok); }
+.pvp-letzte .tod { color: var(--bad); }

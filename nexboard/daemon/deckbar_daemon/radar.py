@@ -29,7 +29,7 @@ from radar.punkte import Karte  # noqa: E402
 log = logging.getLogger(__name__)
 
 TAKT_S = 0.2  # so oft zeichnen die Widgets neu, Warnungen zählen in Zehntelsekunden
-BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart")
+BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "pvp_neu")
 
 
 async def _aion2_laeuft() -> bool:
@@ -104,7 +104,8 @@ class Radar:
             raise RuntimeError("Radar läuft nicht")
         aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
                     "aufnahme_start": self.dienst.aufnahme_starten,
-                    "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen}
+                    "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen,
+                    "pvp_neu": self.dienst.pvp_neu}
         aktionen[name]()
 
     def uebersicht(self) -> dict:

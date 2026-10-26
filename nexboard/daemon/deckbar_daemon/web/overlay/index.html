@@ -13,6 +13,9 @@
 <div id="toolbar" role="toolbar" aria-label="Overlay bearbeiten">
   <div class="tb-title"><span class="dot"></span>Overlay bearbeiten</div>
   <span class="tb-hint">Ziehen = verschieben · Mausrad = Größe · Shift = frei · Esc = fertig</span>
+  <label class="tb-select" title="Profil = welche Widgets sichtbar sind (Tastenkürzel: deckbar-overlay --profil NAME)">Profil
+    <select id="profil"></select>
+  </label>
   <div class="tb-group" id="toggles"></div>
   <label class="tb-select" title="Effekt auf deinem Namen in der Meter-Zeile">Namenseffekt
     <select id="fx">
@@ -57,7 +60,15 @@
   <div class="karte-tipp" id="karte-tipp" hidden></div>
 </section>
 
+<section class="widget hud" id="w-pvp" data-id="pvp" data-title="PvP">
+  <div class="pvp-kopf"><span>PvP · Sitzung</span><span id="pvp-zeit"></span></div>
+  <div class="pvp-kda" id="pvp-kda"></div>
+  <div class="pvp-punkte" id="pvp-punkte"></div>
+  <div class="pvp-letzte" id="pvp-letzte"></div>
+</section>
+
 <script src="radar.js"></script>
+<script src="pvp.js"></script>
 <script src="overlay.js"></script>
 </body>
 </html>

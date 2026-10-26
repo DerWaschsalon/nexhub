@@ -32,6 +32,7 @@ function radarNeuZeichnen() {
   zeichneRadar();
   zeichneWarnungen();
   karteAktualisieren();
+  zeichnePvp();
   regionsSoon();
 }
 
