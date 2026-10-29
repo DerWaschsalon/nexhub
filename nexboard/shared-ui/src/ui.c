@@ -24,6 +24,7 @@
 #define TOGGLE_REVERT_MS 1500 /* optimistischer Toggle ohne Bestätigung -> zurück */
 #define DRAG_THRESHOLD 6
 #define TAP_SLOP 16          /* weiter bewegt = Wischversuch, kein Tippen */
+#define SWIPE_MIN 50         /* Wischweg in px, ab dem die Seite wechselt */
 #define MARQUEE_MS 20000     /* so lange läuft ein zu langer Titel, danach endet er mit „…“ */
 #define HELLO_TIMEOUT_MS 5000
 #define CACHE_KEY "layout"
@@ -1358,33 +1359,38 @@ static void go_to_page(int idx)
     }
 }
 
-/* Wischen springt ab der LVGL-Gestenschwelle (50 px) zur Nachbarseite. Mitziehen zeichnete jedes Bild
- * komplett neu (bis 100 ms auf dem Gerät); bei so wenigen Touch-Proben schnappte die Seite oft zurück. */
-static void tv_gesture_cb(lv_event_t *e)
+/* Wischt der Finger über eine Seite (nicht über einen Slider), springt sie beim Loslassen zur Nachbarseite.
+ * Die Kette über GESTURE_BUBBLE endet bei Slidern, bei allen anderen Kacheln beim Tileview. */
+static bool swipes_page(lv_obj_t *obj)
 {
-    (void)e;
-    lv_indev_t *indev = lv_indev_active();
-    lv_dir_t dir = lv_indev_get_gesture_dir(indev);
-    if (dir == LV_DIR_LEFT) go_to_page(ui.page_active + 1);
-    else if (dir == LV_DIR_RIGHT) go_to_page(ui.page_active - 1);
-    else return;
-    /* bis zum Loslassen nichts mehr auslösen, die Kachel unter dem Finger bekommt PRESS_LOST */
-    lv_indev_wait_release(indev);
+    while (obj && obj != ui.tv && lv_obj_has_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE)) obj = lv_obj_get_parent(obj);
+    return obj == ui.tv;
 }
 
-/* Ohne scrollbare Seiten wertet LVGL auch einen kurzen, abgebrochenen Wisch als Klick. Das
- * Eingabegerät sieht PRESSED und die Klicks vor der Kachel und verwirft sie hier. */
-static void tap_filter_cb(lv_event_t *e)
+/*
+ * Wischen und Tippen werden am Eingabegerät entschieden, das PRESSED, RELEASED und die Klicks vor der
+ * Kachel sieht:
+ *   - Seiten folgen nicht dem Finger: Mitziehen zeichnete jedes Bild komplett neu (bis 100 ms), bei so
+ *     wenigen Touch-Proben schnappte die Seite oft zurück.
+ *   - Die LVGL-Geste taugt nicht: Der Controller meldet nicht bei jeder Abfrage eine neue Position, und
+ *     jede Abfrage ohne Bewegung setzt LVGLs Gestensumme zurück. Gezählt wird die Strecke seit PRESSED.
+ *   - Wer weiter als TAP_SLOP wischt, löst keinen Klick auf der Kachel darunter aus.
+ */
+static void touch_cb(lv_event_t *e)
 {
     static lv_point_t press;
     lv_indev_t *indev = lv_indev_active();
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t p;
     lv_indev_get_point(indev, &p);
+    int32_t dx = p.x - press.x, dy = p.y - press.y;
     if (code == LV_EVENT_PRESSED) {
         press = p;
+    } else if (code == LV_EVENT_RELEASED) {
+        if (LV_ABS(dx) >= SWIPE_MIN && LV_ABS(dx) > LV_ABS(dy) && swipes_page(lv_event_get_param(e)))
+            go_to_page(ui.page_active + (dx < 0 ? 1 : -1));
     } else if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
-        if (LV_ABS(p.x - press.x) + LV_ABS(p.y - press.y) > TAP_SLOP) lv_indev_stop_processing(indev);
+        if (LV_ABS(dx) + LV_ABS(dy) > TAP_SLOP) lv_indev_stop_processing(indev);
     }
 }
 
@@ -1532,9 +1538,8 @@ static bool apply_layout(const cJSON *msg)
     lv_obj_set_style_bg_opa(ui.tv, LV_OPA_TRANSP, 0);
     lv_obj_set_scrollbar_mode(ui.tv, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(ui.tv, tv_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    /* nicht scrollbar: Seiten wechseln per Geste; ohne GESTURE_BUBBLE endet die Geste hier */
+    /* nicht scrollbar: Seiten wechseln per Wisch (touch_cb); ohne GESTURE_BUBBLE endet die Kette hier */
     lv_obj_remove_flag(ui.tv, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
-    lv_obj_add_event_cb(ui.tv, tv_gesture_cb, LV_EVENT_GESTURE, NULL);
 
     int idx = 0;
     const cJSON *jp;
@@ -1740,7 +1745,7 @@ void deckbar_ui_init(const deckbar_config_t *cfg)
     ui.heartbeat_s = 5;
     ui.net = DECKBAR_NET_SEARCHING;
     for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i))
-        if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_add_event_cb(i, tap_filter_cb, LV_EVENT_ALL, NULL);
+        if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_add_event_cb(i, touch_cb, LV_EVENT_ALL, NULL);
     ui.state = cJSON_CreateObject();
     ui.art.front = -1;
     ui.bgi.front = -1;
