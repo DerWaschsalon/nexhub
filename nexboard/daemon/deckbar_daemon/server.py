@@ -51,6 +51,7 @@ DEVICE_HIDDEN_KEYS = {"art_url"}
 MAX_MSG = 16 * 1024
 DPS_DEVICE_INTERVAL = 1.0  # DPS höchstens 1× pro Sekunde je Gerät (die Kachel zeigt ganze Sekunden)
 DPS_DEFAULT_PLAYERS = 5    # wie in shared-ui (build_dps)
+SWIPED_STAY_S = 30  # selbst auf die DPS-Seite gewischt: so lange bleibt sie ohne Kampf stehen
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 WEB_DIR = Path(str(resources.files("deckbar_daemon").joinpath("web")))
 
@@ -73,7 +74,7 @@ class Device:
     dps_sent: float = 0.0  # monotonic des letzten DPS-Versands
     dps_last: str = ""     # zuletzt geschickte DPS-Nachricht (gleiche nicht nochmal)
     dps_task: asyncio.Task | None = None
-    return_page: str | None = None  # Seite vor dem automatischen Wechsel zur DPS-Seite
+    return_task: asyncio.Task | None = None  # verzögerter Rückweg von der DPS-Seite (_follow_combat)
     # Bildübertragungen pro Gerät nacheinander, damit sich Teile zweier Bilder nicht mischen
     send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -446,23 +447,34 @@ class NexBoard:
         await self._broadcast_ui({"type": "modules", "modules": self.modules.info()})
 
     async def _on_combat(self, active: bool) -> None:
-        """Kampfbeginn: auf die DPS-Seite wechseln; Kampfende: zurück, wenn dort noch."""
+        for dev in list(self.devices):
+            await self._follow_combat(dev, combat_start=active)
+
+    async def _follow_combat(self, dev: Device, combat_start: bool = False, delay: float = 0) -> None:
+        """Die DPS-Seite nur, solange wirklich ein Kampf läuft; sonst die erste Seite.
+        Im Kampf darf man selbst wegwischen. delay: Rückweg erst nach so vielen Sekunden, falls dann
+        immer noch kein Kampf läuft (selbst hingewischt)."""
         page = self.dps.settings.auto_page
         page_ids = [p.id for p in self.layout.pages]
         if not page or page not in page_ids:
             return
-        for dev in list(self.devices):
-            if active:
-                if dev.page != page:
-                    dev.return_page = dev.page or page_ids[0]
-                    log.info("Kampfbeginn: %s wechselt zu Seite '%s'", dev.id, page)
-                    await self._send(dev.ws, _msg("goto", page=page))
-            else:
-                back, dev.return_page = dev.return_page, None
-                # nur zurück, wenn niemand inzwischen selbst weggewischt hat
-                if back and back in page_ids and dev.page == page and self.dps.settings.return_after:
-                    log.info("Kampfende: %s zurück zu Seite '%s'", dev.id, back)
-                    await self._send(dev.ws, _msg("goto", page=back))
+        if combat_start:
+            target = page
+        elif dev.page == page and not self.state.values.get("dps_active"):
+            target = page_ids[0]
+        else:
+            return
+        if dev.page == target:
+            return
+        if delay:
+            dev.return_task = asyncio.ensure_future(self._return_later(dev, delay))
+            return
+        log.info("%s wechselt zu Seite '%s'", dev.id, target)
+        await self._send(dev.ws, _msg("goto", page=target))
+
+    async def _return_later(self, dev: Device, delay: float) -> None:
+        await asyncio.sleep(delay)
+        await self._follow_combat(dev)
 
     async def _devices_changed(self) -> None:
         await self._broadcast_ui({"type": "devices", "devices": [d.info() for d in self.devices]})
@@ -592,6 +604,7 @@ class NexBoard:
             values["dps"] = self._dps_for(dev, self._dps_rows(dev) or DPS_DEFAULT_PLAYERS)
         await self._send(ws, _msg("state", full=True, values=values))
         asyncio.ensure_future(self._send_bg(dev))
+        await self._follow_combat(dev)
 
         async def heartbeat():
             while not ws.closed:
@@ -628,8 +641,11 @@ class NexBoard:
                 elif t == "event":
                     if msg.get("event") == "page_change":
                         dev.page = msg.get("page")
+                        if dev.return_task:
+                            dev.return_task.cancel()
                         self._queue_dps(dev)  # auf eine DPS-Seite gewechselt: aktuellen Stand nachreichen
                         await self._devices_changed()
+                        await self._follow_combat(dev, delay=SWIPED_STAY_S)
                     err = await self.handle_event(msg, dev.id)
                     if err:
                         await self._send(ws, _msg("error", code="bad_request", message=err))
@@ -637,8 +653,9 @@ class NexBoard:
                     log.debug("Gerät %s: unbekannter Typ %r", dev.id, t)
         finally:
             hb_task.cancel()
-            if dev.dps_task:
-                dev.dps_task.cancel()
+            for task in (dev.dps_task, dev.return_task):
+                if task:
+                    task.cancel()
             self.devices.discard(dev)
             log.info("Gerät getrennt: %s", dev.id)
             await self._devices_changed()
