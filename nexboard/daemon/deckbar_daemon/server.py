@@ -24,6 +24,7 @@ from .background import UPLOAD_MAX, Background, save_upload
 from .bot import DiscordBot
 from .hub import Hub, HubError
 from .capture import aion2_running, history_root
+from .claude import ClaudeUsage
 from .audio import Audio
 from .config import Layout, Page, Settings, load_layout, save_layout, save_settings
 from .config import config_dir as default_config_dir
@@ -44,7 +45,7 @@ log = logging.getLogger(__name__)
 PROTO_V = 1
 # Einstellungen, die erst nach einem Neustart des Daemons wirken
 RESTART_FIELDS = ("host", "port", "token", "mdns", "usb", "heartbeat")
-BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url", "dps", "dps_active")
+BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url", "dps", "dps_active", "claude")
 # nur für Daemon/Web-UI; das Gerät bekommt das Cover als Bild per `art`
 DEVICE_HIDDEN_KEYS = {"art_url"}
 MAX_MSG = 16 * 1024
@@ -120,6 +121,7 @@ class NexBoard:
         self.art = Art()
         self.bg = Background()
         self.dps = DpsFeed(self.state, config_dir, self._on_combat)
+        self.claude = ClaudeUsage(self.state, lambda: self.layout.has_type("claude"))
         self.dps.status_listeners.append(self._dps_changed)
         self.runs = DungeonRuns(config_dir)
         self.runs.history_dir = self._history_dir
@@ -176,7 +178,7 @@ class NexBoard:
         m = self.modules
         usb_url = f"ws://127.0.0.1:{self.settings.port}/ws"
         m.register("deck", self.audio.watch, self.media.watch, self.watch_layout_file, self.watch_background,
-                   UsbBridge(self.settings.usb, usb_url).watch, self._announce,
+                   UsbBridge(self.settings.usb, usb_url).watch, self._announce, self.claude.watch,
                    hook=self._deck_toggled, status=self._deck_status)
         m.register("aion2.dps", self.dps.watch, hook=self._dps_toggled, status=self._dps_status)
         m.register("aion2.runs", self.runs.watch, status=self._runs_status)

@@ -10,6 +10,10 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
 
 - **Kacheln:** Taste, Schalter und Schieberegler für Audio (Lautstärke, Mute von Ausgang und
   Mikrofon), Media-Steuerung mit Cover und Titel, Links, Hotkeys und Shell-Befehle
+- **Claude-Nutzung:** Auslastung des Claude-Abos (5-Stunden-Sitzung und Woche) wie `/usage` in
+  Claude Code. Der Daemon liest dafür die Anmeldung von Claude Code (`~/.claude/.credentials.json`)
+  und fragt alle 5 Minuten nach, solange die Kachel im Layout ist. Der Endpunkt ist nicht
+  offiziell dokumentiert; ändert er sich, zeigt die Kachel „–“.
 - **Live-Status:** Mute, Lautstärke und Track folgen dem PC, auch wenn dort umgeschaltet wird.
   Eigene Werte kommen per `POST /api/state` dazu.
 - **Mehrere Seiten** mit Wischgesten, Hintergrund wählbar (Standard, Desktop-Hintergrund, eigenes Bild)
