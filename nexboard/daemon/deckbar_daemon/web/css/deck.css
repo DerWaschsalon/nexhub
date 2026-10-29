@@ -18,7 +18,7 @@
 .tile-d {
   position: absolute; border-radius: 18px;
   background: linear-gradient(rgba(255, 255, 255, .196), rgba(255, 255, 255, .063));
-  border: 1px solid rgba(255, 255, 255, .2); box-shadow: 0 5px 18px rgba(0, 0, 0, .27);
+  border: 1px solid rgba(255, 255, 255, .2);
   color: #fff; overflow: hidden; cursor: pointer;
   transition: transform .14s ease-out, background .14s, box-shadow .14s, outline-color .14s;
   outline: 2px solid transparent; outline-offset: 2px;
@@ -41,7 +41,7 @@
   border-color: color-mix(in srgb, #fff 47%, var(--c)); box-shadow: 0 2px 24px color-mix(in srgb, var(--c) 51%, transparent); color: #fff;
 }
 .tile-d .fill {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 0; z-index: 1; opacity: .78;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0; z-index: 1; opacity: .78; border-radius: 18px;
   background: linear-gradient(color-mix(in srgb, #fff 16%, var(--daccent)), var(--daccent));
   transition: width .22s ease-out;
 }
