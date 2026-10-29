@@ -23,6 +23,8 @@
 #define SLIDER_SETTLE_MS 700  /* nach dem Loslassen veraltete Werte vom Daemon ignorieren */
 #define TOGGLE_REVERT_MS 1500 /* optimistischer Toggle ohne Bestätigung -> zurück */
 #define DRAG_THRESHOLD 6
+#define TAP_SLOP 16          /* weiter bewegt = Wischversuch, kein Tippen */
+#define MARQUEE_MS 20000     /* so lange läuft ein zu langer Titel, danach endet er mit „…“ */
 #define HELLO_TIMEOUT_MS 5000
 #define CACHE_KEY "layout"
 #define BG_KEY "bg"          /* Hintergrund im Flash: nach einem Neustart nicht erneut übertragen */
@@ -614,6 +616,15 @@ static void tile_set_muted(tile_t *t, bool muted)
     if (t->value) lv_obj_set_style_text_opa(t->value, muted ? 120 : LV_OPA_COVER, 0);
 }
 
+/* Der Lauftext zeichnet jedes Bild neu, und das Panel nimmt nur ganze Frames (220 KB):
+ * Dauerlauf hielt das Gerät mit 45 Bildern/s ständig ausgelastet. Deshalb nur eine Weile. */
+static void marquee_stop_cb(lv_timer_t *tm)
+{
+    tile_t *t = lv_timer_get_user_data(tm);
+    t->timer = NULL;
+    lv_label_set_long_mode(t->title, LV_LABEL_LONG_DOT);
+}
+
 static void media_update(tile_t *t)
 {
     const cJSON *track = cJSON_GetObjectItemCaseSensitive(ui.state, "track");
@@ -622,8 +633,13 @@ static void media_update(tile_t *t)
     const char *artist = cJSON_IsObject(track) ? jstr(track, "artist") : NULL;
 
     if (title && *title) {
-        lv_label_set_long_mode(t->title, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_label_set_text(t->title, title);
+        if (strcmp(lv_label_get_text(t->title), title) != 0) {
+            lv_label_set_long_mode(t->title, LV_LABEL_LONG_SCROLL_CIRCULAR);
+            lv_label_set_text(t->title, title);
+            if (t->timer) lv_timer_delete(t->timer);
+            t->timer = lv_timer_create(marquee_stop_cb, MARQUEE_MS, t);
+            lv_timer_set_repeat_count(t->timer, 1);
+        }
         lv_obj_set_style_text_opa(t->title, LV_OPA_COVER, 0);
     } else {
         lv_label_set_long_mode(t->title, LV_LABEL_LONG_DOT);
@@ -704,7 +720,7 @@ static void toggle_revert_cb(lv_timer_t *tm)
     tile_set_checked(t, truthy(cJSON_GetObjectItemCaseSensitive(ui.state, t->bind)));
 }
 
-static void go_to_page(int idx, bool anim);
+static void go_to_page(int idx);
 
 static void tile_event_cb(lv_event_t *e)
 {
@@ -714,7 +730,7 @@ static void tile_event_cb(lv_event_t *e)
     if (code == LV_EVENT_SHORT_CLICKED) {
         if (t->nav[0]) {
             for (int i = 0; i < ui.page_count; i++)
-                if (!strcmp(ui.page_ids[i], t->nav)) go_to_page(i, true);
+                if (!strcmp(ui.page_ids[i], t->nav)) go_to_page(i);
             return;
         }
         if (ui.net != DECKBAR_NET_ONLINE) return;
@@ -868,7 +884,6 @@ static void build_button(tile_t *t, int32_t w, int32_t h, const char *label)
 static void build_slider(tile_t *t, int32_t w, int32_t h, const char *label)
 {
     lv_obj_t *o = t->obj;
-    lv_obj_set_style_clip_corner(o, true, 0);
     /* Wischen auf dem Slider darf nicht die Seite wechseln */
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLL_CHAIN | LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(o, LV_OBJ_FLAG_PRESS_LOCK);
@@ -876,7 +891,8 @@ static void build_slider(tile_t *t, int32_t w, int32_t h, const char *label)
     t->fill = plain_obj(o);
     lv_obj_add_style(t->fill, &db_theme.fill, 0);
     lv_obj_add_style(t->fill, &db_theme.fill_muted, DB_STATE_MUTED);
-    lv_obj_set_style_radius(t->fill, 0, 0);
+    /* gleiche Rundung wie die Kachel statt clip_corner (das zeichnete die Kachel über eine Zwischenebene) */
+    lv_obj_set_style_radius(t->fill, DB_RADIUS, 0);
     lv_obj_set_size(t->fill, 0, LV_PCT(100));
     lv_obj_align(t->fill, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_remove_flag(t->fill, LV_OBJ_FLAG_CLICKABLE);
@@ -1331,14 +1347,44 @@ static void update_dots(void)
     }
 }
 
-static void go_to_page(int idx, bool anim)
+static void go_to_page(int idx)
 {
     if (idx < 0 || idx >= ui.page_count) return;
-    lv_tileview_set_tile(ui.tv, ui.pages[idx], anim ? LV_ANIM_ON : LV_ANIM_OFF);
+    lv_tileview_set_tile(ui.tv, ui.pages[idx], LV_ANIM_OFF);
     if (idx != ui.page_active) {
         ui.page_active = idx;
         update_dots();
         send_page_change(ui.page_ids[idx]);
+    }
+}
+
+/* Wischen springt ab der LVGL-Gestenschwelle (50 px) zur Nachbarseite. Mitziehen zeichnete jedes Bild
+ * komplett neu (bis 100 ms auf dem Gerät); bei so wenigen Touch-Proben schnappte die Seite oft zurück. */
+static void tv_gesture_cb(lv_event_t *e)
+{
+    (void)e;
+    lv_indev_t *indev = lv_indev_active();
+    lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+    if (dir == LV_DIR_LEFT) go_to_page(ui.page_active + 1);
+    else if (dir == LV_DIR_RIGHT) go_to_page(ui.page_active - 1);
+    else return;
+    /* bis zum Loslassen nichts mehr auslösen, die Kachel unter dem Finger bekommt PRESS_LOST */
+    lv_indev_wait_release(indev);
+}
+
+/* Ohne scrollbare Seiten wertet LVGL auch einen kurzen, abgebrochenen Wisch als Klick. Das
+ * Eingabegerät sieht PRESSED und die Klicks vor der Kachel und verwirft sie hier. */
+static void tap_filter_cb(lv_event_t *e)
+{
+    static lv_point_t press;
+    lv_indev_t *indev = lv_indev_active();
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    if (code == LV_EVENT_PRESSED) {
+        press = p;
+    } else if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
+        if (LV_ABS(p.x - press.x) + LV_ABS(p.y - press.y) > TAP_SLOP) lv_indev_stop_processing(indev);
     }
 }
 
@@ -1486,6 +1532,9 @@ static bool apply_layout(const cJSON *msg)
     lv_obj_set_style_bg_opa(ui.tv, LV_OPA_TRANSP, 0);
     lv_obj_set_scrollbar_mode(ui.tv, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(ui.tv, tv_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    /* nicht scrollbar: Seiten wechseln per Geste; ohne GESTURE_BUBBLE endet die Geste hier */
+    lv_obj_remove_flag(ui.tv, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_event_cb(ui.tv, tv_gesture_cb, LV_EVENT_GESTURE, NULL);
 
     int idx = 0;
     const cJSON *jp;
@@ -1617,7 +1666,7 @@ void deckbar_ui_net_message(const char *text, size_t len)
     } else if (!strcmp(type, "goto")) {
         const char *page = jstr(msg, "page");
         for (int i = 0; page && i < ui.page_count; i++)
-            if (!strcmp(ui.page_ids[i], page)) go_to_page(i, true);
+            if (!strcmp(ui.page_ids[i], page)) go_to_page(i);
     } else if (!strcmp(type, "layout")) {
         if (apply_layout(msg)) deckbar_hal_store(CACHE_KEY, text, len);
     } else if (!strcmp(type, "welcome")) {
@@ -1690,6 +1739,8 @@ void deckbar_ui_init(const deckbar_config_t *cfg)
     ui.cfg = *cfg;
     ui.heartbeat_s = 5;
     ui.net = DECKBAR_NET_SEARCHING;
+    for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i))
+        if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_add_event_cb(i, tap_filter_cb, LV_EVENT_ALL, NULL);
     ui.state = cJSON_CreateObject();
     ui.art.front = -1;
     ui.bgi.front = -1;
