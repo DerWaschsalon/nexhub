@@ -19,6 +19,7 @@ class State:
             "art_url": None,  # Cover des aktuellen Titels (das Gerät bekommt das Bild per `art`)
             "dps": None,  # AION 2, siehe dps.py
             "dps_active": False,
+            "claude": None,  # Claude-Nutzung, siehe claude.py
         }
         self._listeners: list[Listener] = []
 

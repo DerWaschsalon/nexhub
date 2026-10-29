@@ -78,6 +78,15 @@
 .tile-d .dps .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(242, 243, 247, .62); font-size: 14px; }
 .tile-d .dps .demo { position: absolute; right: 12px; bottom: 6px; font-size: 11px; color: #ff9f0a; }
 
+/* Claude-Kachel (wie build_claude in shared-ui/src/ui.c) */
+.tile-d .claude { position: absolute; inset: 0; z-index: 2; }
+.tile-d .claude .r { position: absolute; left: 12px; right: 12px; height: 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.tile-d .claude .n { width: 40px; color: rgba(242, 243, 247, .62); }
+.tile-d .claude .t { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .11); overflow: hidden; }
+.tile-d .claude .t i { display: block; height: 100%; border-radius: 3px; opacity: .86; }
+.tile-d .claude .p { width: 36px; text-align: right; }
+.tile-d .claude .x { width: 60px; text-align: right; color: rgba(242, 243, 247, .62); }
+
 /* Editor */
 .page-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

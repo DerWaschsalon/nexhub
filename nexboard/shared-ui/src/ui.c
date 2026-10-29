@@ -31,7 +31,7 @@
  * aufgefüllt), w, h, y, rows (je uint16 little endian), dann rows*w*2 Byte RGB565 */
 #define BIN_HEAD 27
 
-typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS } it_type_t;
+typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS, IT_CLAUDE } it_type_t;
 
 #define DPS_MAX_ROWS 8
 
@@ -64,6 +64,18 @@ typedef struct {
     dps_row_t rows[DPS_MAX_ROWS];
 } dps_view_t;
 
+/* Claude-Kachel: je Limit (Sitzung, Woche) eine Zeile [Name  Balken  Prozent  Reset] */
+typedef struct {
+    lv_obj_t *fill;
+    lv_obj_t *pct;
+    lv_obj_t *reset;
+} usage_row_t;
+
+typedef struct {
+    int32_t bar_w;
+    usage_row_t rows[2];
+} claude_view_t;
+
 typedef struct {
     char id[ID_LEN];
     it_type_t type;
@@ -87,6 +99,7 @@ typedef struct {
     int32_t cover_px;  /* Media: Kantenlänge des Covers, 0 = keins */
     bool flat;         /* Media: einzeiliges Layout, Text wird vertikal zentriert */
     dps_view_t *dps;   /* DPS-Kachel */
+    claude_view_t *claude;
 
     bool checked;
     bool muted;
@@ -634,6 +647,7 @@ static void media_update(tile_t *t)
 }
 
 static void dps_update(tile_t *t);
+static void claude_update(tile_t *t);
 
 static void apply_state_key(const char *key, const cJSON *val)
 {
@@ -647,6 +661,10 @@ static void apply_state_key(const char *key, const cJSON *val)
         }
         if (t->type == IT_DPS) {
             if (!strcmp(key, "dps")) dps_update(t);
+            continue;
+        }
+        if (t->type == IT_CLAUDE) {
+            if (!strcmp(key, "claude")) claude_update(t);
             continue;
         }
         if (t->bind[0] && !strcmp(t->bind, key)) {
@@ -673,6 +691,7 @@ static void apply_full_state(void)
     for (int i = 0; i < ui.tile_count; i++) {
         if (ui.tiles[i].type == IT_MEDIA) media_update(&ui.tiles[i]);
         if (ui.tiles[i].type == IT_DPS) dps_update(&ui.tiles[i]);
+        if (ui.tiles[i].type == IT_CLAUDE) claude_update(&ui.tiles[i]);
     }
 }
 
@@ -1214,6 +1233,90 @@ static void build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *
     dps_update(t);
 }
 
+/* Schlüssel im State `claude` und Beschriftung, in Zeilenreihenfolge (siehe daemon/claude.py) */
+static const char *const CLAUDE_KEYS[2] = {"session", "week"};
+static const char *const CLAUDE_NAMES[2] = {"5 h", "Woche"};
+
+static void claude_update(tile_t *t)
+{
+    claude_view_t *v = t->claude;
+    if (!v) return;
+    const cJSON *c = cJSON_GetObjectItemCaseSensitive(ui.state, "claude");
+    char buf[8];
+    for (int i = 0; i < 2; i++) {
+        usage_row_t *r = &v->rows[i];
+        const cJSON *jr = cJSON_IsObject(c) ? cJSON_GetObjectItemCaseSensitive(c, CLAUDE_KEYS[i]) : NULL;
+        const cJSON *jp = cJSON_IsObject(jr) ? cJSON_GetObjectItemCaseSensitive(jr, "pct") : NULL;
+        if (!cJSON_IsNumber(jp)) {
+            lv_obj_set_width(r->fill, 0);
+            lv_label_set_text(r->pct, "–");
+            if (r->reset) lv_label_set_text(r->reset, "");
+            continue;
+        }
+        int32_t pct = LV_CLAMP(0, (int32_t)jp->valuedouble, 100);
+        lv_obj_set_width(r->fill, v->bar_w * pct / 100);
+        /* Farbe warnt, bevor das Limit erreicht ist */
+        db_style_t s = pct >= 90 ? DB_STYLE_DANGER : pct >= 75 ? DB_STYLE_WARNING : DB_STYLE_ACCENT;
+        lv_obj_set_style_bg_color(r->fill, db_theme_color(s), 0);
+        lv_snprintf(buf, sizeof buf, "%d %%", (int)pct);
+        lv_label_set_text(r->pct, buf);
+        const char *reset = jstr(jr, "reset");
+        if (r->reset) lv_label_set_text(r->reset, reset ? reset : "");
+    }
+}
+
+/* Claude-Kachel: Auslastung des Claude-Abos, Werte kommen alle 5 Minuten vom Daemon */
+static void build_claude(tile_t *t, int32_t w, int32_t h)
+{
+    lv_obj_t *o = t->obj;
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    claude_view_t *v = lv_malloc_zeroed(sizeof *v);
+    if (!v) return;
+    t->claude = v;
+
+    const int32_t px = 12, gap = 8, name_w = 40, pct_w = 36;
+    /* Rücksetzzeit („Sa 01:00“) nur, wenn die Kachel breit genug ist */
+    const int32_t reset_w = w >= 260 ? 60 : 0;
+    const int32_t lh = lv_font_get_line_height(&db_font_small);
+    v->bar_w = LV_MAX(w - 2 * px - name_w - pct_w - reset_w - (reset_w ? 3 : 2) * gap, 10);
+    const int32_t bar_x = px + name_w + gap;
+    const int32_t pct_x = bar_x + v->bar_w + gap;
+
+    for (int i = 0; i < 2; i++) {
+        usage_row_t *r = &v->rows[i];
+        int32_t mid = h * (2 * i + 1) / 4; /* Mitte der oberen bzw. unteren Hälfte */
+
+        lv_obj_t *name = text_label(o, &db_font_small, CLAUDE_NAMES[i]);
+        lv_obj_add_style(name, &db_theme.text_dim, 0);
+        lv_obj_set_pos(name, px, mid - lh / 2);
+
+        lv_obj_t *track = plain_obj(o);
+        lv_obj_set_size(track, v->bar_w, 6);
+        lv_obj_set_pos(track, bar_x, mid - 3);
+        lv_obj_set_style_radius(track, 3, 0);
+        lv_obj_set_style_bg_color(track, lv_color_white(), 0);
+        lv_obj_set_style_bg_opa(track, 28, 0);
+        r->fill = plain_obj(track);
+        lv_obj_set_size(r->fill, 0, 6);
+        lv_obj_set_style_radius(r->fill, 3, 0);
+        lv_obj_set_style_bg_opa(r->fill, 220, 0);
+
+        r->pct = text_label(o, &db_font_small, "");
+        lv_obj_set_width(r->pct, pct_w);
+        lv_obj_set_style_text_align(r->pct, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_set_pos(r->pct, pct_x, mid - lh / 2);
+
+        if (reset_w) {
+            r->reset = text_label(o, &db_font_small, "");
+            lv_obj_add_style(r->reset, &db_theme.text_dim, 0);
+            lv_obj_set_width(r->reset, reset_w);
+            lv_obj_set_style_text_align(r->reset, LV_TEXT_ALIGN_RIGHT, 0);
+            lv_obj_set_pos(r->reset, pct_x + pct_w + gap, mid - lh / 2);
+        }
+    }
+    claude_update(t);
+}
+
 /* ======================================================================= Seiten */
 
 static void update_dots(void)
@@ -1259,6 +1362,7 @@ static void free_tiles(void)
         lv_anim_delete(t, fill_anim_cb);
         if (t->timer) lv_timer_delete(t->timer);
         lv_free(t->dps);
+        lv_free(t->claude);
     }
     lv_free(ui.tiles);
     ui.tiles = NULL;
@@ -1271,6 +1375,7 @@ static it_type_t parse_type(const char *s)
     if (s && !strcmp(s, "slider")) return IT_SLIDER;
     if (s && !strcmp(s, "media")) return IT_MEDIA;
     if (s && !strcmp(s, "dps")) return IT_DPS;
+    if (s && !strcmp(s, "claude")) return IT_CLAUDE;
     return IT_BUTTON;
 }
 
@@ -1341,6 +1446,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         case IT_SLIDER: build_slider(t, pw, ph, jstr(ji, "label")); break;
         case IT_MEDIA: build_media(t, pw, ph); break;
         case IT_DPS: build_dps(t, pw, ph, jint(ji, "players", 5), jstr(ji, "extra")); break;
+        case IT_CLAUDE: build_claude(t, pw, ph); break;
         default: build_button(t, pw, ph, jstr(ji, "label")); break;
         }
     }
