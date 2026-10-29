@@ -174,16 +174,22 @@ async def test_auto_page(tmp_path):
     await deck._on_combat(False)
     assert len(ws.sent) == 3
 
-    # ohne Kampf auf die DPS-Seite gewischt oder dort verbunden → erste Seite
+    # ohne Kampf dort verbunden → sofort erste Seite
     dev.page = "aion"
     await deck._follow_combat(dev)
     assert ws.sent[-1]["page"] == "main" and len(ws.sent) == 4
+
+    # ohne Kampf selbst hingewischt → erst nach der Wartezeit zurück
+    await deck._follow_combat(dev, delay=0.01)
+    assert len(ws.sent) == 4
+    await asyncio.sleep(0.05)
+    assert ws.sent[-1]["page"] == "main" and len(ws.sent) == 5
 
     # im Kampf schon auf der DPS-Seite → kein goto
     deck.state.update(dps_active=True)
     await deck._on_combat(True)
     await deck._follow_combat(dev)
-    assert len(ws.sent) == 4
+    assert len(ws.sent) == 5
 
 
 async def test_reset_button(tmp_path):
