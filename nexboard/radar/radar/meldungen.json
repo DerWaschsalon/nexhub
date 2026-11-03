@@ -5,7 +5,14 @@
   },
   "dungeons": {
     "Krao Cave": {},
-    "Urugugu Canyon": {},
+    "Urugugu Canyon": {
+      "raur_konter": "Raur: Konter (nicht angreifen)",
+      "raur_bombe": "Raur: Zeitbombe (auf dir)",
+      "urahum_gift": "Urahum: Gift (auf dir)",
+      "auldor_linien": "Auldor: Linien",
+      "auldor_sturz": "Auldor: Sturzschlag (zusammenstellen)",
+      "auldor_mitte": "Auldor: Mitte-Phase und Sturmstreich"
+    },
     "Feuertempel": {
       "flamme": "Kromede: Todesmal / Teufelsflamme",
       "regen": "Kromede: Regen des Hasses",

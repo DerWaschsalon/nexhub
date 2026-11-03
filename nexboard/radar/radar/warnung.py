@@ -45,6 +45,7 @@ class Regel:
     gruppe: str                      # neue Warnung ersetzt aeltere derselben Gruppe
     danach: tuple["Regel", ...] = ()  # gleichzeitig ausgeloeste Vorhersagen
     plan: tuple[tuple[float, "Regel"], ...] = ()  # (Sekunden spaeter, Regel)
+    auf_dir: bool = False            # zielt der Cast auf mich, steht "DU!" im Titel
 
 
 GRUEN = (0, 230, 118)
@@ -105,12 +106,38 @@ REGELN.update({
     1802433: Regel("Schlag", "Ausweichen", 1.3, GRAU, "zikel_angriffe"),
 })
 
+# Urugugu Canyon. Ausgewertet 2026-11-03 an einem Lauf (Zone 600013), Ablauf nach dem Guide
+# "Urugugu Canyon [NORMAL & HARD] guide" (Madsin). Skill-Namen fehlen zum Teil in den A2Tools-Daten.
+STURMSTREICH_KOMMT = Regel("Sturmstreich kommt", "Zu zweit zusammenstellen", 3.0, GELB, "auldor_mitte")
+REGELN.update({
+    # Hueterhauptmann Raur: Schild in den Boden, 3,8 s Konter (jeder Treffer wird zurueckgeworfen und
+    # staerkt den Boss), danach grosse Explosion um ihn, wenn jemand getroffen hat
+    1504450: Regel("Konter", "Nicht angreifen!", 3.8, ROT, "raur_konter"),
+    1504460: Regel("Konter-Explosion", "Ausweichen oder blocken", 1.2, ROT, "raur_konter"),
+    # Heiliger Auldor: Linien im Faecher (Treffer nach 1,7 s). Wer getroffen wird, fliegt hoch,
+    # 3 s spaeter Sturzschlag auf ihn (Hard Mode: Stack-Marker, toedlich fuer Einzelne)
+    1600920: Regel("Linien", "Seitlich raus, sonst wirst du gegriffen", 1.7, BLAU, "auldor_linien"),
+    1600925: Regel("Linien rundum", "In die Lücke zwischen den Linien", 0.65, BLAU, "auldor_linien"),
+    1600960: Regel("Sturzschlag", "Alle zusammenstellen!", 1.7, ROT, "auldor_sturz", auf_dir=True),
+    # bei 75 % und 35 %: Sprung in die Mitte, Wirbel-Linien, 11,6 s spaeter Sturmstreich (Stack zu zweit),
+    # ab 35 % bleibt am Rand ein Sturm
+    1601010: Regel("Sprung in die Mitte", "Wirbeln ausweichen, Rand meiden", 0.7, GELB, "auldor_mitte",
+                   plan=((8.6, STURMSTREICH_KOMMT),)),
+    1601030: Regel("Sturmstreich", "Zu zweit zusammenstellen!", 0.7, GELB, "auldor_mitte", auf_dir=True),
+})
+
 # Status-Effekte (0x382A) auf dem eigenen Charakter. Gefunden 2026-10-24: 0,1 s nach Ignus'
 # Flammenbombe (1600840) bekommen zwei Spieler 16008401 fuer 3 s, danach entsteht die Feuerpfuetze.
 STATUS_REGELN: dict[int, Regel] = {
     16008401: Regel("Verzögerte Explosion", "Pfütze kommt unter dir", 3.0, GRUEN, "bombe"),
     # Blutung, 20 s, ca. 1.900 Schaden alle 2 s (Zikels Blutschlag). Der Heiltrank entfernt sie.
     12000151: Regel("Blutung", "Trank nehmen!", 3.0, ROT, "blutung"),
+    # Urugugu Canyon: Raurs Zeitbombe (3 s, dann Explosion um dich)
+    15044311: Regel("Zeitbombe", "Weg von der Gruppe!", 3.0, ROT, "raur_bombe"),
+    # Urahums Gift (3 s), danach 40 s Giftpfuetze an der Stelle
+    16051103: Regel("Gift", "Pfütze kommt: an den Rand laufen", 3.0, GRUEN, "urahum_gift"),
+    # von Auldors Linien getroffen: 3 s spaeter Sturzschlag auf dich
+    16009201: Regel("Gleich Sturzschlag", "Gruppe zu dir holen!", 3.0, ROT, "auldor_sturz"),
 }
 # Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
 GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
@@ -176,6 +203,20 @@ ENGLISCH = {
     "Dritte Linie": "Third Line", "Zur dritten Zone, danach unter den Boss": "To the third zone, then under the boss",
     "Donut": "Donut", "Unter den Boss!": "Get under the boss!",
     "Blutung": "Bleeding", "Trank nehmen!": "Drink a potion!",
+    "Raur: Konter (nicht angreifen)": "Raur: Counter (don't attack)", "Raur: Zeitbombe (auf dir)": "Raur: Time Bomb (on you)",
+    "Urahum: Gift (auf dir)": "Urahum: Poison (on you)", "Auldor: Linien": "Auldor: Lines",
+    "Auldor: Sturzschlag (zusammenstellen)": "Auldor: Crash (stack)",
+    "Auldor: Mitte-Phase und Sturmstreich": "Auldor: Middle Phase and Tempest Strike",
+    "Konter": "Counter", "Nicht angreifen!": "Don't attack!", "Konter-Explosion": "Counter Explosion",
+    "Ausweichen oder blocken": "Dodge or block", "Zeitbombe": "Time Bomb",
+    "Gift": "Poison", "Pfütze kommt: an den Rand laufen": "Puddle incoming: move to the edge",
+    "Linien": "Lines", "Seitlich raus, sonst wirst du gegriffen": "Step sideways or you get grabbed",
+    "Linien rundum": "Lines all around", "In die Lücke zwischen den Linien": "Into the gap between the lines",
+    "Sturzschlag": "Crash", "Alle zusammenstellen!": "Everyone stack!", "Gleich Sturzschlag": "Crash incoming",
+    "Gruppe zu dir holen!": "Get the group to you!", "Sprung in die Mitte": "Leap to the middle",
+    "Wirbeln ausweichen, Rand meiden": "Dodge the tornadoes, avoid the edge",
+    "Sturmstreich kommt": "Tempest Strike incoming", "Sturmstreich": "Tempest Strike",
+    "Zu zweit zusammenstellen": "Stack in pairs", "Zu zweit zusammenstellen!": "Stack in pairs!",
     "Zikel: weitere Schläge (grau, ohne Ton)": "Zikel: other strikes (grey, silent)",
     "Schlag": "Strike", "Ausweichen": "Dodge",
     "Wenig HP: heilen (alle Dungeons)": "Low HP: heal (all dungeons)", "Heilen!": "Heal!",
@@ -234,7 +275,7 @@ class WarnZentrale:
         jetzt = self.uhr()
         if skill == REGEN:
             self.regen_zuletzt = jetzt
-        ich = skill == TODESMAL and ziel is not None and ziel == self.zustand.eigene_eid
+        ich = (skill == TODESMAL or regel.auf_dir) and ziel is not None and ziel == self.zustand.eigene_eid
         name = "" if ich or ziel == self.zustand.eigene_eid else self.zustand.spieler.get(ziel, "")
         with self.lock:
             # ein echter Cast ersetzt geplante Vorhersagen derselben Gruppen

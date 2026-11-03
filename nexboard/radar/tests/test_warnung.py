@@ -123,6 +123,21 @@ class WarnungTest(unittest.TestCase):
         self.t[0] += 40
         self.assertEqual(self.z.vorschau(), [("Regen des Hasses jederzeit möglich", 0.0)])
 
+    def test_urugugu_sturzschlag_auf_mir_und_sturmstreich_geplant(self):
+        self.zustand.dungeon = "Urugugu Canyon"
+        self.z.cast(1, 1600960, 5)  # Sturzschlag auf mich
+        self.assertEqual(self.z.schnappschuss()[0].titel(), "Sturzschlag  –  DU!")
+        self.z.cast(1, 1601010, 1)  # Sprung in die Mitte: Sturmstreich in 11,6 s
+        self.t[0] += 8.6
+        self.assertIn("Sturmstreich kommt", self.titel())
+        self.z.status(5, 15044311)  # Raurs Zeitbombe auf mir
+        self.assertIn("Zeitbombe", self.titel())
+
+    def test_urugugu_warnung_nicht_im_feuertempel(self):
+        self.zustand.dungeon = "Feuertempel"
+        self.z.cast(1, 1504450, 1)
+        self.assertEqual(self.titel(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
