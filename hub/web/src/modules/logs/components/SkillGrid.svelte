@@ -1,10 +1,26 @@
 <!-- Skills wie im Spiel: Symbol mit Stufe, Schloss für nicht gelernte, „E“ für angelegte Stigmen,
-     Name darunter. Angelegt, aber nicht gelernt: gestrichelt rot. -->
+     Name darunter. Angelegt, aber nicht gelernt: gestrichelt rot. Die Stufe ist die echte Stufe mit
+     Boni aus Daevanion und Ausrüstung (skillLevels.ts), farbig, wenn Boni dabei sind. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData } from '../api.ts';
+	import { skillBonuses } from '../skillLevels.ts';
 
-	let { skills }: { skills: CharacterData['skills'] } = $props();
+	let { data }: { data: CharacterData } = $props();
+	const skills = $derived(data.skills);
+	const bonuses = $derived(skillBonuses(data));
+
+	type Skill = CharacterData['skills'][number];
+	// Stigmen (Dp) bekommen keine Boni
+	const bonusOf = (s: Skill) => (s.category === 'Dp' ? undefined : bonuses.get(s.name));
+	const total = (s: Skill) => s.level + (bonusOf(s)?.daevanion ?? 0) + (bonusOf(s)?.items ?? 0);
+	function title(s: Skill): string {
+		const b = bonusOf(s);
+		const parts = [t('logs.char.level', { n: total(s) })];
+		if (b) parts.push(t('logs.char.levelParts', { base: s.level, daevanion: b.daevanion, items: b.items }));
+		if (s.equipped && !s.learned) parts.push(t('logs.char.notLearned'));
+		return `${s.name} · ${parts.join(' – ')}`;
+	}
 
 	const groups = $derived([
 		{ key: 'active', label: t('logs.char.active'), skills: skills.filter((s) => s.category === 'Active') },
@@ -22,7 +38,7 @@
 				<li
 					class:locked
 					class:missing={s.equipped && !s.learned}
-					title="{s.name} · {t('logs.char.level', { n: s.level })}{s.equipped && !s.learned ? ` – ${t('logs.char.notLearned')}` : ''}"
+					title={title(s)}
 				>
 					<span class="icon">
 						{#if s.icon}<img src={s.icon} alt="" width="52" height="52" loading="lazy" referrerpolicy="no-referrer" />{/if}
@@ -31,7 +47,7 @@
 								<svg viewBox="0 0 24 24" width="18" height="18"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5z" /></svg>
 							</span>
 						{:else}
-							<span class="level num">{s.level}</span>
+							<span class="level num" class:boosted={!!bonusOf(s)}>{total(s)}</span>
 						{/if}
 						{#if g.key === 'stigma' && s.equipped && s.learned}<span class="equip">E</span>{/if}
 					</span>
@@ -111,6 +127,9 @@
 		font-size: 11px;
 		font-weight: 700;
 		text-align: center;
+	}
+	.level.boosted {
+		color: var(--accent);
 	}
 	.equip {
 		position: absolute;

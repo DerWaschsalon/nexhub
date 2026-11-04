@@ -191,7 +191,7 @@
 
 <section class="glass pad">
 	<h3>{t('logs.char.skills')}</h3>
-	<SkillGrid skills={data.skills} />
+	<SkillGrid {data} />
 </section>
 
 <section class="glass pad">

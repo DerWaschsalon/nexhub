@@ -86,10 +86,11 @@ def combat_power(data: dict) -> int | None:
 
 
 def _stats(rows: object, *fields: str) -> list[dict]:
-    """Werte eines Gegenstands: [{name, value, …}] ohne leere Zeilen."""
+    """Werte eines Gegenstands: [{id, name, value, …}] ohne leere Zeilen. Die Kennung (z. B. „Critical“)
+    ist in jeder Sprache gleich; ratgeber.py erkennt daran verschenkte Werte."""
     if not isinstance(rows, list):
         return []
-    return [{"name": r.get("name"), "value": r.get("value"), **{f: r.get(f) for f in fields}}
+    return [{"id": r.get("id"), "name": r.get("name"), "value": r.get("value"), **{f: r.get(f) for f in fields}}
             for r in rows if isinstance(r, dict) and r.get("name")]
 
 
@@ -121,6 +122,7 @@ def _item_detail(d: dict) -> dict:
     Zusatzwerte, Manasteine, Gottsteine, verstärkte Skills und bei Arkana das Set."""
     detail = {
         "level": d.get("level"), "category": d.get("categoryName"), "max_enchant": d.get("maxEnchantLevel"),
+        "stone_slots": d.get("magicStoneSlotCount"),
         "main": _stats(d.get("mainStats"), "extra"),
         "sub": _stats(d.get("subStats")),
         "stones": _stats(d.get("magicStoneStat"), "grade", "icon"),
