@@ -1,8 +1,9 @@
-"""Boss-Warnungen fuer den Feuertempel: reagiert auf den Cast-Beginn (0x3802).
+"""Boss-Warnungen: reagiert auf den Cast-Beginn (0x3802), Status-Effekte (0x382A), Treffer (0x3804)
+und die Stagger-Leiste (0xE005).
 
-Alle Zeiten stammen aus der Auswertung von rund 20 Kaempfen (2026-10-23).
-Skill-Namen aus den A2Tools-Daten, Ausweich-Hinweise aus dem Guide
-"Fire Temple Guide Aion 2 Global" (NoBS Game Guides).
+Feuertempel: alle Zeiten aus der Auswertung von rund 20 Kaempfen (2026-10-23), Skill-Namen aus den
+A2Tools-Daten, Ausweich-Hinweise aus dem Guide "Fire Temple Guide Aion 2 Global" (NoBS Game Guides).
+Die uebrigen Dungeons kommen aus mechaniken.json (IDs nach glass-cannon, MIT).
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from .daten import a2_namen, npc_name
 from .konfig import abspielen, konfig_laden
+from .zustand import MECHANIKEN
 
 ALARM = Path.home() / ".cache" / "aion2-radar" / "alarm.wav"
 ANSAGEN = Path.home() / ".cache" / "aion2-radar" / "ansagen"   # fertig gesprochene Saetze
@@ -45,6 +47,8 @@ class Regel:
     gruppe: str                      # neue Warnung ersetzt aeltere derselben Gruppe
     danach: tuple["Regel", ...] = ()  # gleichzeitig ausgeloeste Vorhersagen
     plan: tuple[tuple[float, "Regel"], ...] = ()  # (Sekunden spaeter, Regel)
+    auf: str = "du"                  # Status-Effekt zaehlt auf: du, mitspieler, spieler, boss
+    hinweis_ich: str = "Weg von der Gruppe!"  # Hinweis, wenn es dich trifft
 
 
 GRUEN = (0, 230, 118)
@@ -94,6 +98,36 @@ STATUS_REGELN: dict[int, Regel] = {
 }
 # Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
 GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
+# Gruppenmitglied unter 25 % LP; erst wieder melden, wenn es ueber 50 % war
+GRUPPE_LP = Regel("Wenig LP", "Unter 25 %", 3.0, ROT, "gruppe_lp")
+LP_KNAPP, LP_WIEDER = 0.25, 0.5
+TREFFER_REGELN: dict[int, Regel] = {}  # Skill, der dich trifft (Pfuetzen, Zonen) -> Regel
+STAGGER_REGELN: dict[int, Regel] = {}  # Boss-NPC mit Stagger-Pruefung -> „Jetzt staggern“
+FARBEN = {"GRUEN": GRUEN, "LILA": LILA, "ORANGE": ORANGE, "GELB": GELB, "BLAU": BLAU, "ROT": ROT}
+
+
+def mechanik_regel(m: dict) -> Regel:
+    """Eine Regel aus mechaniken.json. „danach“ wird als geplante Folge-Warnung derselben Gruppe
+    eingehaengt und ersetzt die erste, wenn sie abgelaufen ist."""
+    farbe = FARBEN[m["farbe"]]
+    plan = ()
+    if m.get("danach"):
+        folge = Regel(m["titel"], m["danach"]["hinweis"], m["danach"]["sekunden"], farbe, m["gruppe"])
+        plan = ((m["sekunden"], folge),)
+    return Regel(m["titel"], m["hinweis"], m["sekunden"], farbe, m["gruppe"], plan=plan,
+                 auf=m["wann"].get("auf", "du"), hinweis_ich=m.get("hinweis_ich", "Weg von der Gruppe!"))
+
+
+for _m in MECHANIKEN:
+    _regel, _wann = mechanik_regel(_m), _m["wann"]
+    if _wann["art"] == "cast":
+        REGELN.update({skill: _regel for skill in _wann["skills"]})
+    elif _wann["art"] == "effekt":
+        STATUS_REGELN[_wann["id"]] = _regel
+    elif _wann["art"] == "treffer":
+        TREFFER_REGELN.update({skill: _regel for skill in _wann["skills"]})
+    elif _wann["art"] == "stagger":
+        STAGGER_REGELN.update({npc: _regel for npc in _m["bosse"]})
 
 # Meldungen je Dungeon: Dungeon -> {Gruppe: Name}, steht in meldungen.json (liest auch die
 # NexBoard-Seite). Ohne Eintraege = noch keine Warnungen ("fehlt").
@@ -144,7 +178,13 @@ ENGLISCH = {
     "Drei Treffer, alle 2 s ausweichen": "Three hits, dodge every 2 s",
     "Hinter sie gehen": "Get behind her",
     "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
+    "Wenig LP": "Low HP", "Unter 25 %": "Below 25 %", "Berserker": "Berserk",
+    "Mitspieler mit wenig LP (alle Dungeons)": "Party member with low HP (all dungeons)",
 }
+for _m in MECHANIKEN:  # englische Texte der Mechaniken stehen in mechaniken.json
+    ENGLISCH.update(_m["en"])
+# Lernhilfe (jeden Boss-Cast grau zeigen) gilt in Dungeons, fuer die es noch keine Cast-Warnungen gibt
+CAST_GRUPPEN = {r.gruppe for r in REGELN.values()}
 
 
 def tr(text: str) -> str:
@@ -182,11 +222,12 @@ class WarnZentrale:
         self.laut: list[tuple[str, str]] = []  # (art, text): Piepton oder Ansage, spielt der RadarDienst ab
         self.k = konfig_laden()
         self.an = self.k["warn_an"]
+        self._knapp: set[int] = set()  # Mitspieler, die schon als „wenig LP“ gemeldet sind
 
     def cast(self, caster: int, skill: int, ziel: int | None) -> None:
         regel = REGELN.get(skill)
         dungeon = self.zustand.dungeon
-        if not regel and dungeon and not DUNGEONS[dungeon] and caster in self.zustand.bosse:
+        if not regel and dungeon and not CAST_GRUPPEN & set(DUNGEONS[dungeon]) and caster in self.zustand.bosse:
             regel = cast_regel(skill, self.zustand.bosse[caster])  # Lernhilfe: jeden Boss-Cast zeigen
         if not regel or not self.an:
             return
@@ -198,24 +239,64 @@ class WarnZentrale:
         ich = skill == TODESMAL and ziel is not None and ziel == self.zustand.eigene_eid
         name = "" if ich else self.zustand.spieler.get(ziel, "")
         with self.lock:
-            # ein echter Cast ersetzt geplante Vorhersagen derselben Gruppen
-            gruppen = {r.gruppe for r in (regel, *regel.danach)}
-            self.geplant = [(t, r) for t, r in self.geplant if r.gruppe not in gruppen]
-            self.geplant += [(jetzt + nach, r) for nach, r in regel.plan]
-            self._hinzufuegen(regel, jetzt, ich, name)
-            for r in regel.danach:
-                self._hinzufuegen(r, jetzt)
+            self._ausloesen(regel, jetzt, ich, name)
+
+    def _ausloesen(self, regel: Regel, jetzt: float, ich: bool = False, name: str = "") -> None:
+        """Warnung zeigen, ihre gleichzeitigen Vorhersagen dazu und die geplanten Folgen einreihen.
+        Ein neuer Ausloeser ersetzt geplante Vorhersagen derselben Gruppen. Aufruf unter self.lock."""
+        gruppen = {r.gruppe for r in (regel, *regel.danach)}
+        self.geplant = [(t, r) for t, r in self.geplant if r.gruppe not in gruppen]
+        self.geplant += [(jetzt + nach, r) for nach, r in regel.plan]
+        self._hinzufuegen(regel, jetzt, ich, name)
+        for r in regel.danach:
+            self._hinzufuegen(r, jetzt)
 
     def status(self, ziel: int, sid: int) -> None:
-        """Status-Effekt: nur, wenn er den eigenen Charakter trifft."""
-        if self.an and ziel == self.zustand.eigene_eid:
+        """Status-Effekt auf dir, einem Mitspieler, irgendeinem Spieler oder dem Boss (Regel.auf)."""
+        regel = STATUS_REGELN[sid]
+        ich = ziel == self.zustand.eigene_eid
+        spieler = ziel in self.zustand.spieler and not ich
+        passt = {"du": ich, "mitspieler": spieler, "spieler": ich or spieler,
+                 "boss": ziel in self.zustand.bosse}[regel.auf]
+        if self.an and passt:
+            name = self.zustand.spieler.get(ziel, "") if spieler else ""
             with self.lock:
-                self._hinzufuegen(STATUS_REGELN[sid], self.uhr(), ich=True)
+                self._ausloesen(regel, self.uhr(), ich and regel.auf != "boss", name)
+
+    def treffer(self, skill: int) -> None:
+        """Ein Skill vom Boden trifft dich (Pfuetze, Zone): raus da. Pfuetzen treffen mehrmals pro
+        Sekunde; solange die Warnung laeuft, zaehlt das als derselbe Treffer (keine Ansage im Sekundentakt)."""
+        regel, jetzt = TREFFER_REGELN[skill], self.uhr()
+        if not self.an:
+            return
+        with self.lock:
+            if not any(w.regel == regel and w.rest(jetzt) > 0 for w in self.aktiv):
+                self._ausloesen(regel, jetzt)
+
+    def staggern(self, boss: int) -> None:
+        """Die Stagger-Leiste eines Bosses mit Stagger-Pruefung ist brechbar geworden."""
+        regel = STAGGER_REGELN.get(self.zustand.bosse.get(boss, 0))
+        if self.an and regel:
+            with self.lock:
+                self._ausloesen(regel, self.uhr())
 
     def groggy(self, boss: int) -> None:
         if self.an:
             with self.lock:
+                # gebrochen: „Jetzt staggern“ ist erledigt
+                self.aktiv = [w for w in self.aktiv if w.regel not in STAGGER_REGELN.values()]
                 self._hinzufuegen(GROGGY, self.uhr())
+
+    def gruppe_lp(self, eid: int, anteil: float) -> None:
+        """Mitspieler unter 25 % LP einmal melden, erst nach Erholung ueber 50 % wieder."""
+        if anteil > LP_WIEDER:
+            self._knapp.discard(eid)
+            return
+        if not self.an or anteil >= LP_KNAPP or eid in self._knapp:
+            return
+        self._knapp.add(eid)
+        with self.lock:
+            self._hinzufuegen(GRUPPE_LP, self.uhr(), ziel=self.zustand.spieler.get(eid, ""))
 
     def _hinzufuegen(self, regel: Regel, start: float, ich: bool = False, ziel: str = "") -> None:
         if regel.gruppe in self.k["meldung_aus"]:
@@ -256,6 +337,9 @@ class WarnZentrale:
                 liste.append(("Regen des Hasses jederzeit möglich", 0.0))
             else:
                 self.regen_zuletzt = None  # Kampf vermutlich vorbei
+        for ende in list(self.zustand.berserker.values()):  # 0x8D21: Boss wird berserk
+            if ende > jetzt:
+                liste.append(("Berserker", ende - jetzt))
         return sorted(liste, key=lambda x: x[1])
 
 

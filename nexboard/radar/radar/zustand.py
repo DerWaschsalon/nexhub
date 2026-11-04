@@ -51,6 +51,13 @@ OP_STAGGER = 0xE005   # Stagger-Leiste: Entity, 03 01, Max u32, Wert u32, Status
 # Kommt nach dem Brechen keine neue Leiste, gilt der Boss nach so vielen Sekunden wieder als nicht groggy
 GROGGY_MAX_S = 8.0
 OP_DUNGEON = 0x6100   # Dungeon-Lauf: Dungeon u32, Status (2 laeuft, 3 geschafft), Start u64 ms, Ende u64 ms (geprueft)
+OP_TREFFER = 0x3804   # Treffer: Ziel, Flags u16, Angreifer, Skill u32, ... (Aufbau aus glass-cannon, MIT)
+OP_KAMPF = 0x8D21     # Kampf an/aus: Entity, Flags u8, Zustand u8, bei Flag 1 Berserker-Zeit u64 ms (glass-cannon)
+OP_GRUPPE_LP = 0x921B # LP eines Gruppenmitglieds: Entity, LP, max. LP (Varints, glass-cannon)
+OP_GEOEFFNET = 0x363A # Objekt fertig geoeffnet; beim Cube steht am Ende der verbrauchte Schluessel
+CUBE_SCHLUESSEL = 630900003  # Item, das beim Oeffnen eines Cubes verbraucht wird (aion2-cube-radar, AsseylumVA)
+STAGGER_BEREIT = 0x02  # Bit im letzten Byte der Stagger-Leiste: jetzt brechbar
+STAGGER_SPAET_S = 5.0  # erscheint die Leiste so lange nach dem Boss, ist es eine Stagger-Pruefung
 OP_EFFEKT = 0x382A    # Status auf einer Entity (Ziel, 2 Byte, Zaehler, Status-ID u32, Dauer u32 ms, ...)
                       # mit Position am Ende. Mit eigener ID die einzige
                       # Positionsquelle, im Kampf aber oft die Position des Effekts (unsicher)
@@ -67,6 +74,12 @@ BOSSE: dict[int, str] = {int(k): v for k, v in
                          json.loads((Path(__file__).parent / "bosse.json").read_text()).items()}
 ZONEN: dict[int, str] = {int(k): v for k, v in
                          json.loads((Path(__file__).parent / "zonen.json").read_text()).items()}
+# Boss-Mechaniken (mechaniken.json). Bosse, die A2Tools nicht als Boss fuehrt, kommen von dort dazu
+MECHANIKEN: list[dict] = json.loads((Path(__file__).parent / "mechaniken.json").read_text())["mechaniken"]
+for _m in MECHANIKEN:
+    for _npc in _m["bosse"]:
+        BOSSE.setdefault(_npc, _m["dungeon"])
+STAGGER_BOSSE = {npc for m in MECHANIKEN if m["wann"]["art"] == "stagger" for npc in m["bosse"]}
 
 
 def gueltig(*werte: float) -> bool:
@@ -104,6 +117,10 @@ class RadarZustand:
         self.spieler: dict[int, str] = {}     # Entity -> Name, fuer "Todesmal auf ..."
         self.bosse: dict[int, int] = {}       # Entity -> Boss-NPC-ID
         self.groggy_seit: dict[int, float] = {}  # Boss-Entity -> Zeit, seit die Stagger-Leiste gebrochen ist
+        self.boss_seit: dict[int, float] = {}    # Boss-Entity -> Zeit, seit er erschienen ist
+        self.leiste_bereit: dict[int, bool] = {}  # Boss-Entity -> war die Leiste zuletzt brechbar
+        self.berserker: dict[int, float] = {}    # Boss-Entity -> Berserker-Zeit (Sekunden seit 1970)
+        self.schluessel = 0  # verbrauchte Cube-Schluessel seit dem Start
         self.zone: int | None = None
         # live gespeichert, damit Timer und Seelen einen Neustart ueberleben (nicht beim Abspielen alter Mitschnitte)
         self.speichern = speichern
@@ -116,19 +133,51 @@ class RadarZustand:
         self.bei_cast: list[Callable[[int, int, int | None], None]] = []
         self.bei_status: list[Callable[[int, int], None]] = []  # (Ziel, Status-ID), nur IDs aus status_ids
         self.bei_groggy: list[Callable[[int], None]] = []       # Boss-Entity, deren Stagger-Leiste bricht
+        self.bei_staggern: list[Callable[[int], None]] = []     # Boss-Entity, deren Leiste brechbar wird
+        self.bei_treffer: list[Callable[[int], None]] = []      # Skill, der dich trifft, nur IDs aus treffer_ids
+        self.bei_gruppe_lp: list[Callable[[int, float], None]] = []  # (Entity, LP-Anteil 0-1)
         self.status_ids: set[int] = set()
+        self.treffer_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)
         self.pvp = PvpSitzung(self)
 
-    def _stagger(self, boss: int, gebrochen: bool) -> None:
-        """Gebrochene Leiste: Boss ist groggy. Jede andere Leisten-Nachricht heißt, die Leiste
-        läuft wieder, also ist es vorbei."""
-        if not gebrochen:
-            self.groggy_seit.pop(boss, None)
+    def _stagger(self, boss: int, p: bytes, n: int) -> None:
+        """Gebrochene Leiste (Flags 0): Boss ist groggy. Jede andere Leisten-Nachricht heißt, die
+        Leiste läuft wieder, also ist es vorbei. Bei Bossen mit Stagger-Prüfung zusätzlich melden,
+        wenn die Leiste brechbar wird."""
+        if p[n] == 0:
+            self.groggy_seit[boss] = time.time()
+            self.leiste_bereit[boss] = False
+            for f in self.bei_groggy:
+                f(boss)
             return
-        self.groggy_seit[boss] = time.time()
-        for f in self.bei_groggy:
-            f(boss)
+        self.groggy_seit.pop(boss, None)
+        if self.bosse[boss] in STAGGER_BOSSE:
+            self._stagger_pruefung(boss, p, n)
+
+    def _stagger_pruefung(self, boss: int, p: bytes, n: int) -> None:
+        """Brechbar nach einer Pause oder eine Leiste, die erst spaeter im Kampf erscheint = Pruefung.
+        Eine Leiste, die von Anfang an brechbar ist, gehoert zum Boss selbst (glass-cannon: Lakshmi)."""
+        flags = p[n]
+        ende = n + 2 + 4 * bool(flags & 1) + 4 * bool(flags & 2)  # Flags, Zustand, Max und Wert, falls da
+        if flags & ~3 or len(p) <= ende:
+            return  # Aufbau unbekannt: lieber nichts melden
+        bereit = bool(p[ende] & STAGGER_BEREIT)
+        vorher = self.leiste_bereit.get(boss)
+        self.leiste_bereit[boss] = bereit
+        spaet = time.time() - self.boss_seit.get(boss, time.time()) >= STAGGER_SPAET_S
+        if bereit and (vorher is False or (vorher is None and spaet)):
+            for f in self.bei_staggern:
+                f(boss)
+
+    def _kampf(self, eid: int, p: bytes, n: int) -> None:
+        """Berserker-Zeit eines Bosses merken; Kampf vorbei (Zustand 0) = weg."""
+        if eid not in self.bosse:
+            return
+        if p[n + 1] == 0:
+            self.berserker.pop(eid, None)
+        elif p[n] & 1:
+            self.berserker[eid] = struct.unpack_from("<Q", p, n + 2)[0] / 1000
 
     def boss_groggy(self, jetzt: float | None = None) -> bool:
         """Ist gerade ein Boss groggy? Für Makros, unabhängig davon, ob die Warnung angezeigt wird."""
@@ -163,6 +212,7 @@ class RadarZustand:
                 npc = struct.unpack_from("<I", p, n + 3)[0]
                 if npc in BOSSE:
                     self.dungeon, self.bosse[eid] = BOSSE[npc], npc
+                    self.boss_seit[eid] = time.time()
                 elif npc in daten.feldboss_npcs():
                     self._feldboss_name(npc, struct.unpack_from("<fff", p, n + 9))
             elif op == OP_GRUPPE:
@@ -188,7 +238,23 @@ class RadarZustand:
                 spieler = uvarint(p, n)[0]
                 self.cubes[eid].oeffner = self.spieler.get(spieler, "?")
             elif op == OP_STAGGER and eid in self.bosse:
-                self._stagger(eid, gebrochen=p[n] == 0)
+                self._stagger(eid, p, n)
+            elif op == OP_TREFFER and eid == self.eigene_eid and self.bei_treffer:
+                angreifer_laenge = uvarint(p, n + 2)[1]  # nach den 2 Flag-Bytes
+                skill = struct.unpack_from("<I", p, n + 2 + angreifer_laenge)[0]
+                if skill in self.treffer_ids:
+                    for f in self.bei_treffer:
+                        f(skill)
+            elif op == OP_KAMPF:
+                self._kampf(eid, p, n)
+            elif op == OP_GRUPPE_LP and eid != self.eigene_eid:
+                lp, laenge = uvarint(p, n)
+                maximal = uvarint(p, n + laenge)[0]
+                if maximal:
+                    for f in self.bei_gruppe_lp:
+                        f(eid, lp / maximal)
+            elif op == OP_GEOEFFNET and struct.pack("<I", CUBE_SCHLUESSEL) in p[-12:]:
+                self.schluessel += 1
             elif op == OP_DUNGEON:
                 laeuft = p[4] == 2
                 self.dungeon_ende = struct.unpack_from("<Q", p, 13)[0] / 1000 if laeuft else None
