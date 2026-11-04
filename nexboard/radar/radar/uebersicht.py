@@ -3,7 +3,9 @@ Angezeigt auf der NexBoard-Seite des Radars, angesagt vom RadarDienst."""
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+
+from nexproto.termine import TERMINE, termin
+from nexproto.termine import alle as alle_termine
 
 from .daten import VERTRAUTE, npc_name
 from .konfig import konfig_laden
@@ -12,27 +14,6 @@ from .warnung import ansage, tr
 VERMUTLICH_DA = 2 * 3600  # so lange nach dem Respawn gilt ein Feldboss als "vermutlich da"
 GRUEN, ORANGE, GRAU = "ok", "warn", "leise"  # Farbklassen der NexBoard-Seite
 SEELEN = (5, 25, 75)  # Seelen fuer Stufe 1, 2 und 3 (MAX), 105 insgesamt (laut aion2pettracker, passt zum Mitschnitt)
-
-
-# Feste Termine der globalen Server (EU/NA) aus jackships/aion2-data: (Name, Bezugszeit UTC, alle Minuten,
-# offen Minuten). In UTC, damit die Zeitumstellung nichts verschiebt. Nur der Riss ist dort "confirmed".
-TERMINE = [
-    ("Riss", "2026-10-07 00:00", 180, 10),
-    ("Shugo-Fest", "2026-10-07 00:00", 60, 10),
-    ("Beritra-Luftangriff", "2026-10-07 00:30", 60, 10),
-    ("Wächterin Kaira", "2026-10-07 01:00", 180, 30),
-    ("Tages-Reset", "2026-10-07 07:00", 1440, 1),
-    ("Wochen-Reset", "2026-10-07 07:00", 10080, 1),  # Mittwoch
-]
-
-
-def termin(jetzt: float, bezug: str, alle: int, offen: int) -> tuple[float, bool]:
-    """(Beginn des naechsten oder laufenden Termins, gerade offen?)."""
-    start = datetime.fromisoformat(bezug).replace(tzinfo=timezone.utc).timestamp()
-    beginn = start + -(-(jetzt - start) // (alle * 60)) * alle * 60  # naechster Beginn ab jetzt
-    if jetzt < beginn - alle * 60 + offen * 60:
-        return beginn - alle * 60, True
-    return beginn, False
 
 
 def riss(jetzt: float) -> tuple[float, bool]:
@@ -89,11 +70,8 @@ def feldboss_ansagen(zustand, gemeldet: set) -> None:
 
 def termine(jetzt: float) -> list[dict]:
     """Feste Termine: Name, Beginn (Sekunden seit 1970), offen bis (nur wenn gerade offen)."""
-    zeilen = []
-    for name, bezug, alle, dauer in TERMINE:
-        beginn, offen = termin(jetzt, bezug, alle, dauer)
-        zeilen.append({"name": tr(name), "beginn": beginn, "offen_bis": beginn + dauer * 60 if offen else None})
-    return zeilen
+    return [{"name": tr(name), "beginn": beginn, "offen_bis": offen_bis}
+            for name, beginn, offen_bis in alle_termine(jetzt)]
 
 
 def feldbosse(plaetze: dict[str, dict], zone: int | None) -> list[dict]:

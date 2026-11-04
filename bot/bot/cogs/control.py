@@ -108,8 +108,13 @@ SECTIONS: dict[str, Section] = {s.id: s for s in [
         Field("level_no_xp_channels", "channels", "Kanäle ohne XP", "Ausnahmen"),
         Field("level_no_xp_roles", "roles", "Rollen ohne XP", "Ausnahmen"),
     )),
-    Section("aion", "AION 2", "Runs aus dem NexBoard: ein Post je Lauf mit Rangliste und Link in den NexHub.", (
+    Section("aion", "AION 2", "Runs aus dem NexBoard (ein Post je Lauf mit Rangliste und Link in den NexHub) "
+            "und die Termin-Tafel.", (
         Field("aion_channel", "channel", "Ziel-Kanal", hint="Leer schaltet die Posts ab."),
+        Field("termine_channel", "channel", "Kanal für die Termin-Tafel", "Termin-Tafel",
+              hint="Riss, Shugo-Fest, Beritra, Kaira und Resets, aktualisiert sich jede Minute. Leer schaltet sie ab."),
+        Field("termine_role", "role", "Rolle, die 5 Minuten vorher gepingt wird", "Termin-Tafel",
+              hint="Leer: nur die Tafel, kein Ping."),
     ), actions={"token": "Neuen Token erzeugen (der alte wird ungültig)"}),
 ]}
 
