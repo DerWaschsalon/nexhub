@@ -107,6 +107,7 @@ class RadarDienst:
         return {
             "position": s["position"],
             "position_alter": s["position_alter"],
+            "kurs": s["kurs"],
             "cubes": [{"x": c.x, "y": c.y, "z": c.z, "alter": time.time() - c.seit, "oeffner": c.oeffner}
                       for c in s["cubes"]],
             "gruppe": [{"name": name, "x": x, "y": y} for name, x, y, *_ in s["gruppe"]],
@@ -117,7 +118,7 @@ class RadarDienst:
             "jetzt_text": tr("JETZT"),
             "karte": self.k["karte_name"] or "",
             "punkte": len(self.punkte.punkte),  # aendert sich die Zahl, laedt die Karte die Punkte neu
-            "einstellungen": {k: self.k[k] for k in ("reichweite", "drehung", "spiegeln", "karte_folgen")},
+            "einstellungen": {k: self.k[k] for k in ("reichweite", "drehung", "spiegeln", "karte_folgen", "kurs_oben")},
             "pvp": self.zustand.pvp.stand(),
         }
 

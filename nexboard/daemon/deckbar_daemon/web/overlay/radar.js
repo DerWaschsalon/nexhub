@@ -72,11 +72,18 @@ function leinwand(el, breite, hoehe) {
 const minSek = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 /* ================================================================ Radar */
+/** Drehung des Radars: fest eingestellt, oder so, dass die Laufrichtung oben ist (radar.kurs). */
+function drehwinkel(e) {
+  if (!e.kurs_oben || !radar.kurs) return (e.drehung * Math.PI) / 180;
+  const [kx, ky] = radar.kurs;
+  return -Math.atan2(e.spiegeln ? -kx : kx, -ky);
+}
+
 /** Weltversatz (cm) → Bildschirmversatz. Norden ist Welt −y, Osten +x; dazu Drehen und Spiegeln. */
 function aufSchirm(dx, dy) {
   const e = radar.einstellungen;
   const sx = e.spiegeln ? -dx : dx;
-  const w = (e.drehung * Math.PI) / 180;
+  const w = drehwinkel(e);
   return [sx * Math.cos(w) - dy * Math.sin(w), sx * Math.sin(w) + dy * Math.cos(w)];
 }
 
