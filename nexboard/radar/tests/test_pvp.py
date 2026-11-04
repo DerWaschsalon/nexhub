@@ -106,3 +106,19 @@ class TodesursacheTest(unittest.TestCase):
     def test_ohne_laufende_warnung(self):
         self.t[0] += 30
         self.assertEqual(self.tode(tod(300))[0]["warning"], None)
+
+
+class KampfFuerMakrosTest(unittest.TestCase):
+    setUp = TodesursacheTest.setUp  # dieselbe Lage: Todesmal auf Anna
+
+    def test_laufende_warnungen_und_groggy(self):
+        from types import SimpleNamespace
+
+        from radar.dienst import RadarDienst
+        self.t[0] -= 4.0  # Todesmal auf Anna laeuft noch 4 s
+        self.zentrale.status(100, 16008401)  # Ignus-Bombe auf mir
+        dienst = SimpleNamespace(zustand=self.z, zentrale=self.zentrale)
+        k = RadarDienst.kampf(dienst)
+        self.assertFalse(k["groggy"])
+        self.assertEqual([(w["gruppe"], w["ich"]) for w in k["warnungen"]], [("flamme", False), ("bombe", True)])
+        self.assertTrue(all(w["rest"] > 0 for w in k["warnungen"]))

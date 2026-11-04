@@ -73,6 +73,16 @@ class RadarDienst:
     def aufnahme(self) -> bool:
         return bool(self.quelle.aufnahme)
 
+    def kampf(self) -> dict:
+        """Fuer eigene Makros (GET /api/radar/kampf): Boss groggy und die laufenden Warnungen mit
+        Gruppe (Schalter auf der NexBoard-Seite), Titel, ob sie dich trifft, und Restzeit. Abgeschaltete
+        Warnungen (Seite „Radar“) kommen auch hier nicht vor."""
+        jetzt = self.zentrale.uhr()
+        return {"groggy": self.zustand.boss_groggy(),
+                "warnungen": [{"gruppe": w.regel.gruppe, "titel": w.titel(), "ich": w.ich,
+                               "rest": round(w.rest(jetzt), 2)}
+                              for w in self.zentrale.schnappschuss() if w.regel.gruppe != "casts"]}
+
     def _tod(self, opfer: int, skill: int, taeter_name: str) -> None:
         """Tod merken mit Skill und der Warnung, die das Radar gerade zeigte. PvP (Taeter ist ein
         Spieler) und tote Monster zaehlen nicht."""
