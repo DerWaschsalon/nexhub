@@ -41,6 +41,7 @@ Ein Run, so wie der Daemon ihn nach dem Ende hochlädt: **eine** gzip-gepackte J
 | `names` | aufgelöste Namen der Mitspieler. Der Mitschnitt speichert fremde Namen maskiert („Mo\*\*\*n“), der Daemon kennt die vollen aus dem Live-Stream. Schlüssel wie in `runs.yaml`: `Maske|Klasse` |
 | `fights` | die Kampfdateien des Mitschnitts (`~/.local/share/deckbar/aion2/history/*.json`), **unverändert** im Format des A2Tools-Meters, 1 bis 64 Stück |
 | `hits` | **jeder einzelne Treffer** je Kampf-ID, so wie `deckbar-capture` ihn nach `hits/<id>.json` schreibt (siehe unten); fehlt für Kämpfe ohne Treffer-Datei |
+| `deaths` | Todesursachen vom Radar im Daemon (`0x8D04`): `t_ms` (ms seit 1970), `name`, `skill`, `warning` (Titel der zuletzt gezeigten Warnung oder fehlt), `lead_ms` (so lange vor dem Tod). Fehlt, wenn das Radar nicht lief. Neu: ältere Hubs lehnen das Feld ab, also erst den Hub aktualisieren |
 
 Regeln:
 - Alle Kämpfe stammen aus dem Dungeon des Runs; `hits` gehört nur zu Kämpfen aus `fights`.

@@ -15,7 +15,9 @@
   "feldboss_ansage": true,
   "karte_folgen": false,
   "bei_karte_ausblenden": true,
+  "kurs_oben": false,
   "warn_an": true,
   "name": "",
-  "karte_name": ""
+  "karte_name": "",
+  "flaeche_m": 6.0
 }

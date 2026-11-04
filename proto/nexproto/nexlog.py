@@ -8,7 +8,8 @@ Aufbau (Einzelheiten in proto/README.md):
      "you": {...},        eigener Charakter, falls bekannt
      "names": {...},      aufgelöste Namen: "Mo***n|ranger" → "Moonlin"
      "fights": [...],     die Kampfdateien des Mitschnitts, unverändert im A2Tools-Format
-     "hits": {...}}       Einzeltreffer je Kampf-ID, wie deckbar-capture sie schreibt (hits/<id>.json)
+     "hits": {...},       Einzeltreffer je Kampf-ID, wie deckbar-capture sie schreibt (hits/<id>.json)
+     "deaths": [...]}     Todesursachen vom Radar (Skill, Warnung), falls es lief
 
 Gepackt mit gzip. Die Kampfdateien bleiben roh, damit der Hub später mehr auswerten kann, ohne
 dass sich das Format ändert. Von ihnen prüft das Modell nur die Felder, die der Hub sicher braucht;
@@ -113,6 +114,17 @@ class FightHits(_Strict):
         return self
 
 
+class Death(_Strict):
+    """Ein Tod, wie das Radar ihn sieht (0x8D04): wer, durch welchen Skill und welche Warnung lief.
+    Der Hub ordnet ihn über Name und Zeit dem Tod in der Kampfdatei zu."""
+
+    t_ms: int  # ms seit 1970
+    name: str = Field(max_length=64)
+    skill: int
+    warning: str | None = Field(None, max_length=120)  # Titel der zuletzt gezeigten Warnung
+    lead_ms: int | None = Field(None, ge=0)  # so lange vor dem Tod erschien sie
+
+
 class NexLog(_Strict):
     format: Literal["nexlog"] = FORMAT
     version: Literal[1] = VERSION
@@ -123,6 +135,8 @@ class NexLog(_Strict):
     fights: list[A2Fight] = Field(min_length=1, max_length=MAX_FIGHTS)
     # Kampf-ID → Treffer; fehlt für Kämpfe ohne Treffer-Datei (Mitschnitt ohne Treffer-Haken)
     hits: dict[str, FightHits] = Field(default_factory=dict, max_length=MAX_FIGHTS)
+    # Neu: ältere Hubs kennen das Feld nicht und lehnen es ab, deshalb erst den Hub aktualisieren
+    deaths: list[Death] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode="after")
     def _consistent(self) -> NexLog:

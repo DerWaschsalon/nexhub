@@ -1,0 +1,976 @@
+{
+ "_quelle": "Boss-Mechaniken nach xinjalin/glass-cannon, gamedata/boss-mechanics.json (MIT, Copyright (c) 2026 Xinjalin, Stand 2026-11-01). Übernommen sind die IDs und Zeiten, die Texte sind eigene. Dort steht: die IDs stammen als Hinweise aus GT Companion und sind nur zum Teil in Mitschnitten bestätigt. Eigene Bestätigung: Raur 15044501 und Urahum 16051103 (Urugugu-Mitschnitt). Dazu aus eigenen Guides (Urugugu: Video Madsin + Mitschnitt 2026-11-03; Grimmhorn: Video „Every Killer Mechanic“, IDs aus den A2Tools-Daten). Dort, wo der Guide keine Zeit nennt, ist sie geschätzt.",
+ "_felder": "wann.art: effekt (Status auf du, mitspieler, spieler oder boss), cast (Boss beginnt einen Skill), treffer (ein Skill trifft dich, z. B. eine Pfütze), stagger (Leiste des Bosses wird brechbar). sekunden: so lange zeigen bzw. bis zum Einschlag. danach: Hinweis, wenn es vorbei ist. en: englische Texte. Gruppe = Schalter auf der NexBoard-Seite (meldungen.json).",
+ "mechaniken": [
+  {
+   "gruppe": "raur_konter",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300206,
+    2310206,
+    2320206
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 15044501,
+    "auf": "boss"
+   },
+   "titel": "Konter-Haltung",
+   "hinweis": "Nicht angreifen, zurückgehen",
+   "sekunden": 4.85,
+   "farbe": "ROT",
+   "danach": {
+    "hinweis": "Abstand halten",
+    "sekunden": 3
+   },
+   "meldung": "Raur: Konter-Haltung",
+   "en": {
+    "Konter-Haltung": "Counter stance",
+    "Nicht angreifen, zurückgehen": "Stop attacking, back off",
+    "Abstand halten": "Stay back",
+    "Raur: Konter-Haltung": "Raur: Counter stance"
+   }
+  },
+  {
+   "gruppe": "auldor_sturm",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300218,
+    2310218,
+    2320218
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16010302,
+    "auf": "spieler"
+   },
+   "titel": "Sturmstreich",
+   "hinweis": "Zusammenstellen",
+   "sekunden": 10.75,
+   "farbe": "ORANGE",
+   "hinweis_ich": "Zusammenstellen",
+   "meldung": "Auldor: Sturmstreich",
+   "en": {
+    "Sturmstreich": "Tempest Strike",
+    "Zusammenstellen": "Stack together",
+    "Auldor: Sturmstreich": "Auldor: Tempest Strike"
+   }
+  },
+  {
+   "gruppe": "urahum_gift",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300207,
+    2310207,
+    2320207
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16051103,
+    "auf": "du"
+   },
+   "titel": "Gift",
+   "hinweis": "Von der Gruppe wegtragen",
+   "sekunden": 5,
+   "farbe": "GRUEN",
+   "hinweis_ich": "Von der Gruppe wegtragen",
+   "danach": {
+    "hinweis": "Raus aus dem Gift",
+    "sekunden": 2.5
+   },
+   "meldung": "Urahum: Gift (auf dir)",
+   "en": {
+    "Gift": "Poison",
+    "Von der Gruppe wegtragen": "Take it away from the party",
+    "Raus aus dem Gift": "Out of the poison",
+    "Urahum: Gift (auf dir)": "Urahum: Poison (on you)"
+   }
+  },
+  {
+   "gruppe": "urahum_pfuetze",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300207,
+    2310207,
+    2320207
+   ],
+   "wann": {
+    "art": "treffer",
+    "skills": [
+     1605144
+    ]
+   },
+   "titel": "Giftpfütze",
+   "hinweis": "Raus aus der Pfütze",
+   "sekunden": 1.5,
+   "farbe": "ROT",
+   "meldung": "Urahum: Giftpfütze",
+   "en": {
+    "Giftpfütze": "Poison pool",
+    "Raus aus der Pfütze": "Move out",
+    "Urahum: Giftpfütze": "Urahum: Poison pool"
+   }
+  },
+  {
+   "gruppe": "tiere_blume",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300810,
+    2310810,
+    2320810
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1604500
+    ]
+   },
+   "titel": "Rafflesia",
+   "hinweis": "Die Rafflesia töten",
+   "sekunden": 9,
+   "farbe": "ORANGE",
+   "meldung": "Tiere: Rafflesia",
+   "en": {
+    "Rafflesia": "Rafflesia",
+    "Die Rafflesia töten": "Kill the Rafflesia",
+    "Tiere: Rafflesia": "Tiere: Rafflesia"
+   }
+  },
+  {
+   "gruppe": "tiere_rotation",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300810,
+    2310810,
+    2320810
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1604532
+    ]
+   },
+   "titel": "Rotation",
+   "hinweis": "Zusammen nach links laufen",
+   "sekunden": 10,
+   "farbe": "BLAU",
+   "meldung": "Tiere: Rotation",
+   "en": {
+    "Rotation": "Rotation",
+    "Zusammen nach links laufen": "Stack, move left together",
+    "Tiere: Rotation": "Tiere: Rotation"
+   }
+  },
+  {
+   "gruppe": "tiere_gift",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300810,
+    2310810,
+    2320810
+   ],
+   "wann": {
+    "art": "treffer",
+    "skills": [
+     1604511,
+     1604531
+    ]
+   },
+   "titel": "Giftfläche",
+   "hinweis": "Raus aus der Fläche",
+   "sekunden": 1.5,
+   "farbe": "ROT",
+   "meldung": "Tiere: Giftfläche",
+   "en": {
+    "Giftfläche": "Poison",
+    "Raus aus der Fläche": "Move out",
+    "Tiere: Giftfläche": "Tiere: Poison"
+   }
+  },
+  {
+   "gruppe": "thamon_physisch",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300811,
+    2310811,
+    2320811
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16046601,
+    "auf": "boss"
+   },
+   "titel": "Physischer Schild",
+   "hinweis": "Keine physischen Angriffe",
+   "sekunden": 11,
+   "farbe": "ROT",
+   "meldung": "Thamon: Physischer Schild",
+   "en": {
+    "Physischer Schild": "Physical shield",
+    "Keine physischen Angriffe": "Stop physical attacks",
+    "Thamon: Physischer Schild": "Thamon: Physical shield"
+   }
+  },
+  {
+   "gruppe": "thamon_magisch",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300811,
+    2310811,
+    2320811
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16046701,
+    "auf": "boss"
+   },
+   "titel": "Magischer Schild",
+   "hinweis": "Keine magischen Angriffe",
+   "sekunden": 11,
+   "farbe": "BLAU",
+   "meldung": "Thamon: Magischer Schild",
+   "en": {
+    "Magischer Schild": "Magic shield",
+    "Keine magischen Angriffe": "Stop magic attacks",
+    "Thamon: Magischer Schild": "Thamon: Magic shield"
+   }
+  },
+  {
+   "gruppe": "thamon_stein",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300811,
+    2310811,
+    2320811
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16047201,
+    "auf": "mitspieler"
+   },
+   "titel": "Versteinert",
+   "hinweis": "Befreien",
+   "sekunden": 7,
+   "farbe": "BLAU",
+   "meldung": "Thamon: Versteinert (Mitspieler)",
+   "en": {
+    "Versteinert": "Petrified",
+    "Befreien": "Free them",
+    "Thamon: Versteinert (Mitspieler)": "Thamon: Petrified (ally)"
+   }
+  },
+  {
+   "gruppe": "vakron_mal",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300812,
+    2310812,
+    2320812
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16043811,
+    "auf": "du"
+   },
+   "titel": "Dornenmal",
+   "hinweis": "Weg von der Gruppe",
+   "sekunden": 8,
+   "farbe": "LILA",
+   "meldung": "Vakron: Dornenmal (auf dir)",
+   "en": {
+    "Dornenmal": "Thorn mark",
+    "Weg von der Gruppe": "Move away from the party",
+    "Vakron: Dornenmal (auf dir)": "Vakron: Thorn mark (on you)"
+   }
+  },
+  {
+   "gruppe": "vakron_gefangen",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300812,
+    2310812,
+    2320812
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16043701,
+    "auf": "mitspieler"
+   },
+   "titel": "Gefangen",
+   "hinweis": "Befreien",
+   "sekunden": 5,
+   "farbe": "BLAU",
+   "meldung": "Vakron: Gefangen (Mitspieler)",
+   "en": {
+    "Gefangen": "Trapped",
+    "Befreien": "Free them",
+    "Vakron: Gefangen (Mitspieler)": "Vakron: Trapped (ally)"
+   }
+  },
+  {
+   "gruppe": "vakron_ringe",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300812,
+    2310812,
+    2320812
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1604390
+    ]
+   },
+   "titel": "Dornenringe",
+   "hinweis": "Über die Ringe springen",
+   "sekunden": 10,
+   "farbe": "ORANGE",
+   "meldung": "Vakron: Dornenringe",
+   "en": {
+    "Dornenringe": "Thorn rings",
+    "Über die Ringe springen": "Jump the rings",
+    "Vakron: Dornenringe": "Vakron: Thorn rings"
+   }
+  },
+  {
+   "gruppe": "vakron_gefaengnis",
+   "dungeon": "Vakron Sky Island",
+   "bosse": [
+    2300812,
+    2310812,
+    2320812
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1604420
+    ]
+   },
+   "titel": "Gefängnis",
+   "hinweis": "Roten Stein zerstören",
+   "sekunden": 15,
+   "farbe": "ROT",
+   "meldung": "Vakron: Gefängnis",
+   "en": {
+    "Gefängnis": "Prison",
+    "Roten Stein zerstören": "Break the red rock to get out",
+    "Vakron: Gefängnis": "Vakron: Prison"
+   }
+  },
+  {
+   "gruppe": "berk_wirbel",
+   "dungeon": "Krao Cave",
+   "bosse": [
+    2300171,
+    2310171,
+    2320171
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 18001601,
+    "auf": "boss"
+   },
+   "titel": "Wirbelwind",
+   "hinweis": "Raus aus der Nähe",
+   "sekunden": 7,
+   "farbe": "ROT",
+   "meldung": "Berk: Wirbelwind",
+   "en": {
+    "Wirbelwind": "Whirlwind",
+    "Raus aus der Nähe": "Get out",
+    "Berk: Wirbelwind": "Berk: Whirlwind"
+   }
+  },
+  {
+   "gruppe": "berk_welle",
+   "dungeon": "Krao Cave",
+   "bosse": [
+    2300171,
+    2310171,
+    2320171
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1800150
+    ]
+   },
+   "titel": "Welle",
+   "hinweis": "Hinter einen Felsen",
+   "sekunden": 10,
+   "farbe": "ORANGE",
+   "meldung": "Berk: Welle",
+   "en": {
+    "Welle": "Wave",
+    "Hinter einen Felsen": "Hide behind a rock",
+    "Berk: Welle": "Berk: Wave"
+   }
+  },
+  {
+   "gruppe": "berk_stagger",
+   "dungeon": "Krao Cave",
+   "bosse": [
+    2300171,
+    2310171,
+    2320171
+   ],
+   "wann": {
+    "art": "stagger"
+   },
+   "titel": "Jetzt staggern",
+   "hinweis": "Leiste brechen",
+   "sekunden": 25,
+   "farbe": "GELB",
+   "meldung": "Berk: Jetzt staggern",
+   "en": {
+    "Jetzt staggern": "Stagger now",
+    "Leiste brechen": "Break the gauge",
+    "Berk: Jetzt staggern": "Berk: Stagger now"
+   }
+  },
+  {
+   "gruppe": "lakshmi_reflexion",
+   "dungeon": "Draupnir",
+   "bosse": [
+    2300401,
+    2310401,
+    2320401
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16059101,
+    "auf": "boss"
+   },
+   "titel": "Reflexion",
+   "hinweis": "Nicht angreifen",
+   "sekunden": 9,
+   "farbe": "ROT",
+   "meldung": "Lakshmi: Reflexion",
+   "en": {
+    "Reflexion": "Reflect",
+    "Nicht angreifen": "Stop attacking",
+    "Lakshmi: Reflexion": "Lakshmi: Reflect"
+   }
+  },
+  {
+   "gruppe": "bakarma_stagger",
+   "dungeon": "Draupnir",
+   "bosse": [
+    2300471,
+    2310471,
+    2320471
+   ],
+   "wann": {
+    "art": "stagger"
+   },
+   "titel": "Jetzt staggern",
+   "hinweis": "Leiste brechen",
+   "sekunden": 25,
+   "farbe": "GELB",
+   "meldung": "Bakarma: Jetzt staggern",
+   "en": {
+    "Bakarma: Jetzt staggern": "Bakarma: Stagger now"
+   }
+  },
+  {
+   "gruppe": "ignus_zone",
+   "dungeon": "Feuertempel",
+   "bosse": [
+    2300311,
+    2310311,
+    2320311
+   ],
+   "wann": {
+    "art": "treffer",
+    "skills": [
+     1600865
+    ]
+   },
+   "titel": "Flammenzone",
+   "hinweis": "Raus aus dem Feuer",
+   "sekunden": 1.5,
+   "farbe": "ROT",
+   "meldung": "Ignus: Flammenzone",
+   "en": {
+    "Flammenzone": "Flame zone",
+    "Raus aus dem Feuer": "Out of the fire",
+    "Ignus: Flammenzone": "Ignus: Flame zone"
+   }
+  },
+  {
+   "gruppe": "nuakum_blutung",
+   "dungeon": "Ferocious Horn Den",
+   "bosse": [
+    2300910,
+    2310910,
+    2320910
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 18020003,
+    "auf": "du"
+   },
+   "titel": "Blutung",
+   "hinweis": "Von der Gruppe wegtragen",
+   "sekunden": 5,
+   "farbe": "GRUEN",
+   "hinweis_ich": "Von der Gruppe wegtragen",
+   "danach": {
+    "hinweis": "Raus aus der Pfütze",
+    "sekunden": 2
+   },
+   "meldung": "Nuakum: Blutung (auf dir)",
+   "en": {
+    "Blutung": "Bleed",
+    "Raus aus der Pfütze": "Out of the pool",
+    "Nuakum: Blutung (auf dir)": "Nuakum: Bleed (on you)"
+   }
+  },
+  {
+   "gruppe": "nazmun_bombe",
+   "dungeon": "Deus Research Base",
+   "bosse": [
+    2320615,
+    2340615,
+    2343615,
+    2346615
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16056701,
+    "auf": "spieler"
+   },
+   "titel": "Bombe",
+   "hinweis": "Abstand halten",
+   "sekunden": 5,
+   "farbe": "LILA",
+   "meldung": "Nazmun: Bombe",
+   "en": {
+    "Bombe": "Bomb",
+    "Abstand halten": "Keep away from them",
+    "Nazmun: Bombe": "Nazmun: Bomb"
+   }
+  },
+  {
+   "gruppe": "atiel_wurzel",
+   "dungeon": "Deus Research Base",
+   "bosse": [
+    2320601,
+    2340601,
+    2343601,
+    2346601
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 18014501,
+    "auf": "mitspieler"
+   },
+   "titel": "Festgehalten",
+   "hinweis": "Zu ihm stellen",
+   "sekunden": 6,
+   "farbe": "BLAU",
+   "meldung": "Atiel: Festgehalten (Mitspieler)",
+   "en": {
+    "Festgehalten": "Rooted",
+    "Zu ihm stellen": "Stack on them",
+    "Atiel: Festgehalten (Mitspieler)": "Atiel: Rooted (ally)"
+   }
+  },
+  {
+   "gruppe": "atiel_kette",
+   "dungeon": "Deus Research Base",
+   "bosse": [
+    2320601,
+    2340601,
+    2343601,
+    2346601
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 18014604,
+    "auf": "du"
+   },
+   "titel": "Kette",
+   "hinweis": "Weg vom Partner",
+   "sekunden": 30,
+   "farbe": "LILA",
+   "hinweis_ich": "Weg vom Partner",
+   "meldung": "Atiel: Kette (auf dir)",
+   "en": {
+    "Kette": "Chained",
+    "Weg vom Partner": "Move away from your partner",
+    "Atiel: Kette (auf dir)": "Atiel: Chained (on you)"
+   }
+  },
+  {
+   "gruppe": "atiel_kette",
+   "dungeon": "Deus Research Base",
+   "bosse": [
+    2320601,
+    2340601,
+    2343601,
+    2346601
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 18014651,
+    "auf": "du"
+   },
+   "titel": "Kette",
+   "hinweis": "Weg vom Partner",
+   "sekunden": 2.5,
+   "farbe": "LILA",
+   "hinweis_ich": "Weg vom Partner",
+   "meldung": "Atiel: Kette (auf dir)",
+   "en": {
+    "Atiel: Kette (auf dir)": "Atiel: Chained (on you)"
+   }
+  },
+  {
+   "gruppe": "atiel_stagger",
+   "dungeon": "Deus Research Base",
+   "bosse": [
+    2320601,
+    2340601,
+    2343601,
+    2346601
+   ],
+   "wann": {
+    "art": "stagger"
+   },
+   "titel": "Jetzt staggern",
+   "hinweis": "Leiste brechen",
+   "sekunden": 25,
+   "farbe": "GELB",
+   "meldung": "Atiel: Jetzt staggern",
+   "en": {
+    "Atiel: Jetzt staggern": "Atiel: Stagger now"
+   }
+  },
+  {
+   "gruppe": "ruthilis_blitz",
+   "dungeon": "Shattered Arkanis",
+   "bosse": [
+    2330708,
+    2350708,
+    2353708,
+    2356708
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 16063724,
+    "auf": "du"
+   },
+   "titel": "Blitz",
+   "hinweis": "Weg von der Gruppe",
+   "sekunden": 4,
+   "farbe": "LILA",
+   "meldung": "Ruthilis: Blitz (auf dir)",
+   "en": {
+    "Blitz": "Lightning",
+    "Ruthilis: Blitz (auf dir)": "Ruthilis: Lightning (on you)"
+   }
+  },
+  {
+   "gruppe": "talisra_gefaengnis",
+   "dungeon": "Shattered Arkanis",
+   "bosse": [
+    2330709,
+    2350709,
+    2353709,
+    2356709
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 18017805,
+    "auf": "mitspieler"
+   },
+   "titel": "Kristallgefängnis",
+   "hinweis": "Mit Kristallspeeren befreien",
+   "sekunden": 15,
+   "farbe": "BLAU",
+   "meldung": "Talisra: Kristallgefängnis (Mitspieler)",
+   "en": {
+    "Kristallgefängnis": "Crystal prison",
+    "Mit Kristallspeeren befreien": "Free them with Crystal Spears",
+    "Talisra: Kristallgefängnis (Mitspieler)": "Talisra: Crystal prison (ally)"
+   }
+  },
+  {
+   "gruppe": "raur_zeitbombe",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300206,
+    2310206,
+    2320206
+   ],
+   "wann": {
+    "art": "effekt",
+    "id": 15044311,
+    "auf": "spieler"
+   },
+   "titel": "Zeitbombe",
+   "hinweis": "Abstand halten",
+   "sekunden": 3,
+   "farbe": "LILA",
+   "hinweis_ich": "Weg von der Gruppe, Kreis folgt",
+   "meldung": "Raur: Zeitbombe",
+   "en": {
+    "Zeitbombe": "Time bomb",
+    "Weg von der Gruppe, Kreis folgt": "Away from the party, a circle follows",
+    "Raur: Zeitbombe": "Raur: Time bomb"
+   }
+  },
+  {
+   "gruppe": "raur_ansturm",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300206,
+    2310206,
+    2320206
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1504470
+    ]
+   },
+   "titel": "Ansturm",
+   "hinweis": "Aus der Linie zum Tank",
+   "sekunden": 2.5,
+   "farbe": "ORANGE",
+   "meldung": "Raur: Ansturm",
+   "en": {
+    "Ansturm": "Charge",
+    "Aus der Linie zum Tank": "Out of the line to the tank",
+    "Raur: Ansturm": "Raur: Charge"
+   }
+  },
+  {
+   "gruppe": "urahum_flaechen",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300207,
+    2310207,
+    2320207
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1605130
+    ]
+   },
+   "titel": "Drei Flächen",
+   "hinweis": "Weit weg: klein, groß, sehr groß",
+   "sekunden": 3,
+   "farbe": "ROT",
+   "meldung": "Urahum: Drei Flächen",
+   "en": {
+    "Drei Flächen": "Three AoEs",
+    "Weit weg: klein, groß, sehr groß": "Far away: small, big, huge",
+    "Urahum: Drei Flächen": "Urahum: Three AoEs"
+   }
+  },
+  {
+   "gruppe": "urahum_tankschlag",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300207,
+    2310207,
+    2320207
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1605070
+    ]
+   },
+   "titel": "Schlag auf den Tank",
+   "hinweis": "Nicht neben dem Tank stehen",
+   "sekunden": 3.7,
+   "farbe": "GELB",
+   "meldung": "Urahum: Schlag auf den Tank",
+   "en": {
+    "Schlag auf den Tank": "Tank strike",
+    "Nicht neben dem Tank stehen": "Don't stand next to the tank",
+    "Urahum: Schlag auf den Tank": "Urahum: Tank strike"
+   }
+  },
+  {
+   "gruppe": "auldor_linien",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300218,
+    2310218,
+    2320218
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1600920
+    ]
+   },
+   "titel": "Linien im Fächer",
+   "hinweis": "Zwischen die Linien",
+   "sekunden": 1.7,
+   "farbe": "ROT",
+   "meldung": "Auldor: Linien im Fächer",
+   "en": {
+    "Linien im Fächer": "Fan of lines",
+    "Zwischen die Linien": "Between the lines",
+    "Auldor: Linien im Fächer": "Auldor: Fan of lines"
+   }
+  },
+  {
+   "gruppe": "auldor_sturz",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300218,
+    2310218,
+    2320218
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1600960
+    ],
+    "auf_dir": true
+   },
+   "titel": "Sturzschlag",
+   "hinweis": "Tödlich! Im Hard Mode alle zusammen",
+   "sekunden": 1.7,
+   "farbe": "LILA",
+   "meldung": "Auldor: Sturzschlag",
+   "en": {
+    "Sturzschlag": "Plunge",
+    "Tödlich! Im Hard Mode alle zusammen": "Deadly! In hard mode stack together",
+    "Auldor: Sturzschlag": "Auldor: Plunge"
+   }
+  },
+  {
+   "gruppe": "auldor_rundum",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300218,
+    2310218,
+    2320218
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1600925
+    ]
+   },
+   "titel": "Linien rundum",
+   "hinweis": "Sofort ausweichen",
+   "sekunden": 0.65,
+   "farbe": "ROT",
+   "meldung": "Auldor: Linien rundum (Hard)",
+   "en": {
+    "Linien rundum": "Lines all around",
+    "Sofort ausweichen": "Dodge now",
+    "Auldor: Linien rundum (Hard)": "Auldor: Lines all around (hard)"
+   }
+  },
+  {
+   "gruppe": "auldor_wirbel",
+   "dungeon": "Urugugu Canyon",
+   "bosse": [
+    2300218,
+    2310218,
+    2320218
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1601010
+    ]
+   },
+   "titel": "Wirbel-Phase",
+   "hinweis": "Linien ausweichen, Sturmstreich folgt",
+   "sekunden": 11.6,
+   "farbe": "BLAU",
+   "meldung": "Auldor: Wirbel-Phase",
+   "en": {
+    "Wirbel-Phase": "Whirlwind phase",
+    "Linien ausweichen, Sturmstreich folgt": "Dodge the lines, Tempest Strike follows",
+    "Auldor: Wirbel-Phase": "Auldor: Whirlwind phase"
+   }
+  },
+  {
+   "gruppe": "kwapo_donner",
+   "dungeon": "Ferocious Horn Den",
+   "bosse": [
+    2300908,
+    2310908,
+    2320908
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1606910
+    ]
+   },
+   "titel": "Donnergrollen",
+   "hinweis": "Kugeln einsammeln, dann über die Welle springen",
+   "sekunden": 6,
+   "farbe": "BLAU",
+   "meldung": "Kwapo: Donnergrollen",
+   "en": {
+    "Donnergrollen": "Stutter Cry",
+    "Kugeln einsammeln, dann über die Welle springen": "Collect the orbs, then jump the wave",
+    "Kwapo: Donnergrollen": "Kwapo: Stutter Cry"
+   }
+  },
+  {
+   "gruppe": "duanka_geister",
+   "dungeon": "Ferocious Horn Den",
+   "bosse": [
+    2300909,
+    2310909,
+    2320909
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1607020
+    ]
+   },
+   "titel": "Mau-Nekromantie",
+   "hinweis": "Seele vom Altar holen, Geister töten",
+   "sekunden": 6,
+   "farbe": "ORANGE",
+   "meldung": "Duanka: Mau-Nekromantie",
+   "en": {
+    "Mau-Nekromantie": "Mau Necromancy",
+    "Seele vom Altar holen, Geister töten": "Take the soul from the altar, kill the ghosts",
+    "Duanka: Mau-Nekromantie": "Duanka: Mau Necromancy"
+   }
+  },
+  {
+   "gruppe": "duanka_seelenrufer",
+   "dungeon": "Ferocious Horn Den",
+   "bosse": [
+    2300909,
+    2310909,
+    2320909
+   ],
+   "wann": {
+    "art": "cast",
+    "skills": [
+     1607050
+    ]
+   },
+   "titel": "Seelenrufer",
+   "hinweis": "Weit weglaufen, Blitze kommen",
+   "sekunden": 4,
+   "farbe": "ROT",
+   "meldung": "Duanka: Seelenrufer",
+   "en": {
+    "Seelenrufer": "Soul Caller",
+    "Weit weglaufen, Blitze kommen": "Run far away, bolts incoming",
+    "Duanka: Seelenrufer": "Duanka: Soul Caller"
+   }
+  }
+ ]
+}

@@ -23,6 +23,9 @@
 #define SLIDER_SETTLE_MS 700  /* nach dem Loslassen veraltete Werte vom Daemon ignorieren */
 #define TOGGLE_REVERT_MS 1500 /* optimistischer Toggle ohne Bestätigung -> zurück */
 #define DRAG_THRESHOLD 6
+#define TAP_SLOP 16          /* weiter bewegt = Wischversuch, kein Tippen */
+#define SWIPE_MIN 50         /* Wischweg in px, ab dem die Seite wechselt */
+#define MARQUEE_MS 20000     /* so lange läuft ein zu langer Titel, danach endet er mit „…“ */
 #define HELLO_TIMEOUT_MS 5000
 #define CACHE_KEY "layout"
 #define BG_KEY "bg"          /* Hintergrund im Flash: nach einem Neustart nicht erneut übertragen */
@@ -31,7 +34,7 @@
  * aufgefüllt), w, h, y, rows (je uint16 little endian), dann rows*w*2 Byte RGB565 */
 #define BIN_HEAD 27
 
-typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS } it_type_t;
+typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS, IT_CLAUDE } it_type_t;
 
 #define DPS_MAX_ROWS 8
 
@@ -64,6 +67,18 @@ typedef struct {
     dps_row_t rows[DPS_MAX_ROWS];
 } dps_view_t;
 
+/* Claude-Kachel: je Limit (Sitzung, Woche) eine Zeile [Name  Balken  Prozent  Reset] */
+typedef struct {
+    lv_obj_t *fill;
+    lv_obj_t *pct;
+    lv_obj_t *reset;
+} usage_row_t;
+
+typedef struct {
+    int32_t bar_w;
+    usage_row_t rows[2];
+} claude_view_t;
+
 typedef struct {
     char id[ID_LEN];
     it_type_t type;
@@ -87,6 +102,7 @@ typedef struct {
     int32_t cover_px;  /* Media: Kantenlänge des Covers, 0 = keins */
     bool flat;         /* Media: einzeiliges Layout, Text wird vertikal zentriert */
     dps_view_t *dps;   /* DPS-Kachel */
+    claude_view_t *claude;
 
     bool checked;
     bool muted;
@@ -601,6 +617,15 @@ static void tile_set_muted(tile_t *t, bool muted)
     if (t->value) lv_obj_set_style_text_opa(t->value, muted ? 120 : LV_OPA_COVER, 0);
 }
 
+/* Der Lauftext zeichnet jedes Bild neu, und das Panel nimmt nur ganze Frames (220 KB):
+ * Dauerlauf hielt das Gerät mit 45 Bildern/s ständig ausgelastet. Deshalb nur eine Weile. */
+static void marquee_stop_cb(lv_timer_t *tm)
+{
+    tile_t *t = lv_timer_get_user_data(tm);
+    t->timer = NULL;
+    lv_label_set_long_mode(t->title, LV_LABEL_LONG_DOT);
+}
+
 static void media_update(tile_t *t)
 {
     const cJSON *track = cJSON_GetObjectItemCaseSensitive(ui.state, "track");
@@ -609,8 +634,13 @@ static void media_update(tile_t *t)
     const char *artist = cJSON_IsObject(track) ? jstr(track, "artist") : NULL;
 
     if (title && *title) {
-        lv_label_set_long_mode(t->title, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_label_set_text(t->title, title);
+        if (strcmp(lv_label_get_text(t->title), title) != 0) {
+            lv_label_set_long_mode(t->title, LV_LABEL_LONG_SCROLL_CIRCULAR);
+            lv_label_set_text(t->title, title);
+            if (t->timer) lv_timer_delete(t->timer);
+            t->timer = lv_timer_create(marquee_stop_cb, MARQUEE_MS, t);
+            lv_timer_set_repeat_count(t->timer, 1);
+        }
         lv_obj_set_style_text_opa(t->title, LV_OPA_COVER, 0);
     } else {
         lv_label_set_long_mode(t->title, LV_LABEL_LONG_DOT);
@@ -634,6 +664,7 @@ static void media_update(tile_t *t)
 }
 
 static void dps_update(tile_t *t);
+static void claude_update(tile_t *t);
 
 static void apply_state_key(const char *key, const cJSON *val)
 {
@@ -647,6 +678,10 @@ static void apply_state_key(const char *key, const cJSON *val)
         }
         if (t->type == IT_DPS) {
             if (!strcmp(key, "dps")) dps_update(t);
+            continue;
+        }
+        if (t->type == IT_CLAUDE) {
+            if (!strcmp(key, "claude")) claude_update(t);
             continue;
         }
         if (t->bind[0] && !strcmp(t->bind, key)) {
@@ -673,6 +708,7 @@ static void apply_full_state(void)
     for (int i = 0; i < ui.tile_count; i++) {
         if (ui.tiles[i].type == IT_MEDIA) media_update(&ui.tiles[i]);
         if (ui.tiles[i].type == IT_DPS) dps_update(&ui.tiles[i]);
+        if (ui.tiles[i].type == IT_CLAUDE) claude_update(&ui.tiles[i]);
     }
 }
 
@@ -685,7 +721,7 @@ static void toggle_revert_cb(lv_timer_t *tm)
     tile_set_checked(t, truthy(cJSON_GetObjectItemCaseSensitive(ui.state, t->bind)));
 }
 
-static void go_to_page(int idx, bool anim);
+static void go_to_page(int idx);
 
 static void tile_event_cb(lv_event_t *e)
 {
@@ -695,7 +731,7 @@ static void tile_event_cb(lv_event_t *e)
     if (code == LV_EVENT_SHORT_CLICKED) {
         if (t->nav[0]) {
             for (int i = 0; i < ui.page_count; i++)
-                if (!strcmp(ui.page_ids[i], t->nav)) go_to_page(i, true);
+                if (!strcmp(ui.page_ids[i], t->nav)) go_to_page(i);
             return;
         }
         if (ui.net != DECKBAR_NET_ONLINE) return;
@@ -849,7 +885,6 @@ static void build_button(tile_t *t, int32_t w, int32_t h, const char *label)
 static void build_slider(tile_t *t, int32_t w, int32_t h, const char *label)
 {
     lv_obj_t *o = t->obj;
-    lv_obj_set_style_clip_corner(o, true, 0);
     /* Wischen auf dem Slider darf nicht die Seite wechseln */
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLL_CHAIN | LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(o, LV_OBJ_FLAG_PRESS_LOCK);
@@ -857,7 +892,8 @@ static void build_slider(tile_t *t, int32_t w, int32_t h, const char *label)
     t->fill = plain_obj(o);
     lv_obj_add_style(t->fill, &db_theme.fill, 0);
     lv_obj_add_style(t->fill, &db_theme.fill_muted, DB_STATE_MUTED);
-    lv_obj_set_style_radius(t->fill, 0, 0);
+    /* gleiche Rundung wie die Kachel statt clip_corner (das zeichnete die Kachel über eine Zwischenebene) */
+    lv_obj_set_style_radius(t->fill, DB_RADIUS, 0);
     lv_obj_set_size(t->fill, 0, LV_PCT(100));
     lv_obj_align(t->fill, LV_ALIGN_LEFT_MID, 0, 0);
     lv_obj_remove_flag(t->fill, LV_OBJ_FLAG_CLICKABLE);
@@ -1214,6 +1250,90 @@ static void build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *
     dps_update(t);
 }
 
+/* Schlüssel im State `claude` und Beschriftung, in Zeilenreihenfolge (siehe daemon/claude.py) */
+static const char *const CLAUDE_KEYS[2] = {"session", "week"};
+static const char *const CLAUDE_NAMES[2] = {"5 h", "Woche"};
+
+static void claude_update(tile_t *t)
+{
+    claude_view_t *v = t->claude;
+    if (!v) return;
+    const cJSON *c = cJSON_GetObjectItemCaseSensitive(ui.state, "claude");
+    char buf[8];
+    for (int i = 0; i < 2; i++) {
+        usage_row_t *r = &v->rows[i];
+        const cJSON *jr = cJSON_IsObject(c) ? cJSON_GetObjectItemCaseSensitive(c, CLAUDE_KEYS[i]) : NULL;
+        const cJSON *jp = cJSON_IsObject(jr) ? cJSON_GetObjectItemCaseSensitive(jr, "pct") : NULL;
+        if (!cJSON_IsNumber(jp)) {
+            lv_obj_set_width(r->fill, 0);
+            lv_label_set_text(r->pct, "–");
+            if (r->reset) lv_label_set_text(r->reset, "");
+            continue;
+        }
+        int32_t pct = LV_CLAMP(0, (int32_t)jp->valuedouble, 100);
+        lv_obj_set_width(r->fill, v->bar_w * pct / 100);
+        /* Farbe warnt, bevor das Limit erreicht ist */
+        db_style_t s = pct >= 90 ? DB_STYLE_DANGER : pct >= 75 ? DB_STYLE_WARNING : DB_STYLE_ACCENT;
+        lv_obj_set_style_bg_color(r->fill, db_theme_color(s), 0);
+        lv_snprintf(buf, sizeof buf, "%d %%", (int)pct);
+        lv_label_set_text(r->pct, buf);
+        const char *reset = jstr(jr, "reset");
+        if (r->reset) lv_label_set_text(r->reset, reset ? reset : "");
+    }
+}
+
+/* Claude-Kachel: Auslastung des Claude-Abos, Werte kommen alle 5 Minuten vom Daemon */
+static void build_claude(tile_t *t, int32_t w, int32_t h)
+{
+    lv_obj_t *o = t->obj;
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    claude_view_t *v = lv_malloc_zeroed(sizeof *v);
+    if (!v) return;
+    t->claude = v;
+
+    const int32_t px = 12, gap = 8, name_w = 40, pct_w = 36;
+    /* Rücksetzzeit („Sa 01:00“) nur, wenn die Kachel breit genug ist */
+    const int32_t reset_w = w >= 260 ? 60 : 0;
+    const int32_t lh = lv_font_get_line_height(&db_font_small);
+    v->bar_w = LV_MAX(w - 2 * px - name_w - pct_w - reset_w - (reset_w ? 3 : 2) * gap, 10);
+    const int32_t bar_x = px + name_w + gap;
+    const int32_t pct_x = bar_x + v->bar_w + gap;
+
+    for (int i = 0; i < 2; i++) {
+        usage_row_t *r = &v->rows[i];
+        int32_t mid = h * (2 * i + 1) / 4; /* Mitte der oberen bzw. unteren Hälfte */
+
+        lv_obj_t *name = text_label(o, &db_font_small, CLAUDE_NAMES[i]);
+        lv_obj_add_style(name, &db_theme.text_dim, 0);
+        lv_obj_set_pos(name, px, mid - lh / 2);
+
+        lv_obj_t *track = plain_obj(o);
+        lv_obj_set_size(track, v->bar_w, 6);
+        lv_obj_set_pos(track, bar_x, mid - 3);
+        lv_obj_set_style_radius(track, 3, 0);
+        lv_obj_set_style_bg_color(track, lv_color_white(), 0);
+        lv_obj_set_style_bg_opa(track, 28, 0);
+        r->fill = plain_obj(track);
+        lv_obj_set_size(r->fill, 0, 6);
+        lv_obj_set_style_radius(r->fill, 3, 0);
+        lv_obj_set_style_bg_opa(r->fill, 220, 0);
+
+        r->pct = text_label(o, &db_font_small, "");
+        lv_obj_set_width(r->pct, pct_w);
+        lv_obj_set_style_text_align(r->pct, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_set_pos(r->pct, pct_x, mid - lh / 2);
+
+        if (reset_w) {
+            r->reset = text_label(o, &db_font_small, "");
+            lv_obj_add_style(r->reset, &db_theme.text_dim, 0);
+            lv_obj_set_width(r->reset, reset_w);
+            lv_obj_set_style_text_align(r->reset, LV_TEXT_ALIGN_RIGHT, 0);
+            lv_obj_set_pos(r->reset, pct_x + pct_w + gap, mid - lh / 2);
+        }
+    }
+    claude_update(t);
+}
+
 /* ======================================================================= Seiten */
 
 static void update_dots(void)
@@ -1228,14 +1348,49 @@ static void update_dots(void)
     }
 }
 
-static void go_to_page(int idx, bool anim)
+static void go_to_page(int idx)
 {
     if (idx < 0 || idx >= ui.page_count) return;
-    lv_tileview_set_tile(ui.tv, ui.pages[idx], anim ? LV_ANIM_ON : LV_ANIM_OFF);
+    lv_tileview_set_tile(ui.tv, ui.pages[idx], LV_ANIM_OFF);
     if (idx != ui.page_active) {
         ui.page_active = idx;
         update_dots();
         send_page_change(ui.page_ids[idx]);
+    }
+}
+
+/* Wischt der Finger über eine Seite (nicht über einen Slider), springt sie beim Loslassen zur Nachbarseite.
+ * Die Kette über GESTURE_BUBBLE endet bei Slidern, bei allen anderen Kacheln beim Tileview. */
+static bool swipes_page(lv_obj_t *obj)
+{
+    while (obj && obj != ui.tv && lv_obj_has_flag(obj, LV_OBJ_FLAG_GESTURE_BUBBLE)) obj = lv_obj_get_parent(obj);
+    return obj == ui.tv;
+}
+
+/*
+ * Wischen und Tippen werden am Eingabegerät entschieden, das PRESSED, RELEASED und die Klicks vor der
+ * Kachel sieht:
+ *   - Seiten folgen nicht dem Finger: Mitziehen zeichnete jedes Bild komplett neu (bis 100 ms), bei so
+ *     wenigen Touch-Proben schnappte die Seite oft zurück.
+ *   - Die LVGL-Geste taugt nicht: Der Controller meldet nicht bei jeder Abfrage eine neue Position, und
+ *     jede Abfrage ohne Bewegung setzt LVGLs Gestensumme zurück. Gezählt wird die Strecke seit PRESSED.
+ *   - Wer weiter als TAP_SLOP wischt, löst keinen Klick auf der Kachel darunter aus.
+ */
+static void touch_cb(lv_event_t *e)
+{
+    static lv_point_t press;
+    lv_indev_t *indev = lv_indev_active();
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    int32_t dx = p.x - press.x, dy = p.y - press.y;
+    if (code == LV_EVENT_PRESSED) {
+        press = p;
+    } else if (code == LV_EVENT_RELEASED) {
+        if (LV_ABS(dx) >= SWIPE_MIN && LV_ABS(dx) > LV_ABS(dy) && swipes_page(lv_event_get_param(e)))
+            go_to_page(ui.page_active + (dx < 0 ? 1 : -1));
+    } else if (code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_CLICKED || code == LV_EVENT_LONG_PRESSED) {
+        if (LV_ABS(dx) + LV_ABS(dy) > TAP_SLOP) lv_indev_stop_processing(indev);
     }
 }
 
@@ -1259,6 +1414,7 @@ static void free_tiles(void)
         lv_anim_delete(t, fill_anim_cb);
         if (t->timer) lv_timer_delete(t->timer);
         lv_free(t->dps);
+        lv_free(t->claude);
     }
     lv_free(ui.tiles);
     ui.tiles = NULL;
@@ -1271,6 +1427,7 @@ static it_type_t parse_type(const char *s)
     if (s && !strcmp(s, "slider")) return IT_SLIDER;
     if (s && !strcmp(s, "media")) return IT_MEDIA;
     if (s && !strcmp(s, "dps")) return IT_DPS;
+    if (s && !strcmp(s, "claude")) return IT_CLAUDE;
     return IT_BUTTON;
 }
 
@@ -1341,6 +1498,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         case IT_SLIDER: build_slider(t, pw, ph, jstr(ji, "label")); break;
         case IT_MEDIA: build_media(t, pw, ph); break;
         case IT_DPS: build_dps(t, pw, ph, jint(ji, "players", 5), jstr(ji, "extra")); break;
+        case IT_CLAUDE: build_claude(t, pw, ph); break;
         default: build_button(t, pw, ph, jstr(ji, "label")); break;
         }
     }
@@ -1380,6 +1538,8 @@ static bool apply_layout(const cJSON *msg)
     lv_obj_set_style_bg_opa(ui.tv, LV_OPA_TRANSP, 0);
     lv_obj_set_scrollbar_mode(ui.tv, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(ui.tv, tv_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    /* nicht scrollbar: Seiten wechseln per Wisch (touch_cb); ohne GESTURE_BUBBLE endet die Kette hier */
+    lv_obj_remove_flag(ui.tv, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     int idx = 0;
     const cJSON *jp;
@@ -1511,7 +1671,7 @@ void deckbar_ui_net_message(const char *text, size_t len)
     } else if (!strcmp(type, "goto")) {
         const char *page = jstr(msg, "page");
         for (int i = 0; page && i < ui.page_count; i++)
-            if (!strcmp(ui.page_ids[i], page)) go_to_page(i, true);
+            if (!strcmp(ui.page_ids[i], page)) go_to_page(i);
     } else if (!strcmp(type, "layout")) {
         if (apply_layout(msg)) deckbar_hal_store(CACHE_KEY, text, len);
     } else if (!strcmp(type, "welcome")) {
@@ -1584,6 +1744,8 @@ void deckbar_ui_init(const deckbar_config_t *cfg)
     ui.cfg = *cfg;
     ui.heartbeat_s = 5;
     ui.net = DECKBAR_NET_SEARCHING;
+    for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i))
+        if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_add_event_cb(i, touch_cb, LV_EVENT_ALL, NULL);
     ui.state = cJSON_CreateObject();
     ui.art.front = -1;
     ui.bgi.front = -1;

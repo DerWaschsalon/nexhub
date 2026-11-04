@@ -29,6 +29,9 @@ class FakeDienst:
     def warnung_testen(self) -> None:
         self.aufrufe.append("warnung_testen")
 
+    def pvp_neu(self) -> None:
+        self.aufrufe.append("pvp_neu")
+
     def aufnahme_starten(self) -> None:
         self.aufnahme = True
 
@@ -116,10 +119,11 @@ async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel():
     assert gesendet[-1] == {"aktiv": True, "cubes": []}
     dienst = r.dienst
     await r.befehl("warnung_testen")
+    await r.befehl("pvp_neu")
     await r.befehl("aufnahme_start")
     assert r.aufnahme
     await r.speichern({"ton": False})
-    assert dienst.aufrufe == ["starten", "warnung_testen", "neu_laden"]
+    assert dienst.aufrufe == ["starten", "warnung_testen", "pvp_neu", "neu_laden"]
     spiel_an = False
     await warten_bis(lambda: not r.laeuft)
     assert dienst.aufrufe[-1] == "stoppen" and gesendet[-1] == {"aktiv": False}
@@ -150,3 +154,17 @@ def test_uebersicht_ohne_laufendes_radar():
     assert [t["name"] for t in u["termine"]][:2] == ["Riss", "Shugo-Fest"]
     assert u["vertraute"] and all("fehlen" in v for v in u["vertraute"])
     assert r.karte() == {"name": ""} and r.kartendatei("bild") is None
+
+
+def test_kampf_ohne_laufendes_radar():
+    r, _ = radar()
+    assert r.kampf() == {"groggy": False, "warnungen": []}
+
+
+def test_tode_ueberleben_das_radar_und_gehoeren_zum_run():
+    r, _ = radar()
+    r._starten()
+    assert r.dienst.tode is r.tode  # der Dienst schreibt in die Liste des Daemons
+    r.tode.extend([{"t_ms": 100, "name": "A", "skill": 1}, {"t_ms": 500, "name": "B", "skill": 2}])
+    r._beenden()
+    assert r.tode_zwischen(0, 200) == [{"t_ms": 100, "name": "A", "skill": 1}]

@@ -3,6 +3,7 @@ import gzip
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from nexproto import NexLog, NexLogError, dungeon_label, pack, player_name, unpack
 from nexproto.nexlog import HIT_COLUMNS, MAX_PACKED, MAX_UNPACKED
@@ -61,6 +62,15 @@ def test_treffer_kommen_mit():
     back = unpack(pack(log()))
     assert back.hits["auto_1"].rows[1] == (900, 1, 0, 1, 450_000, 2, 0)
     assert "auto_2" not in back.hits  # Kampf ohne Treffer-Datei
+
+
+def test_todesursachen_kommen_mit():
+    tod = {"t_ms": 1_792_000_200_000, "name": "Moonlin", "skill": 1801120, "warning": "Todesmal", "lead_ms": 4100}
+    back = unpack(pack(log(deaths=[tod, {"t_ms": 1, "name": "x", "skill": 2}])))
+    assert back.deaths[0].model_dump() == tod and back.deaths[1].warning is None
+    assert unpack(pack(log())).deaths == []  # ohne Radar: leer
+    with pytest.raises(ValidationError):
+        log(deaths=[{"t_ms": 1, "name": "x", "skill": 2, "lead_ms": -5}])
 
 
 def test_treffer_zu_unbekanntem_kampf():

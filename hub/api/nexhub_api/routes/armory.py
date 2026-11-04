@@ -26,6 +26,7 @@ from sqlalchemy.orm import defer
 
 from ..aion2 import LANGS, NC, NCError, NotFound, localized, shard_of
 from ..armory import Armory
+from ..ratgeber import hints
 from ..buildcheck import STALE, BuildChecker, aware
 from ..config import Settings
 from ..deps import DB, CurrentUser, SettingsDep
@@ -60,6 +61,7 @@ class ArmoryDetail(ArmoryOut):
     error: str | None
     days: list[Day]
     can_delete: bool
+    hints: dict[str, list[dict]]  # Sprache → Hinweise aus ratgeber.py
 
 
 class Hit(BaseModel):
@@ -261,6 +263,7 @@ async def get_character(character_id: int, user: CurrentUser, db: DB) -> ArmoryD
     days = await db.scalars(select(CharacterDay).where(CharacterDay.character_id == row.id).order_by(CharacterDay.day))
     return ArmoryDetail(**_armory_out(row, owner, user, _profile_of(row)),
                         data=row.data, error=row.error,
+                        hints={lang: hints(localized(row.data, lang), row.cls) for lang in LANGS} if row.data else {},
                         days=[Day(day=d.day, combat_power=d.combat_power, item_level=d.item_level) for d in days],
                         can_delete=row.user_id == user.id or user.role == "admin")
 

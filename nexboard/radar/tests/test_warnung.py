@@ -127,9 +127,9 @@ class WarnungTest(unittest.TestCase):
         self.zustand.dungeon = "Urugugu Canyon"
         self.z.cast(1, 1600960, 5)  # Sturzschlag auf mich
         self.assertEqual(self.z.schnappschuss()[0].titel(), "Sturzschlag  –  DU!")
-        self.z.cast(1, 1601010, 1)  # Sprung in die Mitte: Sturmstreich in 11,6 s
+        self.z.cast(1, 1601010, 1)  # Sprung in die Mitte: Wirbel-Phase (mechaniken.json), Sturmstreich folgt
         self.t[0] += 8.6
-        self.assertIn("Sturmstreich kommt", self.titel())
+        self.assertIn("Wirbel-Phase", self.titel())
         self.z.status(5, 15044311)  # Raurs Zeitbombe auf mir
         self.assertIn("Zeitbombe", self.titel())
 

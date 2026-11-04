@@ -10,6 +10,10 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
 
 - **Kacheln:** Taste, Schalter und Schieberegler für Audio (Lautstärke, Mute von Ausgang und
   Mikrofon), Media-Steuerung mit Cover und Titel, Links, Hotkeys und Shell-Befehle
+- **Claude-Nutzung:** Auslastung des Claude-Abos (5-Stunden-Sitzung und Woche) wie `/usage` in
+  Claude Code. Der Daemon liest dafür die Anmeldung von Claude Code (`~/.claude/.credentials.json`)
+  und fragt alle 5 Minuten nach, solange die Kachel im Layout ist. Der Endpunkt ist nicht
+  offiziell dokumentiert; ändert er sich, zeigt die Kachel „–“.
 - **Live-Status:** Mute, Lautstärke und Track folgen dem PC, auch wenn dort umgeschaltet wird.
   Eigene Werte kommen per `POST /api/state` dazu.
 - **Mehrere Seiten** mit Wischgesten, Hintergrund wählbar (Standard, Desktop-Hintergrund, eigenes Bild)
@@ -233,7 +237,17 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Kämpfen ausgeblendet.
 - **Event-Timer:** Countdown bis zum nächsten Start (Shugo-Festival, Spacetime Rift, Resets …),
   Ereignisse frei einstellbar in der Web-UI.
+- **PvP** (Daten vom Modul „AION 2 · Radar“): Kills und Tode der Sitzung live, dazu Assists,
+  Abyss-Rangpunkte und Rang aus der Saisonwertung des Servers (rechnet etwa stündlich neu, daher
+  „Stand“). Neu beginnen: Web-UI → Radar → „PvP neu beginnen“. Details in `radar/README.md`.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
+
+**Profile** legen fest, welche Widgets sichtbar sind (Standard: PvE und PvP). Wechsel in der
+Bearbeiten-Leiste, in der Web-UI (Overlay → Widgets → Profile) oder per `--profil NAME`; das aktive
+Profil merkt sich jedes Ein- und Ausblenden. `--widget ID` blendet ein einzelnes Widget ein oder aus
+(meter, boss, timers, radar, warnung, karte, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
+also sofort. Der Daemon trägt je Profil und Widget eine Aktion in den Starter „NexBoard Overlay
+ein/aus“ ein; dort in den Systemeinstellungen (Kurzbefehle) eine Taste zuweisen.
 
 Die Fläche bekommt nie die Tastatur und nimmt Klicks nur dort an, wo es nötig ist:
 

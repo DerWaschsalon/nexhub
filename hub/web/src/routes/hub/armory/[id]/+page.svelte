@@ -4,6 +4,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { api } from '#lib/api.ts';
 	import { t } from '#lib/i18n.svelte.ts';
+	import Hints from '#modules/armory/components/Hints.svelte';
 	import History from '#modules/armory/components/History.svelte';
 	import { classColor, classFromName } from '#modules/logs/classes.ts';
 	import CharacterProfile from '#modules/logs/components/CharacterProfile.svelte';
@@ -71,6 +72,7 @@
 			{#if c.days.length === 1}<p class="dim small">{t('armory.historyStart')}</p>{/if}
 		</section>
 	{/if}
+	<Hints hints={c.hints} />
 	<CharacterProfile character={{ ...c, cls }} data={c.data} source={t('armory.source')} />
 {:else if c.status !== 'offen'}
 	<section class="glass pad">

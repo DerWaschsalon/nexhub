@@ -33,11 +33,41 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 - **Ansage:** Pro Warnung auf der Seite „Radar“ wählbar: Aus, Piepton oder Ansage (Standard). Gesprochen wird
   lokal mit Piper (`~/.local/share/aion2-radar/piper`, Stimmen Thorsten/Amy), fertige Sätze im Cache
   `~/.cache/aion2-radar/ansagen`. Fehlt Piper, kommt der Piepton.
-- **Lernhilfe:** In Dungeons ohne Warnungen erscheint jeder Boss-Cast grau mit Namen aus den A2Tools-Daten.
+- **Lernhilfe:** Jeder Cast eines Bosses, zu dem es noch keine Cast-Warnung gibt, erscheint grau mit Namen aus den A2Tools-Daten
+  (Schalter „Alle Boss-Casts zeigen“).
 - **Status auf dir** (`0x382A`): Ignus' Flammenbombe → „Verzögerte Explosion – DU!“ (3 s, danach Feuerpfütze).
   Weitere Effekte in `STATUS_REGELN` (`radar/warnung.py`), IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
+- **Weitere Dungeons** (`radar/mechaniken.json`, 39 Mechaniken; 11 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie und -Seelenrufer): Urugugu (Raur-Konter, Auldor-Sturmstreich,
+  Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Schilde, Vakron-Male, -Ringe, -Gefängnis), Krao-Höhle
+  (Berk), Draupnir (Lakshmi-Reflexion), Grimmhorn (Nuakum-Blutung), Deus (Nazmun-Bombe, Atiel-Kette), Arkanis,
+  dazu Ignus' Flammenzone. Auslöser: Boss-Cast, Status auf dir, einem Mitspieler, jedem Spieler oder dem Boss,
+  ein Treffer vom Boden (`0x3804`, Pfützen; mehrere Treffer zählen als einer) und die Stagger-Prüfung.
+  Mit Folge-Hinweis, wenn es vorbei ist („Abstand halten“). IDs und Zeiten nach
+  [xinjalin/glass-cannon](https://github.com/xinjalin/glass-cannon) `gamedata/boss-mechanics.json`
+  (MIT, Copyright (c) 2026 Xinjalin), Texte eigene; dort zum Teil nur als Hinweise ungeprüft, selbst bestätigt
+  sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechaniken.json` plus Schalter in
+  `meldungen.json`.
+- **Jetzt staggern** (Berk, Bakarma, Atiel): sobald die Stagger-Leiste brechbar wird, nach einer Pause oder wenn sie
+  erst spät im Kampf erscheint. Endet mit „Boss groggy“, sonst nach 25 s.
+- **Fläche unter dir** (`0x3848`, Boden-Markierung, Aufbau nach glass-cannon): Markiert ein Monster eine Fläche, deren Mittelpunkt höchstens `flaeche_m` (Standard 6 m, in `~/.config/aion2-radar.json`) neben dir liegt, kommt „Fläche unter dir – DU!“ mit Countdown bis zum Einschlag. Größe und Form stehen nicht im Paket, deshalb der feste Abstand. Mehrere Markierungen einer Welle = eine Warnung. Ein Makro kann darauf mit Pause oder Ausweichen reagieren (Gruppe `flaeche`, `/api/radar/kampf`).
+- **Berserker-Zeit** (`0x8D21`): Countdown in der Vorschauzeile, solange der Boss im Kampf ist.
+- **Wenig LP** (`0x921B`): Mitspieler unter 25 % LP, einmal bis zur Erholung über 50 %. Schalter unter „alle Dungeons“.
+- **Cube-Schlüssel:** verbrauchte Schlüssel (`0x363A`, Item 630900003) in der Statuszeile.
+- **Mehr Positionsquellen** (ungeprüft, Erkenntnis aus benhighlanderr/Aion2-Hidden-Cube-Radar, dort ohne Lizenz):
+  eigener Cast `0x3802` (x/y/z ab Byte 17, im Kampf die häufigste Quelle), Bewegungen `0x3710`–`0x3750`, Eintritt
+  `0x3621` (Position ab Byte 16, ID nur geschätzt) und Zonenwechsel `0x561E` (ab Byte 17). Sie zählen nur, wenn sie
+  höchstens 30 m neben der letzten Position liegen oder die letzte älter als 10 s ist.
+- **Laufrichtung oben** (Schalter auf der Seite „Radar“): dreht das Radar so, dass die Laufrichtung oben ist (aus den
+  letzten Metern Weg) statt Norden. Weitere Cube-IDs (ungeprüft): 1000549–1000565, 1300081, 1300082.
 - **Dungeon-Restzeit** (`0x6100`) in der Statuszeile unter dem Radar.
+- **PvP der Sitzung** (`radar/pvp.py`, Widget „PvP“ im Overlay): Kills und Tode zählt `0x8D04`
+  (Tod mit Täter und dessen Namen, nur bei Spielern als Täter), Kills über die eigene Entity oder den
+  eigenen Namen (auch Begleiter). Assists, Abyss-Rangpunkte, Rang und Grad kommen aus der eigenen
+  Saisonwertung `0x8D57` (JSON mit kill/death/assist_count); das Spiel schickt sie beim Einloggen und
+  nach manchen Zonenwechseln, der Server rechnet etwa stündlich neu. Gezeigt wird der Zuwachs seit
+  Spielstart bzw. „PvP neu beginnen“. Opcodes und Formate nach dem Desktop-Programm von questlog.gg,
+  an eigenen Mitschnitten geprüft; PvP-Kills selbst sind noch nicht live geprüft.
 - **Feldbosse und Vertraute** (NexBoard-Seite „Radar“, Reiter „Feldbosse und Vertraute“): Respawn-Timer aller gesehenen
   Feldbosse (`0x9101`), Ansage 5 Minuten vorher und beim Respawn (nur aktuelle Karte), lebende Feldbosse
   als lila Raute auf dem Radar. Namen lernt das Radar, sobald ein Boss neben dem Platz erscheint.
@@ -77,5 +107,6 @@ stehen alle Einstellungen, auch der Charaktername. Standardwerte und Warnungslis
 | `werkzeuge/bosse.py` | erzeugt `radar/bosse.json` und `radar/zonen.json` (Boss/Zone -> Dungeon) aus den A2Tools-Daten |
 
 - Kämpfe auswerten: `python3 -m werkzeuge.auswertung mitschnitte/datei.pcap`
-- Tests: `python3 -m unittest discover tests`
+- Für eigene Makros auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true, "warnungen": [{"gruppe", "titel", "ich", "rest"}]}`: groggy, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s, hängt nicht an der Warnungsanzeige), dazu die gerade laufenden Warnungen (ohne Lernhilfe; auf der Seite abgeschaltete fehlen auch hier). Gruppen wie in `meldungen.json`.
+- Tests: `PYTHONPATH=../../proto python3 -m unittest discover tests` (Termine kommen aus `proto/nexproto/termine.py`, im Daemon ist nexproto installiert)
 - Daten: `~/.local/share/aion2-radar/` (Spawnpunkte, Karten, Spawn-Log), Einstellungen `~/.config/aion2-radar.json`.

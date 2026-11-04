@@ -14,6 +14,7 @@ import json
 import logging
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
@@ -29,7 +30,7 @@ from radar.punkte import Karte  # noqa: E402
 log = logging.getLogger(__name__)
 
 TAKT_S = 0.2  # so oft zeichnen die Widgets neu, Warnungen zählen in Zehntelsekunden
-BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart")
+BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "pvp_neu")
 
 
 async def _aion2_laeuft() -> bool:
@@ -56,6 +57,8 @@ class Radar:
         self.meldungen = _json(ORDNER / "radar" / "meldungen.json")
         self.dienst: RadarDienst | None = None
         self.spiel = False
+        # Tode mit Ursache (RadarDienst._tod); hier, damit sie ein Ende des Radars bis zum Hochladen ueberleben
+        self.tode: deque[dict] = deque(maxlen=200)
 
     @property
     def laeuft(self) -> bool:
@@ -104,8 +107,17 @@ class Radar:
             raise RuntimeError("Radar läuft nicht")
         aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
                     "aufnahme_start": self.dienst.aufnahme_starten,
-                    "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen}
+                    "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen,
+                    "pvp_neu": self.dienst.pvp_neu}
         aktionen[name]()
+
+    def tode_zwischen(self, start_ms: int, ende_ms: int) -> list[dict]:
+        """Tode eines Runs (Zeiten in ms seit 1970), fuer das NexLog."""
+        return [t for t in self.tode if start_ms <= t["t_ms"] <= ende_ms]
+
+    def kampf(self) -> dict:
+        """Kampfzustand für eigene Makros auf diesem PC (GET /api/radar/kampf), siehe RadarDienst.kampf."""
+        return self.dienst.kampf() if self.dienst else {"groggy": False, "warnungen": []}
 
     def uebersicht(self) -> dict:
         """Feldbosse, Termine und Vertraute für die NexBoard-Seite. Ohne laufendes Radar aus den
@@ -133,6 +145,7 @@ class Radar:
     def _starten(self) -> None:
         log.info("AION 2 läuft, starte Radar")
         self.dienst = self.neuer_dienst(self.einstellungen()["name"])
+        self.dienst.tode = self.tode
         self.dienst.starten()
 
     def _beenden(self) -> None:

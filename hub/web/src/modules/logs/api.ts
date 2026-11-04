@@ -86,7 +86,9 @@ export type Fight = {
 	run_players: string[];
 	players: FightPlayer[];
 	timeline: { bucket_ms: number; players: { actor: number; damage: number[] }[] } | null;
-	deaths: { name: string; t_ms: number; revived_ms: number | null }[];
+	/** skill, warning, lead_ms: Ursache vom Radar im NexBoard (analysis._with_cause), sonst null */
+	deaths: { name: string; t_ms: number; revived_ms: number | null; skill: number | null; warning: string | null;
+		lead_ms: number | null }[];
 	target: number | null;
 	buffs: Buff[];
 };
@@ -135,6 +137,10 @@ export type ItemDetail = {
 	godstones: { name: string; desc: string | null; grade: string | null; icon: string | null }[];
 	/** verstärkte Skills (Schmuck, Arkana) */
 	skills: { name: string; level: number; icon: string | null }[];
+	/** höchste Verzauberung des Gegenstands */
+	max_enchant?: number | null;
+	/** was die Grundwerte bei höchster Verzauberung mehr hätten; fehlt = schon ganz oben */
+	gain?: { enchant: number; stats: ItemStat[] } | null;
 	/** nur Arkana */
 	set?: { name: string; equipped: number; total: number; bonuses: { degree: number; lines: string[] }[] };
 };
