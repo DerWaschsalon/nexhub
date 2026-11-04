@@ -12,7 +12,8 @@ from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
 from .quelle import Quelle
 from .uebersicht import feldboss_ansagen
-from .warnung import STATUS_REGELN, TODESMAL, WarnZentrale, alarm_abspielen, ansage, ansagen_vorbereiten, tr
+from .warnung import (STATUS_REGELN, TODESMAL, TREFFER_REGELN, WarnZentrale, alarm_abspielen, ansage,
+                      ansagen_vorbereiten, tr)
 from .zustand import Cube, RadarZustand
 
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
@@ -31,7 +32,11 @@ class RadarDienst:
         self.zustand.bei_cast.append(self.zentrale.cast)
         self.zustand.bei_status.append(self.zentrale.status)
         self.zustand.bei_groggy.append(self.zentrale.groggy)
+        self.zustand.bei_staggern.append(self.zentrale.staggern)
+        self.zustand.bei_treffer.append(self.zentrale.treffer)
+        self.zustand.bei_gruppe_lp.append(self.zentrale.gruppe_lp)
         self.zustand.status_ids = set(STATUS_REGELN)
+        self.zustand.treffer_ids = set(TREFFER_REGELN)
         self._ton_faellig = False
         self._dungeon: str | None = None
         self._gemeldet: set = set()  # Feldboss-Ansagen, die schon kamen
@@ -118,7 +123,7 @@ class RadarDienst:
 
     @staticmethod
     def _warnung(w, jetzt: float) -> dict:
-        return {"titel": w.titel(), "hinweis": tr("Weg von der Gruppe!" if w.ich else w.regel.hinweis),
+        return {"titel": w.titel(), "hinweis": tr(w.regel.hinweis_ich if w.ich else w.regel.hinweis),
                 "rest": w.rest(jetzt), "vorlauf": w.regel.vorlauf, "farbe": w.regel.farbe,
                 "lernhilfe": w.regel.gruppe == "casts"}  # Lernhilfe: echter Vorlauf unbekannt, keine Sekunden
 
@@ -139,6 +144,8 @@ class RadarDienst:
             rest = int(ende - time.time()) if ende else 0
             zeitlimit = f" {rest // 60}:{rest % 60:02}" if rest > 0 else ""
             text = f"{s['dungeon']}{zeitlimit} · {text}"
+        if self.zustand.schluessel:
+            text += f" · {self.zustand.schluessel} Cube-Schlüssel benutzt"
         return ("● REC · " if self.aufnahme else "") + text
 
     def karte(self) -> dict:

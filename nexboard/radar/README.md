@@ -33,10 +33,26 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 - **Ansage:** Pro Warnung auf der Seite „Radar“ wählbar: Aus, Piepton oder Ansage (Standard). Gesprochen wird
   lokal mit Piper (`~/.local/share/aion2-radar/piper`, Stimmen Thorsten/Amy), fertige Sätze im Cache
   `~/.cache/aion2-radar/ansagen`. Fehlt Piper, kommt der Piepton.
-- **Lernhilfe:** In Dungeons ohne Warnungen erscheint jeder Boss-Cast grau mit Namen aus den A2Tools-Daten.
+- **Lernhilfe:** In Dungeons ohne Cast-Warnungen erscheint jeder Boss-Cast grau mit Namen aus den A2Tools-Daten
+  (Schalter „Alle Boss-Casts zeigen“).
 - **Status auf dir** (`0x382A`): Ignus' Flammenbombe → „Verzögerte Explosion – DU!“ (3 s, danach Feuerpfütze).
   Weitere Effekte in `STATUS_REGELN` (`radar/warnung.py`), IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
+- **Weitere Dungeons** (`radar/mechaniken.json`, 28 Mechaniken): Urugugu (Raur-Konter, Auldor-Sturmstreich,
+  Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Schilde, Vakron-Male, -Ringe, -Gefängnis), Krao-Höhle
+  (Berk), Draupnir (Lakshmi-Reflexion), Grimmhorn (Nuakum-Blutung), Deus (Nazmun-Bombe, Atiel-Kette), Arkanis,
+  dazu Ignus' Flammenzone. Auslöser: Boss-Cast, Status auf dir, einem Mitspieler, jedem Spieler oder dem Boss,
+  ein Treffer vom Boden (`0x3804`, Pfützen; mehrere Treffer zählen als einer) und die Stagger-Prüfung.
+  Mit Folge-Hinweis, wenn es vorbei ist („Abstand halten“). IDs und Zeiten nach
+  [xinjalin/glass-cannon](https://github.com/xinjalin/glass-cannon) `gamedata/boss-mechanics.json`
+  (MIT, Copyright (c) 2026 Xinjalin), Texte eigene; dort zum Teil nur als Hinweise ungeprüft, selbst bestätigt
+  sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechaniken.json` plus Schalter in
+  `meldungen.json`.
+- **Jetzt staggern** (Berk, Bakarma, Atiel): sobald die Stagger-Leiste brechbar wird, nach einer Pause oder wenn sie
+  erst spät im Kampf erscheint. Endet mit „Boss groggy“, sonst nach 25 s.
+- **Berserker-Zeit** (`0x8D21`): Countdown in der Vorschauzeile, solange der Boss im Kampf ist.
+- **Wenig LP** (`0x921B`): Mitspieler unter 25 % LP, einmal bis zur Erholung über 50 %. Schalter unter „alle Dungeons“.
+- **Cube-Schlüssel:** verbrauchte Schlüssel (`0x363A`, Item 630900003) in der Statuszeile.
 - **Dungeon-Restzeit** (`0x6100`) in der Statuszeile unter dem Radar.
 - **PvP der Sitzung** (`radar/pvp.py`, Widget „PvP“ im Overlay): Kills und Tode zählt `0x8D04`
   (Tod mit Täter und dessen Namen, nur bei Spielern als Täter), Kills über die eigene Entity oder den
