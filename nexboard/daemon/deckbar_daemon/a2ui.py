@@ -295,7 +295,7 @@ class A2Ui:
                 return await self._req("details", target_id=int(a("targetId") or 0), actor_ids=a("actorIds"),
                                        summary=bool(a("summaryOnly")))
             case "get_fight_buffs":
-                return await self._req("buffs", target_id=int(a("targetId") or 0)) if live else None
+                return await self._req("buffs", target_id=int(a("targetId") or 0), target_ids=a("targetIds")) if live else None
             case "get_fight_history":
                 return await self._req("history") if live else await asyncio.to_thread(summaries, hist)
             case "load_fight":

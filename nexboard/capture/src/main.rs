@@ -1,7 +1,7 @@
 //! deckbar-capture: AION-2-Mitschnitt für die NexBoard.
 //!
 //! Setzt den Kern des A2Tools DPS Meter (GPL-3.0, Submodul `a2tools/`) ohne dessen Oberfläche
-//! zusammen, so wie `app.rs` dort es tut: libpcap auf allen Interfaces (mit Kernel-Filter, pcap.rs)
+//! zusammen, so wie `app.rs` dort es tut: libpcap auf allen Interfaces (mit Kernel-Filter)
 //! → CaptureDispatcher
 //! (Port-Erkennung, Reassembly, Parser) → DataStorage → DpsCalculator. Der Daemon startet das
 //! Programm und spricht mit ihm über Zeilen-JSON:
@@ -50,10 +50,9 @@ use tokio::sync::mpsc;
 use tracing::{info, warn};
 
 mod hits;
-mod pcap;
 mod view;
 
-use pcap::PcapCapturer;
+use a2tools_dps_meter_lib::capture::pcap_capturer::{self as pcap, PcapCapturer};
 
 const HISTORY_EVERY: Duration = Duration::from_secs(30);
 const STATUS_EVERY: Duration = Duration::from_secs(2);
@@ -255,7 +254,11 @@ impl Core {
                 };
                 to_value(serde_json::to_value(res))
             }
-            "buffs" => to_value(serde_json::to_value(self.reader().live_fight_buffs(target()?))),
+            "buffs" => {
+                // alle Ziele, die die Details zusammen zeigen (ihre Stagger-Fenster gehören dazu)
+                let shown: Vec<i32> = cmd.get("target_ids").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
+                to_value(serde_json::to_value(self.reader().live_fight_buffs(target()?, &shown)))
+            }
             "context" => to_value(serde_json::to_value(self.reader().get_details_context())),
             "history" => to_value(serde_json::to_value(self.history.list_fights())),
             "fight" => to_value(serde_json::to_value(self.history.load_fight(str_arg("fight_id")?)?)),
@@ -506,7 +509,7 @@ async fn run_live(args: Args) {
     }));
 
     let (tx, rx) = mpsc::channel::<CapturedPayload>(4096);
-    let capturer = PcapCapturer::new(tx, Some(ports.clone()));
+    let capturer = PcapCapturer::new(tx, ports.clone());
     if pcap {
         capturer.start();
     }

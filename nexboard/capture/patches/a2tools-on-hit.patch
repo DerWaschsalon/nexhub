@@ -1,8 +1,8 @@
 diff --git a/src-tauri/src/combat/data_storage.rs b/src-tauri/src/combat/data_storage.rs
-index 37754a8..71fe636 100644
+index c9b7944..8ec2d86 100644
 --- a/src-tauri/src/combat/data_storage.rs
 +++ b/src-tauri/src/combat/data_storage.rs
-@@ -474,6 +474,8 @@ pub struct DataStorage {
+@@ -495,6 +495,8 @@ pub struct DataStorage {
      /// Run just before combat data is cleared by a zone change or the end of a
      /// party, with no lock of ours held, so the fights can still be saved.
      before_reset: RwLock<Option<Arc<dyn Fn() + Send + Sync>>>,
@@ -11,15 +11,15 @@ index 37754a8..71fe636 100644
      /// Buffs, debuffs and stats as the server reports them (see
      /// `capture::abnormal`). Recorded only, nothing reads it into a fight
      /// yet. Its own lock: it is fed every packet, and nothing here needs it
-@@ -761,6 +763,7 @@ impl DataStorage {
+@@ -831,6 +833,7 @@ impl DataStorage {
              last_zone_reset_ms: AtomicI64::new(NEVER_MS),
              combat_reset_requested: AtomicBool::new(false),
              before_reset: RwLock::new(None),
 +            on_hit: RwLock::new(None),
              abnormals: Mutex::new(AbnormalLog { timeline: abnormal::Timeline::default(), pruned_ms: NEVER_MS }),
+             stagger: Mutex::new(StaggerLog::default()),
          }
-     }
-@@ -860,6 +863,20 @@ impl DataStorage {
+@@ -1020,6 +1023,20 @@ impl DataStorage {
          *self.before_reset.write() = Some(Arc::new(hook));
      }
  
@@ -40,7 +40,7 @@ index 37754a8..71fe636 100644
      fn run_before_reset(&self) {
          let hook = self.before_reset.read().clone();
          if let Some(hook) = hook {
-@@ -1390,9 +1407,11 @@ impl DataStorage {
+@@ -1601,9 +1618,11 @@ impl DataStorage {
              // A direct hit: the DoT ticks since the last one count after all.
              for tick in inner.held_dot_ticks.remove(&key).unwrap_or_default() {
                  apply_damage(&mut inner, &tick);
