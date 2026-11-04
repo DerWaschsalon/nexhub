@@ -48,6 +48,8 @@ OP_VERTRAUTE = 0x9000 # alle Vertrauten: u32, Varint N, N x (id, id, Stufe) u32,
 OP_SEELE = 0x900D     # neue Seele: 01, id u32, Anzahl u32
 OP_STUFE = 0x9014     # neue Stufe: u16 0, id u32, Stufe u32 (Opcodes aus aion2assistant, Formate geprueft)
 OP_STAGGER = 0xE005   # Stagger-Leiste: Entity, 03 01, Max u32, Wert u32, Status. Kurz (Entity, 00 ..) = gebrochen
+# Kommt nach dem Brechen keine neue Leiste, gilt der Boss nach so vielen Sekunden wieder als nicht groggy
+GROGGY_MAX_S = 8.0
 OP_DUNGEON = 0x6100   # Dungeon-Lauf: Dungeon u32, Status (2 laeuft, 3 geschafft), Start u64 ms, Ende u64 ms (geprueft)
 OP_EFFEKT = 0x382A    # Status auf einer Entity (Ziel, 2 Byte, Zaehler, Status-ID u32, Dauer u32 ms, ...)
                       # mit Position am Ende. Mit eigener ID die einzige
@@ -101,6 +103,7 @@ class RadarZustand:
         self.charnamen: dict[int, str] = {}   # Charakter-ID -> Name (aus den Gruppenlisten)
         self.spieler: dict[int, str] = {}     # Entity -> Name, fuer "Todesmal auf ..."
         self.bosse: dict[int, int] = {}       # Entity -> Boss-NPC-ID
+        self.groggy_seit: dict[int, float] = {}  # Boss-Entity -> Zeit, seit die Stagger-Leiste gebrochen ist
         self.zone: int | None = None
         # live gespeichert, damit Timer und Seelen einen Neustart ueberleben (nicht beim Abspielen alter Mitschnitte)
         self.speichern = speichern
@@ -116,6 +119,21 @@ class RadarZustand:
         self.status_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)
         self.pvp = PvpSitzung(self)
+
+    def _stagger(self, boss: int, gebrochen: bool) -> None:
+        """Gebrochene Leiste: Boss ist groggy. Jede andere Leisten-Nachricht heißt, die Leiste
+        läuft wieder, also ist es vorbei."""
+        if not gebrochen:
+            self.groggy_seit.pop(boss, None)
+            return
+        self.groggy_seit[boss] = time.time()
+        for f in self.bei_groggy:
+            f(boss)
+
+    def boss_groggy(self, jetzt: float | None = None) -> bool:
+        """Ist gerade ein Boss groggy? Für Makros, unabhängig davon, ob die Warnung angezeigt wird."""
+        jetzt = time.time() if jetzt is None else jetzt
+        return any(jetzt - seit < GROGGY_MAX_S for seit in self.groggy_seit.values())
 
     def verarbeiten(self, op: int, p: bytes) -> None:
         self.nachrichten += 1
@@ -169,9 +187,8 @@ class RadarZustand:
             elif op == OP_OEFFNEN and eid in self.cubes:
                 spieler = uvarint(p, n)[0]
                 self.cubes[eid].oeffner = self.spieler.get(spieler, "?")
-            elif op == OP_STAGGER and p[n] == 0 and eid in self.bosse:
-                for f in self.bei_groggy:
-                    f(eid)
+            elif op == OP_STAGGER and eid in self.bosse:
+                self._stagger(eid, gebrochen=p[n] == 0)
             elif op == OP_DUNGEON:
                 laeuft = p[4] == 2
                 self.dungeon_ende = struct.unpack_from("<Q", p, 13)[0] / 1000 if laeuft else None
