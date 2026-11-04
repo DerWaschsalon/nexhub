@@ -1,7 +1,8 @@
 {
   "alle": {
     "groggy": "Boss groggy (alle Dungeons)",
-    "gruppe_lp": "Mitspieler mit wenig LP (alle Dungeons)"
+    "gruppe_lp": "Mitspieler mit wenig LP (alle Dungeons)",
+    "flaeche": "Bodenfläche bei dir (alle Dungeons)"
   },
   "dungeons": {
     "Krao Cave": {

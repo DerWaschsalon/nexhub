@@ -43,6 +43,9 @@ OP_SYNC = 0x8D00      # Punkte einer Entity (HP, MP, ...): Entity, Flags u8, bei
                       # MP und SP (Art 1, 3) schickt der Server nur fuer den eigenen Charakter (geprueft)
 EIGENE_PUNKTE = {1, 3}
 OP_CAST = 0x3802      # Cast-Beginn: Caster, 00, Skill u32, 2 Byte, Ziel (geprueft)
+# Boden-Markierung eines Skills (glass-cannon, MIT): Caster, Skill u32, Cast-ID u8, u32, u16, x/y/z, Richtung,
+# ms bis zum Einschlag u16. Nur der Mittelpunkt, keine Groesse und Form.
+OP_MARKIERUNG = 0x3848
 OP_ZONE = 0x4002      # eigener Zonenwechsel: Zonen-ID u32, im Dungeon die Dungeon-ID (geprueft)
 OP_NPC = 0x3641       # NPC erscheint: Entity, 3 Byte, NPC-ID u32 (geprueft)
 OP_SPIELER = 0x3645   # anderer Spieler erscheint: Entity, 4 Byte, Namenslaenge, Name (geprueft)
@@ -149,7 +152,8 @@ class RadarZustand:
         self.bei_staggern: list[Callable[[int], None]] = []     # Boss-Entity, deren Leiste brechbar wird
         self.bei_treffer: list[Callable[[int], None]] = []      # Skill, der dich trifft, nur IDs aus treffer_ids
         self.bei_gruppe_lp: list[Callable[[int, float], None]] = []  # (Entity, LP-Anteil 0-1)
-        self.bei_tod: list[Callable[[int, int, str], None]] = []  # (Opfer, Skill, Name des Taeters oder "")
+        self.bei_tod: list[Callable[[int, int, str], None]] = []
+        self.bei_flaeche: list[Callable[[int, float, float, float], None]] = []  # (Skill, x, y, s bis Einschlag)  # (Opfer, Skill, Name des Taeters oder "")
         self.status_ids: set[int] = set()
         self.treffer_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)
@@ -283,6 +287,12 @@ class RadarZustand:
                 self.dungeon_ende = struct.unpack_from("<Q", p, 13)[0] / 1000 if laeuft else None
             elif op in PVP_OPCODES:
                 self.pvp.verarbeiten(op, p)
+            elif op == OP_MARKIERUNG and len(p) == n + 29 and eid != self.eigene_eid and eid not in self.spieler:
+                skill = struct.unpack_from("<I", p, n)[0]
+                x, y, _z = struct.unpack_from("<fff", p, n + 11)
+                bis = struct.unpack_from("<H", p, n + 27)[0] / 1000
+                for f in self.bei_flaeche:
+                    f(skill, x, y, bis)
             elif op == OP_CAST:
                 if eid == self.eigene_eid and len(p) >= CAST_POS + 12:
                     self._position_pruefen(*struct.unpack_from("<fff", p, CAST_POS))  # im Kampf oft die beste Quelle
