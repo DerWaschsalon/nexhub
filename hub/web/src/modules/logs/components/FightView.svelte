@@ -1,8 +1,10 @@
-<!-- Ein Bosskampf: Reiter Schaden (Verlauf + Rangliste), Fähigkeiten, Zeitleiste, Tode. -->
+<!-- Ein Bosskampf: Reiter Schaden (Verlauf + Rangliste), Fähigkeiten, Zeitleiste, Tode (mit Ursache und
+     Warnung, wenn das Radar im NexBoard lief). -->
 <script lang="ts">
 	import { formatDuration } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { playerId, type Fight } from '../api.ts';
+	import { skillName } from '../names.svelte.ts';
 	import BuffTimeline from './BuffTimeline.svelte';
 	import DpsChart from './DpsChart.svelte';
 	import PlayerName from './PlayerName.svelte';
@@ -78,6 +80,7 @@
 						<tr>
 							<th>{t('logs.deaths.time')}</th>
 							<th>{t('logs.deaths.player')}</th>
+							<th>{t('logs.deaths.cause')}</th>
 							<th>{t('logs.deaths.revived')}</th>
 						</tr>
 					</thead>
@@ -86,6 +89,16 @@
 							<tr>
 								<td class="num">{formatDuration(d.t_ms)}</td>
 								<td><PlayerName name={d.name} cls={fight.players.find((x) => x.name === d.name)?.cls ?? null} /></td>
+								<td>
+									{#if d.skill != null}
+										{skillName(d.skill)}
+										<span class="dim small">
+											{d.warning
+												? t('logs.deaths.warned', { w: d.warning, s: ((d.lead_ms ?? 0) / 1000).toFixed(1) })
+												: t('logs.deaths.unwarned')}
+										</span>
+									{:else}<span class="dim">–</span>{/if}
+								</td>
 								<td class="dim num">
 									{d.revived_ms != null ? t('logs.deaths.after', { d: formatDuration(d.revived_ms - d.t_ms) }) : t('logs.deaths.no')}
 								</td>
@@ -99,6 +112,10 @@
 {/if}
 
 <style>
+	.small {
+		font-size: 12px;
+		display: block;
+	}
 	h2 {
 		font-size: 17px;
 		margin-bottom: 14px;

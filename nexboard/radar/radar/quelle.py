@@ -56,6 +56,8 @@ class Quelle:
                 self.lesen(self.prozess.stdout)
                 if self.prozess.wait() != 0:
                     self.fehler = "tcpdump beendet (Rechte? getcap /usr/bin/tcpdump)"
+            except FileNotFoundError:
+                self.fehler = "tcpdump fehlt (pacman -S tcpdump, dann setcap cap_net_raw,cap_net_admin=eip)"
             except Exception as e:  # Anzeige soll den Fehler zeigen
                 self.fehler = str(e)
 

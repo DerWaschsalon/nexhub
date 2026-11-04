@@ -29,6 +29,7 @@ USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like G
               "Chrome/140.0.0.0 Safari/537.36")
 TRIES = 3
 _TAGS = re.compile(r"</?strong>")
+_NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 
 
 class NCError(Exception):
@@ -85,18 +86,43 @@ def combat_power(data: dict) -> int | None:
 
 
 def _stats(rows: object, *fields: str) -> list[dict]:
-    """Werte eines Gegenstands: [{name, value, …}] ohne leere Zeilen."""
+    """Werte eines Gegenstands: [{id, name, value, …}] ohne leere Zeilen. Die Kennung (z. B. „Critical“)
+    ist in jeder Sprache gleich; ratgeber.py erkennt daran verschenkte Werte."""
     if not isinstance(rows, list):
         return []
-    return [{"name": r.get("name"), "value": r.get("value"), **{f: r.get(f) for f in fields}}
+    return [{"id": r.get("id"), "name": r.get("name"), "value": r.get("value"), **{f: r.get(f) for f in fields}}
             for r in rows if isinstance(r, dict) and r.get("name")]
+
+
+def _total(row: dict | None) -> float:
+    """Grundwert samt Bonus aus der Verzauberung als Zahl ("486" + "146"); NC schickt Texte wie "9.1%"."""
+    found = [_NUMBER.search(str((row or {}).get(f) or "")) for f in ("value", "extra")]
+    return sum(float(m.group()) for m in found if m)
+
+
+def _gain(now: object, capped: object) -> list[dict]:
+    """Was die Grundwerte bei voller Verzauberung mehr hätten: [{name, value: "+34"}]. Verglichen
+    über die Kennung (id), weil die Namen übersetzt sind."""
+    if not isinstance(now, list) or not isinstance(capped, list):
+        return []
+    before = {r.get("id"): r for r in now if isinstance(r, dict)}
+    out = []
+    for row in capped:
+        if not isinstance(row, dict) or row.get("id") not in before:
+            continue
+        diff = round(_total(row) - _total(before[row["id"]]), 1)
+        if diff > 0:
+            unit = "%" if "%" in str(row.get("value")) else ""
+            out.append({"name": row.get("name"), "value": f"+{diff:g}{unit}"})
+    return out
 
 
 def _item_detail(d: dict) -> dict:
     """Was ein Gegenstand im Spiel anzeigt: Grundwerte (+ Bonus aus Verzauberung), zufällige
     Zusatzwerte, Manasteine, Gottsteine, verstärkte Skills und bei Arkana das Set."""
     detail = {
-        "level": d.get("level"), "category": d.get("categoryName"),
+        "level": d.get("level"), "category": d.get("categoryName"), "max_enchant": d.get("maxEnchantLevel"),
+        "stone_slots": d.get("magicStoneSlotCount"),
         "main": _stats(d.get("mainStats"), "extra"),
         "sub": _stats(d.get("subStats")),
         "stones": _stats(d.get("magicStoneStat"), "grade", "icon"),
@@ -209,16 +235,36 @@ class NC:
         Slot nicht mehr trägt – so passen nachgeladene Werte immer zum gespeicherten Gegenstand."""
         if not item.get("id"):
             return None
-        try:
-            d = await self._get(f"{SITE}/equipment/item", {
-                "lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id,
-                "characterId": character_id, "id": item["id"], "enchantLevel": item.get("enchant") or 0,
-                "slotPos": item.get("slot")})
-        except NotFound:
-            return None
+        enchant = item.get("enchant") or 0
+        d = await self._item(server_id, character_id, lang, item, enchant)
         if not d.get("id") or not d.get("name"):
             return None
-        return _item_detail(d)
+        detail = _item_detail(d)
+        top = d.get("maxEnchantLevel")
+        if isinstance(top, int) and top > enchant:
+            detail["gain"] = await self._gain_at(server_id, character_id, lang, item, d, top)
+        return detail
+
+    async def _item(self, server_id: int, character_id: str, lang: str, item: dict, enchant: int) -> dict:
+        """Ein Gegenstand, wie er bei Verzauberung `enchant` aussähe. {} = nicht (mehr) da."""
+        try:
+            return await self._get(f"{SITE}/equipment/item", {
+                "lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id,
+                "characterId": character_id, "id": item["id"], "enchantLevel": enchant,
+                "slotPos": item.get("slot")})
+        except NotFound:
+            return {}
+
+    async def _gain_at(self, server_id: int, character_id: str, lang: str, item: dict, now: dict,
+                       top: int) -> dict | None:
+        """Gewinn bis zur höchsten Verzauberung. NC rechnet jede Stufe aus, auch noch nicht erreichte;
+        manche Gegenstände nennen aber eine Höchststufe, die 404 gibt – dann lieber nichts als raten."""
+        try:
+            capped = await self._item(server_id, character_id, lang, item, top)
+        except NCError:
+            return None
+        stats = _gain(now.get("mainStats"), capped.get("mainStats"))
+        return {"enchant": top, "stats": stats} if stats else None
 
     async def snapshots(self, server_id: int, character_id: str, items: bool = False) -> dict:
         """Momentaufnahme in allen Sprachen (FORMAT). `items`: dazu je Gegenstand die Werte – eine

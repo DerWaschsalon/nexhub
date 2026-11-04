@@ -1,10 +1,22 @@
 {
   "alle": {
-    "groggy": "Boss groggy (alle Dungeons)"
+    "groggy": "Boss groggy (alle Dungeons)",
+    "gruppe_lp": "Mitspieler mit wenig LP (alle Dungeons)",
+    "flaeche": "Bodenfläche bei dir (alle Dungeons)"
   },
   "dungeons": {
-    "Krao Cave": {},
-    "Urugugu Canyon": {},
+    "Krao Cave": {
+      "berk_wirbel": "Berk: Wirbelwind",
+      "berk_welle": "Berk: Welle",
+      "berk_stagger": "Berk: Jetzt staggern"
+    },
+    "Urugugu Canyon": {
+      "raur_konter": "Raur: Konter-Haltung",
+      "auldor_sturm": "Auldor: Sturmstreich",
+      "urahum_gift": "Urahum: Gift (auf dir)",
+      "urahum_pfuetze": "Urahum: Giftpfütze",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+    },
     "Feuertempel": {
       "flamme": "Kromede: Todesmal / Teufelsflamme",
       "regen": "Kromede: Regen des Hasses",
@@ -15,14 +27,43 @@
       "schwert": "Kromede: Schwertangriffe",
       "ignus": "Ignus: Flammeneruption",
       "murute": "Murute: Gigantisches Beben",
-      "bombe": "Ignus: Verzögerte Explosion (auf dir)"
+      "bombe": "Ignus: Verzögerte Explosion (auf dir)",
+      "ignus_zone": "Ignus: Flammenzone"
     },
-    "Draupnir": {},
+    "Draupnir": {
+      "lakshmi_reflexion": "Lakshmi: Reflexion",
+      "bakarma_stagger": "Bakarma: Jetzt staggern",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+    },
     "Dying Dramata's Nest": {},
-    "Deus Research Base": {},
-    "Shattered Arkanis": {},
-    "Vakron Sky Island": {},
-    "Ferocious Horn Den": {},
+    "Deus Research Base": {
+      "nazmun_bombe": "Nazmun: Bombe",
+      "atiel_wurzel": "Atiel: Festgehalten (Mitspieler)",
+      "atiel_kette": "Atiel: Kette (auf dir)",
+      "atiel_stagger": "Atiel: Jetzt staggern",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+    },
+    "Shattered Arkanis": {
+      "ruthilis_blitz": "Ruthilis: Blitz (auf dir)",
+      "talisra_gefaengnis": "Talisra: Kristallgefängnis (Mitspieler)",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+    },
+    "Vakron Sky Island": {
+      "tiere_blume": "Tiere: Rafflesia",
+      "tiere_rotation": "Tiere: Rotation",
+      "tiere_gift": "Tiere: Giftfläche",
+      "thamon_physisch": "Thamon: Physischer Schild",
+      "thamon_magisch": "Thamon: Magischer Schild",
+      "thamon_stein": "Thamon: Versteinert (Mitspieler)",
+      "vakron_mal": "Vakron: Dornenmal (auf dir)",
+      "vakron_gefangen": "Vakron: Gefangen (Mitspieler)",
+      "vakron_ringe": "Vakron: Dornenringe",
+      "vakron_gefaengnis": "Vakron: Gefängnis"
+    },
+    "Ferocious Horn Den": {
+      "nuakum_blutung": "Nuakum: Blutung (auf dir)",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+    },
     "Cradle of Nihility": {},
     "Hall of Illusion": {},
     "Azure Breath Island": {},

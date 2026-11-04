@@ -1,4 +1,5 @@
 import struct
+import time
 import unittest
 
 from radar.zustand import OP_FELDBOSSE, OP_SEELE, OP_STUFE, OP_VERTRAUTE, RadarZustand
@@ -39,7 +40,19 @@ class FeldbosseVertrauteTest(unittest.TestCase):
         self.z.verarbeiten(0x6100, struct.pack("<IBQQ", 600022, 2, 1792742000000, 1792745600000))
         self.assertEqual(status, [(2489, 16008401)])
         self.assertEqual(groggy, [1000])
+        self.assertTrue(self.z.boss_groggy())
+        self.assertFalse(self.z.boss_groggy(time.time() + 9))  # ohne neue Leiste nach 8 s vorbei
         self.assertEqual(self.z.dungeon_ende, 1792745600.0)
+
+    def test_groggy_endet_mit_neuer_leiste(self):
+        self.z.bosse[1000] = 2300311
+        self.z.verarbeiten(0xE005, varint(1000) + b"\x00\x03\x02")
+        self.assertTrue(self.z.boss_groggy())
+        # Leiste läuft wieder (Entity, 03 01, Max u32, Wert u32, Status)
+        self.z.verarbeiten(0xE005, varint(1000) + b"\x03\x01" + struct.pack("<II", 557, 557) + b"\x00")
+        self.assertFalse(self.z.boss_groggy())
+        self.z.verarbeiten(0xE005, varint(55) + b"\x00\x03\x02")  # kein Boss: zählt nicht
+        self.assertFalse(self.z.boss_groggy())
 
     def test_cube_alter(self):
         import time

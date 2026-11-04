@@ -79,7 +79,8 @@ def default_outbox() -> Path:
     return Path(base) / "deckbar" / "outbox"
 
 
-def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, capture: str | None) -> bytes:
+def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, capture: str | None,
+                 deaths: list[dict] | None = None) -> bytes:
     """Run → gepacktes NexLog. Liest die Kampfdateien und Einzeltreffer des Mitschnitts von der Platte;
     läuft in einem Thread (Packen großer Runs dauert bis ~0,1 s)."""
     from nexproto import NexLog, pack  # erst hier: fehlt das Paket, scheitert nur das Hochladen
@@ -100,6 +101,7 @@ def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, c
         "names": run.names,
         "fights": fights,
         "hits": hits,
+        "deaths": deaths or [],  # Todesursachen vom Radar, falls es lief
     }))
 
 
@@ -126,6 +128,7 @@ class Hub:
         self.history_dir: Callable[[], Path] = lambda: Path()
         self.language: Callable[[], str] = lambda: "en"
         self.capture_build: Callable[[], str | None] = lambda: None
+        self.deaths: Callable[[int, int], list[dict]] = lambda start_ms, end_ms: []
 
     # ------------------------------------------------------------ Einstellungen
     def _load(self) -> HubSettings:
@@ -306,7 +309,7 @@ class Hub:
             return
         try:
             data = await asyncio.to_thread(build_nexlog, run, self.history_dir(), self.you, self.language(),
-                                           self.capture_build())
+                                           self.capture_build(), self.deaths(run.start_ms, run.end_ms))
         except ImportError:
             self._note(False, "Paket nexproto fehlt: im Repo `uv tool install --force --editable ./daemon`")
             return

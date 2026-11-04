@@ -39,6 +39,45 @@ async def test_update_saves_and_publishes(tmp_path):
     assert Overlay(tmp_path).layout.widgets.boss.x == 100
 
 
+async def test_profile_schalten_widgets_und_merken_sich_aenderungen(tmp_path):
+    o = Overlay(tmp_path, manage_unit=False)
+    await o.update({"profil": "PvP"})
+    assert o.layout.sichtbar() == ["meter", "pvp"]
+    await o.update({"widgets": {"timers": {"enabled": True}}})  # z.B. Tastenkürzel --widget timers
+    assert o.layout.profile["PvP"] == ["meter", "timers", "pvp"]
+    await o.update({"profil": "PvE"})
+    assert o.layout.sichtbar() == ["meter", "boss", "timers", "radar", "warnung"]
+    with pytest.raises(ValueError):
+        await o.update({"profil": "Tippfehler"})  # z.B. im Tastenkürzel: Ansicht bleibt, wie sie ist
+    assert o.layout.profil == "PvE"
+    # die Profilliste kommt immer ganz, sonst ließe sich keins löschen; das aktive nur zusammen mit profil
+    with pytest.raises(ValueError):
+        await o.update({"profile": {"PvP": ["meter"]}})
+    await o.update({"profile": {"PvP": ["meter"]}, "profil": ""})
+    assert list(o.layout.profile) == ["PvP"] and o.layout.sichtbar() == ["meter", "boss", "timers", "radar", "warnung"]
+    with pytest.raises(ValueError):
+        await o.update({"profile": {"Mit Leerzeichen": []}})
+    with pytest.raises(ValueError):
+        await o.update({"profile": {"X": ["gibtsnicht"]}})
+
+
+async def test_starter_bekommt_je_profil_und_widget_eine_aktion(tmp_path):
+    from deckbar_daemon.overlay import LAUNCHER, launcher_path
+    o = Overlay(tmp_path, manage_unit=True)
+    o.write_launcher()
+    assert not launcher_path().exists()  # Overlay nicht eingerichtet: nichts anlegen
+    launcher_path().parent.mkdir(parents=True)
+    launcher_path().write_text(LAUNCHER.read_text())
+    await o.update({"profile": {"PvP": ["pvp"], "Raid": ["meter", "boss"]}})
+    text = launcher_path().read_text()
+    assert text.startswith(LAUNCHER.read_text())
+    assert "Actions=profil-PvP;profil-Raid;widget-meter;" in text
+    assert "[Desktop Action profil-Raid]\nName=Profil Raid\nExec=deckbar-overlay --profil Raid\n" in text
+    assert "Name=PvP ein/aus\nExec=deckbar-overlay --widget pvp\n" in text
+    await Overlay(tmp_path / "test", manage_unit=False).update({"profile": {"Anders": []}})
+    assert launcher_path().read_text() == text  # Testinstanzen fassen den Starter nie an
+
+
 async def test_autohide_geht_sofort_ans_laufende_programm(tmp_path):
     """Nur ein Wechsel von hide_unfocused schickt einen Befehl über den Socket (hier ein Fake im
     Test-Laufzeitordner aus conftest.py); ohne laufendes Programm wird nur gespeichert."""

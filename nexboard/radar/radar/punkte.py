@@ -178,6 +178,18 @@ class Karte:
         self.ordner.mkdir(parents=True, exist_ok=True)
         (self.ordner / "eichung.json").write_text(json.dumps({"paare": self.eichung.paare}))
 
+    def liste(self, datei: str) -> list:
+        """JSON-Liste aus dem Kartenordner (fundorte.json, teleporter.json), leer wenn es sie nicht gibt."""
+        try:
+            return json.loads((self.ordner / datei).read_text())
+        except (OSError, ValueError):
+            return []
+
+    @property
+    def symbol(self) -> Path:
+        """Teleporter-Symbol aus dem Spiel (werkzeuge.cubekarte)."""
+        return self.ordner / "teleporter.png"
+
     @staticmethod
     def alle() -> list["Karte"]:
         _mitgelieferte_kopieren()

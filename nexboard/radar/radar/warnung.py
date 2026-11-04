@@ -1,15 +1,15 @@
-"""Boss-Warnungen fuer den Feuertempel: reagiert auf den Cast-Beginn (0x3802).
+"""Boss-Warnungen: reagiert auf den Cast-Beginn (0x3802), Status-Effekte (0x382A), Treffer (0x3804)
+und die Stagger-Leiste (0xE005).
 
-Alle Zeiten stammen aus der Auswertung von rund 20 Kaempfen (2026-10-23).
-Skill-Namen aus den A2Tools-Daten, Ausweich-Hinweise aus dem Guide
-"Fire Temple Guide Aion 2 Global" (NoBS Game Guides).
+Feuertempel: alle Zeiten aus der Auswertung von rund 20 Kaempfen (2026-10-23), Skill-Namen aus den
+A2Tools-Daten, Ausweich-Hinweise aus dem Guide "Fire Temple Guide Aion 2 Global" (NoBS Game Guides).
+Die uebrigen Dungeons kommen aus mechaniken.json (IDs nach glass-cannon, MIT).
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import math
-import shutil
 import subprocess
 import threading
 import time
@@ -17,13 +17,9 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel,
-                               QStackedWidget, QVBoxLayout, QWidget)
-
 from .daten import a2_namen, npc_name
-from .overlay import konfig_laden, konfig_speichern
+from .konfig import abspielen, konfig_laden
+from .zustand import MECHANIKEN
 
 ALARM = Path.home() / ".cache" / "aion2-radar" / "alarm.wav"
 ANSAGEN = Path.home() / ".cache" / "aion2-radar" / "ansagen"   # fertig gesprochene Saetze
@@ -51,6 +47,8 @@ class Regel:
     gruppe: str                      # neue Warnung ersetzt aeltere derselben Gruppe
     danach: tuple["Regel", ...] = ()  # gleichzeitig ausgeloeste Vorhersagen
     plan: tuple[tuple[float, "Regel"], ...] = ()  # (Sekunden spaeter, Regel)
+    auf: str = "du"                  # Status-Effekt zaehlt auf: du, mitspieler, spieler, boss
+    hinweis_ich: str = "Weg von der Gruppe!"  # Hinweis, wenn es dich trifft
 
 
 GRUEN = (0, 230, 118)
@@ -100,39 +98,54 @@ STATUS_REGELN: dict[int, Regel] = {
 }
 # Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
 GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
+# Gruppenmitglied unter 25 % LP; erst wieder melden, wenn es ueber 50 % war
+GRUPPE_LP = Regel("Wenig LP", "Unter 25 %", 3.0, ROT, "gruppe_lp")
+LP_KNAPP, LP_WIEDER = 0.25, 0.5
+# Boden-Markierung (0x3848) mit Mittelpunkt hoechstens so nah an dir (Einstellung flaeche_m)
+FLAECHE_DU = "Ausweichen!"
+TREFFER_REGELN: dict[int, Regel] = {}  # Skill, der dich trifft (Pfuetzen, Zonen) -> Regel
+STAGGER_REGELN: dict[int, Regel] = {}  # Boss-NPC mit Stagger-Pruefung -> „Jetzt staggern“
+FARBEN = {"GRUEN": GRUEN, "LILA": LILA, "ORANGE": ORANGE, "GELB": GELB, "BLAU": BLAU, "ROT": ROT}
 
-# Fenster "Meldungen": Dungeon -> {Gruppe: Name}, steht in meldungen.json (liest auch der
-# NexBoard-Daemon). Ohne Eintraege = noch keine Warnungen ("fehlt").
+
+def mechanik_regel(m: dict) -> Regel:
+    """Eine Regel aus mechaniken.json. „danach“ wird als geplante Folge-Warnung derselben Gruppe
+    eingehaengt und ersetzt die erste, wenn sie abgelaufen ist."""
+    farbe = FARBEN[m["farbe"]]
+    plan = ()
+    if m.get("danach"):
+        folge = Regel(m["titel"], m["danach"]["hinweis"], m["danach"]["sekunden"], farbe, m["gruppe"])
+        plan = ((m["sekunden"], folge),)
+    return Regel(m["titel"], m["hinweis"], m["sekunden"], farbe, m["gruppe"], plan=plan,
+                 auf=m["wann"].get("auf", "du"), hinweis_ich=m.get("hinweis_ich", "Weg von der Gruppe!"))
+
+
+for _m in MECHANIKEN:
+    _regel, _wann = mechanik_regel(_m), _m["wann"]
+    if _wann["art"] == "cast":
+        REGELN.update({skill: _regel for skill in _wann["skills"]})
+    elif _wann["art"] == "effekt":
+        STATUS_REGELN[_wann["id"]] = _regel
+    elif _wann["art"] == "treffer":
+        TREFFER_REGELN.update({skill: _regel for skill in _wann["skills"]})
+    elif _wann["art"] == "stagger":
+        STAGGER_REGELN.update({npc: _regel for npc in _m["bosse"]})
+
+# Meldungen je Dungeon: Dungeon -> {Gruppe: Name}, steht in meldungen.json (liest auch die
+# NexBoard-Seite). Ohne Eintraege = noch keine Warnungen ("fehlt").
 _MELDUNGEN = json.loads((Path(__file__).parent / "meldungen.json").read_text())
-ALLE_DUNGEONS: dict[str, str] = _MELDUNGEN["alle"]  # Zeilen auf jeder Seite im Fenster
+ALLE_DUNGEONS: dict[str, str] = _MELDUNGEN["alle"]  # gelten in jedem Dungeon
 DUNGEONS: dict[str, dict[str, str]] = _MELDUNGEN["dungeons"]
 
 # Englische Texte (Deutsch ist der Grundtext). Fehlt ein Eintrag, bleibt der deutsche Text.
 ENGLISCH = {
-    # Fenster
-    "AION2 Meldungen": "AION2 Alerts", "Sprache": "Language", "Meldung": "Alert",
-    "Anzeigen": "Show", "Ton": "Sound", "fehlt": "missing", "Feuertempel": "Fire Temple",
-    "Aus": "Off", "Piepton": "Beep", "Ansage": "Voice",
-    "Für diesen Dungeon gibt es noch keine Warnungen.": "No alerts for this dungeon yet.",
-    "Alle Boss-Casts zeigen (Lernhilfe)": "Show all boss casts (learning aid)",
-    "Dungeons automatisch aufnehmen (Lernmodus)": "Record dungeons automatically (learning mode)",
     " auf ": " on ", " auf dir": " on you",
-    # Feldbosse und Vertraute
-    "AION2 Feldbosse und Vertraute": "AION2 Field Bosses and Familiars", "Feldbosse": "Field bosses",
-    "Feldboss": "Field boss", "Vertraute": "Familiars", "Vertrauter": "Familiar", "Karte": "Map",
-    " in 5 Minuten": " in 5 minutes", " ist da": " is up", "lebt": "alive", "in": "in",
-    "vermutlich da": "probably up", "unbekannt": "unknown",
-    "Ansage 5 Minuten vorher und beim Respawn": "Announce 5 minutes before and at respawn",
-    "Alle": "All", "Noch nicht MAX": "Not MAX yet", "Nicht angefangen": "Not started", "Art": "Type",
-    "Stufe (3 = MAX)": "Tier (3 = MAX)", "Seelen": "Souls", "angefangen": "started", "gesamt": "total",
-    "Noch keine Daten. Sie kommen beim Einloggen oder Zonenwechsel.":
-        "No data yet. It arrives on login or zone change.",
-    "Spezial": "Special", "Alle Arten": "All types", "Fehlen": "Missing", "Wo farmen": "Where to farm",
-    "Seelen bis alles MAX": "Souls until all MAX", "Riss": "Rift", " ist offen": " is open",
-    "Nächster Riss": "Next rift", "Riss offen bis": "Rift open until", "Termin": "Event", "Uhrzeit": "Time",
-    "offen bis": "open until", "Shugo-Fest": "Shugo Festival", "Beritra-Luftangriff": "Beritra Air Raid",
-    "Wächterin Kaira": "Watcher Kaira", "Tages-Reset": "Daily reset", "Wochen-Reset": "Weekly reset",
-    "Ansage 5 Minuten vorher (Feldbosse und Riss)": "Announce 5 minutes before (field bosses and rift)",
+    # Feldbosse, Termine und Vertraute (Ansagen und die Tabellen auf der NexBoard-Seite)
+    "Feldboss": "Field boss", " in 5 Minuten": " in 5 minutes", " ist da": " is up", "lebt": "alive",
+    "in": "in", "vermutlich da": "probably up", "unbekannt": "unknown", "Spezial": "Special",
+    "Riss": "Rift", " ist offen": " is open", "offen bis": "open until", "Shugo-Fest": "Shugo Festival",
+    "Beritra-Luftangriff": "Beritra Air Raid", "Wächterin Kaira": "Watcher Kaira",
+    "Tages-Reset": "Daily reset", "Wochen-Reset": "Weekly reset",
     "Kromede: Todesmal / Teufelsflamme": "Kromede: Mark of Death / Demon Flame",
     "Ignus: Verzögerte Explosion (auf dir)": "Ignus: Delayed Explosion (on you)",
     "Boss groggy (alle Dungeons)": "Boss groggy (all dungeons)", "Verzögerte Explosion": "Delayed Explosion",
@@ -167,8 +180,15 @@ ENGLISCH = {
     "Drei Treffer, alle 2 s ausweichen": "Three hits, dodge every 2 s",
     "Hinter sie gehen": "Get behind her",
     "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
-    "Ziehen zum Verschieben, Doppelklick = fertig": "Drag to move, double-click = done",
+    "Wenig LP": "Low HP", "Unter 25 %": "Below 25 %", "Berserker": "Berserk",
+    "Fläche unter dir": "AoE under you", "Ausweichen!": "Dodge!",
+    "Bodenfläche bei dir (alle Dungeons)": "Ground AoE at you (all dungeons)",
+    "Mitspieler mit wenig LP (alle Dungeons)": "Party member with low HP (all dungeons)",
 }
+for _m in MECHANIKEN:  # englische Texte der Mechaniken stehen in mechaniken.json
+    ENGLISCH.update(_m["en"])
+# Lernhilfe (jeden Boss-Cast grau zeigen) gilt in Dungeons, fuer die es noch keine Cast-Warnungen gibt
+CAST_GRUPPEN = {r.gruppe for r in REGELN.values()}
 
 
 def tr(text: str) -> str:
@@ -203,14 +223,15 @@ class WarnZentrale:
         self.aktiv: list[Warnung] = []
         self.geplant: list[tuple[float, Regel]] = []  # (faellig um, Regel)
         self.regen_zuletzt: float | None = None
-        self.laut: list[tuple[str, str]] = []  # (art, text): Piepton oder Ansage, abgespielt im Fenster
+        self.laut: list[tuple[str, str]] = []  # (art, text): Piepton oder Ansage, spielt der RadarDienst ab
         self.k = konfig_laden()
         self.an = self.k["warn_an"]
+        self._knapp: set[int] = set()  # Mitspieler, die schon als „wenig LP“ gemeldet sind
 
     def cast(self, caster: int, skill: int, ziel: int | None) -> None:
         regel = REGELN.get(skill)
         dungeon = self.zustand.dungeon
-        if not regel and dungeon and not DUNGEONS[dungeon] and caster in self.zustand.bosse:
+        if not regel and dungeon and not CAST_GRUPPEN & set(DUNGEONS[dungeon]) and caster in self.zustand.bosse:
             regel = cast_regel(skill, self.zustand.bosse[caster])  # Lernhilfe: jeden Boss-Cast zeigen
         if not regel or not self.an:
             return
@@ -222,28 +243,83 @@ class WarnZentrale:
         ich = skill == TODESMAL and ziel is not None and ziel == self.zustand.eigene_eid
         name = "" if ich else self.zustand.spieler.get(ziel, "")
         with self.lock:
-            # ein echter Cast ersetzt geplante Vorhersagen derselben Gruppen
-            gruppen = {r.gruppe for r in (regel, *regel.danach)}
-            self.geplant = [(t, r) for t, r in self.geplant if r.gruppe not in gruppen]
-            self.geplant += [(jetzt + nach, r) for nach, r in regel.plan]
-            self._hinzufuegen(regel, jetzt, ich, name)
-            for r in regel.danach:
-                self._hinzufuegen(r, jetzt)
+            self._ausloesen(regel, jetzt, ich, name)
+
+    def _ausloesen(self, regel: Regel, jetzt: float, ich: bool = False, name: str = "") -> None:
+        """Warnung zeigen, ihre gleichzeitigen Vorhersagen dazu und die geplanten Folgen einreihen.
+        Ein neuer Ausloeser ersetzt geplante Vorhersagen derselben Gruppen. Aufruf unter self.lock."""
+        gruppen = {r.gruppe for r in (regel, *regel.danach)}
+        self.geplant = [(t, r) for t, r in self.geplant if r.gruppe not in gruppen]
+        self.geplant += [(jetzt + nach, r) for nach, r in regel.plan]
+        self._hinzufuegen(regel, jetzt, ich, name)
+        for r in regel.danach:
+            self._hinzufuegen(r, jetzt)
 
     def status(self, ziel: int, sid: int) -> None:
-        """Status-Effekt: nur, wenn er den eigenen Charakter trifft."""
-        if self.an and ziel == self.zustand.eigene_eid:
+        """Status-Effekt auf dir, einem Mitspieler, irgendeinem Spieler oder dem Boss (Regel.auf)."""
+        regel = STATUS_REGELN[sid]
+        ich = ziel == self.zustand.eigene_eid
+        spieler = ziel in self.zustand.spieler and not ich
+        passt = {"du": ich, "mitspieler": spieler, "spieler": ich or spieler,
+                 "boss": ziel in self.zustand.bosse}[regel.auf]
+        if self.an and passt:
+            name = self.zustand.spieler.get(ziel, "") if spieler else ""
             with self.lock:
-                self._hinzufuegen(STATUS_REGELN[sid], self.uhr(), ich=True)
+                self._ausloesen(regel, self.uhr(), ich and regel.auf != "boss", name)
+
+    def treffer(self, skill: int) -> None:
+        """Ein Skill vom Boden trifft dich (Pfuetze, Zone): raus da. Pfuetzen treffen mehrmals pro
+        Sekunde; solange die Warnung laeuft, zaehlt das als derselbe Treffer (keine Ansage im Sekundentakt)."""
+        regel, jetzt = TREFFER_REGELN[skill], self.uhr()
+        if not self.an:
+            return
+        with self.lock:
+            if not any(w.regel == regel and w.rest(jetzt) > 0 for w in self.aktiv):
+                self._ausloesen(regel, jetzt)
+
+    def staggern(self, boss: int) -> None:
+        """Die Stagger-Leiste eines Bosses mit Stagger-Pruefung ist brechbar geworden."""
+        regel = STAGGER_REGELN.get(self.zustand.bosse.get(boss, 0))
+        if self.an and regel:
+            with self.lock:
+                self._ausloesen(regel, self.uhr())
 
     def groggy(self, boss: int) -> None:
         if self.an:
             with self.lock:
+                # gebrochen: „Jetzt staggern“ ist erledigt
+                self.aktiv = [w for w in self.aktiv if w.regel not in STAGGER_REGELN.values()]
                 self._hinzufuegen(GROGGY, self.uhr())
+
+    def flaeche(self, skill: int, x: float, y: float, bis: float) -> None:
+        """Ein Monster markiert eine Flaeche am Boden. Liegt ihr Mittelpunkt nah an dir, warnen, mit
+        Countdown bis zum Einschlag. Groesse und Form sind unbekannt, deshalb ein fester Abstand."""
+        pos = self.zustand.position
+        if not self.an or pos is None or bis <= 0:
+            return
+        if math.hypot(x - pos[0], y - pos[1]) > self.k.get("flaeche_m", 6.0) * 100:  # Welt in cm
+            return
+        regel = Regel("Fläche unter dir", FLAECHE_DU, bis, ROT, "flaeche", hinweis_ich=FLAECHE_DU)
+        jetzt = self.uhr()
+        with self.lock:
+            # mehrere Markierungen auf einmal (Nazmun: sechs) = eine Warnung, bis sie eingeschlagen ist
+            if not any(w.regel.gruppe == "flaeche" and w.rest(jetzt) > 0 for w in self.aktiv):
+                self._ausloesen(regel, jetzt, ich=True)
+
+    def gruppe_lp(self, eid: int, anteil: float) -> None:
+        """Mitspieler unter 25 % LP einmal melden, erst nach Erholung ueber 50 % wieder."""
+        if anteil > LP_WIEDER:
+            self._knapp.discard(eid)
+            return
+        if not self.an or anteil >= LP_KNAPP or eid in self._knapp:
+            return
+        self._knapp.add(eid)
+        with self.lock:
+            self._hinzufuegen(GRUPPE_LP, self.uhr(), ziel=self.zustand.spieler.get(eid, ""))
 
     def _hinzufuegen(self, regel: Regel, start: float, ich: bool = False, ziel: str = "") -> None:
         if regel.gruppe in self.k["meldung_aus"]:
-            return  # im Fenster "Meldungen" abgeschaltet
+            return  # auf der NexBoard-Seite abgeschaltet
         alt = [w for w in self.aktiv if w.regel.gruppe == regel.gruppe and w.rest(start) > -1.2]
         if any(w.regel == regel and start - w.start < 1.0 for w in alt):
             return  # derselbe Skill doppelt: nur einmal warnen
@@ -264,6 +340,13 @@ class WarnZentrale:
             self.aktiv = [w for w in self.aktiv if w.rest(jetzt) > -1.2]
             return list(self.aktiv)
 
+    def letzte(self, jetzt: float) -> Warnung | None:
+        """Die zuletzt erschienene Warnung, die gerade laeuft (fuer die Todesursache). Lernhilfe zaehlt nicht."""
+        with self.lock:
+            laufend = [w for w in self.aktiv if w.regel.gruppe != "casts" and w.start <= jetzt
+                       and w.rest(jetzt) > -1.2]
+        return max(laufend, key=lambda w: w.start, default=None)
+
     def vorschau(self) -> list[tuple[str, float]]:
         """Kleine Zeile oben: (Text, Sekunden). 0 Sekunden = jetzt moeglich."""
         jetzt = self.uhr()
@@ -280,6 +363,9 @@ class WarnZentrale:
                 liste.append(("Regen des Hasses jederzeit möglich", 0.0))
             else:
                 self.regen_zuletzt = None  # Kampf vermutlich vorbei
+        for ende in list(self.zustand.berserker.values()):  # 0x8D21: Boss wird berserk
+            if ende > jetzt:
+                liste.append(("Berserker", ende - jetzt))
         return sorted(liste, key=lambda x: x[1])
 
 
@@ -289,12 +375,6 @@ def cast_regel(skill: int, npc: int) -> Regel:
     boss = npc_name(npc, sprache) or "Boss"
     return Regel(a2_namen("skills", sprache).get(str(skill), str(skill)), f"{boss} · {skill}",
                  3.0, GRAU, "casts")
-
-
-def abspielen(datei: Path) -> None:
-    spieler = shutil.which("pw-play") or shutil.which("paplay")
-    if spieler:
-        subprocess.Popen([spieler, str(datei)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def gesprochen(text: str) -> Path | None:
@@ -344,221 +424,3 @@ def alarm_abspielen() -> None:
             w.setframerate(rate)
             w.writeframes(bytes(daten))
     abspielen(ALARM)
-
-
-class WarnFenster(QWidget):
-    """Durchklickbares Fenster oben mittig. Zum Verschieben kurz klickbar schalten."""
-    BREITE, ZEILE = 460, 74
-
-    def __init__(self, zentrale: WarnZentrale) -> None:
-        super().__init__()
-        self.zentrale = zentrale
-        self.k = konfig_laden()
-        self.verschieben = False
-        self._zieh = None
-        self.setWindowTitle("AION2 Warnung")
-        self._flags()
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_ShowWithoutActivating)
-        x, y = self.k.get("warn_x"), self.k.get("warn_y")
-        if x is None:
-            bild = QGuiApplication.primaryScreen().geometry()
-            x, y = bild.center().x() - self.BREITE // 2, bild.top() + 140
-        self.setGeometry(x, y, self.BREITE, self.ZEILE * 3 + 30)
-        self.timer = QTimer(self, interval=50, timeout=self._takt)
-        self.timer.start()
-
-    def _flags(self) -> None:
-        f = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.WindowDoesNotAcceptFocus
-        if not self.verschieben:
-            f |= Qt.WindowTransparentForInput
-        self.setWindowFlags(f)
-
-    def verschieben_umschalten(self) -> None:
-        self.verschieben = not self.verschieben
-        self._flags()
-        self.show()
-        if not self.verschieben:
-            self.k.update(warn_x=self.x(), warn_y=self.y())
-            konfig_speichern(self.k)
-
-    def test(self) -> None:
-        self.zentrale.cast(0, TODESMAL, self.zentrale.zustand.eigene_eid)
-
-    def _takt(self) -> None:
-        sichtbar = self.zentrale.schnappschuss() or self.zentrale.vorschau() or self.verschieben
-        while self.zentrale.laut:
-            art, text = self.zentrale.laut.pop(0)
-            ansage(text) if art == "ansage" else alarm_abspielen()
-        self.setVisible(bool(sichtbar))
-        self.update()
-
-    def mousePressEvent(self, e) -> None:
-        self._zieh = e.globalPosition() - self.pos().toPointF()
-
-    def mouseMoveEvent(self, e) -> None:
-        if self._zieh is not None:
-            self.move((e.globalPosition() - self._zieh).toPoint())
-
-    def mouseReleaseEvent(self, e) -> None:
-        self._zieh = None
-
-    def mouseDoubleClickEvent(self, e) -> None:
-        self.verschieben_umschalten()
-
-    def paintEvent(self, _) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        jetzt = self.zentrale.uhr()
-        if self.verschieben:
-            self._kasten(p, QRectF(1, 1, self.BREITE - 2, self.ZEILE - 8), QColor(255, 255, 255))
-            p.drawText(QRectF(0, 0, self.BREITE, self.ZEILE - 8), Qt.AlignCenter,
-                       tr("Ziehen zum Verschieben, Doppelklick = fertig"))
-            return
-        vorschau = self.zentrale.vorschau()
-        if vorschau:
-            text = "  ·  ".join(tr(t) if r <= 0 else f"{tr(t)} in {r:.0f} s" for t, r in vorschau)
-            p.setFont(QFont("Sans", 10, QFont.DemiBold))
-            breite = min(self.BREITE - 2, p.fontMetrics().horizontalAdvance(text) + 28)
-            r = QRectF((self.BREITE - breite) / 2, 1, breite, 26)
-            p.setPen(Qt.NoPen)
-            p.setBrush(QColor(14, 20, 32, 200))
-            p.drawRoundedRect(r, 10, 10)
-            offen = any(rest <= 0 for _, rest in vorschau)  # Regen jederzeit moeglich
-            p.setPen(QColor(255, 160, 40) if offen else QColor(230, 236, 246))
-            p.drawText(r, Qt.AlignCenter, text)
-            p.translate(0, 30)
-        for i, w in enumerate(self.zentrale.schnappschuss()[-3:]):
-            self._warnung(p, w, QRectF(1, 1 + i * self.ZEILE, self.BREITE - 2, self.ZEILE - 8), jetzt)
-
-    def _kasten(self, p: QPainter, r: QRectF, farbe: QColor, blinken: bool = False) -> None:
-        form = QPainterPath()
-        form.addRoundedRect(r, 14, 14)
-        p.fillPath(form, QColor(farbe.red(), farbe.green(), farbe.blue(), 120) if blinken
-                   else QColor(14, 20, 32, 225))
-        p.setPen(QPen(farbe, 2))
-        p.setBrush(Qt.NoBrush)
-        p.drawPath(form)
-
-    def _warnung(self, p: QPainter, w: Warnung, r: QRectF, jetzt: float) -> None:
-        rest = w.rest(jetzt)
-        farbe = QColor(*w.regel.farbe)
-        self._kasten(p, r, farbe, blinken=rest <= 0 and int(jetzt * 6) % 2)
-        # Countdown-Balken
-        p.setPen(Qt.NoPen)
-        p.setBrush(farbe)
-        anteil = max(0.0, rest / w.regel.vorlauf)
-        p.drawRoundedRect(QRectF(r.left() + 14, r.bottom() - 10, (r.width() - 28) * anteil, 4), 2, 2)
-        # Titel, Hinweis, Sekunden
-        p.setPen(QColor(255, 255, 255))
-        p.setFont(QFont("Sans", 17, QFont.Bold))
-        p.drawText(QRectF(r.left() + 16, r.top() + 6, r.width() - 110, 30),
-                   Qt.AlignLeft | Qt.AlignVCenter, w.titel())
-        p.setFont(QFont("Sans", 10))
-        p.setPen(QColor(220, 228, 240))
-        p.drawText(QRectF(r.left() + 16, r.top() + 36, r.width() - 110, 20),
-                   Qt.AlignLeft | Qt.AlignVCenter, tr("Weg von der Gruppe!" if w.ich else w.regel.hinweis))
-        if w.regel.gruppe == "casts":
-            return  # Lernhilfe: der echte Vorlauf ist unbekannt, also keine Sekunden
-        p.setFont(QFont("Sans", 22, QFont.Bold))
-        p.setPen(farbe)
-        p.drawText(QRectF(r.right() - 100, r.top() + 4, 86, r.height() - 16),
-                   Qt.AlignRight | Qt.AlignVCenter, f"{rest:.1f}" if rest > 0 else tr("JETZT"))
-
-
-class MeldungenFenster(QWidget):
-    """Einstellungen: Dungeon waehlen, dann jede Meldung einzeln anzeigen und mit Ton."""
-
-    def __init__(self, aktuell: str | None = None) -> None:
-        super().__init__(None, Qt.WindowStaysOnTopHint)
-        self.aktuell = aktuell  # erkannter Dungeon, wird beim Oeffnen gezeigt
-        self.setStyleSheet("QWidget { background: #0e1420; color: #e6ecf6; font-size: 11pt; }"
-                           "QComboBox { border: 2px solid #5a6a85; border-radius: 6px; padding: 3px 8px; }"
-                           "QCheckBox::indicator { width: 18px; height: 18px; border-radius: 5px;"
-                           " border: 2px solid #5a6a85; }"
-                           "QCheckBox::indicator:checked { background: #00e676; border-color: #00e676; }")
-        self.k = konfig_laden()
-        self.rahmen = QVBoxLayout(self)
-        self.inhalt: QWidget | None = None
-        self._aufbauen()
-
-    def _aufbauen(self) -> None:
-        """Baut den Inhalt (neu), z.B. nach dem Sprachwechsel."""
-        if self.inhalt:
-            self.inhalt.hide()
-            self.inhalt.deleteLater()
-        self.inhalt = QWidget()
-        self.rahmen.addWidget(self.inhalt)
-        self.setWindowTitle(tr("AION2 Meldungen"))
-        spalte = QVBoxLayout(self.inhalt)
-
-        # oben: Dungeon und Sprache
-        oben = QHBoxLayout()
-        dungeon = QComboBox()
-        for name, gruppen in DUNGEONS.items():
-            dungeon.addItem(tr(name) + ("" if gruppen else f"  ({tr('fehlt')})"), name)
-        sprache = QComboBox()
-        sprache.addItem("Deutsch", "de")
-        sprache.addItem("English", "en")
-        sprache.setCurrentIndex(sprache.findData(self.k["sprache"]))
-        oben.addWidget(QLabel("Dungeon"))
-        oben.addWidget(dungeon, 1)
-        oben.addWidget(QLabel(tr("Sprache")))
-        oben.addWidget(sprache)
-        spalte.addLayout(oben)
-        auto = QCheckBox(tr("Dungeons automatisch aufnehmen (Lernmodus)"), checked=self.k["aufnahme_auto"])
-        auto.toggled.connect(lambda an: self._merken("aufnahme_auto", an))
-        spalte.addWidget(auto)
-
-        # darunter: eine Seite je Dungeon, die Auswahl oben blaettert um
-        seiten = QStackedWidget()
-        for gruppen in DUNGEONS.values():
-            seiten.addWidget(self._seite(gruppen))
-        spalte.addWidget(seiten)
-
-        dungeon.currentIndexChanged.connect(seiten.setCurrentIndex)
-        dungeon.currentIndexChanged.connect(lambda _: self._merken("meldungen_dungeon", dungeon.currentData()))
-        dungeon.setCurrentIndex(max(0, dungeon.findData(self.aktuell or self.k["meldungen_dungeon"])))
-        self.aktuell = None  # nur beim ersten Aufbau
-        sprache.currentIndexChanged.connect(lambda _: self._merken("sprache", sprache.currentData(), neu=True))
-        self.adjustSize()
-
-    def _seite(self, gruppen: dict[str, str]) -> QWidget:
-        seite = QWidget()
-        raster = QGridLayout(seite)
-        if not gruppen:
-            raster.addWidget(QLabel(tr("Für diesen Dungeon gibt es noch keine Warnungen.")), 0, 0, 1, 3)
-            gruppen = {"casts": "Alle Boss-Casts zeigen (Lernhilfe)"}
-        gruppen = {**gruppen, **ALLE_DUNGEONS}
-        for nr, kopf in enumerate(("Meldung", "Anzeigen", "Ton")):
-            raster.addWidget(QLabel(f"<b>{tr(kopf)}</b>"), 1, nr)
-        for zeile, (gruppe, name) in enumerate(gruppen.items(), 2):
-            raster.addWidget(QLabel(tr(name)), zeile, 0)
-            haken = QCheckBox(checked=gruppe not in self.k["meldung_aus"])
-            haken.toggled.connect(lambda an, g=gruppe: self._setzen("meldung_aus", g, an))
-            raster.addWidget(haken, zeile, 1, Qt.AlignCenter)
-            ton = QComboBox()
-            for art, text in (("aus", "Aus"), ("piep", "Piepton"), ("ansage", "Ansage")):
-                ton.addItem(tr(text), art)
-            ton.setCurrentIndex(ton.findData(self.k["warnton"].get(gruppe, "ansage")))
-            ton.currentIndexChanged.connect(lambda _, g=gruppe, t=ton: self._ton(g, t.currentData()))
-            raster.addWidget(ton, zeile, 2)
-        raster.setRowStretch(raster.rowCount(), 1)
-        return seite
-
-    def _setzen(self, liste: str, gruppe: str, an: bool) -> None:
-        aus = set(self.k[liste]) - {gruppe} if an else set(self.k[liste]) | {gruppe}
-        self._merken(liste, sorted(aus))
-
-    def _ton(self, gruppe: str, art: str) -> None:
-        self._merken("warnton", {**self.k["warnton"], gruppe: art})
-        if art == "ansage":
-            alle = (*REGELN.values(), *STATUS_REGELN.values(), GROGGY)
-            ansage(tr(next((r.titel for r in alle if r.gruppe == gruppe), "Ansage")))  # zum Probehoeren
-
-    def _merken(self, schluessel: str, wert, neu: bool = False) -> None:
-        self.k[schluessel] = wert
-        konfig_speichern(self.k)
-        if neu:
-            self._aufbauen()
-            ansagen_vorbereiten()  # neue Sprache

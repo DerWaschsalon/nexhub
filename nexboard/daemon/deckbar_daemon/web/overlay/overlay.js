@@ -1,7 +1,9 @@
 /* NexBoard-Overlay: Widgets über dem Spiel. Läuft im Overlay-Programm (layer-shell-Fläche, Qt
  * WebEngine) und zum Ausprobieren auch im Browser (http://127.0.0.1:<Port+1>/__deckbar__/overlay/).
  *
- * Daten:   GET /api/overlay/events (SSE: layout, dps), PUT /api/overlay/layout (Positionen, Effekt)
+ * Daten:   GET /api/overlay/events (SSE: layout, dps, radar), PUT /api/overlay/layout (Positionen, Effekt)
+ * Radar:   Widgets Radar, Boss-Warnungen und Karte in radar.js, PvP in pvp.js (laden vor dieser Datei)
+ * Profile: welche Widgets sichtbar sind; Wechsel in der Werkzeugleiste oder per deckbar-overlay --profil
  * Host:    QWebChannel-Objekt „bridge“ (overlay/Overlay.qml): mode, setRegions, requestMode,
  *          finishEdit, call (Fenster-Befehle der Meter-Oberfläche)
  * Meter:   die Oberfläche des A2Tools-Meters als iframe (gleicher Ursprung). Ihr Shim
@@ -17,6 +19,10 @@ const DEFAULT_POS = {
   meter: () => [48, Math.max(40, innerHeight - 380)],
   boss: () => [Math.round(innerWidth / 2 - 210), 72],
   timers: () => [innerWidth - 300, 160],
+  radar: () => [innerWidth - 300, 40],
+  warnung: () => [Math.round(innerWidth / 2 - 230), 140],
+  karte: () => [innerWidth - 460, 400],
+  pvp: () => [48, 200],
 };
 
 let bridge = null;
@@ -94,6 +100,7 @@ function applyLayout(next) {
   applyFx();
   renderBoss();
   renderTimers();
+  radarNeuZeichnen();
   if (first || $("toggles").childElementCount === 0) buildToolbar();
   syncToolbar();
   const meter = $("meter");
@@ -142,6 +149,7 @@ function setMode(m) {
   document.body.dataset.mode = m;
   if (m !== "edit") hideGuides();
   renderBoss();
+  radarNeuZeichnen();
   regionsSoon();
 }
 
@@ -254,9 +262,25 @@ function buildToolbar() {
 function syncToolbar() {
   for (const c of $("toggles").querySelectorAll("input")) c.checked = !!cfg(c.dataset.id).enabled;
   $("fx").value = layout.fx || "";
+  const namen = ["", ...Object.keys(layout.profile)];
+  $("profil").replaceChildren(...namen.map((n) => new Option(n || "–", n)));
+  $("profil").value = layout.profil;
+}
+
+/** Profil wechseln: sofort speichern, der Daemon schaltet die Widgets des Profils und schickt das Layout. */
+async function chooseProfile(name) {
+  try {
+    const r = await fetch("/api/overlay/layout", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profil: name }),
+    });
+    if (r.ok) applyLayout(await r.json());
+  } catch (e) {
+    log(`Profilwechsel fehlgeschlagen: ${e}`);
+  }
 }
 
 $("fx").addEventListener("change", () => { layout.fx = $("fx").value; applyFx(); saveSoon(); });
+$("profil").addEventListener("change", () => chooseProfile($("profil").value));
 $("done").addEventListener("click", finishEdit);
 $("reset").addEventListener("click", () => {
   for (const id of Object.keys(W)) Object.assign(cfg(id), { x: null, y: null, scale: 1 });
@@ -529,6 +553,7 @@ function connect() {
   let offlineTimer = 0;
   es.addEventListener("layout", (e) => applyLayout(JSON.parse(e.data)));
   es.addEventListener("dps", (e) => onDps(JSON.parse(e.data)));
+  es.addEventListener("radar", (e) => onRadar(JSON.parse(e.data)));
   es.onopen = () => { clearTimeout(offlineTimer); $("offline").hidden = true; };
   es.onerror = () => {
     clearTimeout(offlineTimer);
@@ -537,6 +562,7 @@ function connect() {
 }
 
 function start() {
+  radarStart();
   setMode(mode);
   connect();
   setInterval(renderTimers, 1000);
