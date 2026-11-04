@@ -154,3 +154,8 @@ def test_uebersicht_ohne_laufendes_radar():
     assert [t["name"] for t in u["termine"]][:2] == ["Riss", "Shugo-Fest"]
     assert u["vertraute"] and all("fehlen" in v for v in u["vertraute"])
     assert r.karte() == {"name": ""} and r.kartendatei("bild") is None
+
+
+def test_kampf_ohne_laufendes_radar():
+    r, _ = radar()
+    assert r.kampf() == {"groggy": False}

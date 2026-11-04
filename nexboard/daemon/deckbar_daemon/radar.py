@@ -108,6 +108,10 @@ class Radar:
                     "pvp_neu": self.dienst.pvp_neu}
         aktionen[name]()
 
+    def kampf(self) -> dict:
+        """Kampfzustand für eigene Makros auf diesem PC (GET /api/radar/kampf)."""
+        return {"groggy": bool(self.dienst and self.dienst.zustand.boss_groggy())}
+
     def uebersicht(self) -> dict:
         """Feldbosse, Termine und Vertraute für die NexBoard-Seite. Ohne laufendes Radar aus den
         gespeicherten Ständen."""

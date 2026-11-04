@@ -1045,6 +1045,9 @@ class NexBoard:
             return web.json_response({"error": str(e)}, status=409)
         return web.json_response({"ok": True, **self.radar.info()})
 
+    async def api_radar_kampf(self, request: web.Request) -> web.Response:
+        return web.json_response(self.radar.kampf())
+
     async def api_radar_uebersicht(self, request: web.Request) -> web.Response:
         return web.json_response(self.radar.uebersicht())
 
@@ -1127,6 +1130,7 @@ def build_app(deck: NexBoard) -> web.Application:
     app.router.add_put("/api/radar", deck.api_put_radar)
     app.router.add_post("/api/radar/befehl", deck.api_radar_befehl)
     app.router.add_get("/api/radar/uebersicht", deck.api_radar_uebersicht)
+    app.router.add_get("/api/radar/kampf", deck.api_radar_kampf)
     app.router.add_static("/static/", WEB_DIR)
 
     async def cleanup(_app: web.Application) -> None:
