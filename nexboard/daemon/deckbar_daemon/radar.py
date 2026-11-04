@@ -116,8 +116,8 @@ class Radar:
         return [t for t in self.tode if start_ms <= t["t_ms"] <= ende_ms]
 
     def kampf(self) -> dict:
-        """Kampfzustand für eigene Makros auf diesem PC (GET /api/radar/kampf)."""
-        return {"groggy": bool(self.dienst and self.dienst.zustand.boss_groggy())}
+        """Kampfzustand für eigene Makros auf diesem PC (GET /api/radar/kampf), siehe RadarDienst.kampf."""
+        return self.dienst.kampf() if self.dienst else {"groggy": False, "warnungen": []}
 
     def uebersicht(self) -> dict:
         """Feldbosse, Termine und Vertraute für die NexBoard-Seite. Ohne laufendes Radar aus den

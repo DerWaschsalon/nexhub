@@ -158,7 +158,7 @@ def test_uebersicht_ohne_laufendes_radar():
 
 def test_kampf_ohne_laufendes_radar():
     r, _ = radar()
-    assert r.kampf() == {"groggy": False}
+    assert r.kampf() == {"groggy": False, "warnungen": []}
 
 
 def test_tode_ueberleben_das_radar_und_gehoeren_zum_run():
