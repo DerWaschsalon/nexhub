@@ -27,6 +27,7 @@ COGS = [
     "bot.cogs.control",
     "bot.cogs.aion_dedup",
     "bot.cogs.bump",
+    "bot.cogs.termintafel",
     "bot.cogs.stats",
     "bot.cogs.starboard",
     "bot.cogs.polls",

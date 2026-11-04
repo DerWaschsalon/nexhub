@@ -107,5 +107,5 @@ stehen alle Einstellungen, auch der Charaktername. Standardwerte und Warnungslis
 
 - Kämpfe auswerten: `python3 -m werkzeuge.auswertung mitschnitte/datei.pcap`
 - Für eigene Makros auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true}`, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s). Hängt nicht an der Warnungsanzeige.
-- Tests: `python3 -m unittest discover tests`
+- Tests: `PYTHONPATH=../../proto python3 -m unittest discover tests` (Termine kommen aus `proto/nexproto/termine.py`, im Daemon ist nexproto installiert)
 - Daten: `~/.local/share/aion2-radar/` (Spawnpunkte, Karten, Spawn-Log), Einstellungen `~/.config/aion2-radar.json`.

@@ -1356,3 +1356,22 @@ def test_hub_giveaway_page():
     assert (first["prize"], first["entries"], first["active"]) == ("Nitro", 1, True)
     assert (second["prize"], second["ended"], second["state"]) == ("Alt", True, "beendet")
     assert {a["id"]: a["when"] for a in table["actions"]} == {"end": "active", "reroll": "ended", "delete": ""}
+
+
+def test_termin_tafel_und_pings():
+    from datetime import datetime, timezone
+
+    from bot.cogs.termintafel import faellige_pings, tafel
+
+    um = lambda s: datetime.fromisoformat(s).replace(tzinfo=timezone.utc).timestamp()  # noqa: E731
+    jetzt = um("2026-10-07 02:57")
+    text = tafel(jetzt).description
+    # Zeiten als Discord-Zeitstempel: jeder sieht sie in seiner Zeitzone
+    assert f"**Riss** <t:{int(um('2026-10-07 03:00'))}:t>" in text
+    assert f"**Wächterin Kaira** <t:{int(um('2026-10-07 04:00'))}:t>" in text
+    # Riss und Shugo-Fest in 3 Minuten, Resets nie
+    faellig = faellige_pings(jetzt, set())
+    assert [n for n, _ in faellig] == ["Riss", "Shugo-Fest"]
+    assert faellige_pings(jetzt, set(faellig)) == []  # nicht doppelt
+    # läuft gerade: Riss offen bis 03:10
+    assert f"läuft, bis <t:{int(um('2026-10-07 03:10'))}:t>" in tafel(um("2026-10-07 03:05")).description
