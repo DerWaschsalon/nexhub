@@ -100,14 +100,16 @@ class WarnungTest(unittest.TestCase):
         self.zustand.berserker[72] = self.t[0] + 90
         self.assertEqual(self.z.vorschau(), [("Berserker", 90.0)])
 
-    def test_lernhilfe_bleibt_ohne_cast_warnungen(self):
-        self.zustand.dungeon = "Urugugu Canyon"  # hat nur Effekt- und Treffer-Warnungen
-        self.z.cast(70, 1504450, 1)
+    def test_lernhilfe_pro_boss(self):
+        self.zustand.dungeon = "Ferocious Horn Den"
+        self.zustand.bosse.update({80: 2300908, 81: 2300910})  # Kwapo mit Cast-Warnung, Nuakum noch ohne
+        self.z.cast(81, 1910261, 1)  # Nuakum: grau zeigen, damit man ihn auswerten kann
         self.assertEqual([w.regel.gruppe for w in self.z.schnappschuss()], ["casts"])
-        self.zustand.dungeon = "Vakron Sky Island"  # hat Cast-Warnungen: keine Lernhilfe
         self.t[0] += 10
-        self.z.cast(71, 1604999, 1)
+        self.z.cast(80, 1606999, 1)  # unbekannter Cast von Kwapo: keine Lernhilfe mehr
         self.assertEqual([w.regel.gruppe for w in self.z.schnappschuss()], [])
+        self.z.cast(80, 1606910, 1)  # bekannte Mechanik
+        self.assertEqual([w.titel() for w in self.z.schnappschuss()], ["Donnergrollen"])
 
 
 class PaketeTest(unittest.TestCase):

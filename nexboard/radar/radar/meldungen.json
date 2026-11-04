@@ -8,14 +8,23 @@
     "Krao Cave": {
       "berk_wirbel": "Berk: Wirbelwind",
       "berk_welle": "Berk: Welle",
-      "berk_stagger": "Berk: Jetzt staggern"
+      "berk_stagger": "Berk: Jetzt staggern",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Urugugu Canyon": {
       "raur_konter": "Raur: Konter-Haltung",
       "auldor_sturm": "Auldor: Sturmstreich",
       "urahum_gift": "Urahum: Gift (auf dir)",
       "urahum_pfuetze": "Urahum: Giftpfütze",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+      "raur_zeitbombe": "Raur: Zeitbombe",
+      "raur_ansturm": "Raur: Ansturm",
+      "urahum_flaechen": "Urahum: Drei Flächen",
+      "urahum_tankschlag": "Urahum: Schlag auf den Tank",
+      "auldor_linien": "Auldor: Linien im Fächer",
+      "auldor_sturz": "Auldor: Sturzschlag",
+      "auldor_rundum": "Auldor: Linien rundum (Hard)",
+      "auldor_wirbel": "Auldor: Wirbel-Phase",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Feuertempel": {
       "flamme": "Kromede: Todesmal / Teufelsflamme",
@@ -33,7 +42,7 @@
     "Draupnir": {
       "lakshmi_reflexion": "Lakshmi: Reflexion",
       "bakarma_stagger": "Bakarma: Jetzt staggern",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Dying Dramata's Nest": {},
     "Deus Research Base": {
@@ -41,12 +50,12 @@
       "atiel_wurzel": "Atiel: Festgehalten (Mitspieler)",
       "atiel_kette": "Atiel: Kette (auf dir)",
       "atiel_stagger": "Atiel: Jetzt staggern",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Shattered Arkanis": {
       "ruthilis_blitz": "Ruthilis: Blitz (auf dir)",
       "talisra_gefaengnis": "Talisra: Kristallgefängnis (Mitspieler)",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Vakron Sky Island": {
       "tiere_blume": "Tiere: Rafflesia",
@@ -58,11 +67,15 @@
       "vakron_mal": "Vakron: Dornenmal (auf dir)",
       "vakron_gefangen": "Vakron: Gefangen (Mitspieler)",
       "vakron_ringe": "Vakron: Dornenringe",
-      "vakron_gefaengnis": "Vakron: Gefängnis"
+      "vakron_gefaengnis": "Vakron: Gefängnis",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Ferocious Horn Den": {
       "nuakum_blutung": "Nuakum: Blutung (auf dir)",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe)"
+      "kwapo_donner": "Kwapo: Donnergrollen",
+      "duanka_geister": "Duanka: Mau-Nekromantie",
+      "duanka_seelenrufer": "Duanka: Seelenrufer",
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
     },
     "Cradle of Nihility": {},
     "Hall of Illusion": {},

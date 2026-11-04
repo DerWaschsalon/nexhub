@@ -33,12 +33,12 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 - **Ansage:** Pro Warnung auf der Seite „Radar“ wählbar: Aus, Piepton oder Ansage (Standard). Gesprochen wird
   lokal mit Piper (`~/.local/share/aion2-radar/piper`, Stimmen Thorsten/Amy), fertige Sätze im Cache
   `~/.cache/aion2-radar/ansagen`. Fehlt Piper, kommt der Piepton.
-- **Lernhilfe:** In Dungeons ohne Cast-Warnungen erscheint jeder Boss-Cast grau mit Namen aus den A2Tools-Daten
+- **Lernhilfe:** Jeder Cast eines Bosses, zu dem es noch keine Cast-Warnung gibt, erscheint grau mit Namen aus den A2Tools-Daten
   (Schalter „Alle Boss-Casts zeigen“).
 - **Status auf dir** (`0x382A`): Ignus' Flammenbombe → „Verzögerte Explosion – DU!“ (3 s, danach Feuerpfütze).
   Weitere Effekte in `STATUS_REGELN` (`radar/warnung.py`), IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
-- **Weitere Dungeons** (`radar/mechaniken.json`, 28 Mechaniken): Urugugu (Raur-Konter, Auldor-Sturmstreich,
+- **Weitere Dungeons** (`radar/mechaniken.json`, 39 Mechaniken; 11 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie und -Seelenrufer): Urugugu (Raur-Konter, Auldor-Sturmstreich,
   Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Schilde, Vakron-Male, -Ringe, -Gefängnis), Krao-Höhle
   (Berk), Draupnir (Lakshmi-Reflexion), Grimmhorn (Nuakum-Blutung), Deus (Nazmun-Bombe, Atiel-Kette), Arkanis,
   dazu Ignus' Flammenzone. Auslöser: Boss-Cast, Status auf dir, einem Mitspieler, jedem Spieler oder dem Boss,
