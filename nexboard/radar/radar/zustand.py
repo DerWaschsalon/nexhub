@@ -96,6 +96,9 @@ for _m in MECHANIKEN:
 STAGGER_BOSSE = {npc for m in MECHANIKEN if m["wann"]["art"] == "stagger" for npc in m["bosse"]}
 
 
+KARTE_OFFEN_S = 2.5  # so lange nach der letzten Feldboss-Liste gilt die Ingame-Karte als offen
+
+
 def gueltig(*werte: float) -> bool:
     return all(math.isfinite(v) and abs(v) < 1_000_000 for v in werte)
 
@@ -138,6 +141,7 @@ class RadarZustand:
         self.berserker: dict[int, float] = {}    # Boss-Entity -> Berserker-Zeit (Sekunden seit 1970)
         self.schluessel = 0  # verbrauchte Cube-Schluessel seit dem Start
         self.zone: int | None = None
+        self.karte_offen_zeit = 0.0  # letzte Feldboss-Liste: kommt etwa jede Sekunde, solange die Ingame-Karte offen ist
         # live gespeichert, damit Timer und Seelen einen Neustart ueberleben (nicht beim Abspielen alter Mitschnitte)
         self.speichern = speichern
         self.feldbosse: dict[str, dict] = daten.laden("feldbosse.json") if speichern else {}  # Platz -> Daten
@@ -238,6 +242,7 @@ class RadarZustand:
             elif op in OP_GRUPPENLISTE:
                 self._gruppenliste(p)
             elif op == OP_FELDBOSSE:
+                self.karte_offen_zeit = time.time()
                 self._feldbosse(p)
             elif op in (OP_VERTRAUTE, OP_SEELE, OP_STUFE):
                 self._vertraute(op, p)
@@ -470,4 +475,5 @@ class RadarZustand:
                 "gruppe": [(self.charnamen.get(cid, ""), *g) for cid, g in self.gruppe.items()
                            if time.time() - g[3] < 10],
                 "nachrichten": self.nachrichten,
+                "karte_offen": time.time() - self.karte_offen_zeit < KARTE_OFFEN_S,
             }
