@@ -159,3 +159,12 @@ def test_uebersicht_ohne_laufendes_radar():
 def test_kampf_ohne_laufendes_radar():
     r, _ = radar()
     assert r.kampf() == {"groggy": False}
+
+
+def test_tode_ueberleben_das_radar_und_gehoeren_zum_run():
+    r, _ = radar()
+    r._starten()
+    assert r.dienst.tode is r.tode  # der Dienst schreibt in die Liste des Daemons
+    r.tode.extend([{"t_ms": 100, "name": "A", "skill": 1}, {"t_ms": 500, "name": "B", "skill": 2}])
+    r._beenden()
+    assert r.tode_zwischen(0, 200) == [{"t_ms": 100, "name": "A", "skill": 1}]

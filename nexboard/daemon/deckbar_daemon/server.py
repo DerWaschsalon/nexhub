@@ -150,6 +150,7 @@ class NexBoard:
         self.overlay.game_check = self._game_running
         self.overlay.ui_watching = lambda: bool(self.ui_clients)
         self.radar = Radar(lambda stand: self.overlay.publish("radar", stand), spiel_laeuft=self._game_running)
+        self.hub.deaths = self.radar.tode_zwischen
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
         self.state.subscribe(self._on_state)

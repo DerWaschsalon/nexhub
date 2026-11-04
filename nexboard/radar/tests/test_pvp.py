@@ -70,3 +70,39 @@ class Sitzung(unittest.TestCase):
         self.assertEqual([grad_name(g) for g in (1, 5, 9, 10, 18, 19, 0)],
                          ["Oberbefehlshaber", "5-Sterne-Offizier", "1-Sterne-Offizier", "Soldat Rang 1",
                           "Soldat Rang 9", "Rekrut", ""])
+
+
+class TodesursacheTest(unittest.TestCase):
+    def setUp(self):
+        from radar.warnung import TODESMAL, WarnZentrale
+        self.t = [1000.0]
+        self.z = RadarZustand("Ich")
+        self.z.eigene_eid, self.z.eid_sicher = 100, True
+        self.z.spieler[300] = "Anna"
+        self.zentrale = WarnZentrale(self.z, uhr=lambda: self.t[0])
+        self.zentrale.an = True
+        self.zentrale.k = {"meldung_aus": [], "warnton": {}}
+        self.zentrale.cast(1, TODESMAL, 300)
+        self.t[0] += 4.1
+
+    def tode(self, *nachrichten: bytes) -> list[dict]:
+        from collections import deque
+        from types import SimpleNamespace
+
+        from radar.dienst import RadarDienst
+        dienst = SimpleNamespace(zustand=self.z, zentrale=self.zentrale, tode=deque())
+        self.z.bei_tod.append(lambda *a: RadarDienst._tod(dienst, *a))
+        for p in nachrichten:
+            self.z.verarbeiten(OP_TOD, p)
+        return list(dienst.tode)
+
+    def test_tod_durch_monster_mit_warnung(self):
+        tode = self.tode(tod(300), tod(100), tod(999), tod(300, 555, "Spieler"))
+        # Anna und ich durch ein Monster; ein totes Monster (999) und PvP zaehlen nicht
+        self.assertEqual([(d["name"], d["skill"], d["warning"], d["lead_ms"]) for d in tode],
+                         [("Anna", 1234, "Todesmal", 4100), ("Ich", 1234, "Todesmal", 4100)])
+        self.assertEqual(tode[0]["t_ms"], 1_004_100)
+
+    def test_ohne_laufende_warnung(self):
+        self.t[0] += 30
+        self.assertEqual(self.tode(tod(300))[0]["warning"], None)

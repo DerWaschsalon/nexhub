@@ -21,7 +21,7 @@ def fight(n: int, boss_dmg: int = 1_000_000) -> dict:
     }
 
 
-def nexlog(**run) -> bytes:
+def nexlog(deaths: list[dict] | None = None, **run) -> bytes:
     fights = [fight(1), fight(2, boss_dmg=500_000)]
     for f in fights:
         f["dungeonId"] = run.get("dungeon_id", f["dungeonId"])
@@ -35,6 +35,7 @@ def nexlog(**run) -> bytes:
         "fights": fights,
         "hits": {"auto_1": {"fight": "auto_1", "target": 1, "start_ms": 0, "columns": list(HIT_COLUMNS),
                             "flags": {"crit": 1}, "rows": [[0, 1, 0, 1, 10, 0, 1], [5, 2, 0, 2, 5, 0, 0]]}},
+        "deaths": deaths or [],
     }))
 
 
@@ -173,7 +174,8 @@ def test_kampf_details(client, as_user):
     assert (held["name"], held["cls"], held["damage"], held["dps"]) == ("Testheld", "ranger", 750_000, 7_500)
     assert [(x["name"], x["dot"], x["share"], x["hits"], x["crit"], x["back"], x["double"]) for x in held["skills"]] == \
         [("Pfeilhagel", False, 66.7, 10, 40.0, 50.0, 10.0), ("Gift", True, 33.3, 20, 0.0, 0.0, 0.0)]
-    assert d["deaths"] == [{"name": "Moonlin", "t_ms": 40_000, "revived_ms": 52_000}]
+    assert d["deaths"] == [{"name": "Moonlin", "t_ms": 40_000, "revived_ms": 52_000,
+                            "skill": None, "warning": None, "lead_ms": None}]  # ohne Radar keine Ursache
     # DPS-Kurve aus den Einzeltreffern: je Sekunde, Länge = Kampfdauer
     series = {p["actor"]: p["damage"] for p in d["timeline"]["players"]}
     assert len(series[1]) == 101 and series[1][0] == 10 and series[2][0] == 5
@@ -263,3 +265,15 @@ def test_bot_fehler_stoert_upload_nicht(make_client, fake, as_user):
     with make_client(**BOT) as c:
         token = pair(c, as_user(MEMBER))
         assert upload(c, token, nexlog()).status_code == 201
+
+
+def test_todesursache_vom_radar(client, as_user):
+    member = as_user(MEMBER)
+    # Moonlin stirbt in Kampf 1 bei 40 s; Kampf 1 beginnt bei 1_792_000_300_000
+    tod = 1_792_000_340_000
+    deaths = [{"t_ms": tod + 1500, "name": "Moonlin", "skill": 1801120, "warning": "Todesmal", "lead_ms": 4100},
+              {"t_ms": tod + 1500, "name": "Testheld", "skill": 1}, {"t_ms": tod + 9000, "name": "Moonlin", "skill": 2}]
+    run_id = upload(client, pair(client, member), nexlog(deaths=deaths)).json()["id"]
+    d = member.get(f"/api/runs/{run_id}/fights/auto_1").json()
+    assert d["deaths"][0] == {"name": "Moonlin", "t_ms": 40_000, "revived_ms": 52_000,
+                                   "skill": 1801120, "warning": "Todesmal", "lead_ms": 4100}

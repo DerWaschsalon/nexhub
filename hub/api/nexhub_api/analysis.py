@@ -81,6 +81,18 @@ def _rate(part: int, total: int) -> float:
     return round(part * 100 / total, 1) if total else 0.0
 
 
+CAUSE_WINDOW_MS = 3000  # Radar und Meter sehen denselben Tod mit leicht verschiedenen Uhren
+
+
+def _with_cause(log: NexLog, fight: A2Fight, death: dict) -> dict:
+    """Ursache aus log.deaths (Radar) dazu: gleicher Name, Zeit innerhalb CAUSE_WINDOW_MS."""
+    at = fight.startTimeMs + death["t_ms"]
+    match = min((d for d in log.deaths if d.name == death["name"] and abs(d.t_ms - at) <= CAUSE_WINDOW_MS),
+                key=lambda d: abs(d.t_ms - at), default=None)
+    return {**death, "skill": match.skill if match else None, "warning": match.warning if match else None,
+            "lead_ms": match.lead_ms if match else None}
+
+
 def fight_detail(log: NexLog, fight: A2Fight) -> dict:
     """Ein Kampf im Detail:
 
@@ -91,7 +103,7 @@ def fight_detail(log: NexLog, fight: A2Fight) -> dict:
                specs, casts}]}],                                aktive Spezialisierungen (1–5), Zeitpunkte in ms
      buffs: [{actor, by, id, up, segments: [[start, ende, stapel, wie]]}],  auf Spielern und dem Boss
      timeline: {bucket_ms, players: [{actor, damage: [je Sekunde]}]} oder None ohne Einzeltreffer,
-     deaths: [{name, t_ms, revived_ms}]}
+     deaths: [{name, t_ms, revived_ms, skill, warning, lead_ms}]}    Ursache vom Radar, sonst None
     """
     names = {a.actorId: (player_name(log, a), JOB_CLASSES.get(a.jobId)) for a in fight.actors}
     skills: dict[int, list[dict]] = {}
@@ -131,7 +143,8 @@ def fight_detail(log: NexLog, fight: A2Fight) -> dict:
                 row[t // BUCKET_MS] += damage
         timeline = {"bucket_ms": BUCKET_MS, "players": [{"actor": a, "damage": d} for a, d in series.items()]}
 
-    deaths = [{"name": names[d["actorId"]][0], "t_ms": int(d.get("tsMs") or 0), "revived_ms": d.get("revivedMs")}
+    deaths = [_with_cause(log, fight, {"name": names[d["actorId"]][0], "t_ms": int(d.get("tsMs") or 0),
+                                       "revived_ms": d.get("revivedMs")})
               for d in fight.details.get("deaths") or [] if d.get("actorId") in names]
     extra = fight.model_extra or {}
     target = extra.get("targetId") or fight.details.get("targetId")
