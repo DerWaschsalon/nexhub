@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .daten import a2_namen, npc_name
 from .konfig import abspielen, konfig_laden
-from .zustand import MECHANIKEN
+from .zustand import BOSSE, MECHANIKEN
 
 ALARM = Path.home() / ".cache" / "aion2-radar" / "alarm.wav"
 ANSAGEN = Path.home() / ".cache" / "aion2-radar" / "ansagen"   # fertig gesprochene Saetze
@@ -187,8 +187,10 @@ ENGLISCH = {
 }
 for _m in MECHANIKEN:  # englische Texte der Mechaniken stehen in mechaniken.json
     ENGLISCH.update(_m["en"])
-# Lernhilfe (jeden Boss-Cast grau zeigen) gilt in Dungeons, fuer die es noch keine Cast-Warnungen gibt
-CAST_GRUPPEN = {r.gruppe for r in REGELN.values()}
+# Lernhilfe (jeden Boss-Cast grau zeigen) gilt fuer Bosse, zu denen es noch keine Cast-Warnung gibt. Die
+# Feuertempel-Regeln oben stehen ohne Boss-IDs, ihre Bosse haben alle Cast-Warnungen.
+CAST_BOSSE = {npc for m in MECHANIKEN if m["wann"]["art"] == "cast" for npc in m["bosse"]} | {
+    npc for npc, dungeon in BOSSE.items() if dungeon == "Feuertempel"}
 
 
 def tr(text: str) -> str:
@@ -231,7 +233,7 @@ class WarnZentrale:
     def cast(self, caster: int, skill: int, ziel: int | None) -> None:
         regel = REGELN.get(skill)
         dungeon = self.zustand.dungeon
-        if not regel and dungeon and not CAST_GRUPPEN & set(DUNGEONS[dungeon]) and caster in self.zustand.bosse:
+        if not regel and dungeon and self.zustand.bosse.get(caster, 0) not in CAST_BOSSE | {0}:
             regel = cast_regel(skill, self.zustand.bosse[caster])  # Lernhilfe: jeden Boss-Cast zeigen
         if not regel or not self.an:
             return
