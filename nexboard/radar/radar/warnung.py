@@ -101,6 +101,8 @@ GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
 # Gruppenmitglied unter 25 % LP; erst wieder melden, wenn es ueber 50 % war
 GRUPPE_LP = Regel("Wenig LP", "Unter 25 %", 3.0, ROT, "gruppe_lp")
 LP_KNAPP, LP_WIEDER = 0.25, 0.5
+# Boden-Markierung (0x3848) mit Mittelpunkt hoechstens so nah an dir (Einstellung flaeche_m)
+FLAECHE_DU = "Ausweichen!"
 TREFFER_REGELN: dict[int, Regel] = {}  # Skill, der dich trifft (Pfuetzen, Zonen) -> Regel
 STAGGER_REGELN: dict[int, Regel] = {}  # Boss-NPC mit Stagger-Pruefung -> „Jetzt staggern“
 FARBEN = {"GRUEN": GRUEN, "LILA": LILA, "ORANGE": ORANGE, "GELB": GELB, "BLAU": BLAU, "ROT": ROT}
@@ -179,6 +181,8 @@ ENGLISCH = {
     "Hinter sie gehen": "Get behind her",
     "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
     "Wenig LP": "Low HP", "Unter 25 %": "Below 25 %", "Berserker": "Berserk",
+    "Fläche unter dir": "AoE under you", "Ausweichen!": "Dodge!",
+    "Bodenfläche bei dir (alle Dungeons)": "Ground AoE at you (all dungeons)",
     "Mitspieler mit wenig LP (alle Dungeons)": "Party member with low HP (all dungeons)",
 }
 for _m in MECHANIKEN:  # englische Texte der Mechaniken stehen in mechaniken.json
@@ -286,6 +290,21 @@ class WarnZentrale:
                 # gebrochen: „Jetzt staggern“ ist erledigt
                 self.aktiv = [w for w in self.aktiv if w.regel not in STAGGER_REGELN.values()]
                 self._hinzufuegen(GROGGY, self.uhr())
+
+    def flaeche(self, skill: int, x: float, y: float, bis: float) -> None:
+        """Ein Monster markiert eine Flaeche am Boden. Liegt ihr Mittelpunkt nah an dir, warnen, mit
+        Countdown bis zum Einschlag. Groesse und Form sind unbekannt, deshalb ein fester Abstand."""
+        pos = self.zustand.position
+        if not self.an or pos is None or bis <= 0:
+            return
+        if math.hypot(x - pos[0], y - pos[1]) > self.k.get("flaeche_m", 6.0) * 100:  # Welt in cm
+            return
+        regel = Regel("Fläche unter dir", FLAECHE_DU, bis, ROT, "flaeche", hinweis_ich=FLAECHE_DU)
+        jetzt = self.uhr()
+        with self.lock:
+            # mehrere Markierungen auf einmal (Nazmun: sechs) = eine Warnung, bis sie eingeschlagen ist
+            if not any(w.regel.gruppe == "flaeche" and w.rest(jetzt) > 0 for w in self.aktiv):
+                self._ausloesen(regel, jetzt, ich=True)
 
     def gruppe_lp(self, eid: int, anteil: float) -> None:
         """Mitspieler unter 25 % LP einmal melden, erst nach Erholung ueber 50 % wieder."""

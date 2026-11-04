@@ -168,3 +168,42 @@ class PaketeTest(unittest.TestCase):
         self.z.verarbeiten(0x363A, varint(400) + b"\x01" + struct.pack("<I", CUBE_SCHLUESSEL))
         self.z.verarbeiten(0x363A, varint(401) + b"\x01" + struct.pack("<I", 12345))
         self.assertEqual(self.z.schluessel, 1)
+
+
+class FlaecheTest(unittest.TestCase):
+    def setUp(self):
+        self.t = [100.0]
+        self.z = RadarZustand()
+        self.z.eigene_eid = 5
+        self.z.spieler[9] = "Anna"
+        self.z.position = (1000.0, 2000.0, 0.0)
+        self.zentrale = WarnZentrale(self.z, uhr=lambda: self.t[0])
+        self.zentrale.an = True
+        self.zentrale.k = {"meldung_aus": [], "warnton": {}}
+        self.z.bei_flaeche.append(self.zentrale.flaeche)
+
+    def markierung(self, caster: int, x: float, y: float, ms: int = 2850) -> None:
+        # Aufbau wie in glass-cannon (cast.rs): Caster, Skill, Cast-ID, u32, u16, x/y/z, Richtung, ms
+        p = varint(caster) + struct.pack("<IBIH", 1226350, 2, 1, 0) + struct.pack("<ffff", x, y, 0.0, 0.0) \
+            + struct.pack("<H", ms)
+        self.z.verarbeiten(0x3848, p)
+
+    def test_flaeche_unter_mir(self):
+        self.markierung(70, 1000.0 + 900, 2000.0)  # 9 m daneben: nichts
+        self.assertEqual(self.zentrale.schnappschuss(), [])
+        self.markierung(70, 1000.0 + 300, 2000.0)  # 3 m: Warnung mit Countdown
+        w = self.zentrale.schnappschuss()
+        self.assertEqual([(x.titel(), x.ich, x.regel.vorlauf) for x in w], [("Fläche unter dir  –  DU!", True, 2.85)])
+        for _ in range(5):  # weitere Markierungen derselben Welle: keine neue Ansage
+            self.markierung(70, 1000.0, 2000.0)
+        self.assertEqual(len(self.zentrale.laut), 1)
+
+    def test_eigene_und_spieler_markierungen_zaehlen_nicht(self):
+        self.markierung(5, 1000.0, 2000.0)
+        self.markierung(9, 1000.0, 2000.0)
+        self.assertEqual(self.zentrale.schnappschuss(), [])
+
+    def test_ohne_position_nichts(self):
+        self.z.position = None
+        self.markierung(70, 1000.0, 2000.0)
+        self.assertEqual(self.zentrale.schnappschuss(), [])

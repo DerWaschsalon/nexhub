@@ -37,6 +37,7 @@ class RadarDienst:
         self.zustand.bei_treffer.append(self.zentrale.treffer)
         self.zustand.bei_gruppe_lp.append(self.zentrale.gruppe_lp)
         self.zustand.bei_tod.append(self._tod)
+        self.zustand.bei_flaeche.append(self.zentrale.flaeche)
         # Tode von dir und Mitspielern durch Monster, fuer den Run im Hub (der Daemon liest sie aus)
         self.tode: deque[dict] = deque(maxlen=200)
         self.zustand.status_ids = set(STATUS_REGELN)
