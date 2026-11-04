@@ -7,7 +7,7 @@ import pytest
 
 from nexhub_api.aion2 import NC, NCError, NotFound, combat_power, item_level, localized, shard_of
 
-from .fake_nc import ICON, FakeNC, search_row
+from .fake_nc import ICON, FakeNC, item, search_row
 
 
 def client(fake) -> NC:
@@ -163,6 +163,33 @@ def test_beide_sprachen_und_werte_je_gegenstand():
     fake.calls.clear()
     run(client(fake).snapshots(2302, "abc="))
     assert "/api/character/equipment/item" not in fake.calls
+
+
+def test_gewinn_bis_zur_hoechsten_verzauberung():
+    fake = FakeNC()
+    now, top = item(), item()
+    now["maxEnchantLevel"] = top["maxEnchantLevel"] = 20
+    top["mainStats"] = [{**top["mainStats"][0], "extra": "180"}]
+    fake.items_at = {"15": now, "20": top}
+    detail = run(client(fake).item(2302, "abc=", "de", {"id": 1, "slot": 1, "enchant": 15}))
+    assert detail["max_enchant"] == 20
+    assert detail["gain"] == {"enchant": 20, "stats": [{"name": "Angriffskraft", "value": "+34"}]}
+
+
+def test_kein_gewinn_ohne_hoehere_stufe():
+    fake = FakeNC()
+    capped = item()
+    capped["maxEnchantLevel"] = 15
+    fake.items_at = {"15": capped}
+    detail = run(client(fake).item(2302, "abc=", "de", {"id": 1, "slot": 1, "enchant": 15}))
+    assert "gain" not in detail and fake.calls.count("/api/character/equipment/item") == 1
+    # Höchststufe, die NC nicht kennt (404): Werte bleiben, ohne Gewinn
+    fake = FakeNC()
+    now = item()
+    now["maxEnchantLevel"] = 20
+    fake.items_at = {"15": now, "20": 404}
+    detail = run(client(fake).item(2302, "abc=", "de", {"id": 1, "slot": 1, "enchant": 15}))
+    assert detail["main"] and detail.get("gain") is None
 
 
 def test_gegenstand_nicht_mehr_angelegt():

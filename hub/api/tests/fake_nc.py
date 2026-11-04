@@ -107,6 +107,8 @@ class FakeNC:
         self.cp_for: dict[str, int] = {}
         self.snapshot_ids: list[str] = []
         self.item_ids: list[str] = []
+        # Antwort für Gegenstände bei dieser Verzauberung (Gewinn bis zur Höchststufe), wie `routes`
+        self.items_at: dict[str, object] = {}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -134,6 +136,8 @@ class FakeNC:
         }
         if path == "/api/character/info" and q.get("characterId") in self.cp_for:
             default[path]["profile"]["combatPower"] = self.cp_for[q["characterId"]]
+        if path == "/api/character/equipment/item" and q.get("enchantLevel") in self.items_at:
+            default[path] = self.items_at[q["enchantLevel"]]
         answer = self.routes.get(path, default.get(path, 404))
         if isinstance(answer, Exception):
             raise answer

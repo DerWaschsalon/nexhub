@@ -135,6 +135,10 @@ export type ItemDetail = {
 	godstones: { name: string; desc: string | null; grade: string | null; icon: string | null }[];
 	/** verstärkte Skills (Schmuck, Arkana) */
 	skills: { name: string; level: number; icon: string | null }[];
+	/** höchste Verzauberung des Gegenstands */
+	max_enchant?: number | null;
+	/** was die Grundwerte bei höchster Verzauberung mehr hätten; fehlt = schon ganz oben */
+	gain?: { enchant: number; stats: ItemStat[] } | null;
 	/** nur Arkana */
 	set?: { name: string; equipped: number; total: number; bonuses: { degree: number; lines: string[] }[] };
 };
