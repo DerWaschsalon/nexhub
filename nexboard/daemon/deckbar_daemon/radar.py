@@ -14,6 +14,7 @@ import json
 import logging
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
@@ -56,6 +57,8 @@ class Radar:
         self.meldungen = _json(ORDNER / "radar" / "meldungen.json")
         self.dienst: RadarDienst | None = None
         self.spiel = False
+        # Tode mit Ursache (RadarDienst._tod); hier, damit sie ein Ende des Radars bis zum Hochladen ueberleben
+        self.tode: deque[dict] = deque(maxlen=200)
 
     @property
     def laeuft(self) -> bool:
@@ -108,6 +111,10 @@ class Radar:
                     "pvp_neu": self.dienst.pvp_neu}
         aktionen[name]()
 
+    def tode_zwischen(self, start_ms: int, ende_ms: int) -> list[dict]:
+        """Tode eines Runs (Zeiten in ms seit 1970), fuer das NexLog."""
+        return [t for t in self.tode if start_ms <= t["t_ms"] <= ende_ms]
+
     def kampf(self) -> dict:
         """Kampfzustand für eigene Makros auf diesem PC (GET /api/radar/kampf)."""
         return {"groggy": bool(self.dienst and self.dienst.zustand.boss_groggy())}
@@ -138,6 +145,7 @@ class Radar:
     def _starten(self) -> None:
         log.info("AION 2 läuft, starte Radar")
         self.dienst = self.neuer_dienst(self.einstellungen()["name"])
+        self.dienst.tode = self.tode
         self.dienst.starten()
 
     def _beenden(self) -> None:

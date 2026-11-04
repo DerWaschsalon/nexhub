@@ -149,6 +149,7 @@ class RadarZustand:
         self.bei_staggern: list[Callable[[int], None]] = []     # Boss-Entity, deren Leiste brechbar wird
         self.bei_treffer: list[Callable[[int], None]] = []      # Skill, der dich trifft, nur IDs aus treffer_ids
         self.bei_gruppe_lp: list[Callable[[int, float], None]] = []  # (Entity, LP-Anteil 0-1)
+        self.bei_tod: list[Callable[[int, int, str], None]] = []  # (Opfer, Skill, Name des Taeters oder "")
         self.status_ids: set[int] = set()
         self.treffer_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)

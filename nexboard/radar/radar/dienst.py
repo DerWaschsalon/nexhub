@@ -6,6 +6,7 @@ Sekunde auf und zeigt stand() als Widgets im Overlay (Radar, Warnungen, Karte).
 from __future__ import annotations
 
 import time
+from collections import deque
 from pathlib import Path
 
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
@@ -35,6 +36,9 @@ class RadarDienst:
         self.zustand.bei_staggern.append(self.zentrale.staggern)
         self.zustand.bei_treffer.append(self.zentrale.treffer)
         self.zustand.bei_gruppe_lp.append(self.zentrale.gruppe_lp)
+        self.zustand.bei_tod.append(self._tod)
+        # Tode von dir und Mitspielern durch Monster, fuer den Run im Hub (der Daemon liest sie aus)
+        self.tode: deque[dict] = deque(maxlen=200)
         self.zustand.status_ids = set(STATUS_REGELN)
         self.zustand.treffer_ids = set(TREFFER_REGELN)
         self._ton_faellig = False
@@ -68,6 +72,19 @@ class RadarDienst:
     @property
     def aufnahme(self) -> bool:
         return bool(self.quelle.aufnahme)
+
+    def _tod(self, opfer: int, skill: int, taeter_name: str) -> None:
+        """Tod merken mit Skill und der Warnung, die das Radar gerade zeigte. PvP (Taeter ist ein
+        Spieler) und tote Monster zaehlen nicht."""
+        z = self.zustand
+        name = z.spieler.get(opfer) or (z.charname if opfer == z.eigene_eid else "")
+        if taeter_name or not name:
+            return
+        jetzt = self.zentrale.uhr()
+        w = self.zentrale.letzte(jetzt)
+        self.tode.append({"t_ms": int(jetzt * 1000), "name": name, "skill": skill,
+                          "warning": tr(w.regel.titel) if w else None,
+                          "lead_ms": int((jetzt - w.start) * 1000) if w else None})
 
     def _neuer_cube(self, cube: Cube) -> None:
         # kommt aus dem Mitschnitt-Thread: nur merken, der Ton kommt im naechsten Takt

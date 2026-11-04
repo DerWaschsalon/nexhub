@@ -321,6 +321,13 @@ class WarnZentrale:
             self.aktiv = [w for w in self.aktiv if w.rest(jetzt) > -1.2]
             return list(self.aktiv)
 
+    def letzte(self, jetzt: float) -> Warnung | None:
+        """Die zuletzt erschienene Warnung, die gerade laeuft (fuer die Todesursache). Lernhilfe zaehlt nicht."""
+        with self.lock:
+            laufend = [w for w in self.aktiv if w.regel.gruppe != "casts" and w.start <= jetzt
+                       and w.rest(jetzt) > -1.2]
+        return max(laufend, key=lambda w: w.start, default=None)
+
     def vorschau(self) -> list[tuple[str, float]]:
         """Kleine Zeile oben: (Text, Sekunden). 0 Sekunden = jetzt moeglich."""
         jetzt = self.uhr()

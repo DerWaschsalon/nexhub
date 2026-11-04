@@ -94,10 +94,12 @@ class PvpSitzung:
     def _tod(self, p: bytes) -> None:
         r = Leser(p)
         opfer = r.varint()
-        r.i32()  # Skill
+        skill = r.i32()
         taeter = r.varint()
         r.u16()  # Server des Taeters
         name = r.text()
+        for f in self.zustand.bei_tod:  # jeder Tod, auch durch Monster (Todesursache im Run)
+            f(opfer, skill, name)
         if not name:
             return  # kein Spieler als Taeter: zaehlt nicht als PvP
         z = self.zustand

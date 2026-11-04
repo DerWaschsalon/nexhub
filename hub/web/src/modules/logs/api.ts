@@ -86,7 +86,9 @@ export type Fight = {
 	run_players: string[];
 	players: FightPlayer[];
 	timeline: { bucket_ms: number; players: { actor: number; damage: number[] }[] } | null;
-	deaths: { name: string; t_ms: number; revived_ms: number | null }[];
+	/** skill, warning, lead_ms: Ursache vom Radar im NexBoard (analysis._with_cause), sonst null */
+	deaths: { name: string; t_ms: number; revived_ms: number | null; skill: number | null; warning: string | null;
+		lead_ms: number | null }[];
 	target: number | null;
 	buffs: Buff[];
 };
