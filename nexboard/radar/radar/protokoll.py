@@ -72,6 +72,45 @@ def uvarint(daten: bytes, pos: int = 0) -> tuple[int, int]:
     raise ValueError("uvarint zu lang")
 
 
+class Leser:
+    """Liest Nutzdaten der Reihe nach: Zahlen little-endian, Texte als uvarint-Laenge + UTF-8 (oft mit 0 am
+    Ende). Zu kurze Daten werfen struct.error bzw. ValueError wie die uebrige Auswertung."""
+
+    def __init__(self, daten: bytes) -> None:
+        self.daten = daten
+        self.pos = 0
+
+    def _zahl(self, format: str) -> int:
+        wert = struct.unpack_from(format, self.daten, self.pos)[0]
+        self.pos += struct.calcsize(format)
+        return wert
+
+    def u8(self) -> int:
+        return self._zahl("<B")
+
+    def u16(self) -> int:
+        return self._zahl("<H")
+
+    def i32(self) -> int:
+        return self._zahl("<i")
+
+    def i64(self) -> int:
+        return self._zahl("<q")
+
+    def varint(self) -> int:
+        wert, n = uvarint(self.daten, self.pos)
+        self.pos += n
+        return wert
+
+    def text(self) -> str:
+        laenge = self.varint()
+        if self.pos + laenge > len(self.daten):
+            raise ValueError("Text unvollstaendig")
+        roh = self.daten[self.pos:self.pos + laenge]
+        self.pos += laenge
+        return roh.rstrip(b"\0").decode("utf-8", "replace")
+
+
 def frame_laenge(puffer: bytes | bytearray, pos: int) -> int | None:
     """Gesamtlaenge des Frames an `pos`, None wenn noch unvollstaendig.
 

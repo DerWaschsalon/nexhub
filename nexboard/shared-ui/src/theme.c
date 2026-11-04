@@ -110,10 +110,7 @@ void db_theme_init(void)
     lv_style_set_border_width(g, 1);
     lv_style_set_border_color(g, lv_color_white());
     lv_style_set_border_opa(g, 52);
-    lv_style_set_shadow_width(g, 18);
-    lv_style_set_shadow_offset_y(g, 5);
-    lv_style_set_shadow_color(g, lv_color_black());
-    lv_style_set_shadow_opa(g, 70);
+    /* kein Schatten: Er kostete auf dem Gerät gut die Hälfte der Zeichenzeit jeder Kachel */
     lv_style_set_text_color(g, lv_color_white());
     lv_style_set_text_font(g, &db_font_label);
     lv_style_set_transition(g, &trans_press);

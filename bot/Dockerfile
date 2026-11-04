@@ -11,6 +11,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY bot ./bot
+# Termine der AION-2-Server, dieselbe Datei wie im Radar (zweiter Build-Kontext „proto“ = Ordner proto/)
+COPY --from=proto nexproto/termine.py ./termine.py
 COPY entrypoint.sh .
 
 # Stand des Codes (z. B. "main@71b65a2"), zeigt der Hub unter Bot → Übersicht

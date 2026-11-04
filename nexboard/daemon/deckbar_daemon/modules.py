@@ -71,8 +71,8 @@ MODULES: tuple[ModuleInfo, ...] = (
     ),
     ModuleInfo(
         "aion2.radar", "AION 2 · Radar", "games", "radar",
-        "Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse und Vertraute in "
-        "der Web-UI. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
+        "Hidden Cubes, Karte, Boss-Warnungen und PvP der Sitzung als Widgets im Overlay, Feldbosse und "
+        "Vertraute in der Web-UI. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
         tags=("AION 2", "Desktop"),
     ),
     ModuleInfo(

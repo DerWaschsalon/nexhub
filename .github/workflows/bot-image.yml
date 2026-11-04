@@ -3,7 +3,7 @@ name: Bot-Image
 on:
   push:
     branches: [main]
-    paths: ["bot/**", ".github/workflows/bot-image.yml"]
+    paths: ["bot/**", "proto/nexproto/termine.py", ".github/workflows/bot-image.yml"]
   workflow_dispatch: {}
 
 permissions:
@@ -27,6 +27,8 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: bot
+          # Termine der AION-2-Server aus dem Monorepo (bot/Dockerfile: COPY --from=proto)
+          build-contexts: proto=proto
           push: true
           tags: |
             ghcr.io/derwaschsalon/thewashbot:latest

@@ -71,6 +71,9 @@ services:
     profiles: [bot]
     build:
       context: ./src/bot
+      # Termine der AION-2-Server aus dem Monorepo (bot/Dockerfile: COPY --from=proto)
+      additional_contexts:
+        proto: ./src/proto
       args:
         GIT_REV: ${GIT_REV:-dev}
     image: nexhub-bot:lokal

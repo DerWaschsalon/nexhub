@@ -6,13 +6,15 @@ Sekunde auf und zeigt stand() als Widgets im Overlay (Radar, Warnungen, Karte).
 from __future__ import annotations
 
 import time
+from collections import deque
 from pathlib import Path
 
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
 from .quelle import Quelle
 from .uebersicht import feldboss_ansagen
-from .warnung import STATUS_REGELN, TODESMAL, WarnZentrale, alarm_abspielen, ansage, ansagen_vorbereiten, tr
+from .warnung import (STATUS_REGELN, TODESMAL, TREFFER_REGELN, WarnZentrale, alarm_abspielen, ansage,
+                      ansagen_vorbereiten, tr)
 from .zustand import Cube, RadarZustand
 
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
@@ -31,7 +33,15 @@ class RadarDienst:
         self.zustand.bei_cast.append(self.zentrale.cast)
         self.zustand.bei_status.append(self.zentrale.status)
         self.zustand.bei_groggy.append(self.zentrale.groggy)
+        self.zustand.bei_staggern.append(self.zentrale.staggern)
+        self.zustand.bei_treffer.append(self.zentrale.treffer)
+        self.zustand.bei_gruppe_lp.append(self.zentrale.gruppe_lp)
+        self.zustand.bei_tod.append(self._tod)
+        self.zustand.bei_flaeche.append(self.zentrale.flaeche)
+        # Tode von dir und Mitspielern durch Monster, fuer den Run im Hub (der Daemon liest sie aus)
+        self.tode: deque[dict] = deque(maxlen=200)
         self.zustand.status_ids = set(STATUS_REGELN)
+        self.zustand.treffer_ids = set(TREFFER_REGELN)
         self._ton_faellig = False
         self._dungeon: str | None = None
         self._gemeldet: set = set()  # Feldboss-Ansagen, die schon kamen
@@ -53,12 +63,39 @@ class RadarDienst:
     def warnung_testen(self) -> None:
         self.zentrale.cast(0, TODESMAL, self.zustand.eigene_eid)
 
+    def pvp_neu(self) -> None:
+        """PvP-Sitzung neu beginnen (Kills, Tode, Punkte ab jetzt)."""
+        self.zustand.pvp.zuruecksetzen()
+
     def aufnahme_starten(self) -> None:
         self.quelle.aufnahme_starten(self.zustand.dungeon or "dungeon")
 
     @property
     def aufnahme(self) -> bool:
         return bool(self.quelle.aufnahme)
+
+    def kampf(self) -> dict:
+        """Fuer eigene Makros (GET /api/radar/kampf): Boss groggy und die laufenden Warnungen mit
+        Gruppe (Schalter auf der NexBoard-Seite), Titel, ob sie dich trifft, und Restzeit. Abgeschaltete
+        Warnungen (Seite „Radar“) kommen auch hier nicht vor."""
+        jetzt = self.zentrale.uhr()
+        return {"groggy": self.zustand.boss_groggy(),
+                "warnungen": [{"gruppe": w.regel.gruppe, "titel": w.titel(), "ich": w.ich,
+                               "rest": round(w.rest(jetzt), 2)}
+                              for w in self.zentrale.schnappschuss() if w.regel.gruppe != "casts"]}
+
+    def _tod(self, opfer: int, skill: int, taeter_name: str) -> None:
+        """Tod merken mit Skill und der Warnung, die das Radar gerade zeigte. PvP (Taeter ist ein
+        Spieler) und tote Monster zaehlen nicht."""
+        z = self.zustand
+        name = z.spieler.get(opfer) or (z.charname if opfer == z.eigene_eid else "")
+        if taeter_name or not name:
+            return
+        jetzt = self.zentrale.uhr()
+        w = self.zentrale.letzte(jetzt)
+        self.tode.append({"t_ms": int(jetzt * 1000), "name": name, "skill": skill,
+                          "warning": tr(w.regel.titel) if w else None,
+                          "lead_ms": int((jetzt - w.start) * 1000) if w else None})
 
     def _neuer_cube(self, cube: Cube) -> None:
         # kommt aus dem Mitschnitt-Thread: nur merken, der Ton kommt im naechsten Takt
@@ -98,6 +135,7 @@ class RadarDienst:
         return {
             "position": s["position"],
             "position_alter": s["position_alter"],
+            "kurs": s["kurs"],
             "cubes": [{"x": c.x, "y": c.y, "z": c.z, "alter": time.time() - c.seit, "oeffner": c.oeffner}
                       for c in s["cubes"]],
             "gruppe": [{"name": name, "x": x, "y": y} for name, x, y, *_ in s["gruppe"]],
@@ -109,12 +147,13 @@ class RadarDienst:
             "karte": self.k["karte_name"] or "",
             "karte_offen": s["karte_offen"] and self.k["bei_karte_ausblenden"],  # Overlay ausblenden
             "punkte": len(self.punkte.punkte),  # aendert sich die Zahl, laedt die Karte die Punkte neu
-            "einstellungen": {k: self.k[k] for k in ("reichweite", "drehung", "spiegeln", "karte_folgen")},
+            "einstellungen": {k: self.k[k] for k in ("reichweite", "drehung", "spiegeln", "karte_folgen", "kurs_oben")},
+            "pvp": self.zustand.pvp.stand(),
         }
 
     @staticmethod
     def _warnung(w, jetzt: float) -> dict:
-        return {"titel": w.titel(), "hinweis": tr("Weg von der Gruppe!" if w.ich else w.regel.hinweis),
+        return {"titel": w.titel(), "hinweis": tr(w.regel.hinweis_ich if w.ich else w.regel.hinweis),
                 "rest": w.rest(jetzt), "vorlauf": w.regel.vorlauf, "farbe": w.regel.farbe,
                 "lernhilfe": w.regel.gruppe == "casts"}  # Lernhilfe: echter Vorlauf unbekannt, keine Sekunden
 
@@ -128,13 +167,15 @@ class RadarDienst:
         alter = s["position_alter"]
         pos = "keine Position" if alter is None else (
             "Position aktuell" if alter < 5 else f"Position vor {alter:.0f} s")
-        quelle = "Name" if s["eid_ueber_name"] else "geschätzt"
+        quelle = "sicher" if s["eid_sicher"] else "geschätzt"
         text = f"ID {s['eid']} ({quelle}) · {pos}"
         if s["dungeon"]:
             ende = self.zustand.dungeon_ende
             rest = int(ende - time.time()) if ende else 0
             zeitlimit = f" {rest // 60}:{rest % 60:02}" if rest > 0 else ""
             text = f"{s['dungeon']}{zeitlimit} · {text}"
+        if self.zustand.schluessel:
+            text += f" · {self.zustand.schluessel} Cube-Schlüssel benutzt"
         return ("● REC · " if self.aufnahme else "") + text
 
     def karte(self) -> dict:

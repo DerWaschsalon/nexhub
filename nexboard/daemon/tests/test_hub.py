@@ -227,6 +227,8 @@ async def test_run_wird_als_nexlog_hochgeladen(tmp_path):
     hub = uploading_hub(tmp_path, url)
     run, hist = history_run(tmp_path)
     hub.history_dir = lambda: hist
+    tod = {"t_ms": run.start_ms + 1000, "name": "Morgan", "skill": 1801120, "warning": "Todesmal", "lead_ms": 4100}
+    hub.deaths = lambda start_ms, end_ms: [tod] if start_ms <= tod["t_ms"] <= end_ms else []
     try:
         await hub.on_fight({"rows": [{"name": "Gamunex", "cls": "chanter", "you": True}, {"name": "Morgan"}]})
         await hub.on_run(run)
@@ -239,6 +241,7 @@ async def test_run_wird_als_nexlog_hochgeladen(tmp_path):
         assert log.you.name == "Gamunex" and log.names == {"Mo***n|ranger": "Morgan"}
         assert [f.id for f in log.fights] == [f.id for f in run.fights]
         assert list(log.hits) == [run.fights[0].id] and len(log.hits[run.fights[0].id].rows) == 2
+        assert [d.model_dump() for d in log.deaths] == [tod]  # Todesursachen vom Radar
     finally:
         await hub.close()
         await runner.cleanup()

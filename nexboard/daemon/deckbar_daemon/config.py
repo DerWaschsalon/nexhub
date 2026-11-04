@@ -63,7 +63,7 @@ Action = Annotated[
 # ------------------------------------------------------------------ Layout
 class Item(_Strict):
     id: ID
-    type: Literal["button", "toggle", "slider", "media", "dps"] = "button"
+    type: Literal["button", "toggle", "slider", "media", "dps", "claude"] = "button"
     label: str | None = Field(None, max_length=24)
     icon: str | None = Field(None, max_length=48)
     icon_on: str | None = Field(None, max_length=48)
@@ -126,6 +126,9 @@ class Layout(_Strict):
                 if i.nav and i.nav not in page_ids:
                     raise ValueError(f"Item '{i.id}': Seite '{i.nav}' gibt es nicht")
         return self
+
+    def has_type(self, item_type: str) -> bool:
+        return any(i.type == item_type for p in self.pages for i in p.items)
 
     def find_item(self, item_id: str) -> Item | None:
         for p in self.pages:

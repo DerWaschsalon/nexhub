@@ -84,7 +84,9 @@ function widgetsTab(ctx) {
       el("div", { class: "cols" },
         card("Radar", "Modul AION 2 · Radar: erscheint nur, solange ein Cube in Sicht ist", sw(w.radar.enabled, (v) => set("radar", { enabled: v })), ...common("radar")),
         card("Boss-Warnungen", "Modul AION 2 · Radar: nur während einer Warnung", sw(w.warnung.enabled, (v) => set("warnung", { enabled: v })), ...common("warnung")),
-        card("Karte", "Modul AION 2 · Radar: ziehen = verschieben, Mausrad = Zoom", sw(w.karte.enabled, (v) => set("karte", { enabled: v })), ...common("karte"))),
+        card("Karte", "Modul AION 2 · Radar: ziehen = verschieben, Mausrad = Zoom", sw(w.karte.enabled, (v) => set("karte", { enabled: v })), ...common("karte")),
+        card("PvP", "Modul AION 2 · Radar: Kills, Tode und Rangpunkte seit Spielstart", sw(w.pvp.enabled, (v) => set("pvp", { enabled: v })), ...common("pvp"))),
+      profilesCard(o, draw),
       eventsCard(w, set));
   };
   // nicht neu aufbauen, solange ein Regler oder Feld in Benutzung ist (sonst bricht das Ziehen ab)
@@ -93,6 +95,34 @@ function widgetsTab(ctx) {
   if (!S.overlay) refresh().then(draw);
   draw();
   return box;
+}
+
+/** Profile: welche Widgets sichtbar sind. Wechsel und Löschen speichern sofort (die Schalter oben ändern sich mit). */
+function profilesCard(o, redraw) {
+  const L = o.layout;
+  const put = async (patch, text) => {
+    try { S.overlay = await api("PUT", "/api/overlay", patch); toast(text); redraw(); } catch (e) { toast(e.message, true); }
+  };
+  const remove = (name) => {
+    const rest = { ...L.profile };
+    delete rest[name];
+    put({ profile: rest, profil: name === L.profil ? "" : L.profil }, `Profil ${name} gelöscht`);
+  };
+  const rows = Object.entries(L.profile).map(([name, ids]) => settingsRow(name,
+    ids.map((id) => o.widget_titel[id]).join(", ") || "keine Widgets",
+    el("div", { class: "row" },
+      name === L.profil ? chip("aktiv", "ok") : button("Wählen", () => put({ profil: name }, `Profil ${name}`), "sm"),
+      button(null, () => remove(name), "sm icon ghost", "delete", { title: "Löschen" }))));
+  let neu = "";
+  const visible = Object.keys(L.widgets).filter((id) => L.widgets[id].enabled);
+  return card("Profile", "Welche Widgets sichtbar sind. Das aktive Profil merkt sich jedes Ein- und Ausschalten.", null,
+    ...rows,
+    el("div", { class: "row wrap", style: "margin-top:14px" },
+      input("", (v) => { neu = v.trim(); }, { placeholder: "Name ohne Leerzeichen, z. B. Raid", maxlength: 24 }),
+      button("Aus der aktuellen Ansicht anlegen", () => put({ profile: { ...L.profile, [neu]: visible }, profil: neu }, `Profil ${neu} angelegt`), "sm", "plus")),
+    el("p", { class: "hint small", style: "margin-top:14px" },
+      "Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „NexBoard Overlay ein/aus“. Dort steht je Profil und je Widget eine eigene Aktion, der du eine Taste gibst. Im Terminal: ",
+      el("code", { text: "deckbar-overlay --profil PvP" }), " bzw. ", el("code", { text: "--widget pvp" }), "."));
 }
 
 function eventsCard(w, set) {

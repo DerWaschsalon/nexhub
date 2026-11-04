@@ -8,8 +8,10 @@ import {
 const W = 640, H = 172, PAD = 8, GAP = 8;
 const STYLES = { default: "#ffffff", accent: null, danger: "#ff453a", success: "#30d158", warning: "#ff9f0a" };
 const STYLE_NAMES = { default: "Standard", accent: "Akzent", danger: "Rot", success: "Grün", warning: "Orange" };
-const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter" };
-const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active"];
+const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter", claude: "Claude-Nutzung" };
+// Icon für Kacheln ohne eigenes Icon (Liste im Editor)
+const TYPE_ICONS = { media: "music", dps: "flash", claude: "chart-bar" };
+const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active", "claude"];
 const EXTRA_NAMES = { pct: "Anteil in %", dmg: "Gesamtschaden", none: "nichts" };
 // Vorschau im Bearbeiten-Modus, solange das Meter nichts liefert
 const DPS_DEMO = { target: "Beispiel-Boss", time: 92, hp: 37.4, rows: [
@@ -36,6 +38,7 @@ const TEMPLATES = [
   { name: "Befehl", icon: "console", item: { label: "Befehl", icon: "console", action: { do: "shell", cmd: "notify-send NexBoard Hallo" } } },
   { name: "Seite wechseln", icon: "chevron-right", item: { label: "Mehr", icon: "chevron-right", nav: "" } },
   { name: "AION 2 DPS-Meter", icon: "flash", item: { type: "dps" }, needs: "aion2.dps" },
+  { name: "Claude-Nutzung", icon: "chart-bar", item: { type: "claude", w: 2 } },
 ];
 
 const ACTION_FIELDS = {
@@ -179,8 +182,8 @@ function renderTile(it, b, idx) {
     }
     t.append(m);
     t.addEventListener("click", () => onTileClick(it, idx));
-  } else if (type === "dps") {
-    t.append(renderDps(it, b));
+  } else if (type === "dps" || type === "claude") {
+    t.append(type === "dps" ? renderDps(it, b) : renderClaude(b));
     t.addEventListener("click", () => D.mode === "edit" && select(idx));
   }
   return t;
@@ -217,6 +220,23 @@ function renderDps(it, b) {
   });
   if (!rows.length) box.append(el("div", { class: "msg", style: b.h >= 90 ? "top:16px" : "", text: d ? "Warte auf Kampf …" : modOn("aion2.dps") ? "DPS-Meter nicht verbunden" : "Modul DPS-Mitschnitt ist aus" }));
   if (demo) box.append(el("span", { class: "demo", text: "Beispieldaten" }));
+  return box;
+}
+
+// wie build_claude in shared-ui/src/ui.c
+function renderClaude(b) {
+  const c = S.state.claude || {};
+  const box = el("div", { class: "claude" });
+  [["session", "5 h"], ["week", "Woche"]].forEach(([key, name], i) => {
+    const r = c[key];
+    const pct = r ? Math.max(0, Math.min(100, r.pct)) : 0;
+    const color = styleColor(pct >= 90 ? "danger" : pct >= 75 ? "warning" : "accent");
+    box.append(el("div", { class: "r", style: `top:${(b.h * (2 * i + 1)) / 4 - 8}px` },
+      el("span", { class: "n", text: name }),
+      el("span", { class: "t" }, el("i", { style: `width:${pct}%;background:${color}` })),
+      el("span", { class: "p", text: r ? `${pct} %` : "–" }),
+      b.w >= 260 ? el("span", { class: "x", text: r?.reset || "" }) : null));
+  });
   return box;
 }
 
@@ -357,8 +377,8 @@ function renderItemList() {
   const boxes = placeItems(page);
   fill(list, ...page.items.map((it, i) => {
     const li = el("li", { class: i === D.sel ? "sel" : null, draggable: "true", onclick: () => select(i) },
-      el("span", { class: "ic", text: g(it.icon) || (it.type === "media" ? g("music") : it.type === "dps" ? g("flash") : "") }),
-      el("span", { class: "nm", text: it.label || (it.type === "media" ? "Media" : it.type === "dps" ? "DPS-Meter" : it.id) }),
+      el("span", { class: "ic", text: g(it.icon) || g(TYPE_ICONS[it.type]) || "" }),
+      el("span", { class: "nm", text: it.label || (TYPE_ICONS[it.type] ? TYPE_NAMES[it.type] : it.id) }),
       boxes[i] ? el("span", { class: "meta", text: `${TYPE_NAMES[it.type || "button"]} · ${it.w || 1}×${it.h || 1}` }) : el("span", { class: "warn", text: "passt nicht" }));
     li.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", String(i)); li.classList.add("dragging"); });
     li.addEventListener("dragend", () => li.classList.remove("dragging"));
@@ -442,7 +462,7 @@ function renderProps() {
       it.id = v;
       changed({ props: false });
     }, { maxlength: 32 })),
-    type !== "media" && type !== "dps" ? field("Beschriftung", inputEl(it.label, (v) => set("label", v, { props: false }), { maxlength: 24 }), null, "span-all") : null,
+    !TYPE_ICONS[type] ? field("Beschriftung", inputEl(it.label, (v) => set("label", v, { props: false }), { maxlength: 24 }), null, "span-all") : null,
     field("Breite (Zellen)", inputEl(it.w || 1, (v) => set("w", clampInt(v, 1, 8, 1) === 1 ? undefined : clampInt(v, 1, 8, 1)), { type: "number", min: 1, max: 8 })),
     field("Höhe (Zellen)", inputEl(it.h || 1, (v) => set("h", clampInt(v, 1, 3, 1) === 1 ? undefined : clampInt(v, 1, 3, 1)), { type: "number", min: 1, max: 3 })));
 
@@ -453,6 +473,11 @@ function renderProps() {
         field("Spieler (Zeilen)", inputEl(it.players || 5, (v) => set("players", clampInt(v, 1, 8, 5) === 5 ? undefined : clampInt(v, 1, 8, 5)), { type: "number", min: 1, max: 8 })),
         field("Neben der DPS-Zahl", selectEl(EXTRA_NAMES, it.extra || "pct", (v) => set("extra", v === "pct" ? undefined : v)))),
       el("p", { class: "hint small", style: "margin-top:10px", text: "Passen nicht alle Spieler in die Kachel, zeigt sie so viele wie möglich. Die Daten kommen vom Modul „AION 2 · DPS-Mitschnitt“." })));
+    fill(box, ...parts);
+    return;
+  }
+  if (type === "claude") {
+    parts.push(el("p", { class: "hint small", style: "margin-top:14px", text: "Zeigt die Auslastung deines Claude-Abos (5-Stunden-Sitzung und Woche) wie /usage in Claude Code. Der Daemon liest dafür die Anmeldung von Claude Code auf diesem Rechner und fragt alle 5 Minuten nach." }));
     fill(box, ...parts);
     return;
   }
@@ -509,8 +534,8 @@ function changeType(it, v) {
   if (v !== "slider") { delete it.mute_bind; delete it.min; delete it.max; }
   if (v !== "button") delete it.nav;
   if (v === "media") { delete it.icon; delete it.label; if (!it.h) it.h = 2; if (!it.w) it.w = 2; }
-  if (v === "dps") { delete it.icon; delete it.label; delete it.style; delete it.action; delete it.long_action; }
-  else { delete it.players; delete it.extra; }
+  if (v === "dps" || v === "claude") { delete it.icon; delete it.label; delete it.style; delete it.action; delete it.long_action; }
+  if (v !== "dps") { delete it.players; delete it.extra; }
 }
 
 function keyInput(value, suggestions, onChange) {

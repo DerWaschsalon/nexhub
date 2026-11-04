@@ -36,6 +36,13 @@
 					<dd class="num">{s.value}{#if hasExtra(s.extra)}<span class="extra"> +{s.extra}</span>{/if}</dd>
 				{/each}
 			</dl>
+			{#if d.gain}
+				<!-- Was eine volle Verzauberung bringen würde, damit man sieht, wo sie sich lohnt -->
+				<p class="gain small">
+					{t('logs.char.gain', { n: d.gain.enchant })}:
+					{d.gain.stats.map((s) => `${s.name} ${s.value}`).join(' · ')}
+				</p>
+			{/if}
 		{/if}
 
 		{#if d.sub.length}
@@ -138,6 +145,10 @@
 	.extra {
 		color: var(--accent);
 		font-weight: 500;
+	}
+	.gain {
+		margin: 6px 0 0;
+		color: var(--accent);
 	}
 	.rolls dd {
 		color: var(--ok);
