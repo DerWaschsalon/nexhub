@@ -18,7 +18,17 @@ export type ArmoryDetail = ArmoryItem & {
 	error: string | null;
 	days: ArmoryDay[];
 	can_delete: boolean;
+	/** Sprache → Hinweise „das zuerst verbessern“ (hub/api/nexhub_api/ratgeber.py) */
+	hints: Record<string, ArmoryHint[]>;
 };
+
+type HintItem = { slot: string; item: string; icon: string | null; grade: string };
+/** Ein Hinweis des Ratgebers; Reihenfolge von schnell erledigt bis teuer */
+export type ArmoryHint =
+	| (HintItem & { art: 'sockel'; frei: number })
+	| (HintItem & { art: 'verzaubern'; stufe: number; werte: string[] })
+	| (HintItem & { art: 'stein' | 'nebenwert'; werte: string[] })
+	| { art: 'set'; set: string; hat: number; braucht: number };
 
 export type ArmoryHit = {
 	name: string;

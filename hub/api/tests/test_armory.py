@@ -75,6 +75,7 @@ def test_eintragen_abrufen_verlauf(make_client, fake, database_url):
     assert (d["status"], d["combat_power"], d["item_level"], d["class_name"]) == ("ok", 123456, 2554, "Waldläufer")
     assert d["data"]["de"]["equipment"][0]["name"] == "Testbogen" and d["mine"] and d["can_delete"]
     assert [(x["combat_power"], x["item_level"]) for x in d["days"]] == [(123456, 2554)]
+    assert d["hints"] == {"de": [], "en": []}  # Testbogen hat nichts Verschenktes, Details: test_ratgeber.py
     # Mit bekannter Charakter-ID keine Suche; in der Armory immer mit Werten je Gegenstand, beide Sprachen
     assert "/aion2global/search/v2/character" not in fake.nc.calls
     assert d["data"]["en"]["equipment"][0]["detail"]["set"]["name"] == "Testset"

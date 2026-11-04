@@ -152,9 +152,10 @@ def test_beide_sprachen_und_werte_je_gegenstand():
     assert {"de-DE", "en-US"} <= set(fake.langs)
     assert item_level(data) == 2554 and combat_power(data) == 123456
     detail = data["de"]["equipment"][0]["detail"]
-    assert detail["main"] == [{"name": "Angriffskraft", "value": "486", "extra": "146"}]
-    assert detail["sub"] == [{"name": "Mehrfachtreffer-Chance", "value": "9.1%"}]
-    assert detail["stones"][0] == {"name": "Kritischer Treffer", "value": "+6", "grade": "Legend", "icon": ICON}
+    assert detail["main"] == [{"id": "WeaponFixingDamage", "name": "Angriffskraft", "value": "486", "extra": "146"}]
+    assert detail["sub"] == [{"id": "AdditionalHitRate", "name": "Mehrfachtreffer-Chance", "value": "9.1%"}]
+    assert detail["stones"][0] == {"id": "Critical", "name": "Kritischer Treffer", "value": "+6", "grade": "Legend",
+                                   "icon": ICON}
     assert detail["godstones"][0]["desc"] == "10 % Chance auf Wind-Schaden"
     assert detail["skills"] == [{"name": "Zielpfeil", "level": 2, "icon": ICON}]
     assert detail["set"] == {"name": "Testset", "equipped": 3, "total": 5,

@@ -222,6 +222,15 @@ und die Typen aus `modules/logs`.
   liefert links die Momentaufnahme ohne Besitzer, rechts holt es live (`fetch_live`, wie
   `/api/armory/live`); fehlt der rechte, steht `right_error` da und links trotzdem.
   Kasten mit Link, Kopieren und Zurückziehen: `lib/components/ShareLink.svelte`, wie bei Runs.
+- Zuerst verbessern (`ratgeber.py`, Feld `hints` in `GET /api/armory/{id}` je Sprache): leere
+  Manastein-Sockel, Gewinn bis zur höchsten Verzauberung (`detail.gain`), bei Schadensklassen
+  Manasteine und Nebenwerte ohne Schaden (LP, Verteidigung, Blocken, Ausweichen …, erkannt an der
+  Kennung `id` der Werte, die es ab diesem Stand gibt) und Arkana-Sets ohne Bonus. Ohne Vergleich mit
+  anderen, Reihenfolge von schnell erledigt bis teuer. Alte Stände ohne `id` zeigen erst nach dem
+  nächsten Abruf alles.
+- Echte Skill-Stufe im Profil (Runs und Armory, `modules/logs/skillLevels.ts`): Stufe aus der
+  Skill-Liste plus Daevanion-Boni plus verstärkte Skills der Ausrüstung, farbig, wenn Boni dabei sind;
+  Stigmen ohne Boni.
 - Build-Check (`hub/armory/<id>/check`): der Charakter gegen die 15 besten Spieler seiner Klasse in
   der EU mit ähnlicher Kampfkraft (±15 %), nur auf Klick (`POST /api/armory/{id}/check`, höchstens
   alle 10 Minuten). Die Top-Spieler kommen aus der Rangliste von **Abyss Logs** (`abysslogs.py`,
