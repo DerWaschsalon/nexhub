@@ -28,6 +28,15 @@ OP_OEFFNEN = 0x3638   # Spieler beginnt ein Objekt zu oeffnen: Objekt-Entity, Sp
                       # am Cube geprueft: 4 s spaeter 0x363A = fertig)
 OP_POSITION = 0x382B  # Status-Variante mit Position am Ende, wie 0x382A (verdoppelt die eigenen Positionen)
 OP_BEWEGUNG = 0x371A  # Bewegung: Entity, 2 Byte, x/y/z
+# Ungeprueft, aus benhighlanderr/Aion2-Hidden-Cube-Radar (ohne Lizenz, nur die Erkenntnis uebernommen).
+# Diese Quellen gehen ueber _position_pruefen, damit ein falscher Wert die Position nicht verdirbt.
+OP_BEWEGUNG_ALLE = range(0x3710, 0x3751)  # weitere Bewegungsarten, gleicher Aufbau wie 0x371A
+OP_EINTRITT = 0x3621  # eigener Charakter betritt die Welt: Entity, ..., x/y/z ab Byte 16
+OP_ZONE_POS = 0x561E  # Zonenwechsel mit Position ab Byte 17
+CAST_POS = 17         # im eigenen Cast (0x3802) stehen x/y/z ab Byte 17
+MAX_SPRUNG_CM = 3000  # ungepruefte Position: hoechstens 30 m neben der letzten ...
+SPRUNG_ALTER_S = 10   # ... ausser die letzte ist aelter
+KURS_AB_CM = 100      # Laufrichtung erst ab 1 m Weg neu bestimmen
 OP_CHARAKTER = 0x3633 # Spieler erscheint, enthaelt den Namen (geprueft)
 OP_TELEPORT = 0x3623  # eigener Teleport/Zonenwechsel mit Position ab Byte 6 (geprueft)
 OP_SYNC = 0x8D00      # Punkte einer Entity (HP, MP, ...): Entity, Flags u8, bei Flag 1 Varint N, N x (Art u8, i32).
@@ -67,6 +76,8 @@ CUBE_IDS = {
     1000295, 1000548, 1000556, 1000566, 1000567, 1000568, 1100056, 1100094,
     1200018, 1200036, 1200037, 1200039, 1200040, 1200041, 1200667, 1200707,
     1201054, 1201055, 1300754, 1301199, 1301200, 1401335, 1401336, 3682560,
+    # ungeprueft, aus benhighlanderr/Aion2-Hidden-Cube-Radar: Varianten 01_V01-V19 und 1300081/82
+    *range(1000549, 1000566), 1300081, 1300082,
 }
 
 # Boss-NPC-ID -> Dungeon und Zonen-ID -> Dungeon, erzeugt mit `python -m werkzeuge.bosse`
@@ -110,6 +121,8 @@ class RadarZustand:
         self._sync_zaehler: Counter[int] = Counter()
         self.position: tuple[float, float, float] | None = None
         self.position_zeit = 0.0
+        self.kurs: tuple[float, float] | None = None  # Laufrichtung als Einheitsvektor (Welt x, y)
+        self._kurs_von: tuple[float, float] | None = None
         self.cubes: dict[int, Cube] = {}
         self.dungeon: str | None = None  # beim Betreten (0x4002), sonst am ersten Boss
         self.gruppe: dict[int, tuple[float, float, float, float]] = {}  # Charakter-ID -> x, y, z, zeit
@@ -234,6 +247,15 @@ class RadarZustand:
                 self._position(*struct.unpack_from("<fff", p, len(p) - 12))
             elif op == OP_BEWEGUNG and eid == self.eigene_eid:
                 self._position(*struct.unpack_from("<fff", p, n + 2))
+            elif op in OP_BEWEGUNG_ALLE and eid == self.eigene_eid:
+                self._position_pruefen(*struct.unpack_from("<fff", p, n + 2))
+            elif op == OP_EINTRITT and len(p) >= 28:
+                if self.eigene_eid is None:
+                    self.eigene_eid = eid  # nur geschaetzt; Name oder MP/SP machen sie sicher
+                if eid == self.eigene_eid:
+                    self._position_pruefen(*struct.unpack_from("<fff", p, 16))
+            elif op == OP_ZONE_POS and len(p) >= 29:
+                self._position_pruefen(*struct.unpack_from("<fff", p, 17))
             elif op == OP_OEFFNEN and eid in self.cubes:
                 spieler = uvarint(p, n)[0]
                 self.cubes[eid].oeffner = self.spieler.get(spieler, "?")
@@ -260,7 +282,9 @@ class RadarZustand:
                 self.dungeon_ende = struct.unpack_from("<Q", p, 13)[0] / 1000 if laeuft else None
             elif op in PVP_OPCODES:
                 self.pvp.verarbeiten(op, p)
-            elif op == OP_CAST and self.bei_cast:
+            elif op == OP_CAST:
+                if eid == self.eigene_eid and len(p) >= CAST_POS + 12:
+                    self._position_pruefen(*struct.unpack_from("<fff", p, CAST_POS))  # im Kampf oft die beste Quelle
                 skill = struct.unpack_from("<I", p, n + 1)[0]
                 ziel = uvarint(p, n + 7)[0] if len(p) > n + 7 else None
                 for f in self.bei_cast:
@@ -388,6 +412,27 @@ class RadarZustand:
         if gueltig(x, y, z):
             with self.lock:
                 self.position, self.position_zeit = (x, y, z), time.time()
+                self._kurs_merken(x, y)
+
+    def _position_pruefen(self, x: float, y: float, z: float) -> None:
+        """Position aus einer ungeprueften Quelle: nur nah an der letzten (oder wenn die alt ist)."""
+        alt = self.position
+        if alt and time.time() - self.position_zeit < SPRUNG_ALTER_S \
+                and math.hypot(x - alt[0], y - alt[1]) > MAX_SPRUNG_CM:
+            return
+        self._position(x, y, z)
+
+    def _kurs_merken(self, x: float, y: float) -> None:
+        """Laufrichtung aus den letzten Metern. Spruenge (Teleport) setzen nur den Startpunkt neu."""
+        if self._kurs_von is None:
+            self._kurs_von = (x, y)
+            return
+        dx, dy = x - self._kurs_von[0], y - self._kurs_von[1]
+        weg = math.hypot(dx, dy)
+        if weg >= MAX_SPRUNG_CM:
+            self._kurs_von = (x, y)
+        elif weg >= KURS_AB_CM:
+            self.kurs, self._kurs_von = (dx / weg, dy / weg), (x, y)
 
     def _loggen(self, eid: int, objekt_id: int, x: float, y: float, z: float) -> None:
         zeile = {"t": round(time.time(), 2), "eid": eid, "objekt_id": objekt_id,
@@ -406,6 +451,7 @@ class RadarZustand:
                 "eid_sicher": self.eid_sicher,
                 "position": self.position,
                 "position_alter": time.time() - self.position_zeit if self.position else None,
+                "kurs": self.kurs,
                 "cubes": list(self.cubes.values()),
                 "dungeon": self.dungeon,
                 "feldbosse": [b for b in self.feldbosse.values()

@@ -53,6 +53,12 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 - **Berserker-Zeit** (`0x8D21`): Countdown in der Vorschauzeile, solange der Boss im Kampf ist.
 - **Wenig LP** (`0x921B`): Mitspieler unter 25 % LP, einmal bis zur Erholung über 50 %. Schalter unter „alle Dungeons“.
 - **Cube-Schlüssel:** verbrauchte Schlüssel (`0x363A`, Item 630900003) in der Statuszeile.
+- **Mehr Positionsquellen** (ungeprüft, Erkenntnis aus benhighlanderr/Aion2-Hidden-Cube-Radar, dort ohne Lizenz):
+  eigener Cast `0x3802` (x/y/z ab Byte 17, im Kampf die häufigste Quelle), Bewegungen `0x3710`–`0x3750`, Eintritt
+  `0x3621` (Position ab Byte 16, ID nur geschätzt) und Zonenwechsel `0x561E` (ab Byte 17). Sie zählen nur, wenn sie
+  höchstens 30 m neben der letzten Position liegen oder die letzte älter als 10 s ist.
+- **Laufrichtung oben** (Schalter auf der Seite „Radar“): dreht das Radar so, dass die Laufrichtung oben ist (aus den
+  letzten Metern Weg) statt Norden. Weitere Cube-IDs (ungeprüft): 1000549–1000565, 1300081, 1300082.
 - **Dungeon-Restzeit** (`0x6100`) in der Statuszeile unter dem Radar.
 - **PvP der Sitzung** (`radar/pvp.py`, Widget „PvP“ im Overlay): Kills und Tode zählt `0x8D04`
   (Tod mit Täter und dessen Namen, nur bei Spielern als Täter), Kills über die eigene Entity oder den
