@@ -9,6 +9,7 @@ import time
 from collections import deque
 from pathlib import Path
 
+from . import minikarte
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
 from .quelle import Quelle
@@ -19,6 +20,8 @@ from .zustand import Cube, RadarZustand
 
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
 
+
+MINIKARTE_S = 0.5  # so oft die Minikarte lesen (ca. 5 ms je Bild)
 
 class RadarDienst:
     def __init__(self, name: str = "", spawn_log: Path | None = LOG) -> None:
@@ -47,6 +50,7 @@ class RadarDienst:
         self._dungeon: str | None = None
         self._gemeldet: set = set()  # Feldboss-Ansagen, die schon kamen
         self._sekunde = 0
+        self._karte_gelesen = 0.0
 
     def starten(self) -> None:
         ansagen_vorbereiten()
@@ -119,6 +123,7 @@ class RadarDienst:
             self._ton_faellig = False
             if self.k["ton"]:
                 ton_abspielen()
+        self._blickrichtung()
         self.zentrale.schnappschuss()  # holt faellige Vorhersagen nach vorn, auch ohne Overlay
         while self.zentrale.laut:
             art, text = self.zentrale.laut.pop(0)
@@ -126,6 +131,18 @@ class RadarDienst:
                 ansage(text)
             else:
                 alarm_abspielen()
+
+    def _blickrichtung(self) -> None:
+        """Blickrichtung aus der Minikarte (Einstellung minikarte = [x, y, Breite, Hoehe]), zweimal pro
+        Sekunde. Sie ersetzt die Laufrichtung aus zwei Positionen, die beim normalen Laufen fehlt."""
+        bereich = self.k["minikarte"]
+        if len(bereich) != 4 or time.time() - self._karte_gelesen < MINIKARTE_S:
+            return
+        self._karte_gelesen = time.time()
+        bild = minikarte.lesen(bereich)
+        grad = minikarte.blickrichtung(bild) if bild is not None else None
+        if grad is not None:
+            self.zustand.kurs = minikarte.kurs(grad)
 
     # --- fuer das Overlay -------------------------------------------------
 
