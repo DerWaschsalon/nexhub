@@ -18,5 +18,6 @@
   "warn_an": true,
   "name": "",
   "karte_name": "",
-  "flaeche_m": 6.0
+  "flaeche_m": 6.0,
+  "minikarte": []
 }
