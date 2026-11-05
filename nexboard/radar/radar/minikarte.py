@@ -9,8 +9,11 @@ bei Sprint, Sprung oder Kampf.
 from __future__ import annotations
 
 import math
+import re
+import time
 
-SCHRITT = 2  # Grad zwischen zwei abgetasteten Richtungen
+TITEL = re.compile(r"^AION2 *$")  # Overlays heißen „AION2 Radar“ usw.
+SCHRITT = 2 # Grad zwischen zwei abgetasteten Richtungen
 RING = (0.55, 0.95)  # außerhalb des hellen Innenkreises, dort sind nur noch die Linien weiß
 MIN_ANTEIL = 0.45  # so viel des Strahls muss weiß sein, Quest-Punkte erreichen das nicht
 KEGEL = (95, 130)  # erlaubter Abstand der beiden Linien in Grad, alles andere ist keine Minikarte
@@ -68,12 +71,55 @@ def kurs(grad: float) -> tuple[float, float]:
     return (math.sin(rad), -math.cos(rad))
 
 
-def lesen(bereich: list[int]):
-    """Bildschirmausschnitt [x, y, Breite, Höhe] (Bildschirm-Pixel). None, wenn kein X-Bildschirm da ist."""
-    from PIL import ImageGrab  # erst hier: Tests und Mitschnitt-Auswertung brauchen keinen Bildschirm
+class _Spielfenster:
+    """Das Spielfenster über X11. Pillows ImageGrab taugt hier nicht: Das Stammfenster von XWayland lässt
+    sich nicht lesen, und dann startet Pillow bei jedem Aufruf ein Screenshot-Programm."""
 
-    x, y, w, h = bereich
-    try:
-        return ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=None)
-    except OSError:
+    SUCHE_S = 2.0  # das Fenster höchstens so oft neu suchen, die Suche durch den Baum dauert einige ms
+
+    def __init__(self) -> None:
+        self.anzeige = None
+        self.fenster = None
+        self._gesucht = 0.0
+
+    def _suchen(self, fenster):
+        try:
+            name = fenster.get_wm_name()
+            if isinstance(name, str) and TITEL.match(name):
+                return fenster
+            kinder = fenster.query_tree().children
+        except Exception:  # Fenster kann zwischendurch verschwinden
+            return None
+        for kind in kinder:
+            treffer = self._suchen(kind)
+            if treffer is not None:
+                return treffer
         return None
+
+    def lesen(self, x: int, y: int, w: int, h: int):
+        from PIL import Image
+        from Xlib import X, display  # erst hier: Tests und Mitschnitt-Auswertung brauchen keinen Bildschirm
+
+        try:
+            if self.anzeige is None:
+                self.anzeige = display.Display()
+            if self.fenster is None:
+                if time.monotonic() - self._gesucht < self.SUCHE_S:
+                    return None
+                self._gesucht = time.monotonic()
+                self.fenster = self._suchen(self.anzeige.screen().root)
+                if self.fenster is None:
+                    return None
+            roh = self.fenster.get_image(x, y, w, h, X.ZPixmap, 0xFFFFFFFF)
+            return Image.frombuffer("RGB", (w, h), bytes(roh.data), "raw", "BGRX", 0, 1)
+        except Exception:  # Spiel beendet, Fenster neu oder X weg: beim nächsten Mal neu verbinden
+            self.anzeige = self.fenster = None
+            return None
+
+
+_spiel = _Spielfenster()
+
+
+def lesen(bereich: list[int]):
+    """Ausschnitt [x, y, Breite, Höhe] in Pixeln des Spielfensters. None, wenn es nicht lesbar ist."""
+    return _spiel.lesen(*bereich)

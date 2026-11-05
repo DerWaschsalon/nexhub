@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=11",
     "pydantic>=2.9",
     "pyserial>=3.5",
+    "python-xlib>=0.33",
     "pyyaml>=6",
     "zeroconf>=0.136",
 ]
