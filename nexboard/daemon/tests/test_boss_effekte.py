@@ -48,7 +48,7 @@ async def test_fragt_capture_hoechstens_alle_02_s():
     uhr = [START / 1000 + 18]
     cap = FakeCapture()
     effekte = BossEffekte(cap, uhr=lambda: uhr[0])
-    assert (await effekte.aktuell())["eigene_effekte"] == []  # eigene ID noch unbekannt
+    assert (await effekte.aktuell())["eigene_effekte"] is None  # eigene ID noch unbekannt
     await cap.data_listeners[0]("dps", {"localPlayerId": 344})
     uhr[0] += 0.3
     assert await effekte.aktuell() == {"boss_effekte": [{"id": REFLEXION, "seit": 2.3}],
@@ -62,7 +62,7 @@ async def test_fragt_capture_hoechstens_alle_02_s():
 
 
 async def test_capture_aus_oder_fehler_leer():
-    leer = {"boss_effekte": [], "eigene_effekte": []}
+    leer = {"boss_effekte": [], "eigene_effekte": None}
     assert await BossEffekte(FakeCapture(running=False)).aktuell() == leer
 
     class Kaputt(FakeCapture):

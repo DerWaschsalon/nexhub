@@ -45,7 +45,8 @@ def aktive(daten: dict | None, jetzt_ms: float, auf: int | None) -> list[dict]:
     return ergebnis
 
 
-LEER = {"boss_effekte": [], "eigene_effekte": []}
+# eigene_effekte None = unbekannt (Capture aus, eigene ID noch nicht gesehen), [] = keine
+LEER = {"boss_effekte": [], "eigene_effekte": None}
 
 
 class BossEffekte:
@@ -82,4 +83,5 @@ class BossEffekte:
             return LEER
         daten = await self.capture.request("buffs", timeout=ABFRAGE_S, target_id=ziel)
         jetzt_ms = self.uhr() * 1000
-        return {"boss_effekte": aktive(daten, jetzt_ms, ziel), "eigene_effekte": aktive(daten, jetzt_ms, self.ich)}
+        eigene = aktive(daten, jetzt_ms, self.ich) if self.ich is not None else None
+        return {"boss_effekte": aktive(daten, jetzt_ms, ziel), "eigene_effekte": eigene}
