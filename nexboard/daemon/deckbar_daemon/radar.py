@@ -116,7 +116,7 @@ class Radar:
         return [t for t in self.tode if start_ms <= t["t_ms"] <= ende_ms]
 
     def kampf(self) -> dict:
-        """Kampfzustand für eigene Makros auf diesem PC (GET /api/radar/kampf), siehe RadarDienst.kampf."""
+        """Kampfzustand für andere Programme auf diesem PC (GET /api/radar/kampf), siehe RadarDienst.kampf."""
         return self.dienst.kampf() if self.dienst else {"groggy": False, "warnungen": []}
 
     def uebersicht(self) -> dict:
