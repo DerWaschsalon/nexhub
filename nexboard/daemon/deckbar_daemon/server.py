@@ -21,6 +21,7 @@ from .actions import Executor
 from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, bin_chunks, chunks
 from .background import UPLOAD_MAX, Background, save_upload
+from .boss_effekte import BossEffekte
 from .bot import DiscordBot
 from .hub import Hub, HubError
 from .capture import aion2_running, history_root
@@ -150,6 +151,7 @@ class NexBoard:
         self.overlay.game_check = self._game_running
         self.overlay.ui_watching = lambda: bool(self.ui_clients)
         self.radar = Radar(lambda stand: self.overlay.publish("radar", stand), spiel_laeuft=self._game_running)
+        self.boss_effekte = BossEffekte(self.dps.capture)
         self.hub.deaths = self.radar.tode_zwischen
         self.devices: set[Device] = set()
         self.ui_clients: set[web.WebSocketResponse] = set()
@@ -1047,7 +1049,7 @@ class NexBoard:
         return web.json_response({"ok": True, **self.radar.info()})
 
     async def api_radar_kampf(self, request: web.Request) -> web.Response:
-        return web.json_response(self.radar.kampf())
+        return web.json_response({**self.radar.kampf(), "boss_effekte": await self.boss_effekte.aktuell()})
 
     async def api_radar_uebersicht(self, request: web.Request) -> web.Response:
         return web.json_response(self.radar.uebersicht())
