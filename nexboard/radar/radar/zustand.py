@@ -203,7 +203,7 @@ class RadarZustand:
             self.berserker[eid] = struct.unpack_from("<Q", p, n + 2)[0] / 1000
 
     def boss_groggy(self, jetzt: float | None = None) -> bool:
-        """Ist gerade ein Boss groggy? Für Makros, unabhängig davon, ob die Warnung angezeigt wird."""
+        """Ist gerade ein Boss groggy? Für andere Programme, unabhängig davon, ob die Warnung angezeigt wird."""
         jetzt = time.time() if jetzt is None else jetzt
         return any(jetzt - seit < GROGGY_MAX_S for seit in self.groggy_seit.values())
 

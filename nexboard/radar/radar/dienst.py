@@ -76,7 +76,7 @@ class RadarDienst:
         return bool(self.quelle.aufnahme)
 
     def kampf(self) -> dict:
-        """Fuer eigene Makros (GET /api/radar/kampf): Boss groggy und die laufenden Warnungen mit
+        """Fuer andere Programme auf diesem PC (GET /api/radar/kampf): Boss groggy und die laufenden Warnungen mit
         Gruppe (Schalter auf der NexBoard-Seite), Titel, ob sie dich trifft, und Restzeit. Abgeschaltete
         Warnungen (Seite „Radar“) kommen auch hier nicht vor."""
         jetzt = self.zentrale.uhr()
