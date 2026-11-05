@@ -108,7 +108,7 @@ class TodesursacheTest(unittest.TestCase):
         self.assertEqual(self.tode(tod(300))[0]["warning"], None)
 
 
-class KampfFuerMakrosTest(unittest.TestCase):
+class KampfAbfrageTest(unittest.TestCase):
     setUp = TodesursacheTest.setUp  # dieselbe Lage: Todesmal auf Anna
 
     def test_laufende_warnungen_und_groggy(self):

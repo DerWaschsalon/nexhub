@@ -1,10 +1,10 @@
-"""Effekte, die gerade auf dem Boss und auf dir liegen, aus dem Capture (für eigene Makros,
-GET /api/radar/kampf).
+"""Effekte, die gerade auf dem Boss und auf dir liegen, aus dem Capture (für andere Programme
+auf diesem PC, GET /api/radar/kampf).
 
 Das Radar erkennt Status-Effekte auf dem Boss erst spät und zeigt sie mit fester Dauer (Lakshmis
 Schadensreflexion am 04.11.2026: 3 s zu spät, 3,5 s zu lang). Das Capture (A2Tools-Kern) kennt Anfang
-und Ende genau: Es sind dieselben Buff-Daten, die im NexLog stehen. Die eigenen Effekte (z. B. Präzision
-vom Markierungsschuss) braucht ein Makro, um den Zielpfeil ins Buff-Fenster zu legen.
+und Ende genau: Es sind dieselben Buff-Daten, die im NexLog stehen. Dazu die eigenen Effekte (z. B. Präzision
+vom Markierungsschuss).
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 STILL_ON = 10  # end_code im A2Tools-Kern: der Abschnitt läuft beim letzten Treffer noch
-FRISCH_S = 0.2  # Makros fragen alle 0,1 s; das Capture höchstens so oft fragen
+FRISCH_S = 0.2  # Abfragen kommen bis zu alle 0,1 s; das Capture höchstens so oft fragen
 # Das Capture rechnet bis zum letzten Treffer. Trifft so lange niemand mehr, gilt der Stand als veraltet
 # (Lakshmis Reflexion dauert 8 s, in der Zeit greifen manche nicht an)
 MAX_RUHE_S = 10.0
@@ -71,7 +71,7 @@ class BossEffekte:
         try:
             self._stand = await self._abfragen()
         except (RuntimeError, TimeoutError, AttributeError, KeyError, ValueError):
-            self._stand = LEER  # Capture aus oder Antwort unbekannt: keine Effekte, Makros laufen normal
+            self._stand = LEER  # Capture aus oder Antwort unbekannt: keine Effekte
         return self._stand
 
     async def _abfragen(self) -> dict:
