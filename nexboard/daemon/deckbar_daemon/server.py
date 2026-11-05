@@ -1049,7 +1049,7 @@ class NexBoard:
         return web.json_response({"ok": True, **self.radar.info()})
 
     async def api_radar_kampf(self, request: web.Request) -> web.Response:
-        return web.json_response({**self.radar.kampf(), "boss_effekte": await self.boss_effekte.aktuell()})
+        return web.json_response({**self.radar.kampf(), **await self.boss_effekte.aktuell()})
 
     async def api_radar_uebersicht(self, request: web.Request) -> web.Response:
         return web.json_response(self.radar.uebersicht())
