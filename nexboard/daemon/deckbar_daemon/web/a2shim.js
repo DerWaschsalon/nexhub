@@ -126,6 +126,7 @@
   // ------------------------------------------------------------------ __TAURI__
   const currentWindow = {
     label: WIN.label,
+    listen,
     show: () => invoke("window_show"),
     setFocus: () => invoke("window_focus"),
     startResizeDragging: (direction) => invoke("window_resize_drag", { direction }),
