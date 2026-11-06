@@ -9,7 +9,8 @@
       "berk_wirbel": "Berk: Wirbelwind",
       "berk_welle": "Berk: Welle",
       "berk_stagger": "Berk: Jetzt staggern",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_ultimate_berk": "Vollendete Berk: Ansagen"
     },
     "Urugugu Canyon": {
       "raur_konter": "Raur: Konter-Haltung",
@@ -24,7 +25,9 @@
       "auldor_sturz": "Auldor: Sturzschlag",
       "auldor_rundum": "Auldor: Linien rundum (Hard)",
       "auldor_wirbel": "Auldor: Wirbel-Phase",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_divine_auldor": "Heiliger Auldor: Ansagen",
+      "ansage_guardian_captain_raur": "Hüterhauptmann Raur: Ansagen"
     },
     "Feuertempel": {
       "flamme": "Kromede: Todesmal / Teufelsflamme",
@@ -37,50 +40,110 @@
       "ignus": "Ignus: Flammeneruption",
       "murute": "Murute: Gigantisches Beben",
       "bombe": "Ignus: Verzögerte Explosion (auf dir)",
-      "ignus_zone": "Ignus: Flammenzone"
+      "ignus_zone": "Ignus: Flammenzone",
+      "ansage_kromede_s_desire": "Kromedes Gier: Ansagen"
     },
     "Draupnir": {
-      "lakshmi_reflexion": "Lakshmi: Reflexion",
       "bakarma_stagger": "Bakarma: Jetzt staggern",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_phantasmal_lakshmi": "Phantom-Lakshmi: Ansagen",
+      "ansage_transcendent_bakarma": "Transzendierter Bakarma: Ansagen"
     },
-    "Dying Dramata's Nest": {},
+    "Dying Dramata's Nest": {
+      "ansage_broodkeeper_nayatman": "Brutpflegerin Nayatman: Ansagen",
+      "ansage_decaying_durvati": "Korrumpierte Durvati: Ansagen",
+      "ansage_manager_nasium": "Verwalter Nasium: Ansagen"
+    },
     "Deus Research Base": {
       "nazmun_bombe": "Nazmun: Bombe",
       "atiel_wurzel": "Atiel: Festgehalten (Mitspieler)",
       "atiel_kette": "Atiel: Kette (auf dir)",
       "atiel_stagger": "Atiel: Jetzt staggern",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_atiel": "Atiel: Ansagen",
+      "ansage_gelcos": "Gelcos: Ansagen",
+      "ansage_nazmun": "Nazmun: Ansagen"
     },
     "Shattered Arkanis": {
       "ruthilis_blitz": "Ruthilis: Blitz (auf dir)",
       "talisra_gefaengnis": "Talisra: Kristallgefängnis (Mitspieler)",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_siliator_of_deceit": "Siliator der Täuschung: Ansagen",
+      "ansage_talisra_of_the_void": "Talisra der Leere: Ansagen"
     },
     "Vakron Sky Island": {
-      "tiere_blume": "Tiere: Rafflesia",
       "tiere_rotation": "Tiere: Rotation",
       "tiere_gift": "Tiere: Giftfläche",
-      "thamon_physisch": "Thamon: Physischer Schild",
-      "thamon_magisch": "Thamon: Magischer Schild",
       "thamon_stein": "Thamon: Versteinert (Mitspieler)",
       "vakron_mal": "Vakron: Dornenmal (auf dir)",
       "vakron_gefangen": "Vakron: Gefangen (Mitspieler)",
-      "vakron_ringe": "Vakron: Dornenringe",
-      "vakron_gefaengnis": "Vakron: Gefängnis",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_thamon": "Thamon: Ansagen",
+      "ansage_tiere": "Tière: Ansagen",
+      "ansage_vakron": "Vakron: Ansagen"
     },
     "Ferocious Horn Den": {
       "nuakum_blutung": "Nuakum: Blutung (auf dir)",
       "kwapo_donner": "Kwapo: Donnergrollen",
       "duanka_geister": "Duanka: Mau-Nekromantie",
-      "duanka_seelenrufer": "Duanka: Seelenrufer",
-      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+      "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
+      "ansage_ferocious_horn_nuakum": "Nuakum (Grimmhorn): Ansagen",
+      "ansage_necromancer_duanka": "Nekromantin Duanka: Ansagen",
+      "ansage_watchdog_kwapo": "Wachhund Kwapo: Ansagen"
     },
-    "Cradle of Nihility": {},
-    "Hall of Illusion": {},
-    "Azure Breath Island": {},
+    "Cradle of Nihility": {
+      "ansage_afflicted_bakarma": "Gequälter Bakarma: Ansagen",
+      "ansage_multiverse_veltiras": "Veltiras der Multidimension: Ansagen",
+      "ansage_solemn_valkan": "Ehrwürdiger Valkan: Ansagen"
+    },
+    "Hall of Illusion": {
+      "ansage_glassvein": "Glassbane: Ansagen",
+      "ansage_nathara": "Nathara: Ansagen",
+      "ansage_nazarak": "Nasarak: Ansagen"
+    },
+    "Azure Breath Island": {
+      "ansage_awakened_alturadon": "Erwachter Althuradon: Ansagen",
+      "ansage_expanding_xyrepe": "Expandierender Zairpe: Ansagen",
+      "ansage_wise_baumnute": "Weiser Baumnut: Ansagen"
+    },
     "Citadel of the Fallen Daeva": {},
-    "Consumed Deus Research Base": {}
+    "Consumed Deus Research Base": {},
+    "Abyssal Forge: Ludra": {
+      "ansage_abyssal_wings_ketu": "Abgrundsflügel Ketu: Ansagen",
+      "ansage_eternal_ludra": "Ludra der Ewigkeit: Ansagen",
+      "ansage_isolation_specialist_rahu": "Rahu der Isolation: Ansagen"
+    },
+    "Weltbosse und Sonstige": {
+      "ansage_basilus_the_false": "Basilus der Falsche: Ansagen",
+      "ansage_dhakan": "Dhakan: Ansagen",
+      "ansage_enraged_reda": "Wütende Reda: Ansagen",
+      "ansage_forbidden_hexbeast_griosa": "Verbotene Hexbestie Griosa: Ansagen",
+      "ansage_gargaum": "Gargaum: Ansagen",
+      "ansage_kaisinel_s_illusion": "Kaisinels Illusion: Ansagen",
+      "ansage_kapu": "Kapu: Ansagen",
+      "ansage_oathbreaker_gartua": "Paktbrecher Gartua: Ansagen",
+      "ansage_scribe_vellum": "Schreiber Vellum: Ansagen",
+      "ansage_sealed_sura": "Versiegelter Sura: Ansagen",
+      "ansage_willful_turgen": "Willensstarker Turgen: Ansagen"
+    },
+    "Corroded Decontamination Facility": {
+      "ansage_black_blood_blatt": "Schwarzblut-Blat: Ansagen",
+      "ansage_devouring_klawfly": "Schwelgender Klawfly: Ansagen",
+      "ansage_terminator_bargott": "Polymerbargott: Ansagen"
+    },
+    "Submerged Life Temple": {
+      "ansage_deep_sea_pydeon": "Pydeon der Tiefsee: Ansagen",
+      "ansage_singing_ellyde": "Singende Ellyde: Ansagen",
+      "ansage_submerged_emon": "Versunkener Emon: Ansagen"
+    },
+    "Chalice of Muspel": {
+      "ansage_iscariel": "Iscariel: Ansagen",
+      "ansage_kaldrix": "Kaldrix: Ansagen"
+    },
+    "Mirror of Scarlet Desire": {
+      "ansage_kromede_s_desolation": "Kromedes Abgrund: Ansagen",
+      "ansage_robstino": "Robstino: Ansagen",
+      "ansage_rotar": "Rotar: Ansagen"
+    }
   }
 }

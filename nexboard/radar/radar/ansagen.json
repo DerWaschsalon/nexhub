@@ -1,0 +1,3188 @@
+{
+ "_quelle": "Boss-Ansagen aus dem Plugin „Boss Callouts“ von taengu/A2Tools-Plugins (GPL-3.0), Stand f206c25, übernommen mit werkzeuge/ansagen.py. Zeilen und Namen: Spieltext (c) NCSOFT.",
+ "sicher": {
+  "de": "Wieder angreifen",
+  "en": "Safe to attack"
+ },
+ "bosse": {
+  "abyssal-wings-ketu": {
+   "name": {
+    "de": "Abgrundsflügel Ketu",
+    "en": "Abyssal Wings Ketu"
+   },
+   "dungeon": "Abyssal Forge: Ludra",
+   "skills": [
+    1801800,
+    1801810,
+    1801820,
+    1801830,
+    1801840,
+    1801850,
+    1801860
+   ]
+  },
+  "afflicted-bakarma": {
+   "name": {
+    "de": "Gequälter Bakarma",
+    "en": "Afflicted Bakarma"
+   },
+   "dungeon": "Cradle of Nihility",
+   "skills": [
+    1804200,
+    1804210,
+    1804212,
+    1804220,
+    1804230,
+    1804240,
+    1804241,
+    1804250,
+    1804260,
+    1804270,
+    1804271,
+    1804280,
+    1804290,
+    1804300,
+    1804350
+   ]
+  },
+  "atiel": {
+   "name": {
+    "de": "Atiel",
+    "en": "Atiel"
+   },
+   "dungeon": "Deus Research Base",
+   "skills": [
+    1801400,
+    1801410,
+    1801420,
+    1801430,
+    1801440,
+    1801450,
+    1801451,
+    1801460,
+    1801470,
+    1801480,
+    1801490,
+    1801510,
+    1801520,
+    1801530
+   ]
+  },
+  "awakened-alturadon": {
+   "name": {
+    "de": "Erwachter Althuradon",
+    "en": "Awakened Alturadon"
+   },
+   "dungeon": "Azure Breath Island",
+   "skills": [
+    1806080,
+    1806090,
+    1806100,
+    1806120,
+    1806130,
+    1806140,
+    1806150,
+    1806160,
+    1806170,
+    1806180,
+    1806190
+   ]
+  },
+  "basilus-the-false": {
+   "name": {
+    "de": "Basilus der Falsche",
+    "en": "Basilus the False"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "black-blood-blatt": {
+   "name": {
+    "de": "Schwarzblut-Blat",
+    "en": "Black Blood Blatt"
+   },
+   "dungeon": "Corroded Decontamination Facility",
+   "skills": []
+  },
+  "broodkeeper-nayatman": {
+   "name": {
+    "de": "Brutpflegerin Nayatman",
+    "en": "Broodkeeper Nayatman"
+   },
+   "dungeon": "Dying Dramata's Nest",
+   "skills": []
+  },
+  "decaying-durvati": {
+   "name": {
+    "de": "Korrumpierte Durvati",
+    "en": "Decaying Durvati"
+   },
+   "dungeon": "Dying Dramata's Nest",
+   "skills": [
+    1604060,
+    1604100,
+    1604110,
+    1604190,
+    1604230,
+    1604280,
+    1604290,
+    1604330
+   ]
+  },
+  "deep-sea-pydeon": {
+   "name": {
+    "de": "Pydeon der Tiefsee",
+    "en": "Deep Sea Pydeon"
+   },
+   "dungeon": "Submerged Life Temple",
+   "skills": []
+  },
+  "devouring-klawfly": {
+   "name": {
+    "de": "Schwelgender Klawfly",
+    "en": "Devouring Klawfly"
+   },
+   "dungeon": "Corroded Decontamination Facility",
+   "skills": []
+  },
+  "dhakan": {
+   "name": {
+    "de": "Dhakan",
+    "en": "Dhakan"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "divine-auldor": {
+   "name": {
+    "de": "Heiliger Auldor",
+    "en": "Divine Auldor"
+   },
+   "dungeon": "Urugugu Canyon",
+   "skills": [
+    1600870,
+    1600920,
+    1600930,
+    1600940,
+    1600960,
+    1600970,
+    1601000,
+    1601010,
+    1601030,
+    1601035,
+    1601040,
+    1601050,
+    1601060,
+    1601065
+   ]
+  },
+  "enraged-reda": {
+   "name": {
+    "de": "Wütende Reda",
+    "en": "Enraged Reda"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "eternal-ludra": {
+   "name": {
+    "de": "Ludra der Ewigkeit",
+    "en": "Eternal Ludra"
+   },
+   "dungeon": "Abyssal Forge: Ludra",
+   "skills": [
+    1803000
+   ]
+  },
+  "expanding-xyrepe": {
+   "name": {
+    "de": "Expandierender Zairpe",
+    "en": "Expanding Xyrepe"
+   },
+   "dungeon": "Azure Breath Island",
+   "skills": []
+  },
+  "ferocious-horn-nuakum": {
+   "name": {
+    "de": "Nuakum (Grimmhorn)",
+    "en": "Ferocious Horn Nuakum"
+   },
+   "dungeon": "Ferocious Horn Den",
+   "skills": [
+    1802000,
+    1802011,
+    1802030,
+    1802040,
+    1802060,
+    1802080,
+    1802090,
+    1802100,
+    1802120
+   ]
+  },
+  "forbidden-hexbeast-griosa": {
+   "name": {
+    "de": "Verbotene Hexbestie Griosa",
+    "en": "Forbidden Hexbeast Griosa"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "gargaum": {
+   "name": {
+    "de": "Gargaum",
+    "en": "Gargaum"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "gelcos": {
+   "name": {
+    "de": "Gelcos",
+    "en": "Gelcos"
+   },
+   "dungeon": "Deus Research Base",
+   "skills": []
+  },
+  "glassvein": {
+   "name": {
+    "de": "Glassbane",
+    "en": "Glassvein"
+   },
+   "dungeon": "Hall of Illusion",
+   "skills": []
+  },
+  "guardian-captain-raur": {
+   "name": {
+    "de": "Hüterhauptmann Raur",
+    "en": "Guardian Captain Raur"
+   },
+   "dungeon": "Urugugu Canyon",
+   "skills": []
+  },
+  "iscariel": {
+   "name": {
+    "de": "Iscariel",
+    "en": "Iscariel"
+   },
+   "dungeon": "Chalice of Muspel",
+   "skills": []
+  },
+  "isolation-specialist-rahu": {
+   "name": {
+    "de": "Rahu der Isolation",
+    "en": "Isolation Specialist Rahu"
+   },
+   "dungeon": "Abyssal Forge: Ludra",
+   "skills": []
+  },
+  "kaisinel-s-illusion": {
+   "name": {
+    "de": "Kaisinels Illusion",
+    "en": "Kaisinel's Illusion"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "kaldrix": {
+   "name": {
+    "de": "Kaldrix",
+    "en": "Kaldrix"
+   },
+   "dungeon": "Chalice of Muspel",
+   "skills": [
+    1806490,
+    1806510,
+    1806520,
+    1806530,
+    1806540,
+    1806550,
+    1806560,
+    1806580,
+    1806610,
+    1806620,
+    1806640,
+    1806650,
+    1806660,
+    1806670,
+    1806680,
+    1806740
+   ]
+  },
+  "kapu": {
+   "name": {
+    "de": "Kapu",
+    "en": "Kapu"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "kromede-s-desire": {
+   "name": {
+    "de": "Kromedes Gier",
+    "en": "Kromede's Desire"
+   },
+   "dungeon": "Feuertempel",
+   "skills": [
+    1801000,
+    1801010,
+    1801020,
+    1801030,
+    1801040,
+    1801050,
+    1801060,
+    1801070,
+    1801080,
+    1801090,
+    1801100,
+    1801110,
+    1801120,
+    1801130,
+    1801185,
+    1801191
+   ]
+  },
+  "kromede-s-desolation": {
+   "name": {
+    "de": "Kromedes Abgrund",
+    "en": "Kromede's Desolation"
+   },
+   "dungeon": "Mirror of Scarlet Desire",
+   "skills": []
+  },
+  "manager-nasium": {
+   "name": {
+    "de": "Verwalter Nasium",
+    "en": "Manager Nasium"
+   },
+   "dungeon": "Dying Dramata's Nest",
+   "skills": []
+  },
+  "multiverse-veltiras": {
+   "name": {
+    "de": "Veltiras der Multidimension",
+    "en": "Multiverse Veltiras"
+   },
+   "dungeon": "Cradle of Nihility",
+   "skills": []
+  },
+  "nathara": {
+   "name": {
+    "de": "Nathara",
+    "en": "Nathara"
+   },
+   "dungeon": "Hall of Illusion",
+   "skills": [
+    1805370,
+    1805430,
+    1805440,
+    1805450,
+    1805560
+   ]
+  },
+  "nazarak": {
+   "name": {
+    "de": "Nasarak",
+    "en": "Nazarak"
+   },
+   "dungeon": "Hall of Illusion",
+   "skills": []
+  },
+  "nazmun": {
+   "name": {
+    "de": "Nazmun",
+    "en": "Nazmun"
+   },
+   "dungeon": "Deus Research Base",
+   "skills": []
+  },
+  "necromancer-duanka": {
+   "name": {
+    "de": "Nekromantin Duanka",
+    "en": "Necromancer Duanka"
+   },
+   "dungeon": "Ferocious Horn Den",
+   "skills": []
+  },
+  "oathbreaker-gartua": {
+   "name": {
+    "de": "Paktbrecher Gartua",
+    "en": "Oathbreaker Gartua"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "phantasmal-lakshmi": {
+   "name": {
+    "de": "Phantom-Lakshmi",
+    "en": "Phantasmal Lakshmi"
+   },
+   "dungeon": "Draupnir",
+   "skills": []
+  },
+  "robstino": {
+   "name": {
+    "de": "Robstino",
+    "en": "Robstino"
+   },
+   "dungeon": "Mirror of Scarlet Desire",
+   "skills": []
+  },
+  "rotar": {
+   "name": {
+    "de": "Rotar",
+    "en": "Rotar"
+   },
+   "dungeon": "Mirror of Scarlet Desire",
+   "skills": []
+  },
+  "scribe-vellum": {
+   "name": {
+    "de": "Schreiber Vellum",
+    "en": "Scribe Vellum"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": [
+    1808430,
+    1808440,
+    1808445,
+    1808450,
+    1808455,
+    1808456,
+    1808460,
+    1808465,
+    1808470,
+    1808480,
+    1808485,
+    1808490
+   ]
+  },
+  "sealed-sura": {
+   "name": {
+    "de": "Versiegelter Sura",
+    "en": "Sealed Sura"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "siliator-of-deceit": {
+   "name": {
+    "de": "Siliator der Täuschung",
+    "en": "Siliator of Deceit"
+   },
+   "dungeon": "Shattered Arkanis",
+   "skills": []
+  },
+  "singing-ellyde": {
+   "name": {
+    "de": "Singende Ellyde",
+    "en": "Singing Ellyde"
+   },
+   "dungeon": "Submerged Life Temple",
+   "skills": []
+  },
+  "solemn-valkan": {
+   "name": {
+    "de": "Ehrwürdiger Valkan",
+    "en": "Solemn Valkan"
+   },
+   "dungeon": "Cradle of Nihility",
+   "skills": []
+  },
+  "submerged-emon": {
+   "name": {
+    "de": "Versunkener Emon",
+    "en": "Submerged Emon"
+   },
+   "dungeon": "Submerged Life Temple",
+   "skills": [
+    1803460,
+    1803470,
+    1803490,
+    1803510,
+    1803520,
+    1803530,
+    1803540,
+    1803550,
+    1803560,
+    1803570,
+    1803600,
+    1803610,
+    1803650,
+    1803655
+   ]
+  },
+  "talisra-of-the-void": {
+   "name": {
+    "de": "Talisra der Leere",
+    "en": "Talisra of the Void"
+   },
+   "dungeon": "Shattered Arkanis",
+   "skills": [
+    1801580,
+    1801590,
+    1801600,
+    1801630,
+    1801640,
+    1801650,
+    1801660,
+    1801670,
+    1801680,
+    1801690,
+    1801720,
+    1801770,
+    1801780,
+    1801790
+   ]
+  },
+  "terminator-bargott": {
+   "name": {
+    "de": "Polymerbargott",
+    "en": "Terminator Bargott"
+   },
+   "dungeon": "Corroded Decontamination Facility",
+   "skills": [
+    1803660,
+    1803670,
+    1803700,
+    1803725,
+    1803730,
+    1803770,
+    1803780,
+    1803820,
+    1803860,
+    1803870,
+    1805700,
+    1805710,
+    1805720,
+    1805730,
+    1805740,
+    1805750
+   ]
+  },
+  "thamon": {
+   "name": {
+    "de": "Thamon",
+    "en": "Thamon"
+   },
+   "dungeon": "Vakron Sky Island",
+   "skills": []
+  },
+  "tiere": {
+   "name": {
+    "de": "Tière",
+    "en": "Tiere"
+   },
+   "dungeon": "Vakron Sky Island",
+   "skills": []
+  },
+  "transcendent-bakarma": {
+   "name": {
+    "de": "Transzendierter Bakarma",
+    "en": "Transcendent Bakarma"
+   },
+   "dungeon": "Draupnir",
+   "skills": [
+    1800500,
+    1800510,
+    1800520,
+    1800530,
+    1800540,
+    1800554,
+    1800560,
+    1800570,
+    1800580,
+    1800590,
+    1800625,
+    1800655,
+    1800670,
+    1800675,
+    1800690,
+    1800695,
+    1800720
+   ]
+  },
+  "ultimate-berk": {
+   "name": {
+    "de": "Vollendete Berk",
+    "en": "Ultimate Berk"
+   },
+   "dungeon": "Krao Cave",
+   "skills": [
+    1800000,
+    1800010,
+    1800020,
+    1800030,
+    1800040,
+    1800050,
+    1800060,
+    1800070,
+    1800090,
+    1800130,
+    1800140,
+    1800190
+   ]
+  },
+  "vakron": {
+   "name": {
+    "de": "Vakron",
+    "en": "Vakron"
+   },
+   "dungeon": "Vakron Sky Island",
+   "skills": [
+    1604340,
+    1604350,
+    1604360,
+    1604370,
+    1604380,
+    1604383,
+    1604390,
+    1604400,
+    1604410,
+    1604420,
+    1604430
+   ]
+  },
+  "watchdog-kwapo": {
+   "name": {
+    "de": "Wachhund Kwapo",
+    "en": "Watchdog Kwapo"
+   },
+   "dungeon": "Ferocious Horn Den",
+   "skills": []
+  },
+  "willful-turgen": {
+   "name": {
+    "de": "Willensstarker Turgen",
+    "en": "Willful Turgen"
+   },
+   "dungeon": "Weltbosse und Sonstige",
+   "skills": []
+  },
+  "wise-baumnute": {
+   "name": {
+    "de": "Weiser Baumnut",
+    "en": "Wise Baumnute"
+   },
+   "dungeon": "Azure Breath Island",
+   "skills": []
+  }
+ },
+ "rufe": [
+  {
+   "schluessel": "cast:1808880:basilus-the-false",
+   "art": "leiste",
+   "id": 1808880,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "vorlauf": 3.2,
+   "zeile": {
+    "de": "O Verderbnis! Verschlinge dieses Urteil!",
+    "en": "O Corruption! Devour this judgment!"
+   }
+  },
+  {
+   "schluessel": "cast:1808885:basilus-the-false",
+   "art": "leiste",
+   "id": 1808885,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "vorlauf": 3.2,
+   "zeile": {
+    "de": "O Urteil! Zerschmettere diese Verderbnis!",
+    "en": "O Judgment! Smite this corruption!"
+   }
+  },
+  {
+   "schluessel": "cast:1808890:basilus-the-false",
+   "art": "leiste",
+   "id": 1808890,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "vorlauf": 19.0,
+   "zeile": {
+    "de": "Wenn Verderbnis und Urteil sich verschlingen ... Wo liegt dann dein Schicksal?",
+    "en": "As corruption and judgment intertwine... Where does your fate lie?"
+   }
+  },
+  {
+   "schluessel": "cast:1808900:basilus-the-false",
+   "art": "leiste",
+   "id": 1808900,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Die Klingen des Urteils sind geschmiedet. Dein Fleisch soll zu ihrem Gefäß werden!",
+    "en": "The blades of judgment are cast. Let your flesh become their vessels!"
+   }
+  },
+  {
+   "schluessel": "cast:1808920:basilus-the-false",
+   "art": "leiste",
+   "id": 1808920,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Das Licht von Schwert und Schild wird ein und dasselbe werden.",
+    "en": "The light of the sword and shield shall become one and the same."
+   }
+  },
+  {
+   "schluessel": "use:1808950:basilus-the-false",
+   "art": "skill",
+   "id": 1808950,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "zeile": {
+    "de": "Das Urteil naht erneut!",
+    "en": "Judgment is nigh once more!"
+   }
+  },
+  {
+   "schluessel": "use:1808955:basilus-the-false",
+   "art": "skill",
+   "id": 1808955,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "zeile": {
+    "de": "Die dunkle Magie verderbt ... Nein!",
+    "en": "The dark magic corrupts... No!"
+   }
+  },
+  {
+   "schluessel": "cast:1808975:basilus-the-false",
+   "art": "leiste",
+   "id": 1808975,
+   "boss": "basilus-the-false",
+   "gruppe": "ansage_basilus_the_false",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Die Klingenlegion ist schon eingetroffen? Absorbiere sie aus nächster Nähe, kru!",
+    "en": "The blades already landed? Absorb them from up close, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1609011:forbidden-hexbeast-griosa",
+   "art": "leiste",
+   "id": 1609011,
+   "boss": "forbidden-hexbeast-griosa",
+   "gruppe": "ansage_forbidden_hexbeast_griosa",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Die Himmel werden dich zerreißen! Das kannst du allein nicht überstehen!",
+    "en": "The heavens shall tear you asunder! You cannot withstand this alone!"
+   }
+  },
+  {
+   "schluessel": "cast:1609030:forbidden-hexbeast-griosa",
+   "art": "leiste",
+   "id": 1609030,
+   "boss": "forbidden-hexbeast-griosa",
+   "gruppe": "ansage_forbidden_hexbeast_griosa",
+   "vorlauf": 4.5,
+   "zeile": {
+    "de": "Ein Sturm, der alle anderen beendet!",
+    "en": "A storm to end all storms!"
+   }
+  },
+  {
+   "schluessel": "use:1609040:forbidden-hexbeast-griosa",
+   "art": "skill",
+   "id": 1609040,
+   "boss": "forbidden-hexbeast-griosa",
+   "gruppe": "ansage_forbidden_hexbeast_griosa",
+   "zeile": {
+    "de": "O arkane Federn, durchbohrt ihr Fleisch und ihre Knochen!",
+    "en": "O Arcane Feathers, pierce their flesh and bones!"
+   }
+  },
+  {
+   "schluessel": "cast:1806350:willful-turgen",
+   "art": "leiste",
+   "id": 1806350,
+   "boss": "willful-turgen",
+   "gruppe": "ansage_willful_turgen",
+   "zeile": {
+    "de": "Schwert des Willens! Schlag zu!",
+    "en": "Sword of Will! Strike down!"
+   }
+  },
+  {
+   "schluessel": "cast:1806360:willful-turgen",
+   "art": "leiste",
+   "id": 1806360,
+   "boss": "willful-turgen",
+   "gruppe": "ansage_willful_turgen",
+   "vorlauf": 3.63,
+   "zeile": {
+    "de": "Die Kraft meiner Klinge vernichtet alles!",
+    "en": "The might of my blade annihilates all things!"
+   }
+  },
+  {
+   "schluessel": "use:1607010:dhakan",
+   "art": "skill",
+   "id": 1607010,
+   "boss": "dhakan",
+   "gruppe": "ansage_dhakan",
+   "zeile": {
+    "de": "Schmaust, meine Freunde! Denn wir bringen reichlich Opfergaben zum Altar!",
+    "en": "Feast, my friends! For we bring offerings aplenty to the altar!"
+   }
+  },
+  {
+   "schluessel": "cast:1607051:dhakan",
+   "art": "leiste",
+   "id": 1607051,
+   "boss": "dhakan",
+   "gruppe": "ansage_dhakan",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Mal sehen, ob du diesem Blitz entkommen kannst!",
+    "en": "Let's see if you can run from this lightning!"
+   }
+  },
+  {
+   "schluessel": "cast:1601540:enraged-reda",
+   "art": "leiste",
+   "id": 1601540,
+   "boss": "enraged-reda",
+   "gruppe": "ansage_enraged_reda",
+   "vorlauf": 8.0,
+   "zeile": {
+    "de": "Flüchte in meinen Zauberkreis!",
+    "en": "Quickly, into my magic ward!"
+   }
+  },
+  {
+   "schluessel": "use:1808509:gargaum",
+   "art": "skill",
+   "id": 1808509,
+   "boss": "gargaum",
+   "gruppe": "ansage_gargaum",
+   "zeile": {
+    "de": "Mein Magen knurrt immer noch! Mehr! Ich verlange mehr!",
+    "en": "My stomach yet rumbles! More! I demand more!"
+   }
+  },
+  {
+   "schluessel": "use:1808520:gargaum",
+   "art": "skill",
+   "id": 1808520,
+   "boss": "gargaum",
+   "gruppe": "ansage_gargaum",
+   "zeile": {
+    "de": "Wirst du alleine in Stücke gerissen, oder sterbt ihr Seite an Seite gemeinsam?",
+    "en": "Will you be torn to shreds alone, or die standing together?"
+   }
+  },
+  {
+   "schluessel": "cast:1808650:gargaum",
+   "art": "leiste",
+   "id": 1808650,
+   "boss": "gargaum",
+   "gruppe": "ansage_gargaum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Ich werde dich in einem Stück verschlingen!",
+    "en": "I will devour you whole!"
+   }
+  },
+  {
+   "schluessel": "cast:1808654:gargaum",
+   "art": "leiste",
+   "id": 1808654,
+   "boss": "gargaum",
+   "gruppe": "ansage_gargaum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Ich werde dich in einem Stück verschlingen!",
+    "en": "I will devour you whole!"
+   }
+  },
+  {
+   "schluessel": "cast:1808662:gargaum",
+   "art": "leiste",
+   "id": 1808662,
+   "boss": "gargaum",
+   "gruppe": "ansage_gargaum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Stille meinen Hunger, oder ich werde mich an dir laben!",
+    "en": "Sate my hunger, or I'll feast on you!"
+   }
+  },
+  {
+   "schluessel": "cast:1603600:kaisinel-s-illusion",
+   "art": "leiste",
+   "id": 1603600,
+   "boss": "kaisinel-s-illusion",
+   "gruppe": "ansage_kaisinel_s_illusion",
+   "vorlauf": 1.67,
+   "zeile": {
+    "de": "Sucher der Urquelle. Beweise deine Würdigkeit!",
+    "en": "Seeker of the Core, prove your worth!"
+   }
+  },
+  {
+   "schluessel": "use:1606930:kapu",
+   "art": "skill",
+   "id": 1606930,
+   "boss": "kapu",
+   "gruppe": "ansage_kapu",
+   "zeile": {
+    "de": "Krauugh! T'shhhz!",
+    "en": "Krauugh! T'shhhz!"
+   }
+  },
+  {
+   "schluessel": "use:1600490:oathbreaker-gartua",
+   "art": "skill",
+   "id": 1600490,
+   "boss": "oathbreaker-gartua",
+   "gruppe": "ansage_oathbreaker_gartua",
+   "zeile": {
+    "de": "Es absorbiert meine Kraft!",
+    "en": "It's absorbing my power!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000002:scribe-vellum",
+   "art": "effekt",
+   "id": 10000002,
+   "boss": "scribe-vellum",
+   "gruppe": "ansage_scribe_vellum",
+   "zeile": {
+    "de": "Wenn ich es nicht haben kann, soll es auch kein anderer bekommen!",
+    "en": "If I cannot have it, no one shall!"
+   },
+   "buff": {
+    "de": "Benommenheit",
+    "en": "Stagger"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1600390:sealed-sura",
+   "art": "skill",
+   "id": 1600390,
+   "boss": "sealed-sura",
+   "gruppe": "ansage_sealed_sura",
+   "zeile": {
+    "de": "Dieser Sura frisst Odium?!",
+    "en": "That Sura is eating Odylium!"
+   }
+  },
+  {
+   "schluessel": "use:1600400:sealed-sura",
+   "art": "skill",
+   "id": 1600400,
+   "boss": "sealed-sura",
+   "gruppe": "ansage_sealed_sura",
+   "zeile": {
+    "de": "So ein Mist, er hat seine Kraft regeneriert!",
+    "en": "Damn it, it regained its strength!"
+   }
+  },
+  {
+   "schluessel": "cast:1606100:siliator-of-deceit",
+   "art": "leiste",
+   "id": 1606100,
+   "boss": "siliator-of-deceit",
+   "gruppe": "ansage_siliator_of_deceit",
+   "vorlauf": 2.0,
+   "zeile": {
+    "de": "Der Tod verfolgt euch bis zum Ende!",
+    "en": "Death shall follow you 'til the end!"
+   }
+  },
+  {
+   "schluessel": "cast:1801670:talisra-of-the-void",
+   "art": "leiste",
+   "id": 1801670,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Weißer Speer des Urteils, verdamme meine Feinde!",
+    "en": "White spear of judgment, condemn my enemies!"
+   }
+  },
+  {
+   "schluessel": "cast:1801690:talisra-of-the-void",
+   "art": "leiste",
+   "id": 1801690,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "vorlauf": 18.0,
+   "zeile": {
+    "de": "Versammelt euch, zersplitterte Seelen!",
+    "en": "To me, shattered souls!"
+   }
+  },
+  {
+   "schluessel": "cast:1801696:talisra-of-the-void",
+   "art": "leiste",
+   "id": 1801696,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "vorlauf": 18.0,
+   "zeile": {
+    "de": "Versammelt euch, zersplitterte Seelen!",
+    "en": "To me, shattered souls!"
+   }
+  },
+  {
+   "schluessel": "use:1801720:talisra-of-the-void",
+   "art": "skill",
+   "id": 1801720,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "zeile": {
+    "de": "Licht und Dunkelheit an der Spitze meines Speers! Richte jene, die keinen Schutz genießen!",
+    "en": "With this spear forged of light and dark, you shall be judged!"
+   }
+  },
+  {
+   "schluessel": "talisra-dark-spear",
+   "art": "skill",
+   "id": 1801730,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "anweisung": {
+    "de": "Dunkel",
+    "en": "Dark"
+   },
+   "reihe": "talisra-spears"
+  },
+  {
+   "schluessel": "talisra-light-spear",
+   "art": "skill",
+   "id": 1801735,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "anweisung": {
+    "de": "Licht",
+    "en": "Light"
+   },
+   "reihe": "talisra-spears"
+  },
+  {
+   "schluessel": "cast:1801780:talisra-of-the-void",
+   "art": "leiste",
+   "id": 1801780,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "vorlauf": 1.2,
+   "zeile": {
+    "de": "Versinke in Stille und schweige für immer.",
+    "en": "Descend into stillness, and be silenced for eternity."
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:talisra-of-the-void",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "talisra-of-the-void",
+   "gruppe": "ansage_talisra_of_the_void",
+   "zeile": {
+    "de": "Nun wird die Leere euch verschlingen!",
+    "en": "Now, the void will consume you!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "thamon-red",
+   "art": "leiste",
+   "id": 1604660,
+   "boss": "thamon",
+   "gruppe": "ansage_thamon",
+   "vorlauf": 1.79,
+   "zeile": {
+    "de": "Es glüht rot auf!",
+    "en": "Burn! Burn!!"
+   },
+   "anweisung": {
+    "de": "Rot — keine physischen Angriffe",
+    "en": "Red — stop physical attacks"
+   },
+   "phase": {
+    "effekt": 16046601,
+    "sekunden": 10.0,
+    "anzeige": {
+     "de": "Nicht physisch",
+     "en": "Stop physical"
+    },
+    "name": {
+     "de": "Lebensgebrüll",
+     "en": "Cry of Life"
+    }
+   }
+  },
+  {
+   "schluessel": "thamon-violet",
+   "art": "leiste",
+   "id": 1604670,
+   "boss": "thamon",
+   "gruppe": "ansage_thamon",
+   "vorlauf": 1.79,
+   "zeile": {
+    "de": "Violettes Licht schießt empor!",
+    "en": "Surging violet!"
+   },
+   "anweisung": {
+    "de": "Lila — keine Magieangriffe",
+    "en": "Purple — stop magic attacks"
+   },
+   "phase": {
+    "effekt": 16046701,
+    "sekunden": 10.0,
+    "anzeige": {
+     "de": "Keine Magie",
+     "en": "Stop magic"
+    },
+    "name": {
+     "de": "Mystisches Gebrüll",
+     "en": "Mysterious Roar"
+    }
+   }
+  },
+  {
+   "schluessel": "cast:1604500:tiere",
+   "art": "leiste",
+   "id": 1604500,
+   "boss": "tiere",
+   "gruppe": "ansage_tiere",
+   "vorlauf": 1.26,
+   "zeile": {
+    "de": "Wagt es nicht, die Blumen anzufassen! Sonst versprühe ich tödliches Gift!",
+    "en": "Don't touch those flowers, unless you wish to be poisoned!"
+   }
+  },
+  {
+   "schluessel": "cast:1604380:vakron",
+   "art": "leiste",
+   "id": 1604380,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "vorlauf": 2.167,
+   "zeile": {
+    "de": "Ihr Verfluchter, seid in Dornen gefangen!",
+    "en": "Accursed ones, these thorns shall imprison you!"
+   }
+  },
+  {
+   "schluessel": "vakron-jump",
+   "art": "skill",
+   "id": 1604390,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "zeile": {
+    "de": "Die Wut der Erde wird alle Hochmütigen strafen, die es wagen, ihren Fuß auf diesen Boden zu setzen!",
+    "en": "The fury of the earth shall punish all who tread upon it with arrogance!"
+   },
+   "anweisung": {
+    "de": "Springen!",
+    "en": "Jump!"
+   },
+   "wellen": true
+  },
+  {
+   "schluessel": "vakron-jump",
+   "art": "skill",
+   "id": 1604393,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "zeile": {
+    "de": "Das könnte tödlich sein, wenn es dich trifft! Du musst springen, um auszuweichen!",
+    "en": "Getting hit by this attack might take you out! Dodge by jumping, kru!"
+   },
+   "anweisung": {
+    "de": "Springen!",
+    "en": "Jump!"
+   },
+   "wellen": true
+  },
+  {
+   "schluessel": "use:1604420:vakron",
+   "art": "skill",
+   "id": 1604420,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "zeile": {
+    "de": "Ihr, die ihr die Wut des Naturgeists auf euch gezogen habt, werdet auf ewig in einem unentrinnbaren Bann gefangen sein.",
+    "en": "You who have incurred the wrath of the Spirits shall be bound eternally."
+   }
+  },
+  {
+   "schluessel": "cast:1604426:vakron",
+   "art": "leiste",
+   "id": 1604426,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "vorlauf": 4.5,
+   "zeile": {
+    "de": "Vakron wird dich einsperren und angreifen! Du musst die Felsen zerstören und entkommen, kru!",
+    "en": "Vakron will attack after trapping you! Destroy the rocks and escape, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1604500:vakron",
+   "art": "leiste",
+   "id": 1604500,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "vorlauf": 1.26,
+   "zeile": {
+    "de": "Tière wird eine Giftwolke erzeugen! Wenn du die Rafflesia besiegst, kannst du das Gift neutralisieren!",
+    "en": "Tiere will create poison clouds! Defeating the Rafflesia will neutralize the poison clouds, kru!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:vakron",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "vakron",
+   "gruppe": "ansage_vakron",
+   "zeile": {
+    "de": "Ich werde jene bestrafen, die die Erde mit ihren zwei Füßen besudeln!",
+    "en": "All who dirty the earth walking upon two feet shall suffer retribution!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1806100:awakened-alturadon",
+   "art": "skill",
+   "id": 1806100,
+   "boss": "awakened-alturadon",
+   "gruppe": "ansage_awakened_alturadon",
+   "zeile": {
+    "de": "Blauatem, versammelt euch!",
+    "en": "Come, Azure Breath!"
+   }
+  },
+  {
+   "schluessel": "cast:1806170:awakened-alturadon",
+   "art": "leiste",
+   "id": 1806170,
+   "boss": "awakened-alturadon",
+   "gruppe": "ansage_awakened_alturadon",
+   "vorlauf": 1.36,
+   "zeile": {
+    "de": "Die Erde wird von Blitzstrahlen bedeckt! Versucht, dem Rasenden Donner auszuweichen.",
+    "en": "Lightning floods the earth! Are you as fast as lightning?"
+   }
+  },
+  {
+   "schluessel": "cast:1806180:awakened-alturadon",
+   "art": "leiste",
+   "id": 1806180,
+   "boss": "awakened-alturadon",
+   "gruppe": "ansage_awakened_alturadon",
+   "vorlauf": 5.0,
+   "zeile": {
+    "de": "Blauatem quillt über. Zersplittert am Schock!",
+    "en": "The Azure Breath is overflowing. Shatter under the impact!"
+   }
+  },
+  {
+   "schluessel": "use:1806190:awakened-alturadon",
+   "art": "skill",
+   "id": 1806190,
+   "boss": "awakened-alturadon",
+   "gruppe": "ansage_awakened_alturadon",
+   "zeile": {
+    "de": "Vom Blauatem durchdrungenes Erz schießt empor!",
+    "en": "Veins brimming with Azure Breath, burst forth!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:awakened-alturadon",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "awakened-alturadon",
+   "gruppe": "ansage_awakened_alturadon",
+   "zeile": {
+    "de": "Die erwachte Wut kann niemand aufhalten!",
+    "en": "None can stop the awakened wrath!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "abnormal:18060805:awakened-alturadon",
+   "art": "effekt",
+   "id": 18060805,
+   "boss": "awakened-alturadon",
+   "gruppe": "ansage_awakened_alturadon",
+   "zeile": {
+    "de": "Der Atem wird sich sammeln und zu einem Blitzstrahl werden.",
+    "en": "Breath, condense into lightning."
+   }
+  },
+  {
+   "schluessel": "use:1607950:expanding-xyrepe",
+   "art": "skill",
+   "id": 1607950,
+   "boss": "expanding-xyrepe",
+   "gruppe": "ansage_expanding_xyrepe",
+   "zeile": {
+    "de": "Fungies, bewegt euch! Schnell!",
+    "en": "Fungie, arise! Go forth!"
+   }
+  },
+  {
+   "schluessel": "cast:1607970:expanding-xyrepe",
+   "art": "leiste",
+   "id": 1607970,
+   "boss": "expanding-xyrepe",
+   "gruppe": "ansage_expanding_xyrepe",
+   "vorlauf": 1.4,
+   "zeile": {
+    "de": "Sporen, breitet euch aus, los! Breitet euch immer weiter und weiter aus!",
+    "en": "Spread, spores, spread! Spread and spread and spread!"
+   }
+  },
+  {
+   "schluessel": "cast:1805880:wise-baumnute",
+   "art": "leiste",
+   "id": 1805880,
+   "boss": "wise-baumnute",
+   "gruppe": "ansage_wise_baumnute",
+   "vorlauf": 3.5,
+   "zeile": {
+    "de": "Der Blitz wird sich durch das Erz ausbreiten!",
+    "en": "Lightning courses through the veins!"
+   }
+  },
+  {
+   "schluessel": "cast:1805940:wise-baumnute",
+   "art": "leiste",
+   "id": 1805940,
+   "boss": "wise-baumnute",
+   "gruppe": "ansage_wise_baumnute",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Die Bedrohungen sind bedeutungslos. Vergehe auf diesem Land!",
+    "en": "Threats are nothing before me. Leave this place!"
+   }
+  },
+  {
+   "schluessel": "cast:1804210:afflicted-bakarma",
+   "art": "leiste",
+   "id": 1804210,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "vorlauf": 1.8,
+   "zeile": {
+    "de": "Der Schmerz ist für alle gerecht.",
+    "en": "Pain is impartial."
+   }
+  },
+  {
+   "schluessel": "cast:1804240:afflicted-bakarma",
+   "art": "leiste",
+   "id": 1804240,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Könnt ihr meinem Blick entkommen?",
+    "en": "I see your every move."
+   }
+  },
+  {
+   "schluessel": "cast:1804241:afflicted-bakarma",
+   "art": "leiste",
+   "id": 1804241,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Könnt ihr meinem Blick entkommen?",
+    "en": "I see your every move."
+   }
+  },
+  {
+   "schluessel": "cast:1804290:afflicted-bakarma",
+   "art": "leiste",
+   "id": 1804290,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Sich zusammenzuscharen, ist die Natur der Insektoiden.",
+    "en": "It's the nature of bugs to swarm together."
+   }
+  },
+  {
+   "schluessel": "cast:1804300:afflicted-bakarma",
+   "art": "leiste",
+   "id": 1804300,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "vorlauf": 1.3,
+   "zeile": {
+    "de": "Genießt den Schmerz und die Leere.",
+    "en": "Embrace pain and emptiness."
+   }
+  },
+  {
+   "schluessel": "cast:1804350:afflicted-bakarma",
+   "art": "leiste",
+   "id": 1804350,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "vorlauf": 3.63,
+   "zeile": {
+    "de": "Die einzige Barmherzigkeit wird zu meinen Füßen liegen.",
+    "en": "Even mercy shall lie beneath my feet."
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:afflicted-bakarma",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "afflicted-bakarma",
+   "gruppe": "ansage_afflicted_bakarma",
+   "zeile": {
+    "de": "Das ist eine Macht jenseits aller Grenzen!!",
+    "en": "Strength that has transcended all limits!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1802220:multiverse-veltiras",
+   "art": "leiste",
+   "id": 1802220,
+   "boss": "multiverse-veltiras",
+   "gruppe": "ansage_multiverse_veltiras",
+   "vorlauf": 11.4,
+   "zeile": {
+    "de": "Dimension, explodiere!",
+    "en": "This dimension will burn around you."
+   }
+  },
+  {
+   "schluessel": "cast:1802270:multiverse-veltiras",
+   "art": "leiste",
+   "id": 1802270,
+   "boss": "multiverse-veltiras",
+   "gruppe": "ansage_multiverse_veltiras",
+   "vorlauf": 7.0,
+   "zeile": {
+    "de": "Vermögt ihr die Gesetze der Dimension zu begreifen?",
+    "en": "Have you grasped the logic of this dimension yet?"
+   }
+  },
+  {
+   "schluessel": "cast:1804100:solemn-valkan",
+   "art": "leiste",
+   "id": 1804100,
+   "boss": "solemn-valkan",
+   "gruppe": "ansage_solemn_valkan",
+   "vorlauf": 1.6,
+   "zeile": {
+    "de": "Eindringlinge der Wiege! Zerbrecht!",
+    "en": "An intruder! You will burn!"
+   }
+  },
+  {
+   "schluessel": "use:1804160:solemn-valkan",
+   "art": "skill",
+   "id": 1804160,
+   "boss": "solemn-valkan",
+   "gruppe": "ansage_solemn_valkan",
+   "zeile": {
+    "de": "Dies ist die Macht, die Bakarma erlangt hat!!",
+    "en": "Witness the might of Bakarma!"
+   }
+  },
+  {
+   "schluessel": "abnormal:18041401:solemn-valkan",
+   "art": "effekt",
+   "id": 18041401,
+   "boss": "solemn-valkan",
+   "gruppe": "ansage_solemn_valkan",
+   "zeile": {
+    "de": "Ich werde eine rote Inschrift in deinen Grabstein meißeln!",
+    "en": "I'll carve your epitaph in red!"
+   },
+   "buff": {
+    "de": "Blutrote Barriere der Verdammnis",
+    "en": "Crimson Barrier of Condemnation"
+   }
+  },
+  {
+   "schluessel": "abnormal:18041501:solemn-valkan",
+   "art": "effekt",
+   "id": 18041501,
+   "boss": "solemn-valkan",
+   "gruppe": "ansage_solemn_valkan",
+   "zeile": {
+    "de": "Mögen blaue Schriftzeichen in deinen Grabstein eingraviert werden!",
+    "en": "I'll carve your epitaph in blue!"
+   },
+   "buff": {
+    "de": "Azurblauer Schild des Urteils",
+    "en": "Azure Barrier of Judgment"
+   }
+  },
+  {
+   "schluessel": "use:1605370:broodkeeper-nayatman",
+   "art": "skill",
+   "id": 1605370,
+   "boss": "broodkeeper-nayatman",
+   "gruppe": "ansage_broodkeeper_nayatman",
+   "zeile": {
+    "de": "Rotes Blut und blaue Schalen ... Soll ich sie mischen und auf die Probe stellen?",
+    "en": "Crimson blood and azure shell... shall we test mixing them?"
+   }
+  },
+  {
+   "schluessel": "cast:1604230:decaying-durvati",
+   "art": "leiste",
+   "id": 1604230,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "vorlauf": 3.33,
+   "zeile": {
+    "de": "Lasst euch vom Giftregen überschütten!",
+    "en": "Face my poison rain!"
+   }
+  },
+  {
+   "schluessel": "cast:1604330:decaying-durvati",
+   "art": "leiste",
+   "id": 1604330,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "vorlauf": 2.0,
+   "zeile": {
+    "de": "Erwacht, meine Kinder!",
+    "en": "Awaken, my children!"
+   }
+  },
+  {
+   "schluessel": "use:1604330:decaying-durvati",
+   "art": "skill",
+   "id": 1604330,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "zeile": {
+    "de": "Zerstöre die Eier, bevor die Dratona-Larven schlüpfen!",
+    "en": "Destroy the eggs before the Dratona are born, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1805110:decaying-durvati",
+   "art": "leiste",
+   "id": 1805110,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Die giftgetränkte Erde wird euer Grab sein.",
+    "en": "This poisoned land will be your grave."
+   }
+  },
+  {
+   "schluessel": "cast:1805115:decaying-durvati",
+   "art": "leiste",
+   "id": 1805115,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Kletter bis ganz nach oben auf die Steinsäule, kru!",
+    "en": "Climb to the top of the stone pillar, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1805120:decaying-durvati",
+   "art": "leiste",
+   "id": 1805120,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Windet euch nur! Am Ende wird euch das Gift verschlingen!",
+    "en": "Struggle all you want! The poison will consume you all the same!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:decaying-durvati",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "decaying-durvati",
+   "gruppe": "ansage_decaying_durvati",
+   "zeile": {
+    "de": "Euer Leben wird in dieser Wiege erlöschen.",
+    "en": "Your lives will fade away in this cradle."
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1606200:manager-nasium",
+   "art": "leiste",
+   "id": 1606200,
+   "boss": "manager-nasium",
+   "gruppe": "ansage_manager_nasium",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Die unaufhaltsame Klinge wird dich bis zum Ende zermalmen!",
+    "en": "My blade will cut you clean through!"
+   }
+  },
+  {
+   "schluessel": "cast:1801440:atiel",
+   "art": "leiste",
+   "id": 1801440,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 1.5,
+   "zeile": {
+    "de": "Du Schwächling, dich werde ich zuerst vernichten!",
+    "en": "You will be the first to die!"
+   }
+  },
+  {
+   "schluessel": "cast:1801450:atiel",
+   "art": "leiste",
+   "id": 1801450,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 1.7,
+   "zeile": {
+    "de": "Zersplittert! In tausend Stücke!",
+    "en": "Break! Scatter!"
+   }
+  },
+  {
+   "schluessel": "cast:1801451:atiel",
+   "art": "leiste",
+   "id": 1801451,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 1.7,
+   "zeile": {
+    "de": "Der Schaden verringert sich, wenn wir gemeinsam getroffen werden!",
+    "en": "Take the hits together to receive less damage, kru!"
+   }
+  },
+  {
+   "schluessel": "use:1801460:atiel",
+   "art": "skill",
+   "id": 1801460,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "zeile": {
+    "de": "Ihr könnt mir nicht entkommen!",
+    "en": "You cannot escape from me!"
+   }
+  },
+  {
+   "schluessel": "cast:1801510:atiel",
+   "art": "leiste",
+   "id": 1801510,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 5.0,
+   "zeile": {
+    "de": "Schwache Welt, stürze ein!",
+    "en": "Frail world, crumble!"
+   }
+  },
+  {
+   "schluessel": "cast:1801520:atiel",
+   "art": "leiste",
+   "id": 1801520,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 5.0,
+   "zeile": {
+    "de": "Ich werde alles zerschmettern!",
+    "en": "I will crush you all!"
+   }
+  },
+  {
+   "schluessel": "cast:1801530:atiel",
+   "art": "leiste",
+   "id": 1801530,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 10.0,
+   "zeile": {
+    "de": "Alles wird zerschmettert und vergehen!",
+    "en": "All will collapse and perish!"
+   }
+  },
+  {
+   "schluessel": "cast:1801550:atiel",
+   "art": "leiste",
+   "id": 1801550,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "vorlauf": 1.5,
+   "zeile": {
+    "de": "Werdet von Ketten gefesselt, ihr unbedeutenden Wesen!",
+    "en": "Be shackled by chains, insignificant creatures!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:atiel",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "atiel",
+   "gruppe": "ansage_atiel",
+   "zeile": {
+    "de": "Schluss mit den Spielchen!",
+    "en": "No more games!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1603350:gelcos",
+   "art": "skill",
+   "id": 1603350,
+   "boss": "gelcos",
+   "gruppe": "ansage_gelcos",
+   "zeile": {
+    "de": "Ich werde euch das wahre Prickeln spüren lassen.",
+    "en": "I'll let you feel the thrill."
+   }
+  },
+  {
+   "schluessel": "use:1605640:nazmun",
+   "art": "skill",
+   "id": 1605640,
+   "boss": "nazmun",
+   "gruppe": "ansage_nazmun",
+   "zeile": {
+    "de": "Lauft, tanzt! Hahaha!",
+    "en": "Run, and dance! Haha!"
+   }
+  },
+  {
+   "schluessel": "lakshmi-reflect",
+   "art": "leiste",
+   "id": 1605910,
+   "boss": "phantasmal-lakshmi",
+   "gruppe": "ansage_phantasmal_lakshmi",
+   "vorlauf": 0.73,
+   "zeile": {
+    "de": "Der Schmerz wird zurückkehren.",
+    "en": "Agony always comes back around!"
+   },
+   "anweisung": {
+    "de": "Reflexion — nicht angreifen",
+    "en": "Reflect — stop attacking"
+   },
+   "phase": {
+    "effekt": 16059101,
+    "sekunden": 8.0,
+    "anzeige": {
+     "de": "Nicht angreifen",
+     "en": "Stop attacking"
+    },
+    "name": {
+     "de": "Schadensreflexion",
+     "en": "Damage Reflection"
+    }
+   }
+  },
+  {
+   "schluessel": "cast:1605970:phantasmal-lakshmi",
+   "art": "leiste",
+   "id": 1605970,
+   "boss": "phantasmal-lakshmi",
+   "gruppe": "ansage_phantasmal_lakshmi",
+   "vorlauf": 1.07,
+   "zeile": {
+    "de": "Opfere dein Leben!",
+    "en": "Offer up your life!"
+   }
+  },
+  {
+   "schluessel": "use:1605975:phantasmal-lakshmi",
+   "art": "skill",
+   "id": 1605975,
+   "boss": "phantasmal-lakshmi",
+   "gruppe": "ansage_phantasmal_lakshmi",
+   "zeile": {
+    "de": "Lakshmis Dienerin wurde beschworen! Sie regeneriert Lakshmi, also musst du sie zuerst erledigen!",
+    "en": "Lakshmi's Handmaiden has been summoned! Take her down first before she heals Lakshmi, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1800655:transcendent-bakarma",
+   "art": "leiste",
+   "id": 1800655,
+   "boss": "transcendent-bakarma",
+   "gruppe": "ansage_transcendent_bakarma",
+   "vorlauf": 18.0,
+   "zeile": {
+    "de": "Armseliges Wesen, verschwinde.",
+    "en": "Wretched worm, begone."
+   }
+  },
+  {
+   "schluessel": "cast:1800656:transcendent-bakarma",
+   "art": "leiste",
+   "id": 1800656,
+   "boss": "transcendent-bakarma",
+   "gruppe": "ansage_transcendent_bakarma",
+   "vorlauf": 18.0,
+   "zeile": {
+    "de": "Benutze Benommenheits-Fähigkeiten gegen Bakarma!",
+    "en": "Use Stagger skills on Bakarma, kru!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:transcendent-bakarma",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "transcendent-bakarma",
+   "gruppe": "ansage_transcendent_bakarma",
+   "zeile": {
+    "de": "Törichtes Wesen, nun bereite ich dir ein Ende.",
+    "en": "Your end is nigh."
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1804420:black-blood-blatt",
+   "art": "leiste",
+   "id": 1804420,
+   "boss": "black-blood-blatt",
+   "gruppe": "ansage_black_blood_blatt",
+   "vorlauf": 2.0,
+   "zeile": {
+    "de": "Nur mein eigenes Blut kann meinem Giftgas widerstehen ...!",
+    "en": "Only mine own blood can withstand this venom!"
+   }
+  },
+  {
+   "schluessel": "use:1804560:black-blood-blatt",
+   "art": "skill",
+   "id": 1804560,
+   "boss": "black-blood-blatt",
+   "gruppe": "ansage_black_blood_blatt",
+   "zeile": {
+    "de": "Der violette Tod bricht herein und explodiert rot ...!",
+    "en": "Violet death crashes down, burning red!"
+   }
+  },
+  {
+   "schluessel": "use:1804561:black-blood-blatt",
+   "art": "skill",
+   "id": 1804561,
+   "boss": "black-blood-blatt",
+   "gruppe": "ansage_black_blood_blatt",
+   "zeile": {
+    "de": "Wer dem unreinen Boden entkommt, wird einen Preis dafür zahlen müssen ...!",
+    "en": "Flee from the filth, suffer the cost!"
+   }
+  },
+  {
+   "schluessel": "use:1804568:black-blood-blatt",
+   "art": "skill",
+   "id": 1804568,
+   "boss": "black-blood-blatt",
+   "gruppe": "ansage_black_blood_blatt",
+   "zeile": {
+    "de": "Rotes Blut birst, violettes Licht wogt ...!",
+    "en": "Red blood bursts forth, and violet chaos writhes!"
+   }
+  },
+  {
+   "schluessel": "use:1805810:devouring-klawfly",
+   "art": "skill",
+   "id": 1805810,
+   "boss": "devouring-klawfly",
+   "gruppe": "ansage_devouring_klawfly",
+   "zeile": {
+    "de": "Nish! Nishka!",
+    "en": "Nish! Nish'qua!"
+   }
+  },
+  {
+   "schluessel": "cast:1805820:devouring-klawfly",
+   "art": "leiste",
+   "id": 1805820,
+   "boss": "devouring-klawfly",
+   "gruppe": "ansage_devouring_klawfly",
+   "vorlauf": 20.0,
+   "zeile": {
+    "de": "Glushrahich!",
+    "en": "Grashira'khna!"
+   }
+  },
+  {
+   "schluessel": "cast:1805840:devouring-klawfly",
+   "art": "leiste",
+   "id": 1805840,
+   "boss": "devouring-klawfly",
+   "gruppe": "ansage_devouring_klawfly",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Venosh! Zartura!!!",
+    "en": "Veno'shi! Jirt'ra!"
+   }
+  },
+  {
+   "schluessel": "use:1803810:terminator-bargott",
+   "art": "skill",
+   "id": 1803810,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "zeile": {
+    "de": "Ultrastarker!!! Strahl!!!",
+    "en": "Super ultra mega beam!!"
+   }
+  },
+  {
+   "schluessel": "cast:1803825:terminator-bargott",
+   "art": "leiste",
+   "id": 1803825,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Bargott mag Explosionen!",
+    "en": "Boom, boom!"
+   }
+  },
+  {
+   "schluessel": "cast:1803860:terminator-bargott",
+   "art": "leiste",
+   "id": 1803860,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "vorlauf": 1.333,
+   "zeile": {
+    "de": "Argh!!! Bargott ist wütend!!!",
+    "en": "Argh! Angry!!"
+   }
+  },
+  {
+   "schluessel": "cast:1805700:terminator-bargott",
+   "art": "leiste",
+   "id": 1805700,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "vorlauf": 1.5,
+   "zeile": {
+    "de": "Zeit für den Kettenwurf!",
+    "en": "Chain throwing time!"
+   }
+  },
+  {
+   "schluessel": "use:1805701:terminator-bargott",
+   "art": "skill",
+   "id": 1805701,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "zeile": {
+    "de": "Ihr langweiligen Kreaturen, kommt alle her!",
+    "en": "Pathetic creatures. Come to me!"
+   }
+  },
+  {
+   "schluessel": "use:1805730:terminator-bargott",
+   "art": "skill",
+   "id": 1805730,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "zeile": {
+    "de": "Sobald es grell aufblitzt, werdet ihr nicht mehr klar sehen können!",
+    "en": "With a flash, it will dazzle your eyes!"
+   }
+  },
+  {
+   "schluessel": "cast:1805750:terminator-bargott",
+   "art": "leiste",
+   "id": 1805750,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "vorlauf": 1.06,
+   "zeile": {
+    "de": "Genug der Spielchen! Stirb!",
+    "en": "Playtime is over. Now you die!"
+   }
+  },
+  {
+   "schluessel": "cast:1805761:terminator-bargott",
+   "art": "leiste",
+   "id": 1805761,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "vorlauf": 1.06,
+   "zeile": {
+    "de": "Wenn auch nur einer nicht entkommt, sterben alle!",
+    "en": "You will all die together!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:terminator-bargott",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "terminator-bargott",
+   "gruppe": "ansage_terminator_bargott",
+   "zeile": {
+    "de": "Bargott tötet alle!!!",
+    "en": "You're all gonna die!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1801185:kromede-s-desire",
+   "art": "leiste",
+   "id": 1801185,
+   "boss": "kromede-s-desire",
+   "gruppe": "ansage_kromede_s_desire",
+   "vorlauf": 16.5,
+   "zeile": {
+    "de": "Sprinte durch die Flammenwände, kru!",
+    "en": "Sprint between the flame walls, kru!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000002:kromede-s-desire",
+   "art": "effekt",
+   "id": 10000002,
+   "boss": "kromede-s-desire",
+   "gruppe": "ansage_kromede_s_desire",
+   "zeile": {
+    "de": "Du ... wie wagst du es ...",
+    "en": "How... dare you..."
+   },
+   "buff": {
+    "de": "Benommenheit",
+    "en": "Stagger"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "abnormal:10000008:kromede-s-desire",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "kromede-s-desire",
+   "gruppe": "ansage_kromede_s_desire",
+   "zeile": {
+    "de": "Lass dich von der Gier verzehren!",
+    "en": "Let desire consume you!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1802020:ferocious-horn-nuakum",
+   "art": "skill",
+   "id": 1802020,
+   "boss": "ferocious-horn-nuakum",
+   "gruppe": "ansage_ferocious_horn_nuakum",
+   "zeile": {
+    "de": "Beute! Werdet ihr euch zerstreuen oder zusammenrotten?",
+    "en": "My dear prey! Will you fight together, or go it alone?"
+   }
+  },
+  {
+   "schluessel": "cast:1802150:ferocious-horn-nuakum",
+   "art": "leiste",
+   "id": 1802150,
+   "boss": "ferocious-horn-nuakum",
+   "gruppe": "ansage_ferocious_horn_nuakum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Verzweifelt! Mit eurer Macht könnt ihr den Abgrund nicht aufhalten!",
+    "en": "Despair! For you will never halt the Abyss!"
+   }
+  },
+  {
+   "schluessel": "cast:1802154:ferocious-horn-nuakum",
+   "art": "leiste",
+   "id": 1802154,
+   "boss": "ferocious-horn-nuakum",
+   "gruppe": "ansage_ferocious_horn_nuakum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Nur meine Macht vermag den Abgrund zu bändigen!",
+    "en": "Only I have the power to quell the abyss!"
+   }
+  },
+  {
+   "schluessel": "cast:1802162:ferocious-horn-nuakum",
+   "art": "leiste",
+   "id": 1802162,
+   "boss": "ferocious-horn-nuakum",
+   "gruppe": "ansage_ferocious_horn_nuakum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Dann zeigt wenigstens die Bereitschaft, euch zu opfern!",
+    "en": "Show your willingness to be sacrificed!"
+   }
+  },
+  {
+   "schluessel": "cast:1802164:ferocious-horn-nuakum",
+   "art": "leiste",
+   "id": 1802164,
+   "boss": "ferocious-horn-nuakum",
+   "gruppe": "ansage_ferocious_horn_nuakum",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Dann zeigt wenigstens die Bereitschaft, euch zu opfern!",
+    "en": "Show your willingness to be sacrificed!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:ferocious-horn-nuakum",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "ferocious-horn-nuakum",
+   "gruppe": "ansage_ferocious_horn_nuakum",
+   "zeile": {
+    "de": "Noch wilder, noch schärfer!!",
+    "en": "Ever fiercer, ever sharper!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1604500:necromancer-duanka",
+   "art": "leiste",
+   "id": 1604500,
+   "boss": "necromancer-duanka",
+   "gruppe": "ansage_necromancer_duanka",
+   "vorlauf": 1.26,
+   "zeile": {
+    "de": "Ihr am Altar gebannten Seelen, erwacht!",
+    "en": "Souls trapped within the alter—awaken!"
+   }
+  },
+  {
+   "schluessel": "use:1607010:necromancer-duanka",
+   "art": "skill",
+   "id": 1607010,
+   "boss": "necromancer-duanka",
+   "gruppe": "ansage_necromancer_duanka",
+   "zeile": {
+    "de": "Ihr am Altar gebannten Seelen, erwacht!",
+    "en": "Souls trapped within the alter—awaken!"
+   }
+  },
+  {
+   "schluessel": "cast:1607011:necromancer-duanka",
+   "art": "leiste",
+   "id": 1607011,
+   "boss": "necromancer-duanka",
+   "gruppe": "ansage_necromancer_duanka",
+   "vorlauf": 1.467,
+   "zeile": {
+    "de": "Iss die Seelenkugeln auf dem Altar, um die Mau-Seelen zu entfernen, bevor sie absorbiert werden, kru!",
+    "en": "Before they are absorbed, collect the soul orbs on the altar and defeat the Mau souls, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1607050:necromancer-duanka",
+   "art": "leiste",
+   "id": 1607050,
+   "boss": "necromancer-duanka",
+   "gruppe": "ansage_necromancer_duanka",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Der Blitz schlägt ein. Versucht mal, dem zu entkommen!",
+    "en": "Flee the oncoming storm, if you can!"
+   }
+  },
+  {
+   "schluessel": "use:1606930:watchdog-kwapo",
+   "art": "skill",
+   "id": 1606930,
+   "boss": "watchdog-kwapo",
+   "gruppe": "ansage_watchdog_kwapo",
+   "zeile": {
+    "de": "Krau Tuschitz!",
+    "en": "Krau T'shz!"
+   }
+  },
+  {
+   "schluessel": "cast:1606932:watchdog-kwapo",
+   "art": "leiste",
+   "id": 1606932,
+   "boss": "watchdog-kwapo",
+   "gruppe": "ansage_watchdog_kwapo",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Lass so viele Elektrokugeln wie möglich platzen, bevor Kwapo heult!",
+    "en": "Before Kwapo starts howling, burst as many lightning orbs as possible, kru!"
+   }
+  },
+  {
+   "schluessel": "cast:1607010:watchdog-kwapo",
+   "art": "leiste",
+   "id": 1607010,
+   "boss": "watchdog-kwapo",
+   "gruppe": "ansage_watchdog_kwapo",
+   "vorlauf": 1.467,
+   "zeile": {
+    "de": "Krau Tuschitz!",
+    "en": "Krau T'shz!"
+   }
+  },
+  {
+   "schluessel": "cast:1800041:ultimate-berk",
+   "art": "leiste",
+   "id": 1800041,
+   "boss": "ultimate-berk",
+   "gruppe": "ansage_ultimate_berk",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Verschwinde aus meinen Augen!",
+    "en": "Disappear from my sight!"
+   }
+  },
+  {
+   "schluessel": "cast:1800050:ultimate-berk",
+   "art": "leiste",
+   "id": 1800050,
+   "boss": "ultimate-berk",
+   "gruppe": "ansage_ultimate_berk",
+   "vorlauf": 6.0,
+   "zeile": {
+    "de": "Schnell, versteck dich hinter dem Fels!",
+    "en": "Quickly, hide behind the rock!"
+   }
+  },
+  {
+   "schluessel": "cast:1800053:ultimate-berk",
+   "art": "leiste",
+   "id": 1800053,
+   "boss": "ultimate-berk",
+   "gruppe": "ansage_ultimate_berk",
+   "vorlauf": 6.0,
+   "zeile": {
+    "de": "Verschwinde aus meinen Augen!",
+    "en": "Disappear from my sight!"
+   }
+  },
+  {
+   "schluessel": "cast:1800141:ultimate-berk",
+   "art": "leiste",
+   "id": 1800141,
+   "boss": "ultimate-berk",
+   "gruppe": "ansage_ultimate_berk",
+   "vorlauf": 8.0,
+   "zeile": {
+    "de": "Das Leben wird zerbersten und mit mir fusionieren!",
+    "en": "Life will shatter, and merge with me!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:ultimate-berk",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "ultimate-berk",
+   "gruppe": "ansage_ultimate_berk",
+   "zeile": {
+    "de": "Am Ende bleibe nur ich!",
+    "en": "Only I will remain in the end!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1807056:kromede-s-desolation",
+   "art": "skill",
+   "id": 1807056,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "zeile": {
+    "de": "Glaubst du wirklich, du könntest einen Schuss ins Herz einstecken und trotzdem auf den Beinen bleiben?",
+    "en": "Think you could take a shot to the heart and remain standing?"
+   }
+  },
+  {
+   "schluessel": "use:1807061:kromede-s-desolation",
+   "art": "skill",
+   "id": 1807061,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "zeile": {
+    "de": "Glaubst du wirklich, du könntest einen Schuss ins Herz einstecken und trotzdem auf den Beinen bleiben?",
+    "en": "Think you could take a shot to the heart and remain standing?"
+   }
+  },
+  {
+   "schluessel": "use:1807062:kromede-s-desolation",
+   "art": "skill",
+   "id": 1807062,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "zeile": {
+    "de": "Glaubst du wirklich, du könntest einen Schuss ins Herz einstecken und trotzdem auf den Beinen bleiben?",
+    "en": "Think you could take a shot to the heart and remain standing?"
+   }
+  },
+  {
+   "schluessel": "use:1807100:kromede-s-desolation",
+   "art": "skill",
+   "id": 1807100,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "zeile": {
+    "de": "Spürst du mein gebrochenes Herz?",
+    "en": "Can you feel my broken heart?"
+   }
+  },
+  {
+   "schluessel": "cast:1807110:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807110,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Mal sehen, ob du ihn ertragen kannst – diesen Schmerz, den ich fühle!",
+    "en": "See if you can bear it, this agony I feel!"
+   }
+  },
+  {
+   "schluessel": "cast:1807122:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807122,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Mal sehen, ob du ihn ertragen kannst – diesen Schmerz, den ich fühle!",
+    "en": "See if you can bear it, this agony I feel!"
+   }
+  },
+  {
+   "schluessel": "cast:1807130:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807130,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 4.5,
+   "zeile": {
+    "de": "Dieser leere Spiegel ist die einzige Rettung.",
+    "en": "This empty mirror is the only salvation."
+   }
+  },
+  {
+   "schluessel": "cast:1807131:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807131,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 4.5,
+   "zeile": {
+    "de": "Dieser leere Spiegel ist die einzige Rettung.",
+    "en": "This empty mirror is the only salvation."
+   }
+  },
+  {
+   "schluessel": "cast:1807132:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807132,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 4.5,
+   "zeile": {
+    "de": "Dieser leere Spiegel ist die einzige Rettung.",
+    "en": "This empty mirror is the only salvation."
+   }
+  },
+  {
+   "schluessel": "cast:1807133:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807133,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 4.5,
+   "zeile": {
+    "de": "Dieser leere Spiegel ist die einzige Rettung.",
+    "en": "This empty mirror is the only salvation."
+   }
+  },
+  {
+   "schluessel": "cast:1807140:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807140,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Ihr hängt an euren Leben? Dann lauft!",
+    "en": "You value your lives? Then run for them!"
+   }
+  },
+  {
+   "schluessel": "cast:1807150:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807150,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 25.0,
+   "zeile": {
+    "de": "Kannst du die Wahrheit im Spiegel finden?",
+    "en": "Can you find truth within the mirror?"
+   }
+  },
+  {
+   "schluessel": "cast:1807162:kromede-s-desolation",
+   "art": "leiste",
+   "id": 1807162,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "vorlauf": 25.0,
+   "zeile": {
+    "de": "Kannst du die Wahrheit im Spiegel finden?",
+    "en": "Can you find truth within the mirror?"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:kromede-s-desolation",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "kromede-s-desolation",
+   "gruppe": "ansage_kromede_s_desolation",
+   "zeile": {
+    "de": "Sterbt, sterbt! Sterbt, ihr alle!",
+    "en": "Die, die, all of you, die!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1806430:robstino",
+   "art": "leiste",
+   "id": 1806430,
+   "boss": "robstino",
+   "gruppe": "ansage_robstino",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Mal sehen, ob du standhalten kannst!",
+    "en": "See if you can stand your ground!"
+   }
+  },
+  {
+   "schluessel": "cast:1806450:robstino",
+   "art": "leiste",
+   "id": 1806450,
+   "boss": "robstino",
+   "gruppe": "ansage_robstino",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Ein Pfad aus Klingen zur Verteidigung von Kromede!",
+    "en": "A path of blades to defend Kromede!"
+   }
+  },
+  {
+   "schluessel": "cast:1608080:rotar",
+   "art": "leiste",
+   "id": 1608080,
+   "boss": "rotar",
+   "gruppe": "ansage_rotar",
+   "vorlauf": 1.9,
+   "zeile": {
+    "de": "Wer Falschheiten folgt, wird zur Rechenschaft gezogen!",
+    "en": "Those who pursue falsehoods shall face judgement!"
+   }
+  },
+  {
+   "schluessel": "cast:1608110:rotar",
+   "art": "leiste",
+   "id": 1608110,
+   "boss": "rotar",
+   "gruppe": "ansage_rotar",
+   "vorlauf": 1.5,
+   "zeile": {
+    "de": "Deine Reise zu Herrin Kromede endet hier!",
+    "en": "Your journey to see Lady Kromede shall end here!"
+   }
+  },
+  {
+   "schluessel": "cast:1608120:rotar",
+   "art": "leiste",
+   "id": 1608120,
+   "boss": "rotar",
+   "gruppe": "ansage_rotar",
+   "vorlauf": 2.0,
+   "zeile": {
+    "de": "Was für ein reizender Haufen … Ungeziefer!",
+    "en": "What a lovely couple... of vermin!"
+   }
+  },
+  {
+   "schluessel": "cast:1608130:rotar",
+   "art": "leiste",
+   "id": 1608130,
+   "boss": "rotar",
+   "gruppe": "ansage_rotar",
+   "vorlauf": 1.83,
+   "zeile": {
+    "de": "Suche das Licht der Wahrheit, sonst wirst du von ihm ausgelöscht!",
+    "en": "Seek the light of truth, lest you be obliterated by it!"
+   }
+  },
+  {
+   "schluessel": "cast:1808110:iscariel",
+   "art": "leiste",
+   "id": 1808110,
+   "boss": "iscariel",
+   "gruppe": "ansage_iscariel",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Fleht, Eindringlinge, in den verblassenden Farben meiner Gnade!",
+    "en": "Beg, trespassers, in the fading hues of my mercy!"
+   }
+  },
+  {
+   "schluessel": "cast:1808120:iscariel",
+   "art": "leiste",
+   "id": 1808120,
+   "boss": "iscariel",
+   "gruppe": "ansage_iscariel",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Überhebliche Narren … Das wird nicht noch einmal vorkommen!",
+    "en": "Arrogant fools... It will not happen again!"
+   }
+  },
+  {
+   "schluessel": "cast:1808130:iscariel",
+   "art": "leiste",
+   "id": 1808130,
+   "boss": "iscariel",
+   "gruppe": "ansage_iscariel",
+   "vorlauf": 2.83,
+   "zeile": {
+    "de": "Haaaaaaah!",
+    "en": "Haaaaaaah!"
+   }
+  },
+  {
+   "schluessel": "cast:1808140:iscariel",
+   "art": "leiste",
+   "id": 1808140,
+   "boss": "iscariel",
+   "gruppe": "ansage_iscariel",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Du willst meine Barriere zerstören? Lächerlich!",
+    "en": "You would shatter my barrier? Ridiculous!"
+   }
+  },
+  {
+   "schluessel": "cast:1808143:iscariel",
+   "art": "leiste",
+   "id": 1808143,
+   "boss": "iscariel",
+   "gruppe": "ansage_iscariel",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Du willst meine Barriere zerstören? Lächerlich!",
+    "en": "You would shatter my barrier? Ridiculous!"
+   }
+  },
+  {
+   "schluessel": "cast:1806620:kaldrix",
+   "art": "leiste",
+   "id": 1806620,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Ich habe nur eine Art der Gnade für dich übrig!",
+    "en": "I have but one mercy to offer you!"
+   }
+  },
+  {
+   "schluessel": "cast:1806621:kaldrix",
+   "art": "leiste",
+   "id": 1806621,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Ich habe nur eine Art der Gnade für dich übrig!",
+    "en": "I have but one mercy to offer you!"
+   }
+  },
+  {
+   "schluessel": "cast:1806630:kaldrix",
+   "art": "leiste",
+   "id": 1806630,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 1.16,
+   "zeile": {
+    "de": "Ich werde nicht zögern, jedes Ärgernis zu beseitigen!",
+    "en": "I will not hesitate to eliminate any nuisances!"
+   }
+  },
+  {
+   "schluessel": "cast:1806640:kaldrix",
+   "art": "leiste",
+   "id": 1806640,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 2.0,
+   "zeile": {
+    "de": "Glühende Flammen, steigt immer höher! Alles wird brennen!",
+    "en": "Brilliant flames, reach ever higher! Everything will burn!"
+   }
+  },
+  {
+   "schluessel": "cast:1806660:kaldrix",
+   "art": "leiste",
+   "id": 1806660,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 1.66,
+   "zeile": {
+    "de": "Du kannst den Flammen nicht entkommen!",
+    "en": "You cannot escape the flames!"
+   }
+  },
+  {
+   "schluessel": "cast:1806690:kaldrix",
+   "art": "leiste",
+   "id": 1806690,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 1.16,
+   "zeile": {
+    "de": "Die Aura des Feuers strömt in meinen Körper!",
+    "en": "The aura of fire swirls into my body!"
+   }
+  },
+  {
+   "schluessel": "cast:1806730:kaldrix",
+   "art": "leiste",
+   "id": 1806730,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Überall, wo du deinen Fuß hinsetzt – dieses Land gehört mir!",
+    "en": "Everywhere you tread, that earth belongs to me!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:kaldrix",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "kaldrix",
+   "gruppe": "ansage_kaldrix",
+   "zeile": {
+    "de": "Endlich! Ich habe die gesamte Kraft des Kelchs in mir aufgenommen!",
+    "en": "Finally! I have absorbed all of the chalice's power!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1805250:glassvein",
+   "art": "skill",
+   "id": 1805250,
+   "boss": "glassvein",
+   "gruppe": "ansage_glassvein",
+   "zeile": {
+    "de": "Folgt ... dem Ruf ...",
+    "en": "Heed... the call..."
+   }
+  },
+  {
+   "schluessel": "cast:1805350:glassvein",
+   "art": "leiste",
+   "id": 1805350,
+   "boss": "glassvein",
+   "gruppe": "ansage_glassvein",
+   "vorlauf": 3.5,
+   "zeile": {
+    "de": "Ich ... richte euch!!",
+    "en": "You will be punished!"
+   }
+  },
+  {
+   "schluessel": "cast:1805490:nathara",
+   "art": "leiste",
+   "id": 1805490,
+   "boss": "nathara",
+   "gruppe": "ansage_nathara",
+   "vorlauf": 1.5,
+   "zeile": {
+    "de": "In dem Moment, da das Licht den Raum verbindet, wird die Wahrheit zerbrechen ...",
+    "en": "The moment light bridges space, truth shall shatter..."
+   }
+  },
+  {
+   "schluessel": "cast:1805530:nathara",
+   "art": "leiste",
+   "id": 1805530,
+   "boss": "nathara",
+   "gruppe": "ansage_nathara",
+   "vorlauf": 1.5,
+   "zeile": {
+    "de": "Werdet ihr das Geheimnis der Illusion zu durchschauen vermögen?",
+    "en": "Can you penetrate the illusion?"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:nathara",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "nathara",
+   "gruppe": "ansage_nathara",
+   "zeile": {
+    "de": "Lasst meine Begierde in Ruhe!!",
+    "en": "Must you deprive me...?"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1805680:nazarak",
+   "art": "leiste",
+   "id": 1805680,
+   "boss": "nazarak",
+   "gruppe": "ansage_nazarak",
+   "vorlauf": 6.0,
+   "zeile": {
+    "de": "Werde auch du verschlungen!",
+    "en": "You will take my place!"
+   }
+  },
+  {
+   "schluessel": "use:1801940:abyssal-wings-ketu",
+   "art": "skill",
+   "id": 1801940,
+   "boss": "abyssal-wings-ketu",
+   "gruppe": "ansage_abyssal_wings_ketu",
+   "zeile": {
+    "de": "Senk dich lautlos herab ... vernichte!",
+    "en": "Sink silently... and perish!"
+   }
+  },
+  {
+   "schluessel": "cast:1801970:abyssal-wings-ketu",
+   "art": "leiste",
+   "id": 1801970,
+   "boss": "abyssal-wings-ketu",
+   "gruppe": "ansage_abyssal_wings_ketu",
+   "vorlauf": 9.0,
+   "zeile": {
+    "de": "Gibt es wohl eine Seele, die dich rettet?",
+    "en": "Will any soul come to your rescue?"
+   }
+  },
+  {
+   "schluessel": "abnormal:18019631:abyssal-wings-ketu",
+   "art": "effekt",
+   "id": 18019631,
+   "boss": "abyssal-wings-ketu",
+   "gruppe": "ansage_abyssal_wings_ketu",
+   "zeile": {
+    "de": "Ein Versteckspiel mit dem Abgrund. Hahaha!",
+    "en": "Hide and seek in the Abyss! Haha!"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "use:1803010:eternal-ludra",
+   "art": "skill",
+   "id": 1803010,
+   "boss": "eternal-ludra",
+   "gruppe": "ansage_eternal_ludra",
+   "zeile": {
+    "de": "So setzt man Kraft ein.",
+    "en": "Power is meant to be wielded like this."
+   }
+  },
+  {
+   "schluessel": "use:1803020:eternal-ludra",
+   "art": "skill",
+   "id": 1803020,
+   "boss": "eternal-ludra",
+   "gruppe": "ansage_eternal_ludra",
+   "zeile": {
+    "de": "Im Abgrund bin ich perfekt.",
+    "en": "Within the Abyss, I am complete."
+   }
+  },
+  {
+   "schluessel": "cast:1803030:eternal-ludra",
+   "art": "leiste",
+   "id": 1803030,
+   "boss": "eternal-ludra",
+   "gruppe": "ansage_eternal_ludra",
+   "vorlauf": 5.0,
+   "zeile": {
+    "de": "Spürt ... die Vernichtung der Existenz.",
+    "en": "Experience... obliteration."
+   }
+  },
+  {
+   "schluessel": "use:1803200:eternal-ludra",
+   "art": "skill",
+   "id": 1803200,
+   "boss": "eternal-ludra",
+   "gruppe": "ansage_eternal_ludra",
+   "zeile": {
+    "de": "Abgrund, dehne dich aus!",
+    "en": "O Abyss, spread forth."
+   }
+  },
+  {
+   "schluessel": "use:1803360:eternal-ludra",
+   "art": "skill",
+   "id": 1803360,
+   "boss": "eternal-ludra",
+   "gruppe": "ansage_eternal_ludra",
+   "zeile": {
+    "de": "Abgrund, dehne dich aus!",
+    "en": "O Abyss, spread forth."
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:eternal-ludra",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "eternal-ludra",
+   "gruppe": "ansage_eternal_ludra",
+   "zeile": {
+    "de": "Das ist die Kraft, die Äonen überdauert hat!!",
+    "en": "A strength that has withstood eternity!"
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1802720:isolation-specialist-rahu",
+   "art": "leiste",
+   "id": 1802720,
+   "boss": "isolation-specialist-rahu",
+   "gruppe": "ansage_isolation_specialist_rahu",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Zeit, verschlungen zu werden!",
+    "en": "You will be devoured!"
+   }
+  },
+  {
+   "schluessel": "cast:1802900:isolation-specialist-rahu",
+   "art": "leiste",
+   "id": 1802900,
+   "boss": "isolation-specialist-rahu",
+   "gruppe": "ansage_isolation_specialist_rahu",
+   "vorlauf": 15.0,
+   "zeile": {
+    "de": "Kreise im Kreislauf des Schmerzes!",
+    "en": "Suffer within the wheel of torment!"
+   }
+  },
+  {
+   "schluessel": "use:1802980:isolation-specialist-rahu",
+   "art": "skill",
+   "id": 1802980,
+   "boss": "isolation-specialist-rahu",
+   "gruppe": "ansage_isolation_specialist_rahu",
+   "zeile": {
+    "de": "Der Abgrund ist immer hungrig.",
+    "en": "The Abyss hungers."
+   }
+  },
+  {
+   "schluessel": "cast:1804850:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804850,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Werdet von der Welle verschlungen und versinkt ...!",
+    "en": "Be swallowed by the tide!"
+   }
+  },
+  {
+   "schluessel": "cast:1804853:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804853,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Werdet von der Welle verschlungen und versinkt ...!",
+    "en": "Be swallowed by the tide!"
+   }
+  },
+  {
+   "schluessel": "cast:1804880:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804880,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Werdet von der Explosion verschlungen …",
+    "en": "The fires will engulf you..."
+   }
+  },
+  {
+   "schluessel": "cast:1804890:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804890,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Explodiere, Macht des Naturgeists …",
+    "en": "Feel the might of the Spirits!"
+   }
+  },
+  {
+   "schluessel": "cast:1804891:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804891,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Explodiere, Macht des Naturgeists …",
+    "en": "Feel the might of the Spirits!"
+   }
+  },
+  {
+   "schluessel": "cast:1804892:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804892,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Explodiere, Macht des Naturgeists …",
+    "en": "Feel the might of the Spirits!"
+   }
+  },
+  {
+   "schluessel": "cast:1804893:deep-sea-pydeon",
+   "art": "leiste",
+   "id": 1804893,
+   "boss": "deep-sea-pydeon",
+   "gruppe": "ansage_deep_sea_pydeon",
+   "vorlauf": 2.5,
+   "zeile": {
+    "de": "Explodiere, Macht des Naturgeists …",
+    "en": "Feel the might of the Spirits!"
+   }
+  },
+  {
+   "schluessel": "use:1804640:singing-ellyde",
+   "art": "skill",
+   "id": 1804640,
+   "boss": "singing-ellyde",
+   "gruppe": "ansage_singing_ellyde",
+   "zeile": {
+    "de": "La… La… La…",
+    "en": "La... La... La..."
+   }
+  },
+  {
+   "schluessel": "cast:1804660:singing-ellyde",
+   "art": "leiste",
+   "id": 1804660,
+   "boss": "singing-ellyde",
+   "gruppe": "ansage_singing_ellyde",
+   "vorlauf": 2.0,
+   "zeile": {
+    "de": "La, la, la!!! La!!!",
+    "en": "La, la, la, laaaaaa!!"
+   }
+  },
+  {
+   "schluessel": "use:1804680:singing-ellyde",
+   "art": "skill",
+   "id": 1804680,
+   "boss": "singing-ellyde",
+   "gruppe": "ansage_singing_ellyde",
+   "zeile": {
+    "de": "La-la! La-la-la!",
+    "en": "Lala! Lalalala!"
+   }
+  },
+  {
+   "schluessel": "cast:1803570:submerged-emon",
+   "art": "leiste",
+   "id": 1803570,
+   "boss": "submerged-emon",
+   "gruppe": "ansage_submerged_emon",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Glaubt ihr, es gäbe einen Ort, an dem ihr diesem Sturm entkommen könnt?!",
+    "en": "There's no escape from the storm!"
+   }
+  },
+  {
+   "schluessel": "cast:1803571:submerged-emon",
+   "art": "leiste",
+   "id": 1803571,
+   "boss": "submerged-emon",
+   "gruppe": "ansage_submerged_emon",
+   "vorlauf": 4.0,
+   "zeile": {
+    "de": "Der Sturm verfolgt euch. Versucht nur, zu entkommen!",
+    "en": "No respite from the stalking storm."
+   }
+  },
+  {
+   "schluessel": "cast:1803600:submerged-emon",
+   "art": "leiste",
+   "id": 1803600,
+   "boss": "submerged-emon",
+   "gruppe": "ansage_submerged_emon",
+   "vorlauf": 1.0,
+   "zeile": {
+    "de": "Mögen Körper, die sich von ihrer Seele entfernt haben, leiden!",
+    "en": "Only agony awaits those severed from their soul!"
+   }
+  },
+  {
+   "schluessel": "cast:1803610:submerged-emon",
+   "art": "leiste",
+   "id": 1803610,
+   "boss": "submerged-emon",
+   "gruppe": "ansage_submerged_emon",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Solange die Seele verweilt, könnt ihr dem Urteil nicht entrinnen!",
+    "en": "As long as your soul remains, you will not escape judgment!"
+   }
+  },
+  {
+   "schluessel": "cast:1803655:submerged-emon",
+   "art": "leiste",
+   "id": 1803655,
+   "boss": "submerged-emon",
+   "gruppe": "ansage_submerged_emon",
+   "vorlauf": 1.2,
+   "zeile": {
+    "de": "Ohne einen Erlöser werdet ihr lediglich von den Fluten verschlungen!",
+    "en": "Without a savior, you will be swallowed by the waters!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:submerged-emon",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "submerged-emon",
+   "gruppe": "ansage_submerged_emon",
+   "zeile": {
+    "de": "Die Zeit der Barmherzigkeit ist vorbei!",
+    "en": "There will be no mercy."
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1601035:divine-auldor",
+   "art": "leiste",
+   "id": 1601035,
+   "boss": "divine-auldor",
+   "gruppe": "ansage_divine_auldor",
+   "vorlauf": 9.57,
+   "zeile": {
+    "de": "Geh zu dem Verbündeten, den Auldor anvisiert, und fang den Angriff gemeinsam ab!",
+    "en": "Get close to the party member that Auldor is watching and take the hit together, kru!"
+   }
+  },
+  {
+   "schluessel": "abnormal:10000008:divine-auldor",
+   "art": "effekt",
+   "id": 10000008,
+   "boss": "divine-auldor",
+   "gruppe": "ansage_divine_auldor",
+   "zeile": {
+    "de": "Ich werde euch den Preis für das Eindringen in die Weihestätte bezahlen lassen.",
+    "en": "You will pay for invading the sanctuary."
+   },
+   "buff": {
+    "de": "Raserei",
+    "en": "Frenzy"
+   },
+   "braucht_boss": true
+  },
+  {
+   "schluessel": "cast:1504450:guardian-captain-raur",
+   "art": "leiste",
+   "id": 1504450,
+   "boss": "guardian-captain-raur",
+   "gruppe": "ansage_guardian_captain_raur",
+   "vorlauf": 3.0,
+   "zeile": {
+    "de": "Ich werde den Angriff zurückgeben! Wage es nur!",
+    "en": "Feel your strength turned against you! Strike me!"
+   }
+  }
+ ]
+}

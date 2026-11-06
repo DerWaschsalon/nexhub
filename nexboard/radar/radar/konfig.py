@@ -52,10 +52,12 @@ def konfig_speichern(k: dict) -> None:
         pass
 
 
-def abspielen(datei: Path) -> None:
+def abspielen(datei: Path) -> subprocess.Popen | None:
+    """Spielt die Datei ab, ohne zu warten. Der Prozess kommt zurueck, damit man warten oder abbrechen kann."""
     spieler = shutil.which("pw-play") or shutil.which("paplay")
-    if spieler:
-        subprocess.Popen([spieler, str(datei)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not spieler:
+        return None
+    return subprocess.Popen([spieler, str(datei)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def ton_erzeugen() -> Path:

@@ -6,6 +6,10 @@ import { fill, el, api, S, field, input, select, button, chip, callout, card, se
 const REICHWEITEN = { 50: "50 m", 100: "100 m", 150: "150 m", 300: "300 m", 600: "600 m" };
 const DREHUNG = { 0: "0°", 90: "90°", 180: "180°", 270: "270°" };
 const TON = { aus: "Aus", piep: "Piepton", ansage: "Ansage" };
+// Wörter wie im A2Tools-Plugin „Boss Callouts“, von dem die Boss-Ansagen stammen
+const STIL = { beides: "Kurze Ansage und der Satz des Bosses", anweisung: "Kurze Ansage", zeile: "Der Satz des Bosses" };
+const EIGENE_HINWEIS = "Wird statt dieses Rufs gesagt und gezeigt, egal welcher Rufstil. Leer: die Vorgabe.";
+const AUS_HINWEIS = "Ein abgehakter Ruf ist ganz aus, auch sein Countdown. Um ihn zu behalten, aber weniger zu hören: Rufstil auf Kurze Ansage stellen oder ihm eigene Worte geben.";
 const FILTER = { alle: "Alle", offen: "Noch nicht MAX", neu: "Nicht angefangen" };
 const ARTEN = { alle: "Alle Arten", Cogni: "Cogni", Fera: "Fera", Natura: "Natura", Varian: "Varian", Spezial: "Spezial" };
 
@@ -18,6 +22,41 @@ async function befehl(name, text) {
     S.radar = await api("POST", "/api/radar/befehl", { befehl: name });
     toast(text);
   } catch (e) { toast(e.message, true); }
+}
+
+async function rufTesten(schluessel) {
+  try { S.radar = await api("POST", "/api/radar/befehl", { befehl: "ansage_testen", ruf: schluessel }); } catch (e) { toast(e.message, true); }
+}
+
+// Aufgeklappte Ruf-Listen; die Seite zeichnet alle 5 s neu, dabei sollen sie offen bleiben
+const offen = new Set();
+
+/** Die Rufe eines Bosses: Haken, Art, Vorgabe, eigene Worte, zurück zur Vorgabe, abspielen. */
+function rufListe(r, gruppe, setzen) {
+  const rufe = r.ansagen[gruppe];
+  const k = r.einstellungen;
+  const zeilen = rufe.map((ruf) => {
+    const eigene = k.eigene_worte[ruf.schluessel] || "";
+    const worte = (text) => {
+      const neu = { ...k.eigene_worte };
+      if (text.trim()) neu[ruf.schluessel] = text.trim(); else delete neu[ruf.schluessel];
+      setzen("eigene_worte", neu);
+    };
+    return el("tr", {},
+      el("td", {}, sw(!k.ruf_aus.includes(ruf.schluessel), (an) =>
+        setzen("ruf_aus", an ? k.ruf_aus.filter((x) => x !== ruf.schluessel) : [...k.ruf_aus, ruf.schluessel]))),
+      el("td", { class: "small muted", text: ruf.art }),
+      el("td", {}, el("div", { text: ruf.vorgabe }), ruf.zeile ? el("div", { class: "small muted", text: ruf.zeile }) : null),
+      el("td", {}, input(eigene, worte, { lazy: true, placeholder: "Eigene Worte", maxlength: 120, title: EIGENE_HINWEIS })),
+      el("td", {}, el("div", { class: "row" },
+        eigene ? button("", () => worte(""), "sm", "close", { title: "Zurück zur Vorgabe" }) : null,
+        button("", () => rufTesten(ruf.schluessel), "sm", "play", { title: "Diesen Ruf abspielen", disabled: !r.laeuft }))));
+  });
+  const liste = el("details", { open: offen.has(gruppe) }, el("summary", { class: "small", text: `${rufe.length} Rufe` }),
+    el("div", { class: "small muted", text: AUS_HINWEIS }),
+    el("table", { class: "list" }, el("tbody", {}, zeilen)));
+  liste.addEventListener("toggle", () => (liste.open ? offen.add(gruppe) : offen.delete(gruppe)));
+  return liste;
 }
 
 function statusChip(r) {
@@ -42,6 +81,7 @@ function einstellungen(ctx) {
     if (!r) return;
     const k = r.einstellungen;
     const setzen = (schluessel, wert) => { k[schluessel] = wert; save({ [schluessel]: wert }); };
+    const neuZeichnen = (schluessel, wert) => { setzen(schluessel, wert); draw(); };  // „Zurück“-Knopf erscheint
     const knopf = (text, name, ic, erledigt) => button(text, () => befehl(name, erledigt), "sm", ic, { disabled: !r.laeuft });
 
     // Warnungen des gewählten Dungeons
@@ -49,7 +89,7 @@ function einstellungen(ctx) {
     const eigene = dungeons[k.meldungen_dungeon] || {};
     const gruppen = { ...(Object.keys(eigene).length ? eigene : { casts: "Alle Boss-Casts zeigen (Lernhilfe)" }), ...r.meldungen.alle };
     const zeilen = Object.entries(gruppen).map(([gruppe, name]) => el("tr", {},
-      el("td", { text: name }),
+      el("td", {}, el("div", { text: name }), r.ansagen?.[gruppe] ? rufListe(r, gruppe, neuZeichnen) : null),
       el("td", {}, sw(!k.meldung_aus.includes(gruppe), (an) =>
         setzen("meldung_aus", an ? k.meldung_aus.filter((g) => g !== gruppe) : [...k.meldung_aus, gruppe]))),
       el("td", {}, select(TON, k.warnton[gruppe] || "ansage", (art) => setzen("warnton", { ...k.warnton, [gruppe]: art })))));
@@ -81,6 +121,8 @@ function einstellungen(ctx) {
           field("Sprache", select({ de: "Deutsch", en: "Englisch" }, k.sprache, (v) => setzen("sprache", v))),
           field("Dungeon", select(Object.fromEntries(Object.keys(dungeons).map((d) => [d, d])), k.meldungen_dungeon, (v) => { setzen("meldungen_dungeon", v); draw(); }))),
         settingsRow("Dungeons automatisch aufnehmen", "Lernmodus: jeder Lauf wird eine eigene Aufnahme", sw(k.aufnahme_auto, (v) => setzen("aufnahme_auto", v))),
+        settingsRow("Art der Ansage", "Kurze Ansage: die Farbe oder was zu tun ist, mit Countdown, ohne den Satz des Bosses.", select(STIL, k.ansage_stil, (v) => setzen("ansage_stil", v))),
+        settingsRow("Piepton bei jeder Welle", "Vakrons Sprung", sw(k.wellen_ton, (v) => setzen("wellen_ton", v))),
         el("div", { style: "overflow-x:auto" }, el("table", { class: "list" },
           el("thead", {}, el("tr", {}, ["Meldung", "Anzeigen", "Ton"].map((h) => el("th", { text: h })))),
           el("tbody", {}, zeilen)))),

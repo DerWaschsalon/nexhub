@@ -18,5 +18,9 @@
   "warn_an": true,
   "name": "",
   "karte_name": "",
-  "flaeche_m": 6.0
+  "flaeche_m": 6.0,
+  "ansage_stil": "beides",
+  "wellen_ton": true,
+  "eigene_worte": {},
+  "ruf_aus": []
 }

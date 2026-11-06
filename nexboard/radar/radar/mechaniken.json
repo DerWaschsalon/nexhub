@@ -112,31 +112,6 @@
    }
   },
   {
-   "gruppe": "tiere_blume",
-   "dungeon": "Vakron Sky Island",
-   "bosse": [
-    2300810,
-    2310810,
-    2320810
-   ],
-   "wann": {
-    "art": "cast",
-    "skills": [
-     1604500
-    ]
-   },
-   "titel": "Rafflesia",
-   "hinweis": "Die Rafflesia töten",
-   "sekunden": 9,
-   "farbe": "ORANGE",
-   "meldung": "Tiere: Rafflesia",
-   "en": {
-    "Rafflesia": "Rafflesia",
-    "Die Rafflesia töten": "Kill the Rafflesia",
-    "Tiere: Rafflesia": "Tiere: Rafflesia"
-   }
-  },
-  {
    "gruppe": "tiere_rotation",
    "dungeon": "Vakron Sky Island",
    "bosse": [
@@ -185,54 +160,6 @@
     "Giftfläche": "Poison",
     "Raus aus der Fläche": "Move out",
     "Tiere: Giftfläche": "Tiere: Poison"
-   }
-  },
-  {
-   "gruppe": "thamon_physisch",
-   "dungeon": "Vakron Sky Island",
-   "bosse": [
-    2300811,
-    2310811,
-    2320811
-   ],
-   "wann": {
-    "art": "effekt",
-    "id": 16046601,
-    "auf": "boss"
-   },
-   "titel": "Physischer Schild",
-   "hinweis": "Keine physischen Angriffe",
-   "sekunden": 11,
-   "farbe": "ROT",
-   "meldung": "Thamon: Physischer Schild",
-   "en": {
-    "Physischer Schild": "Physical shield",
-    "Keine physischen Angriffe": "Stop physical attacks",
-    "Thamon: Physischer Schild": "Thamon: Physical shield"
-   }
-  },
-  {
-   "gruppe": "thamon_magisch",
-   "dungeon": "Vakron Sky Island",
-   "bosse": [
-    2300811,
-    2310811,
-    2320811
-   ],
-   "wann": {
-    "art": "effekt",
-    "id": 16046701,
-    "auf": "boss"
-   },
-   "titel": "Magischer Schild",
-   "hinweis": "Keine magischen Angriffe",
-   "sekunden": 11,
-   "farbe": "BLAU",
-   "meldung": "Thamon: Magischer Schild",
-   "en": {
-    "Magischer Schild": "Magic shield",
-    "Keine magischen Angriffe": "Stop magic attacks",
-    "Thamon: Magischer Schild": "Thamon: Magic shield"
    }
   },
   {
@@ -308,56 +235,6 @@
    }
   },
   {
-   "gruppe": "vakron_ringe",
-   "dungeon": "Vakron Sky Island",
-   "bosse": [
-    2300812,
-    2310812,
-    2320812
-   ],
-   "wann": {
-    "art": "cast",
-    "skills": [
-     1604390
-    ]
-   },
-   "titel": "Dornenringe",
-   "hinweis": "Über die Ringe springen",
-   "sekunden": 10,
-   "farbe": "ORANGE",
-   "meldung": "Vakron: Dornenringe",
-   "en": {
-    "Dornenringe": "Thorn rings",
-    "Über die Ringe springen": "Jump the rings",
-    "Vakron: Dornenringe": "Vakron: Thorn rings"
-   }
-  },
-  {
-   "gruppe": "vakron_gefaengnis",
-   "dungeon": "Vakron Sky Island",
-   "bosse": [
-    2300812,
-    2310812,
-    2320812
-   ],
-   "wann": {
-    "art": "cast",
-    "skills": [
-     1604420
-    ]
-   },
-   "titel": "Gefängnis",
-   "hinweis": "Roten Stein zerstören",
-   "sekunden": 15,
-   "farbe": "ROT",
-   "meldung": "Vakron: Gefängnis",
-   "en": {
-    "Gefängnis": "Prison",
-    "Roten Stein zerstören": "Break the red rock to get out",
-    "Vakron: Gefängnis": "Vakron: Prison"
-   }
-  },
-  {
    "gruppe": "berk_wirbel",
    "dungeon": "Krao Cave",
    "bosse": [
@@ -426,30 +303,6 @@
     "Jetzt staggern": "Stagger now",
     "Leiste brechen": "Break the gauge",
     "Berk: Jetzt staggern": "Berk: Stagger now"
-   }
-  },
-  {
-   "gruppe": "lakshmi_reflexion",
-   "dungeon": "Draupnir",
-   "bosse": [
-    2300401,
-    2310401,
-    2320401
-   ],
-   "wann": {
-    "art": "effekt",
-    "id": 16059101,
-    "auf": "boss"
-   },
-   "titel": "Reflexion",
-   "hinweis": "Nicht angreifen",
-   "sekunden": 9,
-   "farbe": "ROT",
-   "meldung": "Lakshmi: Reflexion",
-   "en": {
-    "Reflexion": "Reflect",
-    "Nicht angreifen": "Stop attacking",
-    "Lakshmi: Reflexion": "Lakshmi: Reflect"
    }
   },
   {
@@ -944,31 +797,6 @@
     "Mau-Nekromantie": "Mau Necromancy",
     "Seele vom Altar holen, Geister töten": "Take the soul from the altar, kill the ghosts",
     "Duanka: Mau-Nekromantie": "Duanka: Mau Necromancy"
-   }
-  },
-  {
-   "gruppe": "duanka_seelenrufer",
-   "dungeon": "Ferocious Horn Den",
-   "bosse": [
-    2300909,
-    2310909,
-    2320909
-   ],
-   "wann": {
-    "art": "cast",
-    "skills": [
-     1607050
-    ]
-   },
-   "titel": "Seelenrufer",
-   "hinweis": "Weit weglaufen, Blitze kommen",
-   "sekunden": 4,
-   "farbe": "ROT",
-   "meldung": "Duanka: Seelenrufer",
-   "en": {
-    "Seelenrufer": "Soul Caller",
-    "Weit weglaufen, Blitze kommen": "Run far away, bolts incoming",
-    "Duanka: Seelenrufer": "Duanka: Soul Caller"
    }
   }
  ]

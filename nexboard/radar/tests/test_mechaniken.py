@@ -66,8 +66,8 @@ class WarnungTest(unittest.TestCase):
 
     def test_treffer_und_cast(self):
         self.z.treffer(1605144)
-        self.z.cast(1, 1604390, None)
-        self.assertEqual(sorted(t for t, _ in self.warnungen()), ["Dornenringe", "Giftpfütze"])
+        self.z.cast(1, 1604532, None)
+        self.assertEqual(sorted(t for t, _ in self.warnungen()), ["Giftpfütze", "Rotation"])
 
     def test_pfuetze_meldet_nicht_im_sekundentakt(self):
         for _ in range(5):
