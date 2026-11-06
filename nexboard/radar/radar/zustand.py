@@ -42,7 +42,11 @@ OP_TELEPORT = 0x3623  # eigener Teleport/Zonenwechsel mit Position ab Byte 6 (ge
 OP_SYNC = 0x8D00      # Punkte einer Entity (HP, MP, ...): Entity, Flags u8, bei Flag 1 Varint N, N x (Art u8, i32).
                       # MP und SP (Art 1, 3) schickt der Server nur fuer den eigenen Charakter (geprueft)
 EIGENE_PUNKTE = {1, 3}
-OP_CAST = 0x3802      # Cast-Beginn: Caster, 00, Skill u32, 2 Byte, Ziel (geprueft)
+OP_CAST = 0x3802      # Skill geht los: Caster, 00, Skill u32, 2 Byte, Ziel (geprueft)
+# Aus taengu/A2Tools-Plugins (Boss Callouts), noch nicht im eigenen Mitschnitt geprueft:
+OP_LEISTE = 0x3809    # Cast-Leiste beginnt (kommt vor 0x3802): Caster, Flag u8, Skill u32
+OP_WELLE = 0x3803     # spaetere Treffer eines Skills (Vakrons Wellen): Caster, u8, Quelle, Skill u32
+OP_EFFEKT_WEG = 0x382C  # Effekte enden: Entity, Anzahl u8, je Effekt: Art u8, Instanz, Grund u8, ...
 # Boden-Markierung eines Skills (glass-cannon, MIT): Caster, Skill u32, Cast-ID u8, u32, u16, x/y/z, Richtung,
 # ms bis zum Einschlag u16. Nur der Mittelpunkt, keine Groesse und Form.
 OP_MARKIERUNG = 0x3848
@@ -94,6 +98,8 @@ for _m in MECHANIKEN:
     for _npc in _m["bosse"]:
         BOSSE.setdefault(_npc, _m["dungeon"])
 STAGGER_BOSSE = {npc for m in MECHANIKEN if m["wann"]["art"] == "stagger" for npc in m["bosse"]}
+# Boss-Ansagen aus dem A2Tools-Plugin (ansagen.json, erzeugt mit `python -m werkzeuge.ansagen`)
+BOSS_ANSAGEN: dict = json.loads((Path(__file__).parent / "ansagen.json").read_text())
 
 
 KARTE_OFFEN_S = 2.5  # so lange nach der letzten Feldboss-Liste gilt die Ingame-Karte als offen
@@ -151,6 +157,12 @@ class RadarZustand:
         # Rueckrufe: neuer Cube, Cast (caster, skill, ziel)
         self.bei_neuem_cube: list[Callable[[Cube], None]] = []
         self.bei_cast: list[Callable[[int, int, int | None], None]] = []
+        self.bei_leiste: list[Callable[[int, int], None]] = []  # (Caster, Skill), Cast-Leiste beginnt
+        self.bei_welle: list[Callable[[int, int], None]] = []   # (Caster, Skill), spaeterer Treffer
+        # (Entity, Instanz, Effekt-ID, Dauer s), nur IDs aus effekt_ids; und (Entity, Instanz), Effekt endet
+        self.bei_effekt: list[Callable[[int, int, int, float], None]] = []
+        self.bei_effekt_weg: list[Callable[[int, int], None]] = []
+        self.effekt_ids: set[int] = set()
         self.bei_status: list[Callable[[int, int], None]] = []  # (Ziel, Status-ID), nur IDs aus status_ids
         self.bei_groggy: list[Callable[[int], None]] = []       # Boss-Entity, deren Stagger-Leiste bricht
         self.bei_hp: list[Callable[[int], None]] = []           # eigene aktuelle HP
@@ -252,6 +264,7 @@ class RadarZustand:
             elif op in (OP_VERTRAUTE, OP_SEELE, OP_STUFE):
                 self._vertraute(op, p)
             elif op == OP_EFFEKT:
+                self._effekt(eid, p, n)
                 for sid in self.status_ids:  # Status-ID steht je nach Zaehler-Laenge 4-6 Byte nach der Entity
                     if struct.pack("<I", sid) in p[n:n + 12]:
                         for f in self.bei_status:
@@ -310,8 +323,32 @@ class RadarZustand:
                 ziel = uvarint(p, n + 7)[0] if len(p) > n + 7 else None
                 for f in self.bei_cast:
                     f(eid, skill, ziel)
+            elif op == OP_LEISTE:
+                skill = struct.unpack_from("<I", p, n + 1)[0]
+                for f in self.bei_leiste:
+                    f(eid, skill)
+            elif op == OP_WELLE:
+                quelle_laenge = uvarint(p, n + 1)[1]
+                skill = struct.unpack_from("<I", p, n + 1 + quelle_laenge)[0]
+                for f in self.bei_welle:
+                    f(eid, skill)
+            elif op == OP_EFFEKT_WEG and len(p) > n + 2:
+                instanz = uvarint(p, n + 2)[0]  # nur der erste der beendeten Effekte, wie im Plugin
+                for f in self.bei_effekt_weg:
+                    f(eid, instanz)
         except (ValueError, struct.error):
             pass  # kaputte oder unbekannte Nachricht
+
+    def _effekt(self, eid: int, p: bytes, n: int) -> None:
+        """Ein Effekt landet: Entity, 01, Flags u8, Instanz, Effekt-ID u32, Dauer i64 ms (Aufbau aus
+        dem A2Tools-Kern, capture/abnormal.rs). Nur fuer die Boss-Ansagen, nur deren Effekte."""
+        if not self.bei_effekt or p[n] != 1:
+            return
+        instanz, laenge = uvarint(p, n + 2)
+        effekt, dauer_ms = struct.unpack_from("<Iq", p, n + 2 + laenge)
+        if effekt in self.effekt_ids:
+            for f in self.bei_effekt:
+                f(eid, instanz, effekt, dauer_ms / 1000)
 
     def _spawn(self, eid: int, p: bytes, n: int) -> None:
         objekt_id = struct.unpack_from("<I", p, n + 2)[0]

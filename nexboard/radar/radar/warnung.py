@@ -1,5 +1,5 @@
-"""Boss-Warnungen: reagiert auf den Cast-Beginn (0x3802), Status-Effekte (0x382A), Treffer (0x3804)
-und die Stagger-Leiste (0xE005).
+"""Boss-Warnungen: reagiert auf Boss-Skills (0x3802), Status-Effekte (0x382A), Treffer (0x3804)
+und die Stagger-Leiste (0xE005). Die Boss-Ansagen aus dem A2Tools-Plugin stehen in ansagen.py.
 
 Feuertempel: alle Zeiten aus der Auswertung von rund 20 Kaempfen (2026-10-23), Skill-Namen aus den
 A2Tools-Daten, Ausweich-Hinweise aus dem Guide "Fire Temple Guide Aion 2 Global" (NoBS Game Guides).
@@ -19,9 +19,10 @@ from pathlib import Path
 
 from .daten import a2_namen, npc_name
 from .konfig import abspielen, konfig_laden
-from .zustand import BOSSE, MECHANIKEN
+from .zustand import BOSS_ANSAGEN, BOSSE, MECHANIKEN
 
 ALARM = Path.home() / ".cache" / "aion2-radar" / "alarm.wav"
+PIEP = Path.home() / ".cache" / "aion2-radar" / "piep.wav"  # kurz und hoch, z. B. je Welle
 ANSAGEN = Path.home() / ".cache" / "aion2-radar" / "ansagen"   # fertig gesprochene Saetze
 PIPER = Path.home() / ".local" / "share" / "aion2-radar" / "piper"  # Programm + Stimmen
 STIMMEN = {"de": "de_DE-thorsten-medium", "en": "en_US-amy-medium"}
@@ -50,6 +51,9 @@ class Regel:
     auf_dir: bool = False            # zielt der Cast auf mich, steht "DU!" im Titel
     auf: str = "du"                  # Status-Effekt zaehlt auf: du, mitspieler, spieler, boss
     hinweis_ich: str = "Weg von der Gruppe!"  # Hinweis, wenn es dich trifft
+    # Was gesprochen wird: None = der Titel; sonst diese Texte, der erste wichtig, die weiteren
+    # (Zeile des Bosses) duerfen von der naechsten Warnung abgebrochen werden; () = nichts
+    sprechen: tuple[str, ...] | None = None
 
 
 GRUEN = (0, 230, 118)
@@ -266,6 +270,8 @@ ENGLISCH = {
 }
 for _m in MECHANIKEN:  # englische Texte der Mechaniken stehen in mechaniken.json
     ENGLISCH.update(_m["en"])
+# Skills mit Boss-Ansage: dazu keine graue Lernhilfe mehr
+ANSAGE_SKILLS = {r["id"] for r in BOSS_ANSAGEN["rufe"] if r["art"] != "effekt"}
 # Lernhilfe (jeden Boss-Cast grau zeigen) gilt fuer Bosse, zu denen es noch keine Cast-Warnung gibt. Die
 # Feuertempel-Regeln oben stehen ohne Boss-IDs, ihre Bosse haben alle Cast-Warnungen.
 CAST_BOSSE = {npc for m in MECHANIKEN if m["wann"]["art"] == "cast" for npc in m["bosse"]} | {
@@ -314,12 +320,11 @@ class WarnZentrale:
     def cast(self, caster: int, skill: int, ziel: int | None) -> None:
         regel = REGELN.get(skill)
         dungeon = self.zustand.dungeon
-        if not regel and dungeon and self.zustand.bosse.get(caster, 0) not in CAST_BOSSE | {0}:
+        lernhilfe = skill not in ANSAGE_SKILLS and self.zustand.bosse.get(caster, 0) not in CAST_BOSSE | {0}
+        if not regel and lernhilfe and dungeon:
             regel = cast_regel(skill, self.zustand.bosse[caster])  # Lernhilfe: jeden Boss-Cast zeigen
-        if not regel or not self.an:
+        if not regel or not self.gruppe_an(regel.gruppe):
             return
-        if dungeon and regel.gruppe not in {*DUNGEONS[dungeon], "casts"}:
-            return  # Skill-ID aus einem anderen Dungeon
         jetzt = self.uhr()
         if skill == REGEN:
             self.regen_zuletzt = jetzt
@@ -327,6 +332,16 @@ class WarnZentrale:
         name = "" if ich or ziel == self.zustand.eigene_eid else self.zustand.spieler.get(ziel, "")
         with self.lock:
             self._ausloesen(regel, jetzt, ich, name)
+
+    def zeigen(self, regel: Regel, jetzt: float) -> None:
+        """Eine fertige Warnung von aussen (Boss-Ansagen) zeigen und sprechen."""
+        with self.lock:
+            self._ausloesen(regel, jetzt)
+
+    def gruppe_an(self, gruppe: str) -> bool:
+        """Warnungen an und die Gruppe gehoert zum erkannten Dungeon (sonst Skill-ID aus einem anderen)."""
+        dungeon = self.zustand.dungeon
+        return self.an and not (dungeon and gruppe not in {*DUNGEONS[dungeon], "casts"})
 
     def _ausloesen(self, regel: Regel, jetzt: float, ich: bool = False, name: str = "") -> None:
         """Warnung zeigen, ihre gleichzeitigen Vorhersagen dazu und die geplanten Folgen einreihen.
@@ -422,7 +437,10 @@ class WarnZentrale:
         warnung = Warnung(regel, start, ich, seit, ziel)
         self.aktiv.append(warnung)
         art = self.k["warnton"].get(regel.gruppe, "ansage")
-        if art != "aus":
+        if art == "ansage" and regel.sprechen is not None:
+            # erster Text wichtig ("ansage"), die weiteren duerfen abgebrochen werden ("zeile")
+            self.laut += [("ansage" if i == 0 else "zeile", t) for i, t in enumerate(regel.sprechen) if t]
+        elif art != "aus":
             self.laut.append((art, warnung.titel().replace(tr("  –  DU!"), tr(" auf dir"))))
 
     def schnappschuss(self) -> list[Warnung]:
@@ -489,32 +507,104 @@ def gesprochen(text: str) -> Path | None:
     return datei
 
 
-def ansage(text: str) -> None:
-    """Spricht den Text, ohne zu warten. Ohne Piper gibt es den Piepton."""
-    threading.Thread(target=lambda: abspielen(gesprochen(text) or ALARM), daemon=True).start()
+class Sprecher:
+    """Spricht nacheinander statt durcheinander, wie das A2Tools-Plugin: hoechstens zwei Saetze warten,
+    ein wichtiger Satz bricht eine noch laufende Boss-Zeile oder einen Rueckstau ab, eine weitere
+    Boss-Zeile bei vollem Stau faellt weg. Ohne Piper gibt es den Alarmton."""
+
+    def __init__(self, spielen=abspielen) -> None:
+        self.spielen = spielen  # startet das Abspielen und gibt den Prozess zurueck (oder None)
+        self.lock = threading.Lock()
+        self.warten: list[tuple[str, bool]] = []  # (Text, wichtig)
+        self.laeuft: tuple[subprocess.Popen | None, bool] | None = None  # (Prozess, wichtig)
+        self.neu = threading.Event()
+        threading.Thread(target=self._schleife, daemon=True).start()
+
+    def sagen(self, text: str, wichtig: bool = True) -> None:
+        with self.lock:
+            stau = self.warten + ([(None, self.laeuft[1])] if self.laeuft else [])
+            boss_zeile_dabei = any(not w for _, w in stau)
+            if wichtig and (len(stau) >= 2 or boss_zeile_dabei):
+                self._abbrechen()
+            elif not wichtig and len(stau) >= 2:
+                return
+            self.warten.append((text, wichtig))
+        self.neu.set()
+
+    def _abbrechen(self) -> None:
+        """Wartende Saetze verwerfen und den laufenden beenden. Aufruf unter self.lock."""
+        self.warten.clear()
+        if self.laeuft and self.laeuft[0]:
+            self.laeuft[0].terminate()
+
+    def _schleife(self) -> None:
+        while True:
+            self.neu.wait()
+            with self.lock:
+                if not self.warten:
+                    self.neu.clear()
+                    continue
+                text, wichtig = self.warten.pop(0)
+            prozess = self.spielen(gesprochen(text) or ALARM)
+            with self.lock:
+                self.laeuft = (prozess, wichtig)
+            if prozess:
+                prozess.wait()
+            with self.lock:
+                self.laeuft = None
+
+
+_SPRECHER: Sprecher | None = None
+
+
+def ansage(text: str, wichtig: bool = True) -> None:
+    """Spricht den Text ueber die gemeinsame Warteschlange, ohne zu warten."""
+    global _SPRECHER
+    if _SPRECHER is None:
+        _SPRECHER = Sprecher()
+    _SPRECHER.sagen(text, wichtig)
 
 
 def ansagen_vorbereiten() -> None:
     """Alle festen Ansagen vorab erzeugen, damit sie im Kampf sofort kommen."""
-    titel = {r.titel for r in (*REGELN.values(), *STATUS_REGELN.values(), GROGGY, WENIG_HP)} | {flamme(0).titel,
-                                                                                    REGEN_KOMMT.titel}
-    texte = [tr(t) for t in titel] + [tr(REGELN[TODESMAL].titel) + tr(" auf dir")]
+    regeln = (*REGELN.values(), *STATUS_REGELN.values(), GROGGY, WENIG_HP)
+    titel = {tr(r.titel) for r in regeln} | {tr(flamme(0).titel), tr(REGEN_KOMMT.titel)}
+    texte = [*titel, tr(REGELN[TODESMAL].titel) + tr(" auf dir"), *ansage_kurztexte(konfig_laden()["sprache"])]
     threading.Thread(target=lambda: [gesprochen(t) for t in texte], daemon=True).start()
 
 
-def alarm_abspielen() -> None:
-    if not ALARM.exists():
-        ALARM.parent.mkdir(parents=True, exist_ok=True)
+def _toene(datei: Path, toene: tuple[int, ...], laenge: float) -> Path:
+    """Wav-Datei mit diesen Toenen nacheinander (Hz, je `laenge` Sekunden), einmal erzeugt."""
+    if not datei.exists():
+        datei.parent.mkdir(parents=True, exist_ok=True)
         rate, daten = 44100, bytearray()
-        for ton in (988, 740, 988, 740):
-            for i in range(int(rate * 0.11)):
+        for ton in toene:
+            for i in range(int(rate * laenge)):
                 t = i / rate
-                huelle = min(1.0, t * 80, (0.11 - t) * 80)
+                huelle = min(1.0, t * 80, (laenge - t) * 80)
                 daten += int(0.6 * 32767 * huelle * math.sin(2 * math.pi * ton * t)).to_bytes(
                     2, "little", signed=True)
-        with wave.open(str(ALARM), "wb") as w:
+        with wave.open(str(datei), "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(rate)
             w.writeframes(bytes(daten))
-    abspielen(ALARM)
+    return datei
+
+
+def ansage_kurztexte(sprache: str) -> list[str]:
+    """Die kurzen Anweisungen der Boss-Ansagen und „Wieder angreifen“ (die langen Boss-Zeilen nicht,
+    die werden beim ersten Mal erzeugt, ca. 0,4 s)."""
+    texte = [BOSS_ANSAGEN["sicher"][sprache]]
+    for ruf in BOSS_ANSAGEN["rufe"]:
+        texte += [ruf[k][sprache] for k in ("anweisung",) if k in ruf]
+        texte += [ruf["phase"]["anzeige"][sprache]] if "phase" in ruf else []
+    return texte
+
+
+def alarm_abspielen() -> None:
+    abspielen(_toene(ALARM, (988, 740, 988, 740), 0.11))
+
+
+def piep_abspielen() -> None:
+    abspielen(_toene(PIEP, (1320,), 0.09))

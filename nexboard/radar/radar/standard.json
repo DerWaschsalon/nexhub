@@ -20,5 +20,9 @@
   "name": "",
   "karte_name": "",
   "flaeche_m": 6.0,
-  "minikarte": []
+  "minikarte": [],
+  "ansage_stil": "beides",
+  "wellen_ton": true,
+  "eigene_worte": {},
+  "ruf_aus": []
 }

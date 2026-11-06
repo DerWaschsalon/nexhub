@@ -133,7 +133,8 @@ body.edit #guides { display: block; }
 }
 .warn.blinkt { background: color-mix(in srgb, var(--farbe) 47%, transparent); }
 .warn-kopf { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
-.warn-titel { font-size: 22px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* lange Boss-Sätze umbrechen statt abschneiden */
+.warn-titel { font-size: 22px; font-weight: 700; color: #fff; overflow-wrap: anywhere; }
 .warn-zeit { font-size: 28px; font-weight: 700; color: var(--farbe); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .warn-hinweis { font-size: 13px; color: #dce4f0; }
 .warn-balken { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 4px; }

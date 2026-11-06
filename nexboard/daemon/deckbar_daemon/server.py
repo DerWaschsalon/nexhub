@@ -1041,7 +1041,8 @@ class NexBoard:
 
     async def api_radar_befehl(self, request: web.Request) -> web.Response:
         try:
-            await self.radar.befehl(str((await request.json())["befehl"]))
+            daten = await request.json()
+            await self.radar.befehl(str(daten["befehl"]), str(daten.get("ruf", "")))
         except (ValueError, KeyError, TypeError) as e:
             return web.json_response({"error": str(e) or "erwartet {befehl}"}, status=400)
         except RuntimeError as e:
