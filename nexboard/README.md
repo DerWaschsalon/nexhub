@@ -287,7 +287,27 @@ So funktioniert es: Der Daemon liefert auf Port 8766 (nur localhost) die Overlay
 kleinen Ersatz für Tauris JavaScript-API davor (`web/a2shim.js`). Daten-Befehle gehen an
 `deckbar-capture` (`a2ui.py`), Fenster-Befehle an die Overlay-Seite bzw. das Programm. Die
 Einstellungen der Meter-Oberfläche liegen in `~/.config/deckbar/a2-settings.json`. Nicht dabei sind
-die Online-Funktionen, Plugins und die eigenen globalen Tastenkürzel des Meters.
+die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters.
+
+**A2Tools-Plugins** laufen ohne das Meter-Programm: In den Meter-Einstellungen unter „Plugins“
+installieren (signierter Katalog von cdn.a2tools.app, Ed25519, Zustimmung zu den Berechtigungen). Der
+Plugin-Host ist `daemon/deckbar_daemon/plugins.py`, ein Nachbau des Hosts aus dem Submodul; die Seiten
+kommen unverändert von dort. Hauptfenster sind normale Fenster des Overlay-Programms (damit die Tastatur
+geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefert
+`capture/src/plugins.rs`. Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
+in `plugin-data/` daneben. Plugins laufen, solange das Overlay läuft, also mit dem Spiel. Anders als im
+Meter: kein Dock, keine FPS-Anzeige (zählt nur unter Windows), keine Entwickler-Ordner, die Option
+„ausblenden“ wirkt nur über das Overlay selbst, Widgets nur mit layer-shell. Plugin-API bis Version 2;
+ein Plugin mit neuerer API wird abgelehnt, dann `API_VERSION` und den Host nachziehen.
+
+**Radar-Widget:** Karte, Cubes, Vertraute und Würfel stecken in einem Widget (`web/overlay/radar.js`), das
+frühere Widget „Karte“ geht darin auf. Pet Soul Tracker und Dice Rolls laufen dort statt im eigenen Fenster
+(`EMBEDDED` in `plugins.py`). Der Pet Soul Tracker ist fest eingebaut (`BUILTIN`): Das NexBoard installiert und
+aktualisiert ihn selbst aus dem signierten Katalog (beim ersten Start also mit Netz), er steht in keiner
+Plugin-Liste und lässt sich nicht ausschalten. Ein Update, das neue Berechtigungen will, bleibt liegen, bis
+jemand es prüft. Die Karte nutzt seine `MiniMap` und Kartenbilder und
+zeichnet darüber, was nur das Radar kennt. Tippen geht dort nur im Bearbeiten-Modus, sonst hat das Overlay
+keine Tastatur.
 
 **Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die NexBoard stattdessen dessen
 Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent Events). Dafür im

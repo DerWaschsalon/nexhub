@@ -36,6 +36,16 @@ Window {
         function ready() { host.pageReady() }
         function call(cmd, json) { return host.call(cmd, json) }
         function log(s) { host.log(s) }
+        function watchPointer() { host.watchPointer() }
+        signal pointerMoved(real x, real y)
+        signal pointerReleased()
+    }
+
+    // Plugin-Widget ziehen: Mausbewegungen an die Seite (LayerHost.watchPointer)
+    Connections {
+        target: host
+        function onPointerMoved(x, y) { bridge.pointerMoved(x, y) }
+        function onPointerReleased() { bridge.pointerReleased() }
     }
 
     WebChannel {

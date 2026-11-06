@@ -9,6 +9,7 @@ import time
 from collections import deque
 from pathlib import Path
 
+from . import minikarte
 from .ansagen import Ansagen
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
@@ -20,6 +21,9 @@ from .zustand import Cube, RadarZustand
 
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
 
+
+MINIKARTE_S = 0.2  # so oft die Minikarte lesen (ca. 5 ms je Bild), so oft wie der Stand ans Overlay geht
+BLICK_GILT_S = 2.0  # so lange nach dem letzten Blick aus der Minikarte zählt die Laufrichtung nicht
 
 class RadarDienst:
     def __init__(self, name: str = "", spawn_log: Path | None = LOG) -> None:
@@ -42,6 +46,7 @@ class RadarDienst:
         self.zustand.effekt_ids = self.ansagen.effekte
         self.zustand.bei_status.append(self.zentrale.status)
         self.zustand.bei_groggy.append(self.zentrale.groggy)
+        self.zustand.bei_hp.append(self.zentrale.hp)
         self.zustand.bei_staggern.append(self.zentrale.staggern)
         self.zustand.bei_treffer.append(self.zentrale.treffer)
         self.zustand.bei_gruppe_lp.append(self.zentrale.gruppe_lp)
@@ -55,6 +60,7 @@ class RadarDienst:
         self._dungeon: str | None = None
         self._gemeldet: set = set()  # Feldboss-Ansagen, die schon kamen
         self._sekunde = 0
+        self._karte_gelesen = 0.0
 
     def starten(self) -> None:
         ansagen_vorbereiten()
@@ -131,6 +137,7 @@ class RadarDienst:
             self._ton_faellig = False
             if self.k["ton"]:
                 ton_abspielen()
+        self._blickrichtung()
         self.ansagen.takt()  # abgelaufene Phasen: „Wieder angreifen“
         self.zentrale.schnappschuss()  # holt faellige Vorhersagen nach vorn, auch ohne Overlay
         while self.zentrale.laut:
@@ -141,6 +148,19 @@ class RadarDienst:
                 piep_abspielen()  # kurzer Ton je Welle (Boss-Ansagen)
             else:
                 alarm_abspielen()
+
+    def _blickrichtung(self) -> None:
+        """Blickrichtung aus der Minikarte (Einstellung minikarte = [x, y, Breite, Hoehe]), fünfmal pro
+        Sekunde. Sie ersetzt die Laufrichtung aus zwei Positionen, die beim normalen Laufen fehlt."""
+        bereich = self.k["minikarte"]
+        if len(bereich) != 4 or time.time() - self._karte_gelesen < MINIKARTE_S:
+            return
+        self._karte_gelesen = time.time()
+        bild = minikarte.lesen(bereich)
+        grad = minikarte.blickrichtung(bild) if bild is not None else None
+        if grad is not None:
+            self.zustand.kurs = minikarte.kurs(grad)
+            self.zustand.blick_bis = time.time() + BLICK_GILT_S
 
     # --- fuer das Overlay -------------------------------------------------
 

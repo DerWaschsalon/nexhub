@@ -304,8 +304,10 @@ class Run:
         return dungeon_name(self.dungeon)
 
     def rename(self, names: dict[str, str]) -> None:
-        """Maskierte Namen beim Auswerten durch bekannte echte ersetzen (die Kämpfe bleiben unverändert)."""
-        self.names = dict(names)
+        """Maskierte Namen beim Auswerten durch bekannte echte ersetzen (die Kämpfe bleiben unverändert).
+        Nur Spieler dieses Runs: alle je gesehenen Namen sprengen die Grenze von 500 im NexLog."""
+        keys = {p.key for f in self.fights for p in f.players}
+        self.names = {k: v for k, v in names.items() if k in keys}
 
     def _display(self, p: Player) -> str:
         return self.names.get(p.key, p.name) if "*" in p.name else p.name

@@ -6,7 +6,8 @@
   "meldung_aus": [],
   "warnton": {
     "schwert": "aus",
-    "casts": "aus"
+    "casts": "aus",
+    "zikel_angriffe": "aus"
   },
   "sprache": "de",
   "meldungen_dungeon": "Feuertempel",
@@ -19,6 +20,7 @@
   "name": "",
   "karte_name": "",
   "flaeche_m": 6.0,
+  "minikarte": [],
   "ansage_stil": "beides",
   "wellen_ton": true,
   "eigene_worte": {},

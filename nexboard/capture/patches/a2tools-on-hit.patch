@@ -11,14 +11,13 @@ index c9b7944..8ec2d86 100644
      /// Buffs, debuffs and stats as the server reports them (see
      /// `capture::abnormal`). Recorded only, nothing reads it into a fight
      /// yet. Its own lock: it is fed every packet, and nothing here needs it
-@@ -831,6 +833,7 @@ impl DataStorage {
+@@ -831,5 +833,6 @@ impl DataStorage {
              last_zone_reset_ms: AtomicI64::new(NEVER_MS),
              combat_reset_requested: AtomicBool::new(false),
              before_reset: RwLock::new(None),
 +            on_hit: RwLock::new(None),
              abnormals: Mutex::new(AbnormalLog { timeline: abnormal::Timeline::default(), pruned_ms: NEVER_MS }),
              stagger: Mutex::new(StaggerLog::default()),
-         }
 @@ -1020,6 +1023,20 @@ impl DataStorage {
          *self.before_reset.write() = Some(Arc::new(hook));
      }

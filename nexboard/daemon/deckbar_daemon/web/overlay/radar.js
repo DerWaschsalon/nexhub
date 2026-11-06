@@ -1,11 +1,16 @@
-/* Modul AION 2 · Radar im Overlay: Radar, Boss-Warnungen und Karte. Die Daten kommen als
+/* Modul AION 2 · Radar im Overlay: das Radar-Widget und die Boss-Warnungen. Die Daten kommen als
  * Overlay-Ereignis „radar“ (RadarDienst im Daemon, etwa fünfmal pro Sekunde). Läuft vor overlay.js
  * und nutzt dessen Layout und Modus erst beim Aufruf (cfg, W, mode, regionsSoon).
  *
- * Radar:      zeigt sich nur, solange ein Cube in Sicht ist
- * Warnungen:  nur, solange eine läuft oder eine Vorhersage ansteht
- * Karte:      ziehen = verschieben, Mausrad = Zoom (um die eigene Position, wenn bekannt),
- *             Doppelklick = wieder der eigenen Position folgen */
+ * Radar:      ein Widget für alles, drei Reiter:
+ *   Karte      Karte und Monster des fest eingebauten Pet Soul Trackers (seine MiniMap,
+ *              seine Szene kommt als Widget-Nachricht), darüber Cubes, Spawnpunkte, Fundorte und
+ *              Teleporter. Du bist ein Pfeil in Blickrichtung (radar.kurs), ohne bekannte Richtung ein
+ *              Punkt. Ziehen = verschieben, Mausrad = Zoom, Doppelklick = wieder dir folgen.
+ *              Der Radarkreis erscheint, solange ein Cube in Sicht ist.
+ *   Vertraute  die Seite des Pet Soul Trackers (tippen nur im Bearbeiten-Modus: sonst keine Tastatur)
+ *   Würfel     die Seite von Dice Rolls; eine laufende Würfelkarte steht über jedem Reiter
+ * Warnungen:  nur, solange eine läuft oder eine Vorhersage ansteht */
 "use strict";
 
 const FARBE = {
@@ -18,8 +23,8 @@ const RADAR_PX = 260;
 const SYMBOL_PX = 20; // Teleporter-Symbol, bleibt beim Zoomen gleich groß
 
 let radar = { aktiv: false };
-const karte = { daten: null, bild: null, symbol: null, schluessel: "", laedt: false, zoom: 1, versatz: [0, 0],
-  folgen: false, folgenEinstellung: null, ziehen: null };
+const karte = { daten: null, symbol: null, schluessel: "", laedt: false, gemalt: null, map: null, szene: null,
+  folgenEinstellung: null };
 
 /** Vom Daemon: neuer Stand (oder {aktiv: false}, wenn das Spiel weg ist). */
 function onRadar(stand) {
@@ -91,7 +96,7 @@ function aufSchirm(dx, dy) {
 
 function zeichneRadar() {
   const cubes = radar.aktiv ? radar.cubes : [];
-  W.radar.classList.toggle("idle", !cubes.length && mode !== "edit");
+  document.getElementById("radar-bild").hidden = !cubes.length;
   const c = leinwand(document.getElementById("radar-bild"), RADAR_PX, RADAR_PX);
   const m = RADAR_PX / 2;
   const r = m - 4;
@@ -229,35 +234,14 @@ function warnKasten(w) {
 }
 
 /* ================================================================ Karte */
+const PLUGIN_DATEIEN = "/__a2plugin__/pet-souls/";
 const geeicht = () => !!karte.daten?.m;
 
-function weltZuBild(x, y) {
+/** Teleporter und Fundorte sind in Bild-Koordinaten der eigenen Karte: zurück in die Welt. */
+function bildZuWelt(u, v) {
   const [a, b, c, d, e, f] = karte.daten.m;
-  return [a * x + b * y + c, d * x + e * y + f];
-}
-
-function kartenFlaeche() {
-  const el = document.getElementById("karte-bild");
-  return [el.clientWidth, el.clientHeight];
-}
-
-function bildZuSchirm(u, v) {
-  const [w, h] = kartenFlaeche();
-  return [w / 2 + (u - karte.versatz[0]) * karte.zoom, h / 2 + (v - karte.versatz[1]) * karte.zoom];
-}
-
-function schirmZuBild(x, y) {
-  const [w, h] = kartenFlaeche();
-  return [karte.versatz[0] + (x - w / 2) / karte.zoom, karte.versatz[1] + (y - h / 2) / karte.zoom];
-}
-
-function bildLaden(url) {
-  return new Promise((ok) => {
-    const img = new Image();
-    img.onload = () => ok(img);
-    img.onerror = () => ok(null);
-    img.src = url;
-  });
+  const det = a * e - b * d;
+  return [(e * (u - c) - b * (v - f)) / det, (a * (v - f) - d * (u - c)) / det];
 }
 
 /** Kartendaten neu holen, wenn eine andere Karte gewählt ist oder neue Spawnpunkte dazukamen. */
@@ -267,14 +251,12 @@ async function karteLaden() {
   karte.laedt = true;
   try {
     const daten = await (await fetch("/api/radar/karte")).json();
-    const andere = daten.name !== karte.daten?.name;
     karte.daten = daten;
     karte.schluessel = schluessel;
-    if (andere) {
-      const name = encodeURIComponent(daten.name);
-      karte.bild = daten.name ? await bildLaden(`/api/radar/karte/bild?karte=${name}`) : null;
-      karte.symbol = daten.symbol ? await bildLaden(`/api/radar/karte/symbol?karte=${name}`) : null;
-      einpassen();
+    if (daten.symbol && daten.name) {
+      const img = new Image();
+      img.onload = () => { karte.symbol = img; };
+      img.src = `/api/radar/karte/symbol?karte=${encodeURIComponent(daten.name)}`;
     }
   } catch (e) {
     log(`Karte nicht geladen: ${e}`);
@@ -283,65 +265,171 @@ async function karteLaden() {
   }
 }
 
-function einpassen() {
-  if (!karte.bild) return;
-  const [w, h] = kartenFlaeche();
-  karte.versatz = [karte.bild.width / 2, karte.bild.height / 2];
-  karte.zoom = Math.min(w / karte.bild.width, h / karte.bild.height) || 1;
+function skriptLaden(url) {
+  return new Promise((ok, fehler) => {
+    const s = document.createElement("script");
+    s.src = url;
+    s.onload = ok;
+    s.onerror = fehler;
+    document.head.append(s);
+  });
+}
+
+/** MiniMap und Karten kommen aus dem installierten Pet Soul Tracker, nichts davon liegt hier doppelt. */
+function miniKarteStarten() {
+  karte.start ||= miniKarteLaden();
+  return karte.start;
+}
+
+async function miniKarteLaden() {
+  try {
+    await skriptLaden(`${PLUGIN_DATEIEN}maps.js`);
+    await skriptLaden(`${PLUGIN_DATEIEN}minimap.js`);
+  } catch {
+    return false;
+  }
+  const bilder = document.getElementById("karte-bilder");
+  for (const id of Object.keys(PET_MAPS)) {
+    const img = document.createElement("img");
+    img.className = "mapPic";
+    img.dataset.map = id;
+    img.loading = "lazy";
+    img.src = `${PLUGIN_DATEIEN}maps/${id}.webp`;
+    bilder.append(img);
+  }
+  const $ = (id) => document.getElementById(id);
+  karte.map = new PetMiniMap.MiniMap(
+    { canvas: $("karte-bild"), zoomIn: $("karte-rein"), zoomOut: $("karte-raus"), follow: $("karte-folgen"), note: $("karte-notiz") },
+    { onZoom: (zoom) => szeneAntwort({ zoom }) },
+  );
+  const malen = karte.map.draw.bind(karte.map);
+  // Die MiniMap kennt als Figur nur ihren Punkt: Sie bekommt keine, folgt dir hier und der Pfeil kommt in radarEbene
+  karte.map.draw = () => {
+    const m = karte.map;
+    const folgt = m.follow;
+    if (folgt && karte.ich) {
+      karteGleiten(karte.ich.pos);
+      m.follow = false;
+    }
+    malen();
+    m.follow = folgt;
+    $("karte-folgen").hidden = folgt;
+    radarEbene();
+  };
+  karte.map.set({});
+  return true;
+}
+
+function karteNachInstallation() {
+  if (karte.map) return;
+  karte.start = null;
+  miniKarteStarten().then((ok) => { if (ok) szeneAntwort({ hello: true }); });
+}
+
+/** Sanft zur Position, ein Teleport springt (wie #glideTo der MiniMap). */
+function karteGleiten(ziel) {
+  const m = karte.map;
+  if (!m.center || Math.hypot(ziel[0] - m.center[0], ziel[1] - m.center[1]) > 50_000) {
+    m.center = [ziel[0], ziel[1]];
+    return;
+  }
+  m.center = [m.center[0] + (ziel[0] - m.center[0]) * 0.35, m.center[1] + (ziel[1] - m.center[1]) * 0.35];
+  if (Math.hypot(ziel[0] - m.center[0], ziel[1] - m.center[1]) > m.zoom * 50 && !karte.gleitet) {
+    karte.gleitet = requestAnimationFrame(() => {
+      karte.gleitet = 0;
+      m.draw();
+    });
+  }
+}
+
+function szeneAntwort(data) {
+  return fetch("/api/a2/invoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd: "plugin_widget_post", args: { data }, window: "widget:pet-souls:map" }),
+  }).catch(() => {});
+}
+
+/** Vom Pet Soul Tracker: was er auf seine Karte zeichnen würde (plugins.js fängt es ab). */
+function karteSzene(szene) {
+  if (!szene || typeof szene !== "object") return;
+  if (!karte.szene && szene.zoom != null) karte.map?.setZoom(szene.zoom);
+  karte.szene = szene;
+  karteAktualisieren();
+}
+
+/** Die Karte, auf der wir sind: die des Plugins, sonst die eingestellte des Radars. */
+function aktuelleKarte() {
+  if (karte.szene?.mapId) return karte.szene.mapId;
+  if (typeof PET_MAPS === "undefined" || !radar.karte) return null;
+  return Object.keys(PET_MAPS).find((id) => PET_MAPS[id].name === radar.karte) || null;
 }
 
 function karteAktualisieren() {
-  W.karte.classList.toggle("idle", !radar.aktiv && mode !== "edit");
-  if (!radar.aktiv || !cfg("karte").enabled) return;
-  karteLaden();
-  const folgen = radar.einstellungen.karte_folgen;
-  if (folgen !== karte.folgenEinstellung) { // auf der NexBoard-Seite umgestellt
-    karte.folgenEinstellung = folgen;
-    karte.folgen = folgen;
-  }
-  if (karte.folgen && geeicht() && radar.position) karte.versatz = weltZuBild(...radar.position);
-  zeichneKarte();
-}
-
-function zeichneKarte() {
-  const [w, h] = kartenFlaeche();
-  const c = leinwand(document.getElementById("karte-bild"), w, h);
-  const d = karte.daten;
-  document.getElementById("karte-name").textContent = d?.name || "Karte";
-  if (!karte.bild) {
-    schrift(c, "Noch keine Karte", w / 2, h / 2 - 9, FARBE.leise, 12);
-    schrift(c, "python3 -m werkzeuge.cubekarte (in nexboard/radar)", w / 2, h / 2 + 9, FARBE.leise, 11);
-    document.getElementById("karte-status").textContent = "";
+  if (!radar.aktiv && !karte.szene) return;
+  if (radar.aktiv) karteLaden();
+  const m = karte.map;
+  if (!m) {
+    miniKarteStarten().then((ok) => {
+      if (ok) karteAktualisieren();
+      else document.getElementById("karte-name").textContent = "Karte wird geladen …";
+    });
     return;
   }
-  const [ox, oy] = bildZuSchirm(0, 0);
-  c.drawImage(karte.bild, ox, oy, karte.bild.width * karte.zoom, karte.bild.height * karte.zoom);
-  c.fillStyle = FARBE.fundort; // bekannte Cube-Fundorte (aion2hub)
-  for (const [u, v] of d.fundorte) {
-    kreis(c, ...bildZuSchirm(u, v), 3.5);
-    c.fill();
+  const folgen = radar.einstellungen?.karte_folgen;
+  if (folgen !== karte.folgenEinstellung) { // auf der NexBoard-Seite umgestellt
+    karte.folgenEinstellung = folgen;
+    m.follow = !!folgen;
   }
-  if (karte.symbol) {
-    for (const [, u, v] of d.teleporter) {
-      const [x, y] = bildZuSchirm(u, v);
-      c.drawImage(karte.symbol, x - SYMBOL_PX / 2, y - SYMBOL_PX / 2, SYMBOL_PX, SYMBOL_PX);
-    }
-  }
-  document.getElementById("karte-status").textContent = geeicht()
-    ? `${d.punkte.length} Spawnpunkte · ${radar.cubes.length} aktiv` : "nicht geeicht";
-  if (geeicht()) zeichneKartenInhalt(c);
+  const s = karte.szene || {};
+  // Das Radar kennt die Position meist früher und genauer als die Szene
+  karte.ich = radar.position
+    ? { pos: radar.position, at: Date.now() - (radar.position_alter || 0) * 1000, estimated: false }
+    : s.you || null;
+  m.set({ mapId: aktuelleKarte(), you: null, wanted: s.wanted || [], others: s.others || [],
+    spawnColours: s.spawnColours || {}, labels: s.labels || {} });
+  document.getElementById("karte-name").textContent = s.title || radar.karte || "";
+  const teile = [];
+  if (s.count) teile.push(s.count);
+  if (karte.daten?.punkte?.length) teile.push(`${karte.daten.punkte.length} Spawnpunkte`);
+  document.getElementById("karte-status").textContent = teile.join(" · ");
 }
 
-function zeichneKartenInhalt(c) {
-  c.lineWidth = 1.6;
-  for (const [x, y, quelle] of karte.daten.punkte) { // gesehene Spawnpunkte
-    c.strokeStyle = quelle === "radar" ? FARBE.punktRadar : FARBE.punktHand;
-    kreis(c, ...bildZuSchirm(...weltZuBild(x, y)), 4.5);
-    c.stroke();
+/** Über dem Bild der MiniMap: was nur das Radar kennt. Gleiche Rechnung wie MiniMap.draw. */
+function radarEbene() {
+  const m = karte.map;
+  const el = document.getElementById("karte-bild");
+  if (!m?.center || !el.isConnected) return;
+  const w = el.clientWidth || 300;
+  const h = el.clientHeight || 220;
+  const proPixel = m.zoom * 100;
+  const schirm = (x, y) => [w / 2 + (x - m.center[0]) / proPixel, h / 2 + (y - m.center[1]) / proPixel];
+  const c = el.getContext("2d");
+  const eigeneKarte = karte.daten && PET_MAPS[m.scene.mapId]?.name === karte.daten.name && geeicht();
+  karte.gemalt = [];
+  if (eigeneKarte) {
+    c.fillStyle = FARBE.fundort;
+    for (const [u, v] of karte.daten.fundorte || []) {
+      kreis(c, ...schirm(...bildZuWelt(u, v)), 3.5);
+      c.fill();
+    }
+    c.lineWidth = 1.6;
+    for (const [x, y, quelle] of karte.daten.punkte || []) {
+      c.strokeStyle = quelle === "radar" ? FARBE.punktRadar : FARBE.punktHand;
+      kreis(c, ...schirm(x, y), 4.5);
+      c.stroke();
+    }
+    if (karte.symbol) {
+      for (const [name, u, v] of karte.daten.teleporter || []) {
+        const [x, y] = schirm(...bildZuWelt(u, v));
+        c.drawImage(karte.symbol, x - SYMBOL_PX / 2, y - SYMBOL_PX / 2, SYMBOL_PX, SYMBOL_PX);
+        karte.gemalt.push([name, x, y]);
+      }
+    }
   }
   const puls = 0.5 + 0.5 * Math.sin(Date.now() / 200);
-  for (const cube of radar.cubes) {
-    const [x, y] = bildZuSchirm(...weltZuBild(cube.x, cube.y));
+  for (const cube of radar.aktiv ? radar.cubes || [] : []) {
+    const [x, y] = schirm(cube.x, cube.y);
     c.fillStyle = `rgba(255, 82, 82, ${(60 + 80 * puls) / 255})`;
     kreis(c, x, y, 9 + 4 * puls);
     c.fill();
@@ -349,72 +437,144 @@ function zeichneKartenInhalt(c) {
     kreis(c, x, y, 5);
     c.fill();
   }
-  if (radar.position) {
-    const [x, y] = bildZuSchirm(...weltZuBild(...radar.position));
-    c.globalAlpha = radar.position_alter > 30 ? 0.45 : 1; // veraltet
-    c.fillStyle = FARBE.ich;
-    c.strokeStyle = "rgba(255, 255, 255, .8)";
+  if (karte.ich) eigeneFigur(c, ...schirm(karte.ich.pos[0], karte.ich.pos[1]));
+}
+
+/** Du: ein Pfeil in Blickrichtung, sonst ein Punkt (veraltet blass). Geschätzt mit dem gestrichelten Kreis des Originals. */
+function eigeneFigur(c, x, y) {
+  const ich = karte.ich;
+  c.save();
+  // Stehst du still, altert die Position, die Blickrichtung aber nicht: Mit Richtung bleibt der Pfeil kräftig
+  c.globalAlpha = !radar.kurs && !ich.estimated && Date.now() - ich.at > 15_000 ? 0.5 : 1;
+  if (ich.estimated) {
+    c.setLineDash([4, 3]);
+    c.fillStyle = "rgba(255, 224, 102, .12)";
+    c.strokeStyle = "rgba(255, 224, 102, .85)";
     c.lineWidth = 1.5;
-    kreis(c, x, y, 5.5);
+    kreis(c, x, y, Math.max(18, 25 / karte.map.zoom));
     c.fill();
     c.stroke();
-    c.globalAlpha = 1;
+    c.setLineDash([]);
   }
+  c.fillStyle = "rgba(255, 255, 255, .18)";
+  kreis(c, x, y, 14);
+  c.fill();
+  c.translate(x, y);
+  c.lineJoin = "round";
+  c.strokeStyle = "#14161e";
+  c.lineWidth = 2.5;
+  c.fillStyle = "#ffe066";
+  if (radar.kurs) {
+    // Karte: Norden oben, Welt +x rechts, Welt +y unten. Also im Uhrzeigersinn von Norden
+    c.rotate(Math.atan2(radar.kurs[0], -radar.kurs[1]));
+    c.beginPath();
+    c.moveTo(0, -14);
+    c.lineTo(9, 10);
+    c.lineTo(0, 5);
+    c.lineTo(-9, 10);
+    c.closePath();
+    c.stroke();
+    c.fill();
+  } else {
+    kreis(c, 0, 0, 6);
+    c.stroke();
+    c.fill();
+  }
+  c.restore();
 }
 
 function teleporterTipp(e) {
   const tipp = document.getElementById("karte-tipp");
-  const el = document.getElementById("karte-bild");
-  const r = el.getBoundingClientRect();
-  const s = cfg("karte").scale || 1;
+  const r = document.getElementById("karte-bild").getBoundingClientRect();
+  const s = cfg("radar").scale || 1;
   const [mx, my] = [(e.clientX - r.left) / s, (e.clientY - r.top) / s];
-  const treffer = karte.symbol && karte.daten.teleporter.find(([, u, v]) => {
-    const [x, y] = bildZuSchirm(u, v);
-    return Math.abs(x - mx) <= SYMBOL_PX / 2 && Math.abs(y - my) <= SYMBOL_PX / 2;
-  });
+  const treffer = (karte.gemalt || []).find(([, x, y]) => Math.abs(x - mx) <= SYMBOL_PX / 2 && Math.abs(y - my) <= SYMBOL_PX / 2);
   tipp.hidden = !treffer;
   if (!treffer) return;
   tipp.textContent = treffer[0];
-  tipp.style.left = `${el.offsetLeft + mx + 12}px`;
-  tipp.style.top = `${el.offsetTop + my + 12}px`;
+  tipp.style.left = `${mx + 12}px`;
+  tipp.style.top = `${my + 12}px`;
 }
 
-/** Maus auf der Karte; im Bearbeiten-Modus verschiebt overlay.js das ganze Widget. */
-function radarStart() {
-  const el = document.getElementById("karte-bild");
-  const s = () => cfg("karte").scale || 1;
-  el.addEventListener("pointerdown", (e) => {
-    if (mode === "edit" || e.button !== 0 || !karte.bild) return;
-    el.setPointerCapture(e.pointerId);
-    karte.ziehen = { x: e.clientX, y: e.clientY, versatz: [...karte.versatz] };
-  });
-  el.addEventListener("pointermove", (e) => {
-    if (!karte.ziehen) return teleporterTipp(e);
-    const z = karte.ziehen;
-    // Zittern beim Klicken ist kein Ziehen und soll das Folgen nicht beenden
-    z.bewegt ||= Math.hypot(e.clientX - z.x, e.clientY - z.y) > 4;
-    if (!z.bewegt) return;
-    karte.folgen = false;
-    karte.versatz = [z.versatz[0] - (e.clientX - z.x) / s() / karte.zoom, z.versatz[1] - (e.clientY - z.y) / s() / karte.zoom];
-    zeichneKarte();
-  });
-  el.addEventListener("pointerup", () => { karte.ziehen = null; });
-  el.addEventListener("dblclick", () => {
-    if (mode === "edit") return;
-    karte.folgen = true;
-    karteAktualisieren();
-  });
-  el.addEventListener("wheel", (e) => {
-    if (mode === "edit" || !karte.bild) return;
+/* ================================================================ Reiter */
+const EINGEBETTET = { "pet-souls": "vertraute", "dice-rolls": "wuerfel" };
+
+function reiterZeigen(name) {
+  W.radar.classList.remove("gefaltet");
+  for (const b of W.radar.querySelectorAll("[data-reiter]")) b.classList.toggle("an", b.dataset.reiter === name);
+  for (const s of W.radar.querySelectorAll("[data-seite]")) s.classList.toggle("an", s.dataset.seite === name);
+  try { localStorage.setItem("radar-reiter", name); } catch {}
+  karte.map?.draw();
+  regionsSoon();
+}
+
+/** Die Seiten der beiden Plugins laufen hier, auch im verdeckten Reiter (Seelen zählen weiter). */
+function eingebetteteLaden(ids) {
+  for (const [plugin, seite] of Object.entries(EINGEBETTET)) {
+    const ort = W.radar.querySelector(`[data-seite="${seite}"]`);
+    const da = ort.querySelector("iframe");
+    if (ids.includes(plugin) && !da) {
+      const f = document.createElement("iframe");
+      f.src = `/plugin-host.html?plugin=${plugin}`;
+      ort.replaceChildren(f);
+    } else if (!ids.includes(plugin)) {
+      da?.remove();
+      if (!ort.firstChild) ort.textContent = "";
+    }
+  }
+}
+
+/** Griff unten rechts: Breite und Höhe frei ziehen (das Mausrad im Bearbeiten-Modus skaliert dagegen alles). */
+function griffStarten() {
+  const griff = document.getElementById("radar-griff");
+  griff.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    // Zoom um die eigene Position, solange sie bekannt ist, sonst um den Punkt unter der Maus
-    const r = el.getBoundingClientRect();
-    const anker = geeicht() && radar.position ? bildZuSchirm(...weltZuBild(...radar.position))
-      : [(e.clientX - r.left) / s(), (e.clientY - r.top) / s()];
-    const unter = schirmZuBild(...anker);
-    karte.zoom = Math.max(0.05, Math.min(8, karte.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
-    const neu = schirmZuBild(...anker);
-    karte.versatz = [karte.versatz[0] + unter[0] - neu[0], karte.versatz[1] + unter[1] - neu[1]];
-    zeichneKarte();
-  }, { passive: false });
+    e.stopPropagation(); // sonst zieht der Bearbeiten-Modus das ganze Widget
+    const c = cfg("radar");
+    const s = c.scale || 1;
+    const start = { x: e.clientX, y: e.clientY, w: c.width, h: c.height };
+    griff.setPointerCapture(e.pointerId);
+    dragging = true;
+    const ziehen = (ev) => {
+      c.width = Math.round(Math.max(300, Math.min(2000, innerWidth / s, start.w + (ev.clientX - start.x) / s)));
+      c.height = Math.round(Math.max(220, Math.min(1600, innerHeight / s, start.h + (ev.clientY - start.y) / s)));
+      place(W.radar);
+    };
+    const los = () => {
+      griff.removeEventListener("pointermove", ziehen);
+      dragging = false;
+      regionsSoon();
+      saveSoon();
+    };
+    griff.addEventListener("pointermove", ziehen);
+    griff.addEventListener("pointerup", los, { once: true });
+    griff.addEventListener("pointercancel", los, { once: true });
+  });
+  new ResizeObserver(() => karte.map?.draw()).observe(document.getElementById("karte-bild"));
+}
+
+function radarStart() {
+  griffStarten();
+  for (const b of W.radar.querySelectorAll("[data-reiter]")) b.addEventListener("click", () => reiterZeigen(b.dataset.reiter));
+  document.getElementById("radar-falten").addEventListener("click", () => {
+    W.radar.classList.toggle("gefaltet");
+    try { localStorage.setItem("radar-falten", W.radar.classList.contains("gefaltet") ? "1" : ""); } catch {}
+    regionsSoon();
+  });
+  try {
+    reiterZeigen(localStorage.getItem("radar-reiter") || "karte");
+    if (localStorage.getItem("radar-falten")) W.radar.classList.add("gefaltet");
+  } catch {}
+  document.getElementById("karte-bild").addEventListener("pointermove", teleporterTipp);
+  document.getElementById("karte-quelle").addEventListener("click", (e) => {
+    e.preventDefault();
+    window.__DECKBAR_OVERLAY__.hostCall("open_url", { url: e.currentTarget.href }).catch(() => {});
+  });
+  miniKarteStarten().then((ok) => {
+    if (ok) szeneAntwort({ hello: true });
+    else document.getElementById("karte-name").textContent = "Karte wird geladen …";
+  });
+  // Cubes pulsieren: auch ohne neue Daten neu zeichnen, solange einer da ist
+  setInterval(() => { if (radar.aktiv && radar.cubes?.length) karte.map?.draw(); }, 100);
 }

@@ -1,6 +1,7 @@
 {
   "alle": {
     "groggy": "Boss groggy (alle Dungeons)",
+    "hp": "Wenig HP: heilen (alle Dungeons)",
     "gruppe_lp": "Mitspieler mit wenig LP (alle Dungeons)",
     "flaeche": "Bodenfläche bei dir (alle Dungeons)"
   },
@@ -25,6 +26,8 @@
       "auldor_sturz": "Auldor: Sturzschlag",
       "auldor_rundum": "Auldor: Linien rundum (Hard)",
       "auldor_wirbel": "Auldor: Wirbel-Phase",
+      "raur_bombe": "Raur: Zeitbombe (auf dir)",
+      "auldor_mitte": "Auldor: Mitte-Phase und Sturmstreich",
       "casts": "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)",
       "ansage_divine_auldor": "Heiliger Auldor: Ansagen",
       "ansage_guardian_captain_raur": "Hüterhauptmann Raur: Ansagen"
@@ -53,6 +56,13 @@
       "ansage_broodkeeper_nayatman": "Brutpflegerin Nayatman: Ansagen",
       "ansage_decaying_durvati": "Korrumpierte Durvati: Ansagen",
       "ansage_manager_nasium": "Verwalter Nasium: Ansagen"
+    },
+    "Albtraum": {
+      "zikel_schlag": "Zikel: Blutschlag",
+      "zikel_springen": "Zikel: Boden zerschmettern",
+      "zikel_linien": "Zikel: Linienphase und Donut",
+      "zikel_angriffe": "Zikel: weitere Schläge (grau, ohne Ton)",
+      "blutung": "Blutung (auf dir)"
     },
     "Deus Research Base": {
       "nazmun_bombe": "Nazmun: Bombe",

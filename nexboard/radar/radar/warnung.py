@@ -48,6 +48,7 @@ class Regel:
     gruppe: str                      # neue Warnung ersetzt aeltere derselben Gruppe
     danach: tuple["Regel", ...] = ()  # gleichzeitig ausgeloeste Vorhersagen
     plan: tuple[tuple[float, "Regel"], ...] = ()  # (Sekunden spaeter, Regel)
+    auf_dir: bool = False            # zielt der Cast auf mich, steht "DU!" im Titel
     auf: str = "du"                  # Status-Effekt zaehlt auf: du, mitspieler, spieler, boss
     hinweis_ich: str = "Weg von der Gruppe!"  # Hinweis, wenn es dich trifft
     # Was gesprochen wird: None = der Titel; sonst diese Texte, der erste wichtig, die weiteren
@@ -95,13 +96,63 @@ SCHWERT = Regel("Schwert", "Hinter sie gehen", 1.0, GRAU, "schwert")
 for _skill in (1801030, 1801040, 1801050, 1801060, 1801080, 1801090):
     REGELN[_skill] = SCHWERT
 
+# Albtraum, Zikels Schemen (2980221). Ausgewertet 2026-10-25 an 5 Kaempfen, Ablauf nach dem Guide
+# "Zikel's Apparition Guide" (NoBS Game Guides). Skill-Namen fehlen in den A2Tools-Daten.
+REGELN.update({
+    # harter Schlag nach 1,0 s, bringt Blutung (12000151) und Verlangsamung
+    1802445: Regel("Blutschlag", "Ausweichen, sonst Blutung", 1.0, ROT, "zikel_schlag"),
+    # Boden zerschmettern: Treffer nach 1,95 s, wer nicht springt, bekommt Gebrechlichkeit
+    1802501: Regel("Boden zerschmettern", "Kurz vor Ende springen", 1.8, GELB, "zikel_springen"),
+    # Linienphase: Sprung an den Rand, Linie trifft 1,5 s nach dem Cast, danach sichere Zone
+    1802380: Regel("Linie", "Treffer abwarten, dann in die sichere Zone", 1.5, BLAU, "zikel_linien"),
+    1802381: Regel("Zweite Linie", "Zur nächsten sicheren Zone", 1.5, BLAU, "zikel_linien"),
+    1802383: Regel("Dritte Linie", "Zur dritten Zone, danach unter den Boss", 1.5, BLAU, "zikel_linien"),
+    # Ende der langen Linienphase: Donut, sicher nur direkt unter dem Boss (Zeit noch geschaetzt)
+    1802391: Regel("Donut", "Unter den Boss!", 1.0, ROT, "zikel_linien"),
+    # weitere harte Schlaege (ca. 8.000 Schaden), 1802435 trifft nur jedes fuenfte Mal: grau, ohne Ton
+    1802435: Regel("Schlag", "Ausweichen", 0.8, GRAU, "zikel_angriffe"),
+    1802433: Regel("Schlag", "Ausweichen", 1.3, GRAU, "zikel_angriffe"),
+})
+
+# Urugugu Canyon. Ausgewertet 2026-11-03 an einem Lauf (Zone 600013), Ablauf nach dem Guide
+# "Urugugu Canyon [NORMAL & HARD] guide" (Madsin). Skill-Namen fehlen zum Teil in den A2Tools-Daten.
+STURMSTREICH_KOMMT = Regel("Sturmstreich kommt", "Zu zweit zusammenstellen", 3.0, GELB, "auldor_mitte")
+REGELN.update({
+    # Hueterhauptmann Raur: Schild in den Boden, 3,8 s Konter (jeder Treffer wird zurueckgeworfen und
+    # staerkt den Boss), danach grosse Explosion um ihn, wenn jemand getroffen hat
+    1504450: Regel("Konter", "Nicht angreifen!", 3.8, ROT, "raur_konter"),
+    1504460: Regel("Konter-Explosion", "Ausweichen oder blocken", 1.2, ROT, "raur_konter"),
+    # Heiliger Auldor: Linien im Faecher (Treffer nach 1,7 s). Wer getroffen wird, fliegt hoch,
+    # 3 s spaeter Sturzschlag auf ihn (Hard Mode: Stack-Marker, toedlich fuer Einzelne)
+    1600920: Regel("Linien", "Seitlich raus, sonst wirst du gegriffen", 1.7, BLAU, "auldor_linien"),
+    1600925: Regel("Linien rundum", "In die Lücke zwischen den Linien", 0.65, BLAU, "auldor_linien"),
+    1600960: Regel("Sturzschlag", "Alle zusammenstellen!", 1.7, ROT, "auldor_sturz", auf_dir=True),
+    # bei 75 % und 35 %: Sprung in die Mitte, Wirbel-Linien, 11,6 s spaeter Sturmstreich (Stack zu zweit),
+    # ab 35 % bleibt am Rand ein Sturm
+    1601010: Regel("Sprung in die Mitte", "Wirbeln ausweichen, Rand meiden", 0.7, GELB, "auldor_mitte",
+                   plan=((8.6, STURMSTREICH_KOMMT),)),
+    1601030: Regel("Sturmstreich", "Zu zweit zusammenstellen!", 0.7, GELB, "auldor_mitte", auf_dir=True),
+})
+
 # Status-Effekte (0x382A) auf dem eigenen Charakter. Gefunden 2026-10-24: 0,1 s nach Ignus'
 # Flammenbombe (1600840) bekommen zwei Spieler 16008401 fuer 3 s, danach entsteht die Feuerpfuetze.
 STATUS_REGELN: dict[int, Regel] = {
     16008401: Regel("Verzögerte Explosion", "Pfütze kommt unter dir", 3.0, GRUEN, "bombe"),
+    # Blutung, 20 s, ca. 1.900 Schaden alle 2 s (Zikels Blutschlag). Der Heiltrank entfernt sie.
+    12000151: Regel("Blutung", "Trank nehmen!", 3.0, ROT, "blutung"),
+    # Urugugu Canyon: Raurs Zeitbombe (3 s, dann Explosion um dich)
+    15044311: Regel("Zeitbombe", "Weg von der Gruppe!", 3.0, ROT, "raur_bombe"),
+    # Urahums Gift (3 s), danach 40 s Giftpfuetze an der Stelle
+    16051103: Regel("Gift", "Pfütze kommt: an den Rand laufen", 3.0, GRUEN, "urahum_gift"),
+    # von Auldors Linien getroffen: 3 s spaeter Sturzschlag auf dich
+    16009201: Regel("Gleich Sturzschlag", "Gruppe zu dir holen!", 3.0, ROT, "auldor_sturz"),
 }
 # Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
 GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
+# Eigene HP unter die Haelfte gefallen (nur im Dungeon). Bei Zikel kamen fast alle Tode als zweiter
+# Treffer wenige Sekunden nach dem ersten.
+WENIG_HP = Regel("Heilen!", "Wenig HP: erst heilen, dann angreifen", 2.0, ROT, "hp")
+HP_TIEF, HP_WIEDER = 0.5, 0.65   # warnen unter 50 %, erneut erst nach ueber 65 %
 # Gruppenmitglied unter 25 % LP; erst wieder melden, wenn es ueber 50 % war
 GRUPPE_LP = Regel("Wenig LP", "Unter 25 %", 3.0, ROT, "gruppe_lp")
 LP_KNAPP, LP_WIEDER = 0.25, 0.5
@@ -121,7 +172,8 @@ def mechanik_regel(m: dict) -> Regel:
         folge = Regel(m["titel"], m["danach"]["hinweis"], m["danach"]["sekunden"], farbe, m["gruppe"])
         plan = ((m["sekunden"], folge),)
     return Regel(m["titel"], m["hinweis"], m["sekunden"], farbe, m["gruppe"], plan=plan,
-                 auf=m["wann"].get("auf", "du"), hinweis_ich=m.get("hinweis_ich", "Weg von der Gruppe!"))
+                 auf=m["wann"].get("auf", "du"), auf_dir=m["wann"].get("auf_dir", False),
+                 hinweis_ich=m.get("hinweis_ich", "Weg von der Gruppe!"))
 
 
 for _m in MECHANIKEN:
@@ -183,6 +235,33 @@ ENGLISCH = {
     "Ganz nah an den Boss oder ganz weit weg": "Hug the boss or go far away",
     "Drei Treffer, alle 2 s ausweichen": "Three hits, dodge every 2 s",
     "Hinter sie gehen": "Get behind her",
+    "Zikel: Blutschlag": "Zikel: Bleeding Strike", "Zikel: Boden zerschmettern": "Zikel: Shatter Ground",
+    "Zikel: Linienphase und Donut": "Zikel: Line Phase and Donut", "Blutung (auf dir)": "Bleeding (on you)",
+    "Blutschlag": "Bleeding Strike", "Ausweichen, sonst Blutung": "Dodge or you bleed",
+    "Boden zerschmettern": "Shatter Ground", "Kurz vor Ende springen": "Jump right before it ends",
+    "Linie": "Line", "Treffer abwarten, dann in die sichere Zone": "Wait for the hit, then into the safe zone",
+    "Zweite Linie": "Second Line", "Zur nächsten sicheren Zone": "To the next safe zone",
+    "Dritte Linie": "Third Line", "Zur dritten Zone, danach unter den Boss": "To the third zone, then under the boss",
+    "Donut": "Donut", "Unter den Boss!": "Get under the boss!",
+    "Blutung": "Bleeding", "Trank nehmen!": "Drink a potion!",
+    "Raur: Konter (nicht angreifen)": "Raur: Counter (don't attack)", "Raur: Zeitbombe (auf dir)": "Raur: Time Bomb (on you)",
+    "Urahum: Gift (auf dir)": "Urahum: Poison (on you)", "Auldor: Linien": "Auldor: Lines",
+    "Auldor: Sturzschlag (zusammenstellen)": "Auldor: Crash (stack)",
+    "Auldor: Mitte-Phase und Sturmstreich": "Auldor: Middle Phase and Tempest Strike",
+    "Konter": "Counter", "Nicht angreifen!": "Don't attack!", "Konter-Explosion": "Counter Explosion",
+    "Ausweichen oder blocken": "Dodge or block", "Zeitbombe": "Time Bomb",
+    "Gift": "Poison", "Pfütze kommt: an den Rand laufen": "Puddle incoming: move to the edge",
+    "Linien": "Lines", "Seitlich raus, sonst wirst du gegriffen": "Step sideways or you get grabbed",
+    "Linien rundum": "Lines all around", "In die Lücke zwischen den Linien": "Into the gap between the lines",
+    "Sturzschlag": "Crash", "Alle zusammenstellen!": "Everyone stack!", "Gleich Sturzschlag": "Crash incoming",
+    "Gruppe zu dir holen!": "Get the group to you!", "Sprung in die Mitte": "Leap to the middle",
+    "Wirbeln ausweichen, Rand meiden": "Dodge the tornadoes, avoid the edge",
+    "Sturmstreich kommt": "Tempest Strike incoming", "Sturmstreich": "Tempest Strike",
+    "Zu zweit zusammenstellen": "Stack in pairs", "Zu zweit zusammenstellen!": "Stack in pairs!",
+    "Zikel: weitere Schläge (grau, ohne Ton)": "Zikel: other strikes (grey, silent)",
+    "Schlag": "Strike", "Ausweichen": "Dodge",
+    "Wenig HP: heilen (alle Dungeons)": "Low HP: heal (all dungeons)", "Heilen!": "Heal!",
+    "Wenig HP: erst heilen, dann angreifen": "Low HP: heal first, then attack",
     "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
     "Wenig LP": "Low HP", "Unter 25 %": "Below 25 %", "Berserker": "Berserk",
     "Fläche unter dir": "AoE under you", "Ausweichen!": "Dodge!",
@@ -234,6 +313,8 @@ class WarnZentrale:
         self.laut: list[tuple[str, str]] = []  # (art, text): Piepton oder Ansage, spielt der RadarDienst ab
         self.k = konfig_laden()
         self.an = self.k["warn_an"]
+        self.hp_max = 0
+        self.hp_tief = False
         self._knapp: set[int] = set()  # Mitspieler, die schon als „wenig LP“ gemeldet sind
 
     def cast(self, caster: int, skill: int, ziel: int | None) -> None:
@@ -247,8 +328,8 @@ class WarnZentrale:
         jetzt = self.uhr()
         if skill == REGEN:
             self.regen_zuletzt = jetzt
-        ich = skill == TODESMAL and ziel is not None and ziel == self.zustand.eigene_eid
-        name = "" if ich else self.zustand.spieler.get(ziel, "")
+        ich = (skill == TODESMAL or regel.auf_dir) and ziel is not None and ziel == self.zustand.eigene_eid
+        name = "" if ich or ziel == self.zustand.eigene_eid else self.zustand.spieler.get(ziel, "")
         with self.lock:
             self._ausloesen(regel, jetzt, ich, name)
 
@@ -300,6 +381,17 @@ class WarnZentrale:
         if self.an and regel:
             with self.lock:
                 self._ausloesen(regel, self.uhr())
+
+    def hp(self, wert: int) -> None:
+        """Eigene HP: einmal warnen, wenn sie unter die Haelfte fallen."""
+        self.hp_max = max(self.hp_max, wert)
+        if wert == 0 or wert > self.hp_max * HP_WIEDER:
+            self.hp_tief = False
+        elif wert < self.hp_max * HP_TIEF and not self.hp_tief:
+            self.hp_tief = True
+            if self.an and self.zustand.dungeon:
+                with self.lock:
+                    self._hinzufuegen(WENIG_HP, self.uhr())
 
     def groggy(self, boss: int) -> None:
         if self.an:
@@ -475,7 +567,7 @@ def ansage(text: str, wichtig: bool = True) -> None:
 
 def ansagen_vorbereiten() -> None:
     """Alle festen Ansagen vorab erzeugen, damit sie im Kampf sofort kommen."""
-    regeln = (*REGELN.values(), *STATUS_REGELN.values(), GROGGY)
+    regeln = (*REGELN.values(), *STATUS_REGELN.values(), GROGGY, WENIG_HP)
     titel = {tr(r.titel) for r in regeln} | {tr(flamme(0).titel), tr(REGEN_KOMMT.titel)}
     texte = [*titel, tr(REGELN[TODESMAL].titel) + tr(" auf dir"), *ansage_kurztexte(konfig_laden()["sprache"])]
     threading.Thread(target=lambda: [gesprochen(t) for t in texte], daemon=True).start()

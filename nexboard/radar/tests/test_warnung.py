@@ -42,6 +42,41 @@ class WarnungTest(unittest.TestCase):
         self.z.status(5, 16008401)
         self.assertEqual(self.z.laut, [("ansage", "Verzögerte Explosion auf dir")])
 
+    def test_zikel_blutung_nur_auf_mir_und_linie_nur_im_albtraum(self):
+        self.z.status(9, 12000151)
+        self.assertEqual(self.titel(), [])
+        self.z.status(5, 12000151)
+        self.assertEqual(self.z.laut, [("ansage", "Blutung auf dir")])
+        self.zustand.dungeon = "Feuertempel"
+        self.z.cast(1, 1802380, 1)
+        self.assertEqual(self.titel(), ["Blutung"])
+        self.zustand.dungeon = "Albtraum"
+        self.z.cast(1, 1802380, 1)
+        self.t[0] += 5
+        self.z.cast(1, 1802381, 1)  # zweite Linie ersetzt die erste
+        self.assertEqual(self.titel(), ["Zweite Linie"])
+        self.zustand.spieler[5] = "Ich"
+        self.z.cast(1, 1802445, 5)  # Ziel bin ich: ohne eigenen Namen
+        self.assertEqual(self.z.laut[-1], ("ansage", "Blutschlag"))
+
+    def test_wenig_hp_einmal_und_nur_im_dungeon(self):
+        self.z.hp(20000)
+        self.z.hp(9000)
+        self.assertEqual(self.titel(), [])  # kein Dungeon
+        self.zustand.dungeon = "Albtraum"
+        self.z.hp(20000)
+        self.z.hp(9000)
+        self.z.hp(8000)
+        self.z.hp(11000)  # unter 65 %: keine neue Warnung beim naechsten Fall
+        self.z.hp(9000)
+        self.assertEqual(self.z.laut, [("ansage", "Heilen!")])
+
+    def test_zikel_graue_schlaege_ohne_ton(self):
+        self.zustand.dungeon = "Albtraum"
+        self.z.k["warnton"] = {"zikel_angriffe": "aus"}
+        self.z.cast(1, 1802435, 5)
+        self.assertEqual((self.titel(), self.z.laut), (["Schlag"], []))
+
     def test_groggy(self):
         self.z.groggy(7)
         self.assertEqual(self.titel(), ["Boss groggy"])
@@ -87,6 +122,21 @@ class WarnungTest(unittest.TestCase):
         self.assertEqual(self.z.vorschau()[0][0], "Regen des Hasses frühestens")
         self.t[0] += 40
         self.assertEqual(self.z.vorschau(), [("Regen des Hasses jederzeit möglich", 0.0)])
+
+    def test_urugugu_sturzschlag_auf_mir_und_sturmstreich_geplant(self):
+        self.zustand.dungeon = "Urugugu Canyon"
+        self.z.cast(1, 1600960, 5)  # Sturzschlag auf mich
+        self.assertEqual(self.z.schnappschuss()[0].titel(), "Sturzschlag  –  DU!")
+        self.z.cast(1, 1601010, 1)  # Sprung in die Mitte: Wirbel-Phase (mechaniken.json), Sturmstreich folgt
+        self.t[0] += 8.6
+        self.assertIn("Wirbel-Phase", self.titel())
+        self.z.status(5, 15044311)  # Raurs Zeitbombe auf mir
+        self.assertIn("Zeitbombe", self.titel())
+
+    def test_urugugu_warnung_nicht_im_feuertempel(self):
+        self.zustand.dungeon = "Feuertempel"
+        self.z.cast(1, 1504450, 1)
+        self.assertEqual(self.titel(), [])
 
 
 if __name__ == "__main__":

@@ -114,12 +114,52 @@ body.edit #guides { display: block; }
 }
 
 /* ------------------------------------------------------------ Radar (Modul AION 2 · Radar) */
-#w-radar { width: 260px; }
-#radar-bild { width: 260px; height: 260px; display: block; }
-.radar-info { margin: -2px 8px 0; padding: 5px 10px 6px; text-align: center; }
+#w-radar { width: 440px; height: 580px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+#w-radar.gefaltet { height: auto !important; }
+#w-radar.gefaltet .radar-inhalt, #w-radar.gefaltet #radar-griff { display: none; }
+#radar-griff {
+  position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 5; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, .55) 50% 58%, transparent 58% 68%,
+    rgba(255, 255, 255, .55) 68% 76%, transparent 76%);
+}
+.radar-kopf {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; flex: none;
+  border-bottom: 1px solid var(--hud-line); background: rgba(10, 14, 24, .8);
+}
+.radar-reiter { display: flex; gap: 2px; }
+.radar-kopf button {
+  border: 0; border-radius: 6px; padding: 3px 9px; font: inherit; color: var(--muted);
+  background: transparent; cursor: pointer;
+}
+.radar-kopf button:hover { color: var(--text); }
+.radar-reiter button.an { color: var(--text); background: rgba(255, 255, 255, .12); font-weight: 650; }
+.radar-titel { flex: 1; min-width: 0; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#wuerfel-live { flex: none; }
+#wuerfel-live iframe { display: block; width: 100%; border: 0; background: transparent; }
+.radar-inhalt { position: relative; flex: 1; min-height: 0; }
+.radar-seite { position: absolute; inset: 0; visibility: hidden; }
+.radar-seite.an { visibility: visible; }
+.radar-seite > iframe { width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+#karte-bild { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 46px); display: block; cursor: grab; }
+.karte-knoepfe { position: absolute; top: 34px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
+.karte-knoepfe button {
+  width: 26px; height: 26px; border: 1px solid var(--hud-line); border-radius: 6px; color: var(--text);
+  background: rgba(10, 14, 24, .85); font-size: 15px; line-height: 1; cursor: pointer;
+}
+#radar-bild { position: absolute; right: 8px; bottom: 54px; width: 130px; height: 130px; pointer-events: none; }
+.radar-info {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 46px; box-sizing: border-box; padding: 5px 10px 6px; text-align: center;
+  background: rgba(10, 14, 24, .78); border-top: 1px solid var(--hud-line);
+}
 #radar-cube { font-weight: 650; font-size: 12.5px; color: var(--bad); white-space: nowrap; }
 #radar-cube.oeffnet { color: var(--warn); }
-#radar-status { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radar-zeile { display: flex; justify-content: space-between; gap: 12px; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+#radar-status { overflow: hidden; text-overflow: ellipsis; }
+.karte-quelle {
+  position: absolute; left: 8px; bottom: 72px; padding: 1px 6px; border-radius: 5px; font-size: 10px;
+  color: rgba(238, 242, 255, .75); background: rgba(10, 14, 24, .7); text-decoration: none;
+}
+.karte-notiz { position: absolute; left: 20px; right: 20px; top: 40%; margin: 0; text-align: center; color: var(--muted); font-size: 12px; }
 
 #w-warnung { width: 460px; }
 .warn-vorschau {
@@ -140,14 +180,6 @@ body.edit #guides { display: block; }
 .warn-balken { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 4px; }
 .warn-balken div { height: 100%; border-radius: 2px; background: var(--farbe); transform-origin: 0 50%; }
 
-#w-karte { width: 420px; height: 420px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-.karte-kopf {
-  display: flex; justify-content: space-between; gap: 12px; padding: 5px 12px; font-size: 12px;
-  border-bottom: 1px solid var(--hud-line); background: rgba(10, 14, 24, .8);
-}
-#karte-name { font-weight: 650; }
-#karte-status { color: var(--muted); }
-#karte-bild { flex: 1; min-height: 0; width: 100%; display: block; cursor: grab; }
 .karte-tipp {
   position: absolute; padding: 3px 8px; border-radius: 6px; font-size: 12px; pointer-events: none;
   background: rgba(10, 14, 24, .92); border: 1px solid var(--hud-line);
@@ -170,3 +202,6 @@ body.edit #guides { display: block; }
 .pvp-letzte:empty { display: none; }
 .pvp-letzte .kill { color: var(--ok); }
 .pvp-letzte .tod { color: var(--bad); }
+
+/* Widgets der A2Tools-Plugins (plugins.js) */
+.plugin-widget { position: fixed; border: 0; background: transparent; z-index: 40; }

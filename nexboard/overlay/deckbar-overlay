@@ -47,6 +47,7 @@ import urllib.request
 from pathlib import Path
 
 APP = "deckbar-overlay"
+PLUGIN_TITLE = " (Plugin)"  # Fenstertitel, an ihm hängt die KWin-Regel
 MAIN_TITLE = "NexBoard DPS-Meter"  # KWin-Regel (nur Legacy): Ebene „Overlay“ für dieses Fenster
 REPO = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
@@ -150,7 +151,7 @@ else:
     _FLAGS.append("--disable-gpu-compositing")  # transparente Fenster ohne Artefakte
 os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", " ".join(_FLAGS))
 
-from PySide6.QtCore import (QByteArray, QFile, QIODevice, QObject, QPoint, QRect, QSettings, QSocketNotifier, Qt,  # noqa: E402
+from PySide6.QtCore import (QByteArray, QEvent, QFile, QIODevice, QObject, QPoint, QRect, QSettings, QSize, QSocketNotifier, Qt,  # noqa: E402
                             QTimer, QUrl, ClassInfo, Property, Signal, Slot)
 from PySide6.QtDBus import QDBusConnection, QDBusInterface  # noqa: E402
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QRegion  # noqa: E402
@@ -223,9 +224,11 @@ class Host(QObject):
 class A2Window(QWebEngineView):
     """Fenster mit der Meter-Oberfläche: Details, Verlauf, Einstellungen – und im Legacy-Betrieb das Meter."""
 
-    def __init__(self, overlay: Overlay, label: str, view: str) -> None:
+    def __init__(self, overlay: Overlay, label: str, view: str, plugin: dict | None = None) -> None:
         super().__init__()
         self.overlay, self.label, self.view = overlay, label, view
+        self.plugin = plugin  # Hauptfenster eines Plugins (Kennung, Name, Größe), siehe Overlay.plugin_command
+        self.fitted_from: QSize | None = None
         self.locked = False
         self.card_open = False  # Karte im Meter offen: auch gesperrt ganz klickbar
         self.lock_rect = QRect()
@@ -237,6 +240,9 @@ class A2Window(QWebEngineView):
         if label == "main":
             flags |= Qt.Tool | Qt.WindowStaysOnTopHint  # nicht in der Taskleiste
             self.setWindowTitle(MAIN_TITLE)
+        elif plugin:
+            flags |= Qt.WindowStaysOnTopHint
+            self.setWindowTitle(f"{plugin['name']}{PLUGIN_TITLE}")  # KWin-Regel: über dem Spiel
         else:
             self.setWindowTitle(f"NexBoard – {view.capitalize()}")
         self.setWindowFlags(flags)
@@ -258,7 +264,10 @@ class A2Window(QWebEngineView):
         self.setPage(page)
         self.setContextMenuPolicy(Qt.NoContextMenu)
         self.url = QUrl(overlay.url)
-        if view != "main":
+        if plugin:
+            self.url.setPath("/plugin-host.html")
+            self.url.setQuery(f"plugin={plugin['id']}")
+        elif view != "main":
             self.url.setQuery(f"view={view}")
         # Daemon noch nicht da (Autostart vor dem Daemon, Neustart): später erneut laden
         self.loadFinished.connect(lambda ok: ok or QTimer.singleShot(3000, lambda: self.load(self.url)))
@@ -291,6 +300,8 @@ class LayerHost(QObject):
     modeChanged = Signal()
     screenChanged = Signal()
     readyChanged = Signal()
+    pointerMoved = Signal(float, float)
+    pointerReleased = Signal()
 
     def __init__(self, overlay: Overlay, page: QUrl, start_mode: str) -> None:
         super().__init__()
@@ -396,6 +407,22 @@ class LayerHost(QObject):
     def call(self, cmd: str, args_json: str) -> str:
         return self.overlay.call_json(None, cmd, args_json)
 
+    @Slot()
+    def watchPointer(self) -> None:
+        """Ein Plugin-Widget wird gezogen. Den Mausdruck hat sein Sandbox-iframe bekommen, und es behält
+        alle Bewegungen bis zum Loslassen; die Seite sieht sie nie. Also hier an der Fläche mitlesen."""
+        if self.window is not None:
+            self.window.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:
+        if event.type() == QEvent.MouseMove:
+            at = event.position()
+            self.pointerMoved.emit(at.x(), at.y())
+        elif event.type() == QEvent.MouseButtonRelease:
+            obj.removeEventFilter(self)
+            self.pointerReleased.emit()
+        return False
+
     @Slot(str)
     def log(self, text: str) -> None:
         if os.environ.get("DECKBAR_OVERLAY_DEBUG"):
@@ -479,6 +506,8 @@ class Overlay(QObject):
         else:
             self.main = self._window("main", "main")
             ensure_kwin_rule()
+        ensure_plugin_kwin_rule()
+        self.restore_plugins()
 
     # ------------------------------------------------------------ layer-shell
     def _layer(self) -> None:
@@ -582,6 +611,68 @@ class Overlay(QObject):
             self.store.setValue("geometry/main-pos", w.pos())
         elif not w.label.startswith("details-"):
             self.store.setValue(f"geometry/{w.label}", w.saveGeometry())
+
+    # ------------------------------------------------------------ Plugin-Fenster
+    def plugin_command(self, c: dict) -> None:
+        """Befehle des Daemons (plugins.py). Ein Plugin läuft auch versteckt weiter: Sein Fenster
+        besteht, bis es ausgeschaltet wird."""
+        plugin = str(c.get("id"))
+        label = f"plugin-{plugin}"
+        w = self.windows.get(label)
+        match c.get("action"):
+            case "open":
+                if w is None:
+                    w = A2Window(self, label, "main", plugin=c)
+                    self.windows[label] = w
+                    w.destroyed.connect(lambda *_: self.windows.pop(label, None))
+                    w.setMinimumSize(int(c.get("minWidth") or 240), int(c.get("minHeight") or 60))
+                    geo = self.store.value(f"geometry/{label}")
+                    if isinstance(geo, QByteArray):
+                        w.restoreGeometry(geo)
+                    else:
+                        w.resize(int(c.get("width") or 360), int(c.get("height") or 510))
+                if c.get("shown"):
+                    self.reveal(w)
+            case "show" if w:
+                self.reveal(w)
+            case "hide" if w:
+                self.remember(w)
+                w.hide()
+            case "close" if w:
+                w.close()
+            case "reload" if w:
+                w.reload()
+            case "fit" if w:
+                height = c.get("height")
+                if height is None:  # zurück auf die Größe von vorher
+                    if w.fitted_from:
+                        w.resize(w.fitted_from)
+                        w.fitted_from = None
+                else:
+                    w.fitted_from = w.fitted_from or w.size()
+                    w.setMinimumHeight(min(w.minimumHeight(), int(height)))
+                    w.resize(w.width(), int(height))
+
+    def restore_plugins(self) -> None:
+        """Beim Start: alle eingeschalteten Plugins laufen, sichtbar wie zuletzt. Daemon noch nicht
+        da: gleich noch einmal."""
+        url = QUrl(self.url)
+        url.setPath("/api/a2/invoke")
+        req = QNetworkRequest(url)
+        req.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
+        reply = self.net.post(req, json.dumps({"cmd": "plugin_windows", "args": {}}).encode())
+
+        def finished() -> None:
+            body = bytes(reply.readAll())
+            ok = reply.error() == QNetworkReply.NoError
+            reply.deleteLater()
+            if not ok:
+                QTimer.singleShot(5000, self.restore_plugins)
+                return
+            for window in json.loads(body).get("result") or []:
+                self.plugin_command({"action": "open", **window})
+
+        reply.finished.connect(finished)
 
     def tool(self, label: str, view: str) -> A2Window:
         return self.windows.get(label) or self._window(label, view)
@@ -892,6 +983,12 @@ class Overlay(QObject):
             self.main.apply_lock()
 
     def run(self, cmd: str) -> None:
+        if cmd.startswith("plugin "):
+            try:
+                self.plugin_command(json.loads(cmd[7:]))
+            except ValueError:
+                pass
+            return
         match cmd:
             case "toggle":
                 self.toggle()
@@ -959,6 +1056,36 @@ def ensure_kwin_rule() -> None:
         kw("count", str(len(names)), "General")
     subprocess.run(["qdbus6", "org.kde.KWin", "/KWin", "reconfigure"], check=False, capture_output=True)
     store.setValue("kwinRuleTitle", MAIN_TITLE)  # neuer Titel (Umbenennung) → Regel wird nachgezogen
+
+
+def ensure_plugin_kwin_rule() -> None:
+    """Plugin-Fenster über dem Spiel halten (Qt kann das unter Wayland nicht selbst). Nur einmal
+    anlegen; was der Nutzer danach ändert, bleibt so."""
+    store = QSettings("deckbar", "overlay")
+    if store.value("kwinPluginRule") or not shutil.which("kwriteconfig6"):
+        return
+    group = "deckbar-plugins"
+
+    def kw(key: str, value: str, grp: str = group) -> None:
+        subprocess.run(["kwriteconfig6", "--file", "kwinrulesrc", "--group", grp, "--key", key, value], check=False)
+
+    rules = subprocess.run(["kreadconfig6", "--file", "kwinrulesrc", "--group", "General", "--key", "rules"],
+                           capture_output=True, text=True).stdout.strip()
+    names = [r for r in rules.split(",") if r]
+    kw("Description", "NexBoard Plugin-Fenster über dem Spiel")
+    kw("title", PLUGIN_TITLE)
+    kw("titlematch", "2")  # enthält
+    kw("wmclass", APP)
+    kw("wmclasscomplete", "true")
+    kw("wmclassmatch", "2")
+    kw("layer", "overlay")
+    kw("layerrule", "2")
+    if group not in names:
+        names.append(group)
+        kw("rules", ",".join(names), "General")
+        kw("count", str(len(names)), "General")
+    subprocess.run(["qdbus6", "org.kde.KWin", "/KWin", "reconfigure"], check=False, capture_output=True)
+    store.setValue("kwinPluginRule", True)
 
 
 def kde_primary() -> str:

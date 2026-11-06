@@ -33,6 +33,8 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     url = f"http://localhost:{settings.port}/"
     # Overlay-Seite und Oberfläche des A2Tools-Meters, eigener Port wegen ihrer absoluten Pfade
     a2 = A2Ui(deck.dps.capture, cdir / "a2-settings.json")
+    a2.plugins.overlay = deck.overlay.plugin_command
+    a2.plugins.start()
 
     @web.middleware
     async def overlay_on(request: web.Request, handler):
@@ -62,6 +64,7 @@ async def serve(args: argparse.Namespace) -> NexBoard:
 
     log.info("starte neu …" if deck.restart_requested else "beende …")
     a2.close_clients()
+    await a2.plugins.stop()
     await deck.close_clients()
     await deck.modules.stop_all()
     await a2_runner.cleanup()

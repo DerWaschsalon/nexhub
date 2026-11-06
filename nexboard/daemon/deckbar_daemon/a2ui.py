@@ -25,15 +25,25 @@ from aiohttp import web
 
 from .capture import Capture, history_root
 from .config import _atomic_write
+from .plugins import PluginError, PluginHost, content_policy, valid_id, with_fonts
 
 log = logging.getLogger(__name__)
 
 A2_ROOT = Path(__file__).resolve().parents[2] / "capture" / "a2tools"
 SHIM = Path(__file__).resolve().parent / "web" / "a2shim.js"
 SHIM_URL = "/__deckbar__/a2shim.js"
-QUEUE_MAX = 64  # Ereignisse je Client; ein hängender Client verliert lieber alte dps-update
+EVENTS_WORKER = Path(__file__).resolve().parent / "web" / "a2events.js"
+EVENTS_WORKER_URL = "/__deckbar__/a2events.js"
+PLUGIN_PREFIX = "/__a2plugin__/"
+SDK = A2_ROOT / "src-tauri" / "src" / "plugins" / "a2.js"
+HOST_PAGES = ("index.html", "plugin-host.html", "plugin-widget.html")  # bekommen das Shim
+# Je Client; ein hängender Client verliert lieber alte dps-update. Der Strom ist je Browser-Profil
+# einer (a2events.js), Plugin-Ereignisse dürfen hier nicht verloren gehen.
+QUEUE_MAX = 256
 
 # Nicht aus den Einstellungen des A2Tools-Meters übernehmen: Geheimnisse, Fensterlagen, Online-Kram
+# Befehle ohne plugin_-Vorsilbe, die der Plugin-Host beantwortet
+PLUGIN_COMMANDS = {"meter_shown", "set_meter_shown", "set_plugin_theme"}
 NO_IMPORT = re.compile(r"(?i)key|token|secret|account|^window\.|streamOverlay|autoUpload|discord|kwinRule|plugin")
 
 
@@ -101,12 +111,19 @@ def inject_shim(html: str) -> str:
 
 
 class A2Ui:
-    def __init__(self, capture: Capture, settings_path: Path) -> None:
+    def __init__(self, capture: Capture, settings_path: Path, plugin_dir: Path | None = None) -> None:
         self.capture = capture
         self.settings_path = settings_path
         self.clients: set[asyncio.Queue] = set()
         self.settings = self._load_settings()
         capture.data_listeners.append(self._on_capture)
+        base = plugin_dir or Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "deckbar"
+        self.plugins = PluginHost(capture, lambda: self.settings, self._set_setting, self.emit,
+                                  base / "plugins", base / "plugin-data")
+
+    def _set_setting(self, key: str, value: str) -> None:
+        self.settings[key] = value
+        self._save_settings(self.settings)
 
     # ------------------------------------------------------------ Einstellungen der Oberfläche
     def _load_settings(self) -> dict[str, str]:
@@ -194,28 +211,65 @@ class A2Ui:
     async def static(self, request: web.Request) -> web.StreamResponse:
         if request.path == SHIM_URL:
             return web.FileResponse(SHIM, headers={"Cache-Control": "no-cache"})
+        if request.path == EVENTS_WORKER_URL:
+            return web.FileResponse(EVENTS_WORKER, headers={"Cache-Control": "no-cache", "Content-Type": "text/javascript"})
+        if request.path == "/_sdk/a2.js" or request.path.startswith(PLUGIN_PREFIX):
+            return self.plugin_file(request)
         path = resolve(request.path)
         if path is None:
             raise web.HTTPNotFound()
-        if path.name == "index.html" and path.parent == A2_ROOT:
+        if path.name in HOST_PAGES and path.parent in (A2_ROOT, A2_ROOT / "public"):
             html = inject_shim(path.read_text(encoding="utf-8"))
             return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
         ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         return web.FileResponse(path, headers={"Content-Type": ctype})
+
+    def plugin_file(self, request: web.Request) -> web.Response:
+        """Dateien eines Plugins für sein Sandbox-iframe, mit CSP ohne Netz (serve im Original)."""
+        origin = f"{request.scheme}://{request.host}"
+        rel = unquote(request.path.removeprefix(PLUGIN_PREFIX))
+        plugin, _, rest = rel.partition("/")
+        policy = content_policy(origin, PLUGIN_PREFIX, plugin)
+        headers = {"Content-Security-Policy": policy, "X-Content-Type-Options": "nosniff", "Cache-Control": "no-cache"}
+        if request.path == "/_sdk/a2.js":
+            return web.Response(body=SDK.read_bytes(), content_type="text/javascript", charset="utf-8", headers=headers)
+        loaded = self.plugins.loaded.get(plugin) if valid_id(plugin) else None
+        if loaded is None or not rest:
+            raise web.HTTPNotFound(headers=headers)
+        root = loaded.folder.resolve()
+        file = (root / rest).resolve()
+        if not file.is_relative_to(root) or not file.is_file():
+            raise web.HTTPNotFound(headers=headers)
+        if file.suffix == ".html":
+            return web.Response(text=with_fonts(file.read_text(encoding="utf-8")), content_type="text/html", headers=headers)
+        ctype = mimetypes.guess_type(file.name)[0] or "application/octet-stream"
+        return web.Response(body=file.read_bytes(), headers={**headers, "Content-Type": ctype})
 
     # ------------------------------------------------------------ Commands
     async def invoke(self, request: web.Request) -> web.Response:
         try:
             body = await request.json()
             cmd, args = str(body["cmd"]), body.get("args") or {}
+            window = body.get("window")
         except (ValueError, KeyError, TypeError):
             return web.json_response({"error": "erwartet {cmd, args}"}, status=400)
         try:
-            result = await self.call(cmd, args)
+            # Plugin-Seiten kommen nur an ihre Befehle, das prüft der Host anhand der Fensterkennung
+            if cmd.startswith("plugin_") or cmd in PLUGIN_COMMANDS or str(window or "").startswith(("plugin-", "widget:")):
+                result = await self._plugin_call(cmd, args, str(window) if window else None)
+            else:
+                result = await self.call(cmd, args)
+        except PluginError as e:
+            return web.json_response({"error": str(e)}, status=500)
         except Exception as e:  # Tauri-Commands melden Fehler als String
             log.debug("invoke %s: %s", cmd, e)
             return web.json_response({"error": str(e)}, status=500)
         return web.json_response({"result": result})
+
+    async def _plugin_call(self, cmd: str, args: dict, window: str | None) -> Any:
+        if cmd == "get_settings":
+            return self.settings
+        return await self.plugins.call(cmd, args, window)
 
     async def _req(self, cmd: str, **kw: Any) -> Any:
         return await self.capture.request(cmd, timeout=10, **kw)
@@ -247,6 +301,7 @@ class A2Ui:
             case "set_language":
                 if live:
                     await self._req("language", lang=str(a("language")))
+                await self.plugins.tell_all("language", str(a("language")))
                 return None
             case "is_admin":
                 return True
@@ -320,17 +375,6 @@ class A2Ui:
                 return ""
             case "share_status" | "get_hotkey_status":
                 return {}
-            case "plugin_window_fit":
-                return None
-            case "plugin_boss_timers":
-                return []
-            case "plugin_list" | "plugin_set_dev_mode" | "plugin_add_folder" | "plugin_remove_folder" | "plugin_install" | "plugin_uninstall" | "plugin_set_enabled":
-                return {"devMode": False, "online": False, "plugins": []}
-            case "plugin_catalog":
-                return []
-            case "plugin_check_updates":
-                return {"view": {"devMode": False, "online": False, "plugins": []}, "updated": [], "available": [],
-                        "catalogError": None}
             case _:
                 raise RuntimeError(f"{cmd}: in der NexBoard nicht verfügbar")
 

@@ -18,12 +18,18 @@ STANDARD = json.loads((Path(__file__).parent / "standard.json").read_text())
 _konfig: dict | None = None
 
 
+def mit_standard(eigene: dict) -> dict:
+    """Eigene Einstellungen ueber die Standardwerte legen. warnton einzeln, damit neue Warnungen
+    ihren Standard-Ton auch dann bekommen, wenn schon eigene Toene gespeichert sind."""
+    return {**STANDARD, **eigene, "warnton": {**STANDARD["warnton"], **eigene.get("warnton", {})}}
+
+
 def konfig_laden() -> dict:
     """Gemeinsames Einstellungs-dict fuer alle Teile (nur einmal gelesen)."""
     global _konfig
     if _konfig is None:
         try:
-            _konfig = {**STANDARD, **json.loads(KONFIG.read_text())}
+            _konfig = mit_standard(json.loads(KONFIG.read_text()))
         except (OSError, ValueError):
             _konfig = dict(STANDARD)
     return _konfig
@@ -38,7 +44,7 @@ def konfig_neu_laden() -> dict:
     except (OSError, ValueError):
         return k
     k.clear()
-    k.update({**STANDARD, **neu})
+    k.update(mit_standard(neu))
     return k
 
 

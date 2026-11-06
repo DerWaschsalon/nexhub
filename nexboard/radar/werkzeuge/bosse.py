@@ -17,6 +17,7 @@ from .ansagen import OHNE_DUNGEON
 
 DATEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n")
 UMBENENNEN = {"Fire Temple": "Feuertempel", "the Hall of Illusion": "Hall of Illusion"}
+NACHTRAG = {"200003": {"name": "Albtraum"}}  # fehlt in den A2Tools-Dungeons (Zikel, Sura, Hohepriesterin, ...)
 # Katalog der 207 Vertrauten aus dem Projekt aion2pettracker (GPL-3.0, Daten von questlog.gg, Namen (c) NCSOFT):
 # englischer Name, Kategorie, Fundgebiete und die Monster, die die Seele fallen lassen
 VERTRAUTE = ("https://raw.githubusercontent.com/keytftw/aion2pettracker/main/data/pet-catalog.json")
@@ -46,7 +47,7 @@ def dungeons_ueber_bosse(npcs: dict, bekannt: dict) -> dict[str, str]:
 
 def main() -> None:
     daten = Path(sys.argv[1]) if len(sys.argv) > 1 else DATEN
-    dungeons = json.loads((daten / "dungeons/en.json").read_text())
+    dungeons = json.loads((daten / "dungeons/en.json").read_text()) | NACHTRAG
     npcs = json.loads((daten / "npcs/en.json").read_text())
     zonen = {k: UMBENENNEN.get(v["name"], v["name"]) for k, v in dungeons.items()}
     zonen.update(dungeons_ueber_bosse(npcs, zonen))

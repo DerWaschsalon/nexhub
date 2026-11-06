@@ -19,9 +19,8 @@ const DEFAULT_POS = {
   meter: () => [48, Math.max(40, innerHeight - 380)],
   boss: () => [Math.round(innerWidth / 2 - 210), 72],
   timers: () => [innerWidth - 300, 160],
-  radar: () => [innerWidth - 300, 40],
+  radar: () => [innerWidth - 460, 300],
   warnung: () => [Math.round(innerWidth / 2 - 230), 140],
-  karte: () => [innerWidth - 460, 400],
   pvp: () => [48, 200],
 };
 
@@ -48,6 +47,10 @@ function place(w) {
   w.hidden = !c.enabled;
   w.style.transform = `translate(${x}px, ${y}px) scale(${c.scale || 1})`;
   w.style.opacity = c.opacity ?? 1;
+  if (c.width) {
+    w.style.width = `${c.width}px`;
+    w.style.height = `${c.height}px`;
+  }
 }
 
 function placeAll() {
@@ -67,6 +70,7 @@ function saveSoon() {
     for (const id of Object.keys(W)) {
       const c = cfg(id);
       widgets[id] = { enabled: c.enabled, x: c.x, y: c.y, scale: c.scale };
+      if (c.width) Object.assign(widgets[id], { width: c.width, height: c.height });
     }
     try {
       const r = await fetch("/api/overlay/layout", {
@@ -115,7 +119,7 @@ function rectOf(el) {
 
 function regions() {
   const visible = (w) => !w.hidden && !w.classList.contains("idle") && !document.body.classList.contains("karte-offen");
-  const click = WIDGETS.filter((w) => visible(w) && w.hasAttribute("data-click")).map(rectOf);
+  const click = [...WIDGETS.filter((w) => visible(w) && w.hasAttribute("data-click")).map(rectOf), ...pluginRegions()];
   let lock = [];
   if (cardOpen && visible(W.meter)) lock = [rectOf(W.meter)];
   else if (lockRect && visible(W.meter)) {
@@ -424,6 +428,9 @@ window.__DECKBAR_OVERLAY__ = {
       case "start_drag":
         startMeterDrag();
         return Promise.resolve(null);
+      case "plugin_widget_drag":
+        pluginWidgetDrag(args.label);
+        return Promise.resolve(null);
       case "start_tool_drag": case "window_resize_drag": case "begin_tool_resize":
       case "main_window_ready": case "window_show": case "details_window_ready":
         return Promise.resolve(null);
@@ -563,6 +570,7 @@ function connect() {
 
 function start() {
   radarStart();
+  pluginsStart();
   setMode(mode);
   connect();
   setInterval(renderTimers, 1000);

@@ -686,7 +686,8 @@
     "art": "cast",
     "skills": [
      1600960
-    ]
+    ],
+    "auf_dir": true
    },
    "titel": "Sturzschlag",
    "hinweis": "Tödlich! Im Hard Mode alle zusammen",

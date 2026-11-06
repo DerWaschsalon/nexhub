@@ -269,11 +269,14 @@ class Capture:
                     await self._set("running")
                 else:
                     await self._set("no_caps", "ohne cap_net_raw kein Mitschnitt")
+                await self._notify("hello", msg)
             elif t == "fights_saved":
                 ids = [str(i) for i in msg.get("ids") or []]
                 if self.on_fights:
                     await self.on_fights(ids)
                 await self._notify("fights_saved", ids)
+            elif t in ("plugin_frame", "plugin_character", "plugin_feed"):
+                await self._notify(t, msg)
             elif t == "reply":
                 fut = self._pending.pop(msg.get("id"), None)
                 if fut and not fut.done():

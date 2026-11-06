@@ -44,20 +44,44 @@
   <div class="timer-list" id="timer-list"></div>
 </section>
 
-<section class="widget" id="w-radar" data-id="radar" data-title="Radar">
-  <canvas id="radar-bild" width="520" height="520"></canvas>
-  <div class="radar-info hud"><div id="radar-cube"></div><div id="radar-status"></div></div>
+<section class="widget hud" id="w-radar" data-id="radar" data-title="Radar" data-click>
+  <div class="radar-kopf">
+    <nav class="radar-reiter" role="tablist">
+      <button type="button" data-reiter="karte" class="an">Karte</button>
+      <button type="button" data-reiter="vertraute">Vertraute</button>
+      <button type="button" data-reiter="wuerfel">Würfel</button>
+    </nav>
+    <span id="karte-name" class="radar-titel"></span>
+    <button type="button" id="radar-falten" title="Einklappen" aria-label="Einklappen">–</button>
+  </div>
+  <div id="wuerfel-live"></div>
+  <div class="radar-inhalt">
+    <div class="radar-seite an" data-seite="karte">
+      <canvas id="karte-bild"></canvas>
+      <div class="karte-knoepfe">
+        <button type="button" id="karte-rein" title="Vergrößern">+</button>
+        <button type="button" id="karte-raus" title="Verkleinern">−</button>
+        <button type="button" id="karte-folgen" title="Zurück zu dir" hidden>⌖</button>
+      </div>
+      <canvas id="radar-bild" width="520" height="520" hidden></canvas>
+      <div class="karte-tipp" id="karte-tipp" hidden></div>
+      <p class="karte-notiz" id="karte-notiz" hidden></p>
+      <a class="karte-quelle" id="karte-quelle" href="https://www.aion2timers.com/map/" title="Kartenbilder und Spawnpunkte: Aion 2 Timers, Live-Karte öffnen">Karte: Aion 2 Timers</a>
+      <div class="radar-info">
+        <div id="radar-cube"></div>
+        <div class="radar-zeile"><span id="radar-status"></span><span id="karte-status"></span></div>
+      </div>
+    </div>
+    <div class="radar-seite" data-seite="vertraute"></div>
+    <div class="radar-seite" data-seite="wuerfel"></div>
+  </div>
+  <div id="karte-bilder" hidden></div>
+  <div id="radar-griff" title="Größe ändern" aria-hidden="true"></div>
 </section>
 
 <section class="widget" id="w-warnung" data-id="warnung" data-title="Boss-Warnungen">
   <div class="warn-vorschau" id="warn-vorschau" hidden></div>
   <div id="warn-liste"></div>
-</section>
-
-<section class="widget hud" id="w-karte" data-id="karte" data-title="Karte" data-click>
-  <div class="karte-kopf"><span id="karte-name">Karte</span><span id="karte-status"></span></div>
-  <canvas id="karte-bild"></canvas>
-  <div class="karte-tipp" id="karte-tipp" hidden></div>
 </section>
 
 <section class="widget hud" id="w-pvp" data-id="pvp" data-title="PvP">
@@ -69,6 +93,7 @@
 
 <script src="radar.js"></script>
 <script src="pvp.js"></script>
+<script src="plugins.js"></script>
 <script src="overlay.js"></script>
 </body>
 </html>

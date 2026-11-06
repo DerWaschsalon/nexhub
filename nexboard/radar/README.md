@@ -66,6 +66,7 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
   Spielpatch `STAND` in `werkzeuge/ansagen.py` erhöhen und `python3 -m werkzeuge.ansagen` ausführen.
 - **Jetzt staggern** (Berk, Bakarma, Atiel): sobald die Stagger-Leiste brechbar wird, nach einer Pause oder wenn sie
   erst spät im Kampf erscheint. Endet mit „Boss groggy“, sonst nach 25 s.
+- **Blickrichtung aus der Minikarte** (`radar/minikarte.py`): Der Server schickt die eigene Blickrichtung nie und die Position nur bei Sprint, Sprung oder Kampf. Darum liest das Radar die Minikarte direkt aus dem Spielfenster (X11, `python-xlib`): Die Blickrichtung ist die Mitte zwischen den beiden weißen Linien des Sichtfelds. Einstellung `"minikarte": [x, y, Breite, Höhe]` in Pixeln des Spielfensters, quadratisch und mittig auf dem Pfeil (leer = aus).
 - **Fläche unter dir** (`0x3848`, Boden-Markierung, Aufbau nach glass-cannon): Markiert ein Monster eine Fläche, deren Mittelpunkt höchstens `flaeche_m` (Standard 6 m, in `~/.config/aion2-radar.json`) neben dir liegt, kommt „Fläche unter dir – DU!“ mit Countdown bis zum Einschlag. Größe und Form stehen nicht im Paket, deshalb der feste Abstand. Mehrere Markierungen einer Welle = eine Warnung. Gruppe `flaeche`, auch über `/api/radar/kampf`.
 - **Berserker-Zeit** (`0x8D21`): Countdown in der Vorschauzeile, solange der Boss im Kampf ist.
 - **Wenig LP** (`0x921B`): Mitspieler unter 25 % LP, einmal bis zur Erholung über 50 %. Schalter unter „alle Dungeons“.

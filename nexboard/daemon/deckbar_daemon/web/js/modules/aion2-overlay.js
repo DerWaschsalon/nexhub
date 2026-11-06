@@ -82,9 +82,8 @@ function widgetsTab(ctx) {
           settingsRow("Außerhalb von Kämpfen ausblenden", null, sw(w.boss.hide_idle, (v) => set("boss", { hide_idle: v }))),
           ...common("boss"))),
       el("div", { class: "cols" },
-        card("Radar", "Modul AION 2 · Radar: erscheint nur, solange ein Cube in Sicht ist", sw(w.radar.enabled, (v) => set("radar", { enabled: v })), ...common("radar")),
+        card("Radar", "Modul AION 2 · Radar: Karte, Cubes, Vertraute und Würfel in einem Widget", sw(w.radar.enabled, (v) => set("radar", { enabled: v })), ...common("radar")),
         card("Boss-Warnungen", "Modul AION 2 · Radar: nur während einer Warnung", sw(w.warnung.enabled, (v) => set("warnung", { enabled: v })), ...common("warnung")),
-        card("Karte", "Modul AION 2 · Radar: ziehen = verschieben, Mausrad = Zoom", sw(w.karte.enabled, (v) => set("karte", { enabled: v })), ...common("karte")),
         card("PvP", "Modul AION 2 · Radar: Kills, Tode und Rangpunkte seit Spielstart", sw(w.pvp.enabled, (v) => set("pvp", { enabled: v })), ...common("pvp"))),
       profilesCard(o, draw),
       eventsCard(w, set));

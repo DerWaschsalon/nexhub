@@ -10,11 +10,21 @@
  *
  * Das Overlay setzt vorab window.__DECKBAR_WINDOW__ = {label, view}. Im normalen Browser fehlt es,
  * dann läuft alles als Hauptfenster und Fenster-Commands tun nichts (zum Ausprobieren).
+ *
+ * Plugin-Seiten (plugin-host.html, plugin-widget.html) nennen ihr Plugin in der Adresse. Jeder Befehl
+ * trägt die Fensterkennung, daran erkennt der Daemon das Plugin (plugins.py).
  */
 (function () {
   "use strict";
 
-  const WIN = window.__DECKBAR_WINDOW__ || { label: "main", view: "main" };
+  const QUERY = new URLSearchParams(location.search);
+  const PLUGIN = QUERY.get("plugin");
+  const WIDGET = QUERY.get("widget");
+  if (PLUGIN) window.__A2_PLUGIN_ID__ = PLUGIN;
+  if (WIDGET) window.__A2_WIDGET__ = WIDGET;
+  const WIN = PLUGIN
+    ? { label: WIDGET ? `widget:${PLUGIN}:${WIDGET}` : `plugin-${PLUGIN}`, view: "main" }
+    : window.__DECKBAR_WINDOW__ || { label: "main", view: "main" };
   if (WIN.view && WIN.view !== "main") window.__A2_VIEW__ = WIN.view;
   // Tool-Fenster zeigen sich selbst (show/setFocus), kein main_window_ready
   window.__A2_WINDOW_STARTUP__ = { loadsHidden: false, reusesSettings: false };
@@ -50,6 +60,8 @@
     "request_details_view", "take_pending_details_request", "close_tool_window", "list_monitors",
     "capture_screenshot", "window_show", "window_focus", "window_resize_drag",
   ]);
+  // Widgets: diese Befehle beantwortet die Overlay-Seite selbst, alles andere der Daemon
+  const WIDGET_HOST_COMMANDS = new Set(["plugin_widget_drag"]);
   // Ohne Overlay (Browser): was die Seite dann bekommt
   const NO_HOST = {
     overlay_lock_supported: false, list_monitors: [], take_pending_details_request: null,
@@ -77,11 +89,16 @@
   async function invoke(cmd, args) {
     args = args || {};
     if (cmd === "compositor_resize_supported") return false; // Größe über expandViewport, wie unter X11
+    if (WIDGET_HOST_COMMANDS.has(cmd)) {
+      if (EMBED) EMBED.hostCall(cmd, { ...args, label: WIN.label });
+      return null;
+    }
+    if (cmd === "plugin_screenshot") return hostCall("capture_screenshot", { ...args, saveFile: false });
     if (HOST_COMMANDS.has(cmd)) return hostCall(cmd, args);
     const r = await fetch("/api/a2/invoke", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cmd, args }),
+      body: JSON.stringify({ cmd, args, window: WIN.label }),
     });
     let body = {};
     try { body = await r.json(); } catch {}
@@ -96,6 +113,8 @@
   function dispatch(event, payload) {
     const set = listeners.get(event);
     if (!set) return;
+    // Für ein bestimmtes Fenster gedacht (Nachricht an ein Widget), wie emit_to in Tauri
+    if (payload && payload.__window && payload.__window !== WIN.label) return;
     for (const [id, cb] of [...set]) {
       try { cb({ event, id, payload }); } catch (e) { console.error(`Listener ${event}`, e); }
     }
@@ -108,15 +127,27 @@
     return Promise.resolve(() => listeners.get(event)?.delete(id));
   }
 
+  function onEventText(text) {
+    try {
+      const m = JSON.parse(text);
+      dispatch(m.event, m.payload);
+    } catch {}
+  }
+
   function connectEvents() {
-    const es = new EventSource("/api/a2/events");
-    es.onmessage = (e) => {
+    // Ein gemeinsamer Strom für alle Seiten (a2events.js): je Host gibt es nur 6 Verbindungen
+    if (typeof SharedWorker !== "undefined") {
       try {
-        const m = JSON.parse(e.data);
-        dispatch(m.event, m.payload);
-      } catch {}
-    };
-    // EventSource verbindet sich selbst neu (Daemon-Neustart)
+        const worker = new SharedWorker("/__deckbar__/a2events.js", { name: "a2-events" });
+        worker.port.onmessage = (e) => onEventText(e.data);
+        worker.port.start();
+        addEventListener("pagehide", () => worker.port.postMessage("bye"));
+        return;
+      } catch (e) {
+        console.warn("NexBoard: kein gemeinsamer Ereignis-Strom", e);
+      }
+    }
+    new EventSource("/api/a2/events").onmessage = (e) => onEventText(e.data); // verbindet sich selbst neu
   }
   connectEvents();
   hostReady.then((host) => {
@@ -126,17 +157,30 @@
   // ------------------------------------------------------------------ __TAURI__
   const currentWindow = {
     label: WIN.label,
+    listen,
+    close: () => invoke("close_tool_window"),
     show: () => invoke("window_show"),
     setFocus: () => invoke("window_focus"),
     startResizeDragging: (direction) => invoke("window_resize_drag", { direction }),
   };
 
   window.__TAURI__ = {
-    core: { invoke },
+    // Plugin-Dateien (Original: eigenes Schema a2plugin://), pluginFrame.js hängt den Pfad selbst an
+    core: { invoke, convertFileSrc: () => `${location.origin}/__a2plugin__/` },
     event: { listen, emit: async (event, payload) => dispatch(event, payload) },
     opener: { open: (url) => invoke("open_url", { url }), openUrl: (url) => invoke("open_url", { url }) },
     window: { getCurrentWindow: () => currentWindow },
+    webviewWindow: { getCurrentWebviewWindow: () => currentWindow },
   };
+  // Dock und Meter-Knopf gibt es im NexBoard nicht: jedes Plugin hat sein Fenster, das Meter das Overlay
+  if (PLUGIN && !WIDGET) {
+    addEventListener("DOMContentLoaded", () => {
+      const style = document.createElement("style");
+      // Im Radar-Widget (eingebettet) ist das Widget selbst der Rahmen
+      style.textContent = EMBED ? ".pluginBar { display: none !important; }" : ".pluginDock, .pluginMeter { display: none !important; }";
+      document.head.append(style);
+    });
+  }
   window.__TAURI_INTERNALS__ = { invoke };
 
   // ------------------------------------------------------------------ Einstellungsfenster

@@ -88,6 +88,12 @@ DEFAULT_EVENTS = [
 ]
 
 
+class RadarWidget(Widget):
+    # Größe in CSS-Pixeln, zieht der Griff unten rechts; scale vergrößert zusätzlich alles darin
+    width: int = Field(440, ge=300, le=2000)
+    height: int = Field(580, ge=220, le=1600)
+
+
 class TimersWidget(Widget):
     enabled: bool = False
     events: list[TimerEvent] = Field(default_factory=lambda: [e.model_copy() for e in DEFAULT_EVENTS],
@@ -99,10 +105,9 @@ class Widgets(_Strict):
     meter: Widget = Field(default_factory=Widget, title="DPS-Meter")
     boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste")
     timers: TimersWidget = Field(default_factory=TimersWidget, title="Event-Timer")
-    # Modul AION 2 · Radar: das Radar zeigt sich nur mit einem Cube in Sicht, die Warnungen nur bei einer
-    radar: Widget = Field(default_factory=Widget, title="Radar")
+    # Modul AION 2 · Radar: Karte, Vertraute und Würfel in einem Widget; die Warnungen zeigen sich nur bei einer
+    radar: RadarWidget = Field(default_factory=RadarWidget, title="Radar")
     warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen")
-    karte: Widget = Field(default_factory=lambda: Widget(enabled=False), title="Karte")
     pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP")
 
 
@@ -123,6 +128,24 @@ class OverlayLayout(_Strict):
     widgets: Widgets = Field(default_factory=Widgets)
     profil: str = Field("", max_length=24)  # aktives Profil, leer = keins
     profile: dict[ProfilName, list[str]] = Field(default_factory=lambda: dict(DEFAULT_PROFILE), max_length=12)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _karte_ist_jetzt_radar(cls, data: Any) -> Any:
+        """Das Widget „Karte“ gibt es nicht mehr, es steckt im Radar. War sie an, übernimmt das Radar
+        ihren Platz; das neue Widget zeigt Listen und braucht mindestens 80 % Größe."""
+        if not isinstance(data, dict):
+            return data
+        widgets = data.get("widgets")
+        if isinstance(widgets, dict) and isinstance(widgets.get("karte"), dict):
+            data = {**data, "widgets": dict(widgets)}
+            karte = data["widgets"].pop("karte")
+            if karte.get("enabled"):
+                data["widgets"]["radar"] = {**karte, "scale": max(float(karte.get("scale") or 1), 0.8)}
+        if isinstance(data.get("profile"), dict):
+            data = {**data, "profile": {n: list(dict.fromkeys("radar" if i == "karte" else i for i in ids))
+                                        for n, ids in data["profile"].items()}}
+        return data
 
     @field_validator("profile")
     @classmethod
@@ -330,15 +353,22 @@ class Overlay:
             return await self.game_check()
         return await asyncio.to_thread(aion2_running)
 
+    async def plugin_command(self, command: dict) -> None:
+        """Plugin-Fenster öffnen, zeigen, verbergen … (plugins.py)."""
+        await self._send(b"plugin " + json.dumps(command).encode())
+
     async def command(self, cmd: str) -> None:
         if cmd not in COMMANDS:
             raise ValueError(f"unbekannter Befehl {cmd}")
+        await self._send(cmd.encode())
+
+    async def _send(self, line: bytes) -> None:
         path = socket_path()
         try:
             _, writer = await asyncio.wait_for(asyncio.open_unix_connection(str(path)), 2)
         except (OSError, TimeoutError) as e:
             raise RuntimeError("Overlay läuft nicht") from e
-        writer.write(cmd.encode() + b"\n")
+        writer.write(line + b"\n")
         await writer.drain()
         writer.close()
         try:

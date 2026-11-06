@@ -135,6 +135,7 @@ class RadarZustand:
         self.position_zeit = 0.0
         self.kurs: tuple[float, float] | None = None  # Laufrichtung als Einheitsvektor (Welt x, y)
         self._kurs_von: tuple[float, float] | None = None
+        self.blick_bis = 0.0  # bis dahin gilt die Blickrichtung aus der Minikarte, nicht die Laufrichtung
         self.cubes: dict[int, Cube] = {}
         self.dungeon: str | None = None  # beim Betreten (0x4002), sonst am ersten Boss
         self.gruppe: dict[int, tuple[float, float, float, float]] = {}  # Charakter-ID -> x, y, z, zeit
@@ -165,6 +166,7 @@ class RadarZustand:
         self.effekt_ids: set[int] = set()
         self.bei_status: list[Callable[[int, int], None]] = []  # (Ziel, Status-ID), nur IDs aus status_ids
         self.bei_groggy: list[Callable[[int], None]] = []       # Boss-Entity, deren Stagger-Leiste bricht
+        self.bei_hp: list[Callable[[int], None]] = []           # eigene aktuelle HP
         self.bei_staggern: list[Callable[[int], None]] = []     # Boss-Entity, deren Leiste brechbar wird
         self.bei_treffer: list[Callable[[int], None]] = []      # Skill, der dich trifft, nur IDs aus treffer_ids
         self.bei_gruppe_lp: list[Callable[[int, float], None]] = []  # (Entity, LP-Anteil 0-1)
@@ -233,6 +235,10 @@ class RadarZustand:
                     self.eigene_eid, self.eid_sicher = eid, True
             elif op == OP_SYNC:
                 self._sync(eid, p, n)
+                # eigene aktuelle HP, nur bei sicher erkanntem Charakter (sonst evtl. der Boss)
+                if self.eid_sicher and eid == self.eigene_eid and p[n:n + 3] == b"\x02\x01\x00":
+                    for f in self.bei_hp:
+                        f(struct.unpack_from("<I", p, n + 3)[0])
             elif op == OP_TELEPORT:
                 # Entity-IDs gelten nur bis zum naechsten Teleport/Zonenwechsel
                 with self.lock:
@@ -485,7 +491,9 @@ class RadarZustand:
         if weg >= MAX_SPRUNG_CM:
             self._kurs_von = (x, y)
         elif weg >= KURS_AB_CM:
-            self.kurs, self._kurs_von = (dx / weg, dy / weg), (x, y)
+            self._kurs_von = (x, y)
+            if time.time() >= self.blick_bis:
+                self.kurs = (dx / weg, dy / weg)
 
     def _loggen(self, eid: int, objekt_id: int, x: float, y: float, z: float) -> None:
         zeile = {"t": round(time.time(), 2), "eid": eid, "objekt_id": objekt_id,
