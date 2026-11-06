@@ -181,6 +181,16 @@ class DatenTest(unittest.TestCase):
                        "zeile": "Die Wut der Erde wird alle Hochmütigen strafen, die es wagen, ihren Fuß auf "
                                 "diesen Boden zu setzen!"}, liste["ansage_vakron"])
 
+    def test_neue_dungeons_ueber_ihre_bosse(self):
+        from radar.zustand import ZONEN
+        from werkzeuge.bosse import dungeons_ueber_bosse
+        self.assertEqual(ZONEN[600082], "Abyssal Forge: Ludra")
+        npcs = {"1": {"name": "Eternal Ludra", "isBoss": True, "dungeonId": 600082},
+                "2": {"name": "Kromede's Desire", "isBoss": True, "dungeonId": 200003},  # Albtraum: viele
+                "3": {"name": "Sura", "isBoss": True, "dungeonId": 200003},             # Bosse, nur einer
+                "4": {"name": "Zikel", "isBoss": True, "dungeonId": 200003}}            # bekannt
+        self.assertEqual(dungeons_ueber_bosse(npcs, {}), {"600082": "Abyssal Forge: Ludra"})
+
     def test_ansage_ersetzt_eigene_regel(self):
         mechaniken = json.loads((Path(__file__).parents[1] / "radar" / "mechaniken.json").read_text())
         eigene = {s for m in mechaniken["mechaniken"] for s in m["wann"].get("skills", [m["wann"].get("id")])}
