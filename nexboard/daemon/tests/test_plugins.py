@@ -427,3 +427,37 @@ async def test_invoke_leitet_an_den_host(ui, cdn):
     assert r.status == 500
     r = await ui.client.post("/api/a2/invoke", json={"cmd": "meter_shown", "args": {}})
     assert (await r.json())["result"] is True
+
+
+# ---------------------------------------------------------------- Im Radar-Widget
+async def test_pet_soul_und_wuerfel_laufen_im_radar(host, cdn):
+    cdn.add("pet-souls", permissions=["storage", "window", "widgets"])
+    cdn.add("dice-rolls", permissions=["storage", "window", "widgets"])
+    cdn.add("ping", permissions=["storage", "window"])
+    for plugin in ("pet-souls", "dice-rolls", "ping"):
+        await host.install(plugin)
+    assert [w["id"] for w in host.windows_to_restore()] == ["ping"]  # nur Ping bekommt ein Fenster
+    assert host.embedded() == ["dice-rolls", "pet-souls"]
+    assert not any(c.get("id") in ("pet-souls", "dice-rolls") for c in host.overlay_calls)
+    assert ("plugin-embed", {"plugin": "pet-souls", "shown": True}) in host.emitted
+    assert (await host.call("plugin_hello", {}, "plugin-pet-souls"))["visible"] is True
+    host.emitted.clear()
+    # Pet Soul holt sich nicht nach vorn, ein Klick auf die Würfelkarte schon
+    await host.call("plugin_window", {"visible": True}, "plugin-pet-souls")
+    assert host.emitted == []
+    await host.call("plugin_window", {"visible": True}, "plugin-dice-rolls")
+    assert host.emitted == [("plugin-embed", {"plugin": "dice-rolls", "shown": True})]
+    await host.call("plugin_close", {}, "plugin-pet-souls")
+    await host.call("plugin_window_fit", {"height": 80}, "plugin-pet-souls")
+    assert not any(c.get("id") == "pet-souls" for c in host.overlay_calls)
+
+
+async def test_pet_soul_karte_steht_fest_auf_ausgelagert(host, cdn):
+    cdn.add("pet-souls", permissions=["storage"])
+    await host.install("pet-souls")
+    prefs = json.loads(await host.call("plugin_storage_get", {"key": "prefs"}, "plugin-pet-souls"))
+    assert prefs == {"nearby": True, "mapPopped": True, "farmPopup": False}
+    await host.call("plugin_storage_set", {"key": "prefs", "value": json.dumps({"sort": "left", "nearby": False})}, "plugin-pet-souls")
+    prefs = json.loads(await host.call("plugin_storage_get", {"key": "prefs"}, "plugin-pet-souls"))
+    assert prefs["sort"] == "left" and prefs["nearby"] is True
+    assert await host.call("plugin_storage_get", {"key": "anderes"}, "plugin-pet-souls") is None

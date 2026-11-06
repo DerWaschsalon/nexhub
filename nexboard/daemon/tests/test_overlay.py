@@ -202,3 +202,16 @@ async def test_close_clients_beendet_offene_streams(tmp_path):
         o.close_clients()
         assert await asyncio.wait_for(r.content.read(), 2) == b""  # Server hat beendet
         assert not o.clients
+
+
+def test_alte_karte_geht_im_radar_auf(tmp_path):
+    from deckbar_daemon.overlay import OverlayLayout
+    alt = {"widgets": {"radar": {"enabled": False, "x": 1, "y": 1}, "karte": {"enabled": True, "x": 8, "y": 568, "scale": 0.6}},
+           "profile": {"PvE": ["meter", "karte", "radar"], "Karte": ["karte"]}}
+    neu = OverlayLayout.model_validate(alt)
+    assert neu.widgets.radar.enabled is True and neu.widgets.radar.x == 8 and neu.widgets.radar.scale == 0.8
+    assert neu.profile == {"PvE": ["meter", "radar"], "Karte": ["radar"]}
+    # Karte war aus: das Radar bleibt, wie es war
+    alt = {"widgets": {"radar": {"enabled": False, "x": 1, "y": 1}, "karte": {"enabled": False}}}
+    neu = OverlayLayout.model_validate(alt)
+    assert neu.widgets.radar.enabled is False and neu.widgets.radar.x == 1

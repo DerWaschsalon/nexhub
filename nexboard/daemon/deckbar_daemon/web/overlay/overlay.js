@@ -19,9 +19,8 @@ const DEFAULT_POS = {
   meter: () => [48, Math.max(40, innerHeight - 380)],
   boss: () => [Math.round(innerWidth / 2 - 210), 72],
   timers: () => [innerWidth - 300, 160],
-  radar: () => [innerWidth - 300, 40],
+  radar: () => [innerWidth - 460, 300],
   warnung: () => [Math.round(innerWidth / 2 - 230), 140],
-  karte: () => [innerWidth - 460, 400],
   pvp: () => [48, 200],
 };
 

@@ -99,10 +99,9 @@ class Widgets(_Strict):
     meter: Widget = Field(default_factory=Widget, title="DPS-Meter")
     boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste")
     timers: TimersWidget = Field(default_factory=TimersWidget, title="Event-Timer")
-    # Modul AION 2 · Radar: das Radar zeigt sich nur mit einem Cube in Sicht, die Warnungen nur bei einer
+    # Modul AION 2 · Radar: Karte, Vertraute und Würfel in einem Widget; die Warnungen zeigen sich nur bei einer
     radar: Widget = Field(default_factory=Widget, title="Radar")
     warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen")
-    karte: Widget = Field(default_factory=lambda: Widget(enabled=False), title="Karte")
     pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP")
 
 
@@ -123,6 +122,24 @@ class OverlayLayout(_Strict):
     widgets: Widgets = Field(default_factory=Widgets)
     profil: str = Field("", max_length=24)  # aktives Profil, leer = keins
     profile: dict[ProfilName, list[str]] = Field(default_factory=lambda: dict(DEFAULT_PROFILE), max_length=12)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _karte_ist_jetzt_radar(cls, data: Any) -> Any:
+        """Das Widget „Karte“ gibt es nicht mehr, es steckt im Radar. War sie an, übernimmt das Radar
+        ihren Platz; das neue Widget zeigt Listen und braucht mindestens 80 % Größe."""
+        if not isinstance(data, dict):
+            return data
+        widgets = data.get("widgets")
+        if isinstance(widgets, dict) and isinstance(widgets.get("karte"), dict):
+            data = {**data, "widgets": dict(widgets)}
+            karte = data["widgets"].pop("karte")
+            if karte.get("enabled"):
+                data["widgets"]["radar"] = {**karte, "scale": max(float(karte.get("scale") or 1), 0.8)}
+        if isinstance(data.get("profile"), dict):
+            data = {**data, "profile": {n: list(dict.fromkeys("radar" if i == "karte" else i for i in ids))
+                                        for n, ids in data["profile"].items()}}
+        return data
 
     @field_validator("profile")
     @classmethod

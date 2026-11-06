@@ -176,7 +176,8 @@
   if (PLUGIN && !WIDGET) {
     addEventListener("DOMContentLoaded", () => {
       const style = document.createElement("style");
-      style.textContent = ".pluginDock, .pluginMeter { display: none !important; }";
+      // Im Radar-Widget (eingebettet) ist das Widget selbst der Rahmen
+      style.textContent = EMBED ? ".pluginBar { display: none !important; }" : ".pluginDock, .pluginMeter { display: none !important; }";
       document.head.append(style);
     });
   }

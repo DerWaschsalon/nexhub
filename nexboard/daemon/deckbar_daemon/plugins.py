@@ -76,6 +76,11 @@ STORAGE_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
 WIDGET_NAME = re.compile(r"[a-z0-9-]{1,32}")
 PLAIN_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
+# Laufen im Radar-Widget der Overlay-Seite (web/overlay/radar.js), nicht im eigenen Fenster. Der Pet Soul
+# Tracker schickt seine Karte als Szene an ein Widget, das Radar zeichnet sie auf seiner Karte: dafür steht
+# die Karte fest auf „ausgelagert“. Sein Aufklappen beim Farmen wäre im Radar ein Reiterwechsel.
+EMBEDDED = {"pet-souls", "dice-rolls"}
+EMBEDDED_PREFS = {"pet-souls": {"nearby": True, "mapPopped": True, "farmPopup": False}}
 # Was eine Plugin-Seite (Fenster oder Widget) aufrufen darf, wie PLUGIN_SURFACE_COMMANDS im Original
 SURFACE = {
     "meter_shown", "set_meter_shown", "open_settings_at", "open_settings_window", "open_url",
@@ -632,13 +637,15 @@ class PluginHost:
         await self._overlay({"action": "close", "id": plugin})
         await self._drop_widgets(plugin)
         self._remember_window(plugin, None)
+        self.logs.pop(plugin, None)
         self._save_list(DISABLED_KEY, [x for x in self.disabled() if x != plugin])
         shutil.rmtree(self.folder / plugin, ignore_errors=True)
         self._proof(plugin).unlink(missing_ok=True)
-        self.logs.pop(plugin, None)
         await self._forget_follows(plugin)
         self.reload()
         await self.send_decoders()
+        if plugin in EMBEDDED:
+            await self.emit("plugin-embed", {"plugin": plugin, "shown": False})
         return self.view()  # gespeicherte Daten bleiben für eine spätere Installation
 
     async def check_updates(self) -> dict:
@@ -681,13 +688,20 @@ class PluginHost:
                 "minWidth": 240, "minHeight": min(height + 30, 230)}
 
     async def _open(self, plugin: str, shown: bool) -> None:
+        if plugin in EMBEDDED:
+            await self.emit("plugin-embed", {"plugin": plugin, "shown": shown})
+            return
         await self._overlay({"action": "open", "shown": shown, **self._window_info(plugin)})
         await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": shown})
 
     def windows_to_restore(self) -> list[dict]:
         """Für den Start des Overlays: jedes eingeschaltete Plugin läuft, sichtbar wie zuletzt."""
         windows = self._windows()
-        return [{**self._window_info(p), "shown": windows.get(p) == "shown"} for p in self._on_ids()]
+        return [{**self._window_info(p), "shown": windows.get(p) == "shown"} for p in self._on_ids() if p not in EMBEDDED]
+
+    def embedded(self) -> list[str]:
+        """Für die Overlay-Seite: welche Plugins sie selbst trägt."""
+        return [p for p in self._on_ids() if p in EMBEDDED]
 
     def _require_id(self, plugin: str) -> None:
         if not valid_id(plugin):
@@ -727,6 +741,8 @@ class PluginHost:
             await self._forget_follows(plugin)
             self.pending[:] = [p for p in self.pending if p.plugin != plugin]
             self.logs.pop(plugin, None)
+            if plugin in EMBEDDED:
+                await self.emit("plugin-embed", {"plugin": plugin, "shown": False})
         await self.send_decoders()
         return self.view()
 
@@ -942,7 +958,8 @@ class PluginHost:
         ping = self.capture.status.get("ping")
         return {"manifest": p.public(), "replay": replay, "run": self.run,
                 "character": self.character if "events:character" in p.permissions else None,
-                "language": self.language(), "theme": self.theme(), "visible": self._windows().get(plugin) == "shown",
+                "language": self.language(), "theme": self.theme(),
+                "visible": plugin in EMBEDDED or self._windows().get(plugin) == "shown",
                 "reviewed": True, "game": bool(self.capture.status.get("game")),
                 "ping": ping if isinstance(ping, (int, float)) else None}
 
@@ -1002,6 +1019,8 @@ class PluginHost:
                 return self.windows_to_restore()
             case "plugin_widgets_state":
                 return self.widgets_state()
+            case "plugin_embedded":
+                return self.embedded()
             case "plugin_overlay_screen":
                 self.screen = {"width": max(320, int(a.get("width") or 1920)), "height": max(240, int(a.get("height") or 1080))}
                 return None
@@ -1017,27 +1036,40 @@ class PluginHost:
             case "plugin_window":
                 visible = bool(a.get("visible"))
                 self._require(plugin, "window")
+                if plugin in EMBEDDED:
+                    # Klick auf die Würfelkarte: zum Reiter; sich selbst nach vorn holen darf kein Plugin im Radar
+                    if visible and plugin == "dice-rolls":
+                        await self.emit("plugin-embed", {"plugin": plugin, "shown": True})
+                    return None
                 self._remember_window(plugin, "shown" if visible else "hidden")
                 await self._overlay({"action": "show" if visible else "hide", "id": plugin})
                 await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": visible})
                 return None
             case "plugin_close":
+                if plugin in EMBEDDED:
+                    return None
                 self._remember_window(plugin, "hidden")
                 await self._overlay({"action": "hide", "id": plugin})
                 await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": False})
                 return None
             case "plugin_window_fit":
                 self._require(plugin, "window")
+                if plugin in EMBEDDED:
+                    return None
                 height = a.get("height")
                 await self._overlay({"action": "fit", "id": plugin,
                                      "height": max(MIN_PANEL_HEIGHT, float(height)) if isinstance(height, (int, float)) else None})
                 return None
             case "plugin_storage_get":
                 self._require(plugin, "storage")
+                key = str(a.get("key"))
                 try:
-                    return self._data_file(plugin, str(a.get("key"))).read_text(encoding="utf-8")
+                    text = self._data_file(plugin, key).read_text(encoding="utf-8")
                 except FileNotFoundError:
-                    return None
+                    text = None
+                if key == "prefs" and plugin in EMBEDDED_PREFS:
+                    return json.dumps({**json.loads(text or "{}"), **EMBEDDED_PREFS[plugin]})
+                return text
             case "plugin_storage_set":
                 self._require(plugin, "storage")
                 self._storage_set(plugin, str(a.get("key")), str(a.get("value")))

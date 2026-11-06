@@ -300,6 +300,12 @@ Meter: kein Dock, keine FPS-Anzeige (zählt nur unter Windows), keine Entwickler
 „ausblenden“ wirkt nur über das Overlay selbst, Widgets nur mit layer-shell. Plugin-API bis Version 2;
 ein Plugin mit neuerer API wird abgelehnt, dann `API_VERSION` und den Host nachziehen.
 
+**Radar-Widget:** Karte, Cubes, Vertraute und Würfel stecken in einem Widget (`web/overlay/radar.js`), das
+frühere Widget „Karte“ geht darin auf. Pet Soul Tracker und Dice Rolls laufen dort statt im eigenen Fenster
+(`EMBEDDED` in `plugins.py`). Die Karte nutzt `MiniMap` und Kartenbilder aus dem installierten Plugin und
+zeichnet darüber, was nur das Radar kennt. Tippen geht dort nur im Bearbeiten-Modus, sonst hat das Overlay
+keine Tastatur.
+
 **Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die NexBoard stattdessen dessen
 Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent Events). Dafür im
 Meter das Stream-Overlay einschalten. Port und Schlüssel liest der Daemon aus

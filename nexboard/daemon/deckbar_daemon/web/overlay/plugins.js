@@ -5,6 +5,9 @@
 "use strict";
 
 const pluginWidgets = new Map(); // Kennung → {el, state}
+// Gehen im Radar-Widget auf (radar.js): die Karte zeichnet es selbst, die Würfelkarte steht über den Reitern
+const RADAR_KARTE = "widget:pet-souls:map";
+const RADAR_WUERFEL = "widget:dice-rolls:card";
 
 function pluginInvoke(cmd, args = {}) {
   return fetch("/api/a2/invoke", {
@@ -16,6 +19,12 @@ function pluginInvoke(cmd, args = {}) {
 
 function pluginPlace(entry) {
   const { el, state } = entry;
+  if (!el) return;
+  if (state.label === RADAR_WUERFEL) {
+    el.style.height = `${state.height}px`;
+    el.hidden = !state.open;
+    return;
+  }
   el.style.left = `${state.x}px`;
   el.style.top = `${state.y}px`;
   el.style.width = `${state.width}px`;
@@ -29,12 +38,17 @@ function pluginSync(list) {
   for (const state of list) {
     seen.add(state.label);
     let entry = pluginWidgets.get(state.label);
-    if (!entry) {
+    if (!entry && state.label === RADAR_KARTE) {
+      entry = { el: null, state };
+      pluginWidgets.set(state.label, entry);
+      szeneAntwort({ hello: true });
+    } else if (!entry) {
       const el = document.createElement("iframe");
       el.className = "plugin-widget";
       el.setAttribute("allowtransparency", "true");
       el.src = `/plugin-widget.html?plugin=${encodeURIComponent(state.plugin)}&widget=${encodeURIComponent(state.name)}`;
-      document.body.append(el);
+      if (state.label === RADAR_WUERFEL) document.getElementById("wuerfel-live").append(el);
+      else document.body.append(el);
       entry = { el, state };
       pluginWidgets.set(state.label, entry);
     }
@@ -45,7 +59,7 @@ function pluginSync(list) {
   }
   for (const [label, entry] of pluginWidgets) {
     if (!seen.has(label)) {
-      entry.el.remove();
+      entry.el?.remove();
       pluginWidgets.delete(label);
     }
   }
@@ -56,7 +70,7 @@ function pluginSync(list) {
 function pluginRegions() {
   const out = [];
   for (const { state } of pluginWidgets.values()) {
-    if (!state.open || state.locked) continue;
+    if (!state.open || state.locked || state.label === RADAR_KARTE || state.label === RADAR_WUERFEL) continue;
     if (Array.isArray(state.areas)) {
       for (const [x, y, width, height] of state.areas) {
         out.push([Math.floor(state.x + x), Math.floor(state.y + y), Math.ceil(width), Math.ceil(height)]);
@@ -73,7 +87,7 @@ let pluginDrag = null;
 
 function pluginWidgetDrag(label) {
   const entry = pluginWidgets.get(label);
-  if (!entry || entry.state.locked || !bridge || pluginDrag) return;
+  if (!entry || entry.state.locked || !bridge || pluginDrag || label === RADAR_WUERFEL) return;
   pluginDrag = { label, last: null };
   bridge.watchPointer();
 }
@@ -106,6 +120,7 @@ function pluginsStart() {
   pluginScreen();
   addEventListener("resize", pluginScreen);
   pluginInvoke("plugin_widgets_state").then((r) => pluginSync(r.result)).catch(() => {});
+  pluginInvoke("plugin_embedded").then((r) => eingebetteteLaden(r.result || [])).catch(() => {});
   if (bridge) {
     bridge.pointerMoved.connect(pluginPointerMoved);
     bridge.pointerReleased.connect(pluginPointerReleased);
@@ -114,6 +129,11 @@ function pluginsStart() {
     try {
       const m = JSON.parse(text);
       if (m.event === "plugin-widgets") pluginSync(m.payload);
+      else if (m.event === "plugin-event" && m.payload?.__window === RADAR_KARTE && m.payload.event === "widget") karteSzene(m.payload.data);
+      else if (m.event === "plugin-embed") {
+        pluginInvoke("plugin_embedded").then((r) => eingebetteteLaden(r.result || []));
+        if (m.payload?.shown) reiterZeigen(EINGEBETTET[m.payload.plugin]);
+      }
     } catch {}
   };
   try {
