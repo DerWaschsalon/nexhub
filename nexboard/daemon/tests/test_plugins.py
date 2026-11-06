@@ -1,4 +1,5 @@
 """Plugin-Host: Katalog und Signatur, Installation, Ereignisse, Berechtigungen, Auslieferung."""
+import asyncio
 import hashlib
 import json
 
@@ -439,7 +440,8 @@ async def test_pet_soul_und_wuerfel_laufen_im_radar(host, cdn):
     assert [w["id"] for w in host.windows_to_restore()] == ["ping"]  # nur Ping bekommt ein Fenster
     assert host.embedded() == ["dice-rolls", "pet-souls"]
     assert not any(c.get("id") in ("pet-souls", "dice-rolls") for c in host.overlay_calls)
-    assert ("plugin-embed", {"plugin": "pet-souls", "shown": True}) in host.emitted
+    assert ("plugin-embed", {"plugin": "pet-souls", "shown": False}) in host.emitted  # springt nicht nach vorn
+    assert ("plugin-embed", {"plugin": "dice-rolls", "shown": True}) in host.emitted
     assert (await host.call("plugin_hello", {}, "plugin-pet-souls"))["visible"] is True
     host.emitted.clear()
     # Pet Soul holt sich nicht nach vorn, ein Klick auf die Würfelkarte schon
@@ -461,3 +463,53 @@ async def test_pet_soul_karte_steht_fest_auf_ausgelagert(host, cdn):
     prefs = json.loads(await host.call("plugin_storage_get", {"key": "prefs"}, "plugin-pet-souls"))
     assert prefs["sort"] == "left" and prefs["nearby"] is True
     assert await host.call("plugin_storage_get", {"key": "anderes"}, "plugin-pet-souls") is None
+
+
+# ---------------------------------------------------------------- Fest eingebaut
+async def test_pet_soul_installiert_und_aktualisiert_sich_selbst(host, cdn):
+    cdn.add("pet-souls", "1.0.0", permissions=["storage"])
+    await host._install_builtin()
+    assert host.loaded["pet-souls"].manifest["version"] == "1.0.0" and host.embedded() == ["pet-souls"]
+    cdn.add("pet-souls", "1.1.0", permissions=["storage"])
+    await host._install_builtin()
+    assert host.loaded["pet-souls"].manifest["version"] == "1.1.0"
+    # Will es mehr dürfen, fragt niemand: bleibt auf der alten Version
+    cdn.add("pet-souls", "2.0.0", permissions=["storage", "screenshot"])
+    await host._install_builtin()
+    assert host.loaded["pet-souls"].manifest["version"] == "1.1.0"
+
+
+async def test_pet_soul_steht_in_keiner_liste_und_bleibt_an(host, cdn):
+    cdn.add("pet-souls", permissions=["storage"])
+    cdn.add("ping", permissions=["storage"])
+    await host._install_builtin()
+    await host.install("ping")
+    view = await host.call("plugin_list", {}, None)
+    assert [p["id"] for p in view["plugins"]] == ["ping"] and "pet-souls" not in view["ownWindow"]
+    assert [e["id"] for e in await host.call("plugin_catalog", {}, None)] == ["ping"]
+    with pytest.raises(PluginError, match="ausschalten"):
+        await host.call("plugin_set_enabled", {"id": "pet-souls", "enabled": False}, None)
+    with pytest.raises(PluginError, match="entfernen"):
+        await host.call("plugin_uninstall", {"id": "pet-souls"}, None)
+    # früher ausgeschaltet oder geänderter Ordner: läuft wieder, wird neu geholt
+    host.saved["dpsMeter.pluginsDisabled"] = '["pet-souls"]'
+    assert "pet-souls" in host.embedded()
+    (host.folder / "pet-souls" / "index.html").write_text("boese")
+    host.reload()
+    assert "pet-souls" not in host.loaded and (await host.call("plugin_list", {}, None))["plugins"][0]["id"] == "ping"
+    await host._install_builtin()
+    assert "pet-souls" in host.loaded and not host.errors
+
+
+async def test_ohne_netz_wird_es_spaeter_versucht(host, cdn, monkeypatch):
+    import deckbar_daemon.plugins as modul
+    monkeypatch.setattr(modul, "BUILTIN_RETRY", 0.01)
+    cdn.add("pet-souls", permissions=["storage"])
+    gut = cdn.signature
+    cdn.signature = b"00"
+    task = asyncio.create_task(host._keep_builtin())
+    await asyncio.sleep(0.05)
+    assert "pet-souls" not in host.loaded and not task.done()
+    cdn.signature = gut
+    await asyncio.wait_for(task, 5)
+    assert "pet-souls" in host.loaded

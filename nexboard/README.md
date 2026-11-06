@@ -302,7 +302,10 @@ ein Plugin mit neuerer API wird abgelehnt, dann `API_VERSION` und den Host nachz
 
 **Radar-Widget:** Karte, Cubes, Vertraute und Würfel stecken in einem Widget (`web/overlay/radar.js`), das
 frühere Widget „Karte“ geht darin auf. Pet Soul Tracker und Dice Rolls laufen dort statt im eigenen Fenster
-(`EMBEDDED` in `plugins.py`). Die Karte nutzt `MiniMap` und Kartenbilder aus dem installierten Plugin und
+(`EMBEDDED` in `plugins.py`). Der Pet Soul Tracker ist fest eingebaut (`BUILTIN`): Das NexBoard installiert und
+aktualisiert ihn selbst aus dem signierten Katalog (beim ersten Start also mit Netz), er steht in keiner
+Plugin-Liste und lässt sich nicht ausschalten. Ein Update, das neue Berechtigungen will, bleibt liegen, bis
+jemand es prüft. Die Karte nutzt seine `MiniMap` und Kartenbilder und
 zeichnet darüber, was nur das Radar kennt. Tippen geht dort nur im Bearbeiten-Modus, sonst hat das Overlay
 keine Tastatur.
 

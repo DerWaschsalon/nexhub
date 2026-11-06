@@ -132,6 +132,7 @@ function pluginsStart() {
       else if (m.event === "plugin-event" && m.payload?.__window === RADAR_KARTE && m.payload.event === "widget") karteSzene(m.payload.data);
       else if (m.event === "plugin-embed") {
         pluginInvoke("plugin_embedded").then((r) => eingebetteteLaden(r.result || []));
+        karteNachInstallation(); // beim allerersten Start kommt der Tracker erst jetzt an
         if (m.payload?.shown) reiterZeigen(EINGEBETTET[m.payload.plugin]);
       }
     } catch {}

@@ -81,6 +81,11 @@ PLAIN_NAME = re.compile(r"[A-Za-z0-9._-]+")
 # die Karte fest auf „ausgelagert“. Sein Aufklappen beim Farmen wäre im Radar ein Reiterwechsel.
 EMBEDDED = {"pet-souls", "dice-rolls"}
 EMBEDDED_PREFS = {"pet-souls": {"nearby": True, "mapPopped": True, "farmPopup": False}}
+# Fest eingebaut: Teil des Radars, kein Addon. Das NexBoard installiert und aktualisiert ihn selbst aus dem
+# signierten Katalog, er steht in keiner Liste und lässt sich nicht ausschalten oder entfernen. Die Dateien
+# liegen nicht im Repo: Die Kartenbilder sind von aion2timers.com für den Tracker freigegeben.
+BUILTIN = {"pet-souls"}
+BUILTIN_RETRY = 60.0
 # Was eine Plugin-Seite (Fenster oder Widget) aufrufen darf, wie PLUGIN_SURFACE_COMMANDS im Original
 SURFACE = {
     "meter_shown", "set_meter_shown", "open_settings_at", "open_settings_window", "open_url",
@@ -294,7 +299,7 @@ class PluginHost:
         self.save_setting(key, json.dumps(ids))
 
     def disabled(self) -> list[str]:
-        return self._listed(DISABLED_KEY)
+        return [x for x in self._listed(DISABLED_KEY) if x not in BUILTIN]
 
     def _windows(self) -> dict[str, str]:
         try:
@@ -364,11 +369,12 @@ class PluginHost:
 
     def view(self) -> dict:
         return {"devMode": False, "online": True,
-                "plugins": [self.info(p) for p in self.loaded.values()] + list(self.errors.values()),
+                "plugins": [self.info(p) for p in self.loaded.values() if p.id not in BUILTIN]
+                + [e for e in self.errors.values() if e["id"] not in BUILTIN],
                 "disabled": self.disabled(), "hideClosed": self._listed(HIDE_CLOSED_KEY),
                 "hideUnfocused": self._listed(HIDE_UNFOCUSED_KEY),
                 # Ein Dock wie im Meter gibt es nicht: jedes Plugin hat sein Fenster
-                "ownWindow": list(self.loaded)}
+                "ownWindow": [p for p in self.loaded if p not in BUILTIN]}
 
     async def send_decoders(self) -> None:
         """Decoder der laufenden Plugins an deckbar-capture (auch nach dessen Neustart)."""
@@ -390,7 +396,34 @@ class PluginHost:
 
     def start(self) -> None:
         if not self._tasks:
-            self._tasks = [asyncio.create_task(self._flusher()), asyncio.create_task(self._game_loop())]
+            self._tasks = [asyncio.create_task(self._flusher()), asyncio.create_task(self._game_loop()),
+                           asyncio.create_task(self._keep_builtin())]
+
+    async def _keep_builtin(self) -> None:
+        """Beim Start: Eingebautes installieren oder aktualisieren. Ohne Netz später noch einmal."""
+        while True:
+            try:
+                await self._install_builtin()
+                return
+            except (PluginError, aiohttp.ClientError, TimeoutError, OSError) as e:
+                log.warning("Eingebautes Plugin nicht aktuell: %s", e)
+            await asyncio.sleep(BUILTIN_RETRY)
+
+    async def _install_builtin(self) -> None:
+        catalog = await self.fetch_catalog()
+        for entry in catalog.get("plugins", []):
+            plugin = entry.get("id")
+            if plugin not in BUILTIN:
+                continue
+            p = self.loaded.get(plugin)
+            if p and not newer(str(entry.get("version")), str(p.manifest.get("version"))):
+                continue
+            # Ohne Dialog gibt es keine Zustimmung zu Neuem: Solche Updates bleiben liegen
+            added = [x for x in entry.get("permissions") or [] if p and x not in p.permissions]
+            if added:
+                log.warning("%s %s will mehr dürfen (%s), bleibt auf der alten Version", plugin, entry.get("version"), added)
+                continue
+            await self.install(plugin)
 
     async def stop(self) -> None:
         for task in [*self._tasks, *self._live.values()]:
@@ -541,7 +574,8 @@ class PluginHost:
                  "description": e.get("description", ""), "author": e.get("author", ""),
                  "permissions": e.get("permissions") or [], "source": e.get("source", ""),
                  "installed": self.loaded[e["id"]].manifest.get("version") if e.get("id") in self.loaded else None,
-                 "test": False, "changes": e.get("changes") or []} for e in catalog.get("plugins", [])]
+                 "test": False, "changes": e.get("changes") or []}
+                for e in catalog.get("plugins", []) if e.get("id") not in BUILTIN]
 
     async def install(self, plugin: str) -> dict:
         plugin = plugin.strip().lower()
@@ -562,7 +596,7 @@ class PluginHost:
             await self._overlay({"action": "reload", "id": plugin})
         else:
             self._remember_window(plugin, "shown")
-            await self._open(plugin, True)
+            await self._open(plugin, plugin not in BUILTIN)  # Eingebautes springt nicht nach vorn
         return self.view()
 
     async def _download(self, entry: dict) -> list[tuple[str, bytes]]:
@@ -634,6 +668,8 @@ class PluginHost:
 
     async def uninstall(self, plugin: str) -> dict:
         self._require_id(plugin)
+        if plugin in BUILTIN:
+            raise PluginError("Fest eingebaut, lässt sich nicht entfernen")
         await self._overlay({"action": "close", "id": plugin})
         await self._drop_widgets(plugin)
         self._remember_window(plugin, None)
@@ -655,7 +691,7 @@ class PluginHost:
             catalog = await self.fetch_catalog()
             for entry in catalog.get("plugins", []):
                 p = self.loaded.get(entry.get("id"))
-                if p and newer(str(entry.get("version")), str(p.manifest.get("version"))):
+                if p and p.id not in BUILTIN and newer(str(entry.get("version")), str(p.manifest.get("version"))):
                     frm, to = str(p.manifest.get("version")), str(entry.get("version"))
                     available.append({
                         "id": p.id, "name": entry.get("name"), "from": frm, "to": to,
@@ -727,6 +763,8 @@ class PluginHost:
 
     async def _set_enabled(self, plugin: str, enabled: bool) -> dict:
         self._require_id(plugin)
+        if plugin in BUILTIN and not enabled:
+            raise PluginError("Fest eingebaut, lässt sich nicht ausschalten")
         ids = [x for x in self.disabled() if x != plugin]
         if not enabled:
             ids.append(plugin)

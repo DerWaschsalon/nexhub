@@ -3,7 +3,7 @@
  * und nutzt dessen Layout und Modus erst beim Aufruf (cfg, W, mode, regionsSoon).
  *
  * Radar:      ein Widget für alles, drei Reiter:
- *   Karte      Karte und Monster des Pet Soul Trackers (seine MiniMap aus dem installierten Plugin,
+ *   Karte      Karte und Monster des fest eingebauten Pet Soul Trackers (seine MiniMap,
  *              seine Szene kommt als Widget-Nachricht), darüber Cubes, Spawnpunkte, Fundorte und
  *              Teleporter. Du bist ein Pfeil in Blickrichtung (radar.kurs), ohne bekannte Richtung ein
  *              Punkt. Ziehen = verschieben, Mausrad = Zoom, Doppelklick = wieder dir folgen.
@@ -320,6 +320,12 @@ async function miniKarteLaden() {
   return true;
 }
 
+function karteNachInstallation() {
+  if (karte.map) return;
+  karte.start = null;
+  miniKarteStarten().then((ok) => { if (ok) szeneAntwort({ hello: true }); });
+}
+
 /** Sanft zur Position, ein Teleport springt (wie #glideTo der MiniMap). */
 function karteGleiten(ziel) {
   const m = karte.map;
@@ -366,7 +372,7 @@ function karteAktualisieren() {
   if (!m) {
     miniKarteStarten().then((ok) => {
       if (ok) karteAktualisieren();
-      else document.getElementById("karte-name").textContent = "Pet Soul Tracker fehlt";
+      else document.getElementById("karte-name").textContent = "Karte wird geladen …";
     });
     return;
   }
@@ -567,7 +573,7 @@ function radarStart() {
   });
   miniKarteStarten().then((ok) => {
     if (ok) szeneAntwort({ hello: true });
-    else document.getElementById("karte-name").textContent = "Pet Soul Tracker fehlt";
+    else document.getElementById("karte-name").textContent = "Karte wird geladen …";
   });
   // Cubes pulsieren: auch ohne neue Daten neu zeichnen, solange einer da ist
   setInterval(() => { if (radar.aktiv && radar.cubes?.length) karte.map?.draw(); }, 100);
