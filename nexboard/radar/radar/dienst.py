@@ -22,7 +22,8 @@ from .zustand import Cube, RadarZustand
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
 
 
-MINIKARTE_S = 0.5  # so oft die Minikarte lesen (ca. 5 ms je Bild)
+MINIKARTE_S = 0.2  # so oft die Minikarte lesen (ca. 5 ms je Bild), so oft wie der Stand ans Overlay geht
+BLICK_GILT_S = 2.0  # so lange nach dem letzten Blick aus der Minikarte zählt die Laufrichtung nicht
 
 class RadarDienst:
     def __init__(self, name: str = "", spawn_log: Path | None = LOG) -> None:
@@ -149,7 +150,7 @@ class RadarDienst:
                 alarm_abspielen()
 
     def _blickrichtung(self) -> None:
-        """Blickrichtung aus der Minikarte (Einstellung minikarte = [x, y, Breite, Hoehe]), zweimal pro
+        """Blickrichtung aus der Minikarte (Einstellung minikarte = [x, y, Breite, Hoehe]), fünfmal pro
         Sekunde. Sie ersetzt die Laufrichtung aus zwei Positionen, die beim normalen Laufen fehlt."""
         bereich = self.k["minikarte"]
         if len(bereich) != 4 or time.time() - self._karte_gelesen < MINIKARTE_S:
@@ -159,6 +160,7 @@ class RadarDienst:
         grad = minikarte.blickrichtung(bild) if bild is not None else None
         if grad is not None:
             self.zustand.kurs = minikarte.kurs(grad)
+            self.zustand.blick_bis = time.time() + BLICK_GILT_S
 
     # --- fuer das Overlay -------------------------------------------------
 

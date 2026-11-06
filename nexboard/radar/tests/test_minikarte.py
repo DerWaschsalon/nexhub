@@ -1,11 +1,13 @@
 import math
 import random
+import time
 import unittest
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
 from radar.minikarte import blickrichtung, kurs
+from radar.zustand import KURS_AB_CM, RadarZustand
 
 DATEN = Path(__file__).parent / "daten"
 
@@ -59,6 +61,26 @@ class BlickrichtungTest(unittest.TestCase):
         x, y = kurs(90)
         self.assertAlmostEqual(x, 1)
         self.assertAlmostEqual(y, 0)
+
+
+class LaufrichtungTest(unittest.TestCase):
+    def test_laufrichtung_ueberschreibt_den_blick_nicht(self):
+        z = RadarZustand(speichern=False)
+        z.kurs = kurs(0)
+        z.blick_bis = time.time() + 5
+        z._kurs_merken(0, 0)
+        z._kurs_merken(KURS_AB_CM + 100, 0)  # läuft nach Osten, schaut nach Norden
+        self.assertEqual(z.kurs, kurs(0))
+
+    def test_ohne_blick_gilt_die_laufrichtung(self):
+        z = RadarZustand(speichern=False)
+        z._kurs_merken(0, 0)
+        z._kurs_merken(KURS_AB_CM + 100, 0)
+        self.assertEqual(z.kurs, (1.0, 0.0))
+        # abgelaufen: wieder die Laufrichtung, von dort, wo der Blick zuletzt galt
+        z.blick_bis = time.time() - 1
+        z._kurs_merken(KURS_AB_CM + 100, KURS_AB_CM + 100)
+        self.assertEqual(z.kurs, (0.0, 1.0))
 
 
 if __name__ == "__main__":

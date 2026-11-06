@@ -135,6 +135,7 @@ class RadarZustand:
         self.position_zeit = 0.0
         self.kurs: tuple[float, float] | None = None  # Laufrichtung als Einheitsvektor (Welt x, y)
         self._kurs_von: tuple[float, float] | None = None
+        self.blick_bis = 0.0  # bis dahin gilt die Blickrichtung aus der Minikarte, nicht die Laufrichtung
         self.cubes: dict[int, Cube] = {}
         self.dungeon: str | None = None  # beim Betreten (0x4002), sonst am ersten Boss
         self.gruppe: dict[int, tuple[float, float, float, float]] = {}  # Charakter-ID -> x, y, z, zeit
@@ -490,7 +491,9 @@ class RadarZustand:
         if weg >= MAX_SPRUNG_CM:
             self._kurs_von = (x, y)
         elif weg >= KURS_AB_CM:
-            self.kurs, self._kurs_von = (dx / weg, dy / weg), (x, y)
+            self._kurs_von = (x, y)
+            if time.time() >= self.blick_bis:
+                self.kurs = (dx / weg, dy / weg)
 
     def _loggen(self, eid: int, objekt_id: int, x: float, y: float, z: float) -> None:
         zeile = {"t": round(time.time(), 2), "eid": eid, "objekt_id": objekt_id,
