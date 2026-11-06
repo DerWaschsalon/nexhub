@@ -88,6 +88,12 @@ DEFAULT_EVENTS = [
 ]
 
 
+class RadarWidget(Widget):
+    # Größe in CSS-Pixeln, zieht der Griff unten rechts; scale vergrößert zusätzlich alles darin
+    width: int = Field(440, ge=300, le=2000)
+    height: int = Field(580, ge=220, le=1600)
+
+
 class TimersWidget(Widget):
     enabled: bool = False
     events: list[TimerEvent] = Field(default_factory=lambda: [e.model_copy() for e in DEFAULT_EVENTS],
@@ -100,7 +106,7 @@ class Widgets(_Strict):
     boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste")
     timers: TimersWidget = Field(default_factory=TimersWidget, title="Event-Timer")
     # Modul AION 2 · Radar: Karte, Vertraute und Würfel in einem Widget; die Warnungen zeigen sich nur bei einer
-    radar: Widget = Field(default_factory=Widget, title="Radar")
+    radar: RadarWidget = Field(default_factory=RadarWidget, title="Radar")
     warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen")
     pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP")
 

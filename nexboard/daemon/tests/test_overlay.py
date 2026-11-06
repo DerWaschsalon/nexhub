@@ -215,3 +215,14 @@ def test_alte_karte_geht_im_radar_auf(tmp_path):
     alt = {"widgets": {"radar": {"enabled": False, "x": 1, "y": 1}, "karte": {"enabled": False}}}
     neu = OverlayLayout.model_validate(alt)
     assert neu.widgets.radar.enabled is False and neu.widgets.radar.x == 1
+
+
+async def test_radar_groesse_bleibt_gespeichert(tmp_path):
+    import pydantic
+    o = Overlay(tmp_path, manage_unit=False)
+    assert (o.layout.widgets.radar.width, o.layout.widgets.radar.height) == (440, 580)
+    await o.update({"widgets": {"radar": {"width": 700, "height": 400}}})
+    neu = Overlay(tmp_path).layout.widgets.radar
+    assert (neu.width, neu.height) == (700, 400)
+    with pytest.raises(pydantic.ValidationError):
+        await o.update({"widgets": {"radar": {"width": 10}}})

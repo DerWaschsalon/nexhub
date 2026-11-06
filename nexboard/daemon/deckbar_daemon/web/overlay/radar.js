@@ -448,7 +448,38 @@ function eingebetteteLaden(ids) {
   }
 }
 
+/** Griff unten rechts: Breite und Höhe frei ziehen (das Mausrad im Bearbeiten-Modus skaliert dagegen alles). */
+function griffStarten() {
+  const griff = document.getElementById("radar-griff");
+  griff.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation(); // sonst zieht der Bearbeiten-Modus das ganze Widget
+    const c = cfg("radar");
+    const s = c.scale || 1;
+    const start = { x: e.clientX, y: e.clientY, w: c.width, h: c.height };
+    griff.setPointerCapture(e.pointerId);
+    dragging = true;
+    const ziehen = (ev) => {
+      c.width = Math.round(Math.max(300, Math.min(2000, innerWidth / s, start.w + (ev.clientX - start.x) / s)));
+      c.height = Math.round(Math.max(220, Math.min(1600, innerHeight / s, start.h + (ev.clientY - start.y) / s)));
+      place(W.radar);
+    };
+    const los = () => {
+      griff.removeEventListener("pointermove", ziehen);
+      dragging = false;
+      regionsSoon();
+      saveSoon();
+    };
+    griff.addEventListener("pointermove", ziehen);
+    griff.addEventListener("pointerup", los, { once: true });
+    griff.addEventListener("pointercancel", los, { once: true });
+  });
+  new ResizeObserver(() => karte.map?.draw()).observe(document.getElementById("karte-bild"));
+}
+
 function radarStart() {
+  griffStarten();
   for (const b of W.radar.querySelectorAll("[data-reiter]")) b.addEventListener("click", () => reiterZeigen(b.dataset.reiter));
   document.getElementById("radar-falten").addEventListener("click", () => {
     W.radar.classList.toggle("gefaltet");

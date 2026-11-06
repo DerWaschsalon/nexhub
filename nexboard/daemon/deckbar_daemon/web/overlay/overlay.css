@@ -115,8 +115,13 @@ body.edit #guides { display: block; }
 
 /* ------------------------------------------------------------ Radar (Modul AION 2 · Radar) */
 #w-radar { width: 440px; height: 580px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-#w-radar.gefaltet { height: auto; }
-#w-radar.gefaltet .radar-inhalt { display: none; }
+#w-radar.gefaltet { height: auto !important; }
+#w-radar.gefaltet .radar-inhalt, #w-radar.gefaltet #radar-griff { display: none; }
+#radar-griff {
+  position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 5; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, .55) 50% 58%, transparent 58% 68%,
+    rgba(255, 255, 255, .55) 68% 76%, transparent 76%);
+}
 .radar-kopf {
   display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; flex: none;
   border-bottom: 1px solid var(--hud-line); background: rgba(10, 14, 24, .8);

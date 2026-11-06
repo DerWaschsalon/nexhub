@@ -47,6 +47,10 @@ function place(w) {
   w.hidden = !c.enabled;
   w.style.transform = `translate(${x}px, ${y}px) scale(${c.scale || 1})`;
   w.style.opacity = c.opacity ?? 1;
+  if (c.width) {
+    w.style.width = `${c.width}px`;
+    w.style.height = `${c.height}px`;
+  }
 }
 
 function placeAll() {
@@ -66,6 +70,7 @@ function saveSoon() {
     for (const id of Object.keys(W)) {
       const c = cfg(id);
       widgets[id] = { enabled: c.enabled, x: c.x, y: c.y, scale: c.scale };
+      if (c.width) Object.assign(widgets[id], { width: c.width, height: c.height });
     }
     try {
       const r = await fetch("/api/overlay/layout", {
