@@ -24,13 +24,15 @@ from .config import _atomic_write
 ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
 sys.path.insert(0, str(ORDNER))  # Paket „radar“ liegt dort, nicht im Daemon
 from radar import daten, konfig, uebersicht  # noqa: E402
+from radar.ansagen import seitenliste  # noqa: E402
 from radar.dienst import RadarDienst  # noqa: E402
 from radar.punkte import Karte  # noqa: E402
 
 log = logging.getLogger(__name__)
 
 TAKT_S = 0.2  # so oft zeichnen die Widgets neu, Warnungen zählen in Zehntelsekunden
-BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "pvp_neu")
+BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "pvp_neu",
+           "ansage_testen")
 
 
 async def _aion2_laeuft() -> bool:
@@ -55,6 +57,7 @@ class Radar:
         self.abfrage_s = abfrage_s
         self.nachlauf_s = nachlauf_s  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
         self.meldungen = _json(ORDNER / "radar" / "meldungen.json")
+        self.ansagen = seitenliste()  # Boss-Ansagen je Schalter, für eigene Worte und ▶ auf der Seite
         self.dienst: RadarDienst | None = None
         self.spiel = False
         # Tode mit Ursache (RadarDienst._tod); hier, damit sie ein Ende des Radars bis zum Hochladen ueberleben
@@ -72,7 +75,7 @@ class Radar:
         return {**konfig.STANDARD, **_json(konfig.KONFIG)}
 
     def info(self) -> dict:
-        return {"einstellungen": self.einstellungen(), "meldungen": self.meldungen,
+        return {"einstellungen": self.einstellungen(), "meldungen": self.meldungen, "ansagen": self.ansagen,
                 "karten": [k.name for k in Karte.alle()],
                 "laeuft": self.laeuft, "aufnahme": self.aufnahme, "spiel": self.spiel}
 
@@ -95,7 +98,8 @@ class Radar:
             self.dienst.neu_laden()
         return self.info()
 
-    async def befehl(self, name: str) -> None:
+    async def befehl(self, name: str, ruf: str = "") -> None:
+        """Ein Knopf der NexBoard-Seite; `ruf` = Schlüssel der Boss-Ansage bei „ansage_testen“."""
         if name not in BEFEHLE:
             raise ValueError(f"unbekannter Befehl {name}")
         if name == "neustart":  # z.B. nach neuem Charakternamen, den liest das Radar nur beim Start
@@ -108,7 +112,8 @@ class Radar:
         aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
                     "aufnahme_start": self.dienst.aufnahme_starten,
                     "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen,
-                    "pvp_neu": self.dienst.pvp_neu}
+                    "pvp_neu": self.dienst.pvp_neu,
+                    "ansage_testen": lambda: self.dienst.ansage_testen(ruf)}
         aktionen[name]()
 
     def tode_zwischen(self, start_ms: int, ende_ms: int) -> list[dict]:

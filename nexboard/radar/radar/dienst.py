@@ -9,12 +9,13 @@ import time
 from collections import deque
 from pathlib import Path
 
+from .ansagen import Ansagen
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
 from .quelle import Quelle
 from .uebersicht import feldboss_ansagen
 from .warnung import (STATUS_REGELN, TODESMAL, TREFFER_REGELN, WarnZentrale, alarm_abspielen, ansage,
-                      ansagen_vorbereiten, tr)
+                      ansagen_vorbereiten, piep_abspielen, tr)
 from .zustand import Cube, RadarZustand
 
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
@@ -31,6 +32,14 @@ class RadarDienst:
         self.zentrale = WarnZentrale(self.zustand)
         self.zustand.bei_neuem_cube.append(self._neuer_cube)
         self.zustand.bei_cast.append(self.zentrale.cast)
+        # Boss-Ansagen aus dem A2Tools-Plugin
+        self.ansagen = Ansagen(self.zentrale)
+        self.zustand.bei_cast.append(self.ansagen.skill)
+        self.zustand.bei_leiste.append(self.ansagen.leiste)
+        self.zustand.bei_welle.append(self.ansagen.welle)
+        self.zustand.bei_effekt.append(self.ansagen.effekt)
+        self.zustand.bei_effekt_weg.append(self.ansagen.effekt_weg)
+        self.zustand.effekt_ids = self.ansagen.effekte
         self.zustand.bei_status.append(self.zentrale.status)
         self.zustand.bei_groggy.append(self.zentrale.groggy)
         self.zustand.bei_staggern.append(self.zentrale.staggern)
@@ -59,6 +68,10 @@ class RadarDienst:
         k = konfig_neu_laden()
         self.zentrale.an = k["warn_an"]
         ansagen_vorbereiten()  # falls die Sprache gewechselt hat
+
+    def ansage_testen(self, schluessel: str) -> None:
+        """▶ einer Boss-Ansage auf der NexBoard-Seite."""
+        self.ansagen.testen(schluessel)
 
     def warnung_testen(self) -> None:
         self.zentrale.cast(0, TODESMAL, self.zustand.eigene_eid)
@@ -118,11 +131,14 @@ class RadarDienst:
             self._ton_faellig = False
             if self.k["ton"]:
                 ton_abspielen()
+        self.ansagen.takt()  # abgelaufene Phasen: „Wieder angreifen“
         self.zentrale.schnappschuss()  # holt faellige Vorhersagen nach vorn, auch ohne Overlay
         while self.zentrale.laut:
             art, text = self.zentrale.laut.pop(0)
-            if art == "ansage":
-                ansage(text)
+            if art in ("ansage", "zeile"):
+                ansage(text, wichtig=art == "ansage")  # eine Boss-Zeile darf abgebrochen werden
+            elif art == "welle":
+                piep_abspielen()  # kurzer Ton je Welle (Boss-Ansagen)
             else:
                 alarm_abspielen()
 

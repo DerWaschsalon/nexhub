@@ -38,16 +38,32 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 - **Status auf dir** (`0x382A`): Ignus' Flammenbombe → „Verzögerte Explosion – DU!“ (3 s, danach Feuerpfütze).
   Weitere Effekte in `STATUS_REGELN` (`radar/warnung.py`), IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
-- **Weitere Dungeons** (`radar/mechaniken.json`, 39 Mechaniken; 11 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie und -Seelenrufer): Urugugu (Raur-Konter, Auldor-Sturmstreich,
-  Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Schilde, Vakron-Male, -Ringe, -Gefängnis), Krao-Höhle
-  (Berk), Draupnir (Lakshmi-Reflexion), Grimmhorn (Nuakum-Blutung), Deus (Nazmun-Bombe, Atiel-Kette), Arkanis,
+- **Weitere Dungeons** (`radar/mechaniken.json`, 32 Mechaniken; 10 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie): Urugugu (Raur-Konter, Auldor-Sturmstreich,
+  Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Versteinerung, Vakron-Male), Krao-Höhle
+  (Berk), Draupnir (Bakarma), Grimmhorn (Nuakum-Blutung), Deus (Nazmun-Bombe, Atiel-Kette), Arkanis,
   dazu Ignus' Flammenzone. Auslöser: Boss-Cast, Status auf dir, einem Mitspieler, jedem Spieler oder dem Boss,
   ein Treffer vom Boden (`0x3804`, Pfützen; mehrere Treffer zählen als einer) und die Stagger-Prüfung.
-  Mit Folge-Hinweis, wenn es vorbei ist („Abstand halten“). IDs und Zeiten nach
+  Thamon-Schilde, Lakshmi-Reflexion, Vakron-Ringe und -Gefängnis, Rafflesia und Seelenrufer kommen jetzt aus den
+  Boss-Ansagen (unten). Mit Folge-Hinweis, wenn es vorbei ist („Abstand halten“). IDs und Zeiten nach
   [xinjalin/glass-cannon](https://github.com/xinjalin/glass-cannon) `gamedata/boss-mechanics.json`
   (MIT, Copyright (c) 2026 Xinjalin), Texte eigene; dort zum Teil nur als Hinweise ungeprüft, selbst bestätigt
   sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechaniken.json` plus Schalter in
   `meldungen.json`.
+- **Boss-Ansagen** (`radar/ansagen.py`, Daten `radar/ansagen.json`, ein Schalter je Boss): wie das Plugin
+  „Boss Callouts“ von [taengu/A2Tools-Plugins](https://github.com/taengu/A2Tools-Plugins) (GPL-3.0, Zeilen
+  (c) NCSOFT), 202 Ansagen von 54 Bossen, auch Ludra, Kelch von Muspel, Läuterungsstätte der Korrosion, Roter
+  Spiegel und Versunkener Lebenstempel. Gesagt wird, was das Spiel zeigt: die Zeile des Bosses, bei Skills mit
+  Cast-Leiste schon beim Beginn der Leiste (`0x3809`) mit Countdown. Geprüfte Mechaniken (Thamon, Lakshmi,
+  Vakron, Talisra) bringen eine kurze Anweisung, einen Countdown über die echte Dauer des Buffs (`0x382A`, Ende
+  `0x382C`) und danach „Wieder angreifen“; bei Vakrons Sprung piept es je Welle (`0x3803`), Talisras Speere
+  erscheinen als Reihe („Dunkel → Dunkel → Licht“). Buffs, die jedes Monster bekommen kann (Raserei), zählen
+  erst, wenn das Wesen einen Skill dieses Bosses eingesetzt hat. Auf der NexBoard-Seite: Art der Ansage (kurze
+  Ansage und Satz des Bosses, nur kurze Ansage, nur Satz), Piepton bei jeder Welle und je Boss eine aufklappbare
+  Liste seiner Rufe: Haken (ganz aus, auch der Countdown), eigene Worte (statt des Rufs gesagt und gezeigt,
+  `eigene_worte` in `~/.config/aion2-radar.json`), zurück zur Vorgabe und ▶ (spielt den Ruf wie im Kampf, die
+  Phase auf 5 s gekürzt, Befehl `ansage_testen`). Bedientexte wie im Plugin. Gesprochen wird
+  nacheinander: höchstens zwei Sätze warten, eine Warnung bricht eine noch laufende Boss-Zeile ab. Nach einem
+  Spielpatch `STAND` in `werkzeuge/ansagen.py` erhöhen und `python3 -m werkzeuge.ansagen` ausführen.
 - **Jetzt staggern** (Berk, Bakarma, Atiel): sobald die Stagger-Leiste brechbar wird, nach einer Pause oder wenn sie
   erst spät im Kampf erscheint. Endet mit „Boss groggy“, sonst nach 25 s.
 - **Fläche unter dir** (`0x3848`, Boden-Markierung, Aufbau nach glass-cannon): Markiert ein Monster eine Fläche, deren Mittelpunkt höchstens `flaeche_m` (Standard 6 m, in `~/.config/aion2-radar.json`) neben dir liegt, kommt „Fläche unter dir – DU!“ mit Countdown bis zum Einschlag. Größe und Form stehen nicht im Paket, deshalb der feste Abstand. Mehrere Markierungen einer Welle = eine Warnung. Gruppe `flaeche`, auch über `/api/radar/kampf`.
