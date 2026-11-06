@@ -5,7 +5,8 @@
  * Radar:      ein Widget für alles, drei Reiter:
  *   Karte      Karte und Monster des Pet Soul Trackers (seine MiniMap aus dem installierten Plugin,
  *              seine Szene kommt als Widget-Nachricht), darüber Cubes, Spawnpunkte, Fundorte und
- *              Teleporter. Ziehen = verschieben, Mausrad = Zoom, Doppelklick = wieder dir folgen.
+ *              Teleporter. Du bist ein Pfeil in Blickrichtung (radar.kurs), ohne bekannte Richtung ein
+ *              Punkt. Ziehen = verschieben, Mausrad = Zoom, Doppelklick = wieder dir folgen.
  *              Der Radarkreis erscheint, solange ein Cube in Sicht ist.
  *   Vertraute  die Seite des Pet Soul Trackers (tippen nur im Bearbeiten-Modus: sonst keine Tastatur)
  *   Würfel     die Seite von Dice Rolls; eine laufende Würfelkarte steht über jedem Reiter
@@ -302,12 +303,37 @@ async function miniKarteLaden() {
     { onZoom: (zoom) => szeneAntwort({ zoom }) },
   );
   const malen = karte.map.draw.bind(karte.map);
+  // Die MiniMap kennt als Figur nur ihren Punkt: Sie bekommt keine, folgt dir hier und der Pfeil kommt in radarEbene
   karte.map.draw = () => {
+    const m = karte.map;
+    const folgt = m.follow;
+    if (folgt && karte.ich) {
+      karteGleiten(karte.ich.pos);
+      m.follow = false;
+    }
     malen();
+    m.follow = folgt;
+    $("karte-folgen").hidden = folgt;
     radarEbene();
   };
   karte.map.set({});
   return true;
+}
+
+/** Sanft zur Position, ein Teleport springt (wie #glideTo der MiniMap). */
+function karteGleiten(ziel) {
+  const m = karte.map;
+  if (!m.center || Math.hypot(ziel[0] - m.center[0], ziel[1] - m.center[1]) > 50_000) {
+    m.center = [ziel[0], ziel[1]];
+    return;
+  }
+  m.center = [m.center[0] + (ziel[0] - m.center[0]) * 0.35, m.center[1] + (ziel[1] - m.center[1]) * 0.35];
+  if (Math.hypot(ziel[0] - m.center[0], ziel[1] - m.center[1]) > m.zoom * 50 && !karte.gleitet) {
+    karte.gleitet = requestAnimationFrame(() => {
+      karte.gleitet = 0;
+      m.draw();
+    });
+  }
 }
 
 function szeneAntwort(data) {
@@ -351,10 +377,10 @@ function karteAktualisieren() {
   }
   const s = karte.szene || {};
   // Das Radar kennt die Position meist früher und genauer als die Szene
-  const you = radar.position
+  karte.ich = radar.position
     ? { pos: radar.position, at: Date.now() - (radar.position_alter || 0) * 1000, estimated: false }
     : s.you || null;
-  m.set({ mapId: aktuelleKarte(), you, wanted: s.wanted || [], others: s.others || [],
+  m.set({ mapId: aktuelleKarte(), you: null, wanted: s.wanted || [], others: s.others || [],
     spawnColours: s.spawnColours || {}, labels: s.labels || {} });
   document.getElementById("karte-name").textContent = s.title || radar.karte || "";
   const teile = [];
@@ -405,6 +431,50 @@ function radarEbene() {
     kreis(c, x, y, 5);
     c.fill();
   }
+  if (karte.ich) eigeneFigur(c, ...schirm(karte.ich.pos[0], karte.ich.pos[1]));
+}
+
+/** Du: ein Pfeil in Blickrichtung, sonst ein Punkt (veraltet blass). Geschätzt mit dem gestrichelten Kreis des Originals. */
+function eigeneFigur(c, x, y) {
+  const ich = karte.ich;
+  c.save();
+  // Stehst du still, altert die Position, die Blickrichtung aber nicht: Mit Richtung bleibt der Pfeil kräftig
+  c.globalAlpha = !radar.kurs && !ich.estimated && Date.now() - ich.at > 15_000 ? 0.5 : 1;
+  if (ich.estimated) {
+    c.setLineDash([4, 3]);
+    c.fillStyle = "rgba(255, 224, 102, .12)";
+    c.strokeStyle = "rgba(255, 224, 102, .85)";
+    c.lineWidth = 1.5;
+    kreis(c, x, y, Math.max(18, 25 / karte.map.zoom));
+    c.fill();
+    c.stroke();
+    c.setLineDash([]);
+  }
+  c.fillStyle = "rgba(255, 255, 255, .18)";
+  kreis(c, x, y, 14);
+  c.fill();
+  c.translate(x, y);
+  c.lineJoin = "round";
+  c.strokeStyle = "#14161e";
+  c.lineWidth = 2.5;
+  c.fillStyle = "#ffe066";
+  if (radar.kurs) {
+    // Karte: Norden oben, Welt +x rechts, Welt +y unten. Also im Uhrzeigersinn von Norden
+    c.rotate(Math.atan2(radar.kurs[0], -radar.kurs[1]));
+    c.beginPath();
+    c.moveTo(0, -14);
+    c.lineTo(9, 10);
+    c.lineTo(0, 5);
+    c.lineTo(-9, 10);
+    c.closePath();
+    c.stroke();
+    c.fill();
+  } else {
+    kreis(c, 0, 0, 6);
+    c.stroke();
+    c.fill();
+  }
+  c.restore();
 }
 
 function teleporterTipp(e) {
@@ -491,6 +561,10 @@ function radarStart() {
     if (localStorage.getItem("radar-falten")) W.radar.classList.add("gefaltet");
   } catch {}
   document.getElementById("karte-bild").addEventListener("pointermove", teleporterTipp);
+  document.getElementById("karte-quelle").addEventListener("click", (e) => {
+    e.preventDefault();
+    window.__DECKBAR_OVERLAY__.hostCall("open_url", { url: e.currentTarget.href }).catch(() => {});
+  });
   miniKarteStarten().then((ok) => {
     if (ok) szeneAntwort({ hello: true });
     else document.getElementById("karte-name").textContent = "Pet Soul Tracker fehlt";
