@@ -330,15 +330,22 @@ class Overlay:
             return await self.game_check()
         return await asyncio.to_thread(aion2_running)
 
+    async def plugin_command(self, command: dict) -> None:
+        """Plugin-Fenster öffnen, zeigen, verbergen … (plugins.py)."""
+        await self._send(b"plugin " + json.dumps(command).encode())
+
     async def command(self, cmd: str) -> None:
         if cmd not in COMMANDS:
             raise ValueError(f"unbekannter Befehl {cmd}")
+        await self._send(cmd.encode())
+
+    async def _send(self, line: bytes) -> None:
         path = socket_path()
         try:
             _, writer = await asyncio.wait_for(asyncio.open_unix_connection(str(path)), 2)
         except (OSError, TimeoutError) as e:
             raise RuntimeError("Overlay läuft nicht") from e
-        writer.write(cmd.encode() + b"\n")
+        writer.write(line + b"\n")
         await writer.drain()
         writer.close()
         try:

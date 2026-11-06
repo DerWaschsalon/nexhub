@@ -170,3 +170,6 @@ body.edit #guides { display: block; }
 .pvp-letzte:empty { display: none; }
 .pvp-letzte .kill { color: var(--ok); }
 .pvp-letzte .tod { color: var(--bad); }
+
+/* Widgets der A2Tools-Plugins (plugins.js) */
+.plugin-widget { position: fixed; border: 0; background: transparent; z-index: 40; }

@@ -6,7 +6,7 @@
 //! (Port-Erkennung, Reassembly, Parser) → DataStorage → DpsCalculator. Der Daemon startet das
 //! Programm und spricht mit ihm über Zeilen-JSON:
 //!
-//!   stdout  {"type":"hello"|"dps"|"status"|"fights_saved"|"reply"|"bye", …}
+//!   stdout  {"type":"hello"|"dps"|"status"|"fights_saved"|"reply"|"bye"|"plugin_…", …} (plugins.rs)
 //!   stdin   {"id":1,"cmd":"reset"|"target_mode"|"details"|"buffs"|"context"|"history"|"fight"|
 //!            "delete_fight"|"suspend"|"language"|"save"|"snapshot"|"view"|"capture_status"|
 //!            "set_character_name"|"bind_local_actor_id"|"bind_local_nickname"|"devices"|
@@ -50,6 +50,7 @@ use tokio::sync::mpsc;
 use tracing::{info, warn};
 
 mod hits;
+mod plugins;
 mod view;
 
 use a2tools_dps_meter_lib::capture::pcap_capturer::{self as pcap, PcapCapturer};
@@ -232,6 +233,10 @@ impl Core {
         let to_value = |v: Result<Value, serde_json::Error>| v.map_err(|e| e.to_string());
         match cmd.get("cmd").and_then(Value::as_str).unwrap_or("") {
             "snapshot" => to_value(serde_json::to_value(self.calc.lock().get_dps())),
+            "plugin_decoders" => {
+                let list = cmd.get("plugins").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
+                Ok(plugins::set_decoders(&self.storage, list))
+            }
             "reset" => {
                 self.reset();
                 Ok(Value::Null)
@@ -519,6 +524,7 @@ async fn run_live(args: Args) {
     dispatcher.use_suspend_flag(core.suspended.clone());
     tokio::spawn(async move { dispatcher.run(rx).await });
     let stdin_done = tokio::spawn(commands(core.clone()));
+    tokio::spawn(plugins::watch(core.storage.clone()));
 
     {
         let core = core.clone();
