@@ -465,6 +465,16 @@ async def test_pet_soul_karte_steht_fest_auf_ausgelagert(host, cdn):
     assert await host.call("plugin_storage_get", {"key": "anderes"}, "plugin-pet-souls") is None
 
 
+async def test_pet_art_filter_geht_an_die_radar_karte(host, cdn):
+    cdn.add("pet-souls", permissions=["storage"])
+    await host.install("pet-souls")
+    host.emitted.clear()
+    await host.call("plugin_storage_set", {"key": "prefs", "value": json.dumps({"genus": "fera"})}, "plugin-pet-souls")
+    await host.call("plugin_storage_set", {"key": "prefs", "value": json.dumps({"genus": ""})}, "plugin-pet-souls")
+    await host.call("plugin_storage_set", {"key": "andere", "value": json.dumps({"genus": "fera"})}, "plugin-pet-souls")
+    assert host.emitted == [("radar-pet-art", {"art": "fera"}), ("radar-pet-art", {"art": ""})]
+
+
 # ---------------------------------------------------------------- Fest eingebaut
 async def test_pet_soul_installiert_und_aktualisiert_sich_selbst(host, cdn):
     cdn.add("pet-souls", "1.0.0", permissions=["storage"])

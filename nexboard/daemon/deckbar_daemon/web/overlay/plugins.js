@@ -130,6 +130,7 @@ function pluginsStart() {
       const m = JSON.parse(text);
       if (m.event === "plugin-widgets") pluginSync(m.payload);
       else if (m.event === "plugin-event" && m.payload?.__window === RADAR_KARTE && m.payload.event === "widget") karteSzene(m.payload.data);
+      else if (m.event === "radar-pet-art") petArt(m.payload?.art);
       else if (m.event === "plugin-embed") {
         pluginInvoke("plugin_embedded").then((r) => eingebetteteLaden(r.result || []));
         karteNachInstallation(); // beim allerersten Start kommt der Tracker erst jetzt an

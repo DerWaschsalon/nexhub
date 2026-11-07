@@ -128,6 +128,9 @@ function regions() {
     lock = [[Math.floor(r.left + lockRect.x * s), Math.floor(r.top + lockRect.y * s),
       Math.ceil(lockRect.width * s), Math.ceil(lockRect.height * s)]];
   }
+  // Bearbeiten-Knopf unten rechts: in jedem Modus anklickbar
+  const knopf = $("edit-knopf");
+  if (knopf && mode !== "edit") { const r = rectOf(knopf); click.push(r); lock.push(r); }
   return { click, lock };
 }
 
@@ -286,6 +289,7 @@ async function chooseProfile(name) {
 $("fx").addEventListener("change", () => { layout.fx = $("fx").value; applyFx(); saveSoon(); });
 $("profil").addEventListener("change", () => chooseProfile($("profil").value));
 $("done").addEventListener("click", finishEdit);
+$("edit-knopf").addEventListener("click", () => requestMode("edit"));
 $("reset").addEventListener("click", () => {
   for (const id of Object.keys(W)) Object.assign(cfg(id), { x: null, y: null, scale: 1 });
   placeAll();
