@@ -205,3 +205,15 @@ body.edit #guides { display: block; }
 
 /* Widgets der A2Tools-Plugins (plugins.js) */
 .plugin-widget { position: fixed; border: 0; background: transparent; z-index: 40; }
+
+/* ------------------------------------------------------------ Bearbeiten-Knopf (unten rechts) */
+#edit-knopf {
+  position: fixed; right: 10px; bottom: 10px; z-index: 50;
+  width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
+  color: var(--text); background: var(--hud); border: 1px solid var(--hud-line); border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35); cursor: pointer;
+  opacity: .35; transition: opacity .2s ease, transform .2s ease, border-color .2s ease;
+}
+#edit-knopf:hover { opacity: 1; border-color: var(--accent); transform: scale(1.08); }
+#edit-knopf:active { transform: scale(.96); }
+body.edit #edit-knopf { display: none; } /* im Bearbeiten-Modus gibt es „Fertig“ in der Leiste */
