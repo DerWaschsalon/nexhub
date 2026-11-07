@@ -98,6 +98,15 @@ SURFACE = {
 }
 
 
+def pet_art(prefs: str) -> str:
+    """Die im Pet Soul Tracker gefilterte Pet-Art (cogni, fera, natura, varian), leer = alle. Die Radar-Karte zeigt nur sie."""
+    try:
+        art = json.loads(prefs).get("genus")
+    except (ValueError, AttributeError):
+        return ""
+    return art if isinstance(art, str) else ""
+
+
 class PluginError(RuntimeError):
     """Fehlertext für die Oberfläche."""
 
@@ -1111,6 +1120,8 @@ class PluginHost:
             case "plugin_storage_set":
                 self._require(plugin, "storage")
                 self._storage_set(plugin, str(a.get("key")), str(a.get("value")))
+                if plugin == "pet-souls" and a.get("key") == "prefs":
+                    await self.emit("radar-pet-art", {"art": pet_art(str(a.get("value")))})
                 return None
             case "plugin_boss_timers":
                 self._require(plugin, "feed:boss-timers")

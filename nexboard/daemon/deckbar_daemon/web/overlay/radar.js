@@ -8,6 +8,7 @@
  *              Teleporter. Du bist ein Pfeil in Blickrichtung (radar.kurs), ohne bekannte Richtung ein
  *              Punkt. Ziehen = verschieben, Mausrad = Zoom, Doppelklick = wieder dir folgen.
  *              Der Radarkreis erscheint, solange ein Cube in Sicht ist.
+ *              Filtert der Pet Soul Tracker nach einer Pet-Art, stehen nur deren Monster auf der Karte.
  *   Vertraute  die Seite des Pet Soul Trackers (tippen nur im Bearbeiten-Modus: sonst keine Tastatur)
  *   Würfel     die Seite von Dice Rolls; eine laufende Würfelkarte steht über jedem Reiter
  * Warnungen:  nur, solange eine läuft oder eine Vorhersage ansteht */
@@ -24,7 +25,10 @@ const SYMBOL_PX = 20; // Teleporter-Symbol, bleibt beim Zoomen gleich groß
 
 let radar = { aktiv: false };
 const karte = { daten: null, symbol: null, schluessel: "", laedt: false, gemalt: null, map: null, szene: null,
-  folgenEinstellung: null };
+  folgenEinstellung: null, art: "" };
+// Pet-Arten in den Farben des Pet Soul Trackers (GENUS_COLOURS in seinem plugin.js). Jedes Monster lässt Seelen
+// nur einer Art fallen, die Farbe eines Punkts sagt also genau, zu welcher Art er gehört.
+const PET_ART = { cogni: ["Cogni", "#b99bff"], fera: ["Fera", "#ff9f66"], natura: ["Natura", "#74d99a"], varian: ["Varian", "#5cc9e6"] };
 
 /** Vom Daemon: neuer Stand (oder {aktiv: false}, wenn das Spiel weg ist). */
 function onRadar(stand) {
@@ -317,6 +321,7 @@ async function miniKarteLaden() {
     radarEbene();
   };
   karte.map.set({});
+  petArtLaden();
   return true;
 }
 
@@ -348,6 +353,24 @@ function szeneAntwort(data) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "plugin_widget_post", args: { data }, window: "widget:pet-souls:map" }),
   }).catch(() => {});
+}
+
+/** Filtert der Pet Soul Tracker nach einer Pet-Art, zeigt die Karte nur deren Monster und Spawnpunkte. */
+function petArt(art) {
+  karte.art = PET_ART[art] ? art : "";
+  karteAktualisieren();
+}
+
+/** Beim Start: der zuletzt gespeicherte Filter, danach meldet der Daemon jede Änderung („radar-pet-art“). */
+async function petArtLaden() {
+  try {
+    const r = await (await fetch("/api/a2/invoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cmd: "plugin_storage_get", args: { key: "prefs" }, window: "widget:pet-souls:map" }),
+    })).json();
+    petArt(JSON.parse(r.result || "{}").genus);
+  } catch {}
 }
 
 /** Vom Pet Soul Tracker: was er auf seine Karte zeichnen würde (plugins.js fängt es ab). */
@@ -386,11 +409,15 @@ function karteAktualisieren() {
   karte.ich = radar.position
     ? { pos: radar.position, at: Date.now() - (radar.position_alter || 0) * 1000, estimated: false }
     : s.you || null;
-  m.set({ mapId: aktuelleKarte(), you: null, wanted: s.wanted || [], others: s.others || [],
-    spawnColours: s.spawnColours || {}, labels: s.labels || {} });
+  const [artName, artFarbe] = PET_ART[karte.art] || [];
+  const passt = (farbe) => !artFarbe || farbe === artFarbe;
+  m.set({ mapId: aktuelleKarte(), you: null, wanted: (s.wanted || []).filter((n) => passt(n.colour)), others: s.others || [],
+    spawnColours: Object.fromEntries(Object.entries(s.spawnColours || {}).filter(([, farbe]) => passt(farbe))),
+    labels: s.labels || {} });
   document.getElementById("karte-name").textContent = s.title || radar.karte || "";
   const teile = [];
-  if (s.count) teile.push(s.count);
+  if (artName) teile.push(`nur ${artName}`);
+  else if (s.count) teile.push(s.count); // zählt alle Arten
   if (karte.daten?.punkte?.length) teile.push(`${karte.daten.punkte.length} Spawnpunkte`);
   document.getElementById("karte-status").textContent = teile.join(" · ");
 }
