@@ -194,6 +194,21 @@ def with_hub_link(embed: discord.Embed, url: str) -> discord.Embed:
     return embed.add_field(name=ANALYSIS_FIELD, value=hub_link(url), inline=False)
 
 
+def keep_attachment_images(embeds: list[discord.Embed], attachments) -> list[discord.Embed]:
+    """Beim Bearbeiten zeigen die Embeds auf die CDN-Adresse ihres Anhangs statt auf attachment://.
+    So zurückgeschickt, zeigt Discord den Anhang zusätzlich unter dem Post (Bild doppelt)."""
+    by_url = {}
+    for a in attachments:
+        by_url[a.url.split("?")[0]] = a.filename
+        if getattr(a, "proxy_url", None):
+            by_url[a.proxy_url.split("?")[0]] = a.filename
+    for e in embeds:
+        name = by_url.get((e.image.url or "").split("?")[0])
+        if name:
+            e.set_image(url=f"attachment://{name}")
+    return embeds
+
+
 def build_run_embed(
     run: dict, reporters: int, bosses: list[dict] | None = None, guild_id: int | None = None,
     image_filename: str | None = None, hub_url: str | None = None,
@@ -410,7 +425,7 @@ class AionDedup(commands.Cog):
             posted, run, message = entry
             if now - posted < POSTED_KEEP_S and same_run_start(run, dungeon, start_ms):
                 self.api_posted.remove(entry)
-                embeds = list(message.embeds)
+                embeds = keep_attachment_images(list(message.embeds), message.attachments)
                 if embeds:
                     embeds[0] = with_hub_link(embeds[0], url)
                     await message.edit(embeds=embeds)
