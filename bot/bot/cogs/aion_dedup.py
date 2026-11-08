@@ -3,8 +3,9 @@
 Das NexBoard (nexboard/daemon/deckbar_daemon/bot.py, `run_payload`) schickt nach jedem beendeten
 Run `POST /api/aion/fight` mit dem Token aus `/aion` (Bearer). Melden mehrere Mitspieler denselben
 Lauf (gleicher Dungeon, ähnliche Startzeit/Dauer), wartet der Bot kurz, führt die Meldungen zu
-einer Rangliste zusammen und postet genau einmal: Embed mit Rangliste als Bild und je Boss ein
-Bild. Der NexHub meldet danach den Link zum Run (`attach_hub_link`, über control.py), der kommt
+einer Rangliste zusammen und postet genau einmal: Embed mit dem Run-Bild des NexBoards (dasselbe
+wie beim Discord-Webhook, `image_webp`). Schickt das NexBoard kein Bild (ältere Versionen), malt
+der Bot selbst: Rangliste als Bild und je Boss ein Bild. Der NexHub meldet danach den Link zum Run (`attach_hub_link`, über control.py), der kommt
 vorn ins Feld „📊 Analyse“, daneben die Bestenliste je Boss (`/leaderboard/<guild_id>`).
 
 Erwarteter Payload (ein POST pro abgeschlossenem Lauf, eine Zeile pro Spieler):
@@ -26,7 +27,10 @@ Der Webserver (Port 8789, `AION_PORT`) liefert nur diese zwei Pfade; Caddy gibt 
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import html
+import io
 import logging
 import os
 import secrets
@@ -45,6 +49,7 @@ DURATION_TOLERANCE_S = 20
 API_START_TOLERANCE_MS = 30_000
 ANALYSIS_FIELD = "📊 Analyse"
 HUB_LINK_TEXT = "Im NexHub ansehen"
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Run-Bild vom NexBoard, gemessen 200–400 KB
 POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
 
 
@@ -85,6 +90,8 @@ def validate_fight_payload(data: dict) -> str | None:
             return f"{key} fehlt oder ist keine Zahl"
     if error := _bad_players(data.get("players"), "players"):
         return error
+    if data.get("image_webp") is not None and not isinstance(data["image_webp"], str):
+        return "image_webp muss Base64-Text sein"
     bosses = data.get("bosses")
     if bosses is not None:
         if not isinstance(bosses, list):
@@ -95,6 +102,28 @@ def validate_fight_payload(data: dict) -> str | None:
             if error := _bad_players(b.get("players"), "bosses[].players"):
                 return error
     return None
+
+
+def decode_image(value) -> bytes | None:
+    """Run-Bild aus dem Payload: nur echtes WebP bis MAX_IMAGE_BYTES, sonst None (dann malt der Bot)."""
+    if not isinstance(value, str) or not value or len(value) > MAX_IMAGE_BYTES * 4 // 3 + 4:
+        return None
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    if len(raw) > MAX_IMAGE_BYTES or raw[:4] != b"RIFF" or raw[8:12] != b"WEBP":
+        return None
+    return raw
+
+
+def pick_image(reports: list[dict]) -> bytes | None:
+    """Von mehreren Meldungen desselben Laufs das Bild mit den meisten Spielern (dann dem meisten Schaden)."""
+    with_image = [r for r in reports if r.get("image")]
+    if not with_image:
+        return None
+    best = max(with_image, key=lambda r: (len(r["players"]), sum(p["damage"] for p in r["players"])))
+    return best["image"]
 
 
 def same_api_run(a: dict, b: dict) -> bool:
@@ -256,7 +285,7 @@ class AionDedup(commands.Cog):
         self.runner: web.AppRunner | None = None
 
     async def cog_load(self) -> None:
-        app = web.Application(client_max_size=1024 * 1024)
+        app = web.Application(client_max_size=2 * MAX_IMAGE_BYTES)  # Base64-Bild + Rest
         app.add_routes([
             web.post("/api/aion/fight", self.handle_api_fight),
             web.get("/leaderboard/{guild_id}", self.page_leaderboard),
@@ -301,6 +330,7 @@ class AionDedup(commands.Cog):
             "bosses_total": int(data["bosses_total"]), "bosses_killed": int(data["bosses_killed"]),
             "start_ms": int(data["start_ms"]), "fight_ms": int(data["fight_ms"]), "players": data["players"],
             "bosses": data.get("bosses") or [],
+            "image": decode_image(data.get("image_webp")),
         }
         clusters = self.api_pending.setdefault(guild_id, [])
         for c in clusters:
@@ -328,7 +358,8 @@ class AionDedup(commands.Cog):
         bosses = merge_bosses(cluster.reports)
         if bosses:
             await self._update_leaderboard(cluster.guild_id, bosses, players)
-        image_filename = "aion_run.png" if players else None
+        image = pick_image(cluster.reports)
+        image_filename = ("aion_run.webp" if image else "aion_run.png") if players else None
         embed = build_run_embed(
             cluster.run, len(cluster.reports), bosses, guild_id=cluster.guild_id,
             image_filename=image_filename, hub_url=cluster.hub_url,
@@ -336,7 +367,9 @@ class AionDedup(commands.Cog):
         embeds = [embed]
         files = []
         loop = asyncio.get_running_loop()
-        if image_filename:
+        if image_filename and image:  # Bild des NexBoards, enthält schon alle Bosse
+            files.append(discord.File(io.BytesIO(image), filename=image_filename))
+        elif image_filename:
             from .aion_image import render_run_image
 
             image_buf = await loop.run_in_executor(
@@ -345,7 +378,7 @@ class AionDedup(commands.Cog):
             )
             files.append(discord.File(image_buf, filename=image_filename))
         # max. 10 Embeds pro Discord-Nachricht, eines geht an das Haupt-Embed oben
-        for i, b in enumerate(bosses[:9]):
+        for i, b in enumerate([] if image else bosses[:9]):
             from .aion_image import render_boss_image
 
             boss_buf = await loop.run_in_executor(None, render_boss_image, b["name"], b["players"])

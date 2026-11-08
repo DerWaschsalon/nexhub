@@ -21,13 +21,18 @@ einer Rangliste zusammen. Namen sind sprachunabhängig englisch (Dungeon, Bosse)
      "bosses_total": 3, "bosses_killed": 3, "start_ms": …, "fight_ms": 350000,
      "players": [{"name": "…", "cls": "ranger", "damage": 13290000, "dps": 38000}],
      "bosses": [{"name": "…", "mob": 2400012, "killed": true, "duration_ms": 98000,
-                 "players": [{"name": "…", "cls": "ranger", "damage": 4200000, "dps": 41000}]}]}
+                 "players": [{"name": "…", "cls": "ranger", "damage": 4200000, "dps": 41000}]}],
+     "image_webp": "<base64>"}
+
+`image_webp` ist dasselbe Run-Bild wie beim Discord-Webhook (runs.py, render_run); der Bot postet
+es statt eigener Balken. Fehlt es (Bild ging nicht), malt der Bot wie früher selbst.
 
 Beides schickt Charakternamen von Mitspielern an einen fremden Server. Deshalb ist alles
 standardmäßig aus und wird nur mit eingetragener Adresse aktiv.
 """
 from __future__ import annotations
 
+import base64
 import logging
 import re
 import time
@@ -40,7 +45,7 @@ import yaml
 from pydantic import Field, ValidationError, field_validator
 
 from .config import _atomic_write, _Strict
-from .runs import Run, boss_name_en, dungeon_parts_en
+from .runs import Run, boss_name_en, dungeon_parts_en, run_image
 
 log = logging.getLogger(__name__)
 
@@ -125,12 +130,13 @@ def _players(players: dict, ms: int) -> list[dict]:
     return sorted(out, key=lambda p: -p["damage"])
 
 
-def run_payload(run: Run) -> dict:
-    """Beendeter Run (Namen schon per rename aufgelöst) → Payload der Run-API."""
+def run_payload(run: Run, image: bytes | None = None) -> dict:
+    """Beendeter Run (Namen schon per rename aufgelöst) → Payload der Run-API. `image` ist das
+    Run-Bild wie beim Discord-Webhook (WebP), der Bot postet es dann statt eigener Balken."""
     bosses = run.bosses()
     fight_ms = sum(b.duration_ms for b in bosses)
     name, diff = dungeon_parts_en(run.dungeon)
-    return {
+    payload = {
         "dungeon": name,
         "difficulty": diff,
         "dungeon_id": run.dungeon,
@@ -145,6 +151,9 @@ def run_payload(run: Run) -> dict:
                     "duration_ms": b.duration_ms, "players": _players(b.players, b.duration_ms)}
                    for b in bosses if b.total > 0],
     }
+    if image:
+        payload["image_webp"] = base64.b64encode(image).decode("ascii")
+    return payload
 
 
 async def post_json(session: aiohttp.ClientSession, url: str, payload: dict, token: str = "") -> None:
@@ -291,7 +300,12 @@ class DiscordBot:
 
     async def send_run(self, run: Run) -> bool:
         try:
-            await post_json(self.session(), self.settings.runs_url, run_payload(run), self.settings.runs_token)
+            try:
+                image = await run_image(run)
+            except Exception:  # ohne Bild postet der Bot seine eigenen Balken
+                log.exception("Run-Bild für den Bot")
+                image = None
+            await post_json(self.session(), self.settings.runs_url, run_payload(run, image), self.settings.runs_token)
         except (aiohttp.ClientError, TimeoutError, RuntimeError, OSError) as e:
             self._note("runs", False, f"{run.name}: {e or type(e).__name__}")
             await self._changed()

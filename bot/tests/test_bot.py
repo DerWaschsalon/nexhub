@@ -1219,6 +1219,76 @@ def test_youtube_validate_source_rejects_non_channel_ids():
     run(go())
 
 
+def test_aion_api_run_image():
+    """Run-Bild vom NexBoard: nur echtes WebP, von mehreren Meldungen das mit den meisten Spielern."""
+    import base64
+
+    from bot.cogs.aion_dedup import MAX_IMAGE_BYTES, decode_image, pick_image, validate_fight_payload
+
+    webp = b"RIFF\x10\0\0\0WEBPVP8L" + b"x" * 20
+    enc = base64.b64encode(webp).decode()
+    assert decode_image(enc) == webp
+    assert decode_image(None) is None and decode_image("") is None and decode_image(123) is None
+    assert decode_image("kein base64!") is None
+    assert decode_image(base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 20).decode()) is None
+    assert decode_image(base64.b64encode(b"RIFF\0\0\0\0WEBP" + b"x" * MAX_IMAGE_BYTES).decode()) is None
+
+    base = {"dungeon": "Fire Temple", "bosses_total": 1, "bosses_killed": 1, "start_ms": 1, "fight_ms": 1,
+            "players": [{"name": "A", "damage": 5}]}
+    assert validate_fight_payload({**base, "image_webp": enc}) is None
+    assert validate_fight_payload({**base, "image_webp": 5}) is not None
+
+    one = {"players": [{"name": "A", "damage": 9}], "image": b"eins"}
+    two = {"players": [{"name": "A", "damage": 5}, {"name": "B", "damage": 1}], "image": b"zwei"}
+    bare = {"players": [{"name": "A", "damage": 1}, {"name": "B", "damage": 1}, {"name": "C", "damage": 1}],
+            "image": None}
+    assert pick_image([one, two, bare]) == b"zwei"
+    assert pick_image([bare]) is None
+
+
+def test_aion_api_posts_nexboard_image(monkeypatch):
+    """Mit Bild: ein Embed mit dem WebP, keine eigenen Boss-Bilder; ohne Bild wie früher."""
+    import base64
+
+    import bot.cogs.aion_dedup as dedup
+
+    webp = b"RIFF\x10\0\0\0WEBPVP8L" + b"x" * 20
+    sent = []
+
+    class Channel:
+        async def send(self, embeds, files):
+            sent.append((embeds, files))
+            return object()
+
+    class FakeBot:
+        def get_channel(self, cid):
+            return Channel()
+
+    async def no_lb(*a, **k):
+        return None
+
+    async def no_sleep(*a):
+        return None
+
+    monkeypatch.setattr(dedup.asyncio, "sleep", no_sleep)
+    cog = dedup.AionDedup.__new__(dedup.AionDedup)
+    cog.bot, cog.api_pending, cog.api_posted = FakeBot(), {}, []
+    cog._update_leaderboard = no_lb
+    run_ = {"dungeon": "Fire Temple", "difficulty": None, "bosses_total": 2, "bosses_killed": 2, "start_ms": 1,
+            "fight_ms": 60_000, "players": [{"name": "A", "damage": 600_000, "dps": 10_000}],
+            "bosses": [{"name": "B1", "players": [{"name": "A", "damage": 300_000}]},
+                       {"name": "B2", "players": [{"name": "A", "damage": 300_000}]}],
+            "image": dedup.decode_image(base64.b64encode(webp).decode())}
+    run(cog._finalize_api_later(dedup.ApiCluster(run_, 1), 0, 5))
+    embeds, files = sent[-1]
+    assert len(embeds) == 1 and embeds[0].image.url == "attachment://aion_run.webp"
+    assert [f.filename for f in files] == ["aion_run.webp"] and files[0].fp.read() == webp
+
+    run(cog._finalize_api_later(dedup.ApiCluster({**run_, "image": None}, 1), 0, 5))
+    embeds, files = sent[-1]
+    assert len(embeds) == 3 and [f.filename for f in files] == ["aion_run.png", "aion_boss_0.png", "aion_boss_1.png"]
+
+
 def test_aion_hub_link(monkeypatch):
     """Der NexHub meldet einen Run: Link an den wartenden Post, sonst nachträglich an den geposteten."""
     import time
