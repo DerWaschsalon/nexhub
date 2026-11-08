@@ -1,6 +1,7 @@
-discord.py[voice]>=2.7,<3
-# davey 0.2 verschlüsselt anders, als discord.py 2.7.1 es erwartet: der Bot spielt, aber niemand hört etwas
-davey<0.2
+# discord.py 2.7.1 passt nur zu davey 0.1 (DAVE-Verschlüsselung), und damit klingt die Musik roboterhaft.
+# Fester Stand des PRs Rapptz/discord.py#10548 (davey 0.2). Sobald ein Release ihn enthält:
+# zurück auf discord.py[voice]>=2.8.
+discord.py[voice] @ https://github.com/Snazzah/discord.py/archive/283cafbd45f967fad61fbd14580dca1302122f34.zip
 aiosqlite>=0.20
 yt-dlp[default]
 tzdata
