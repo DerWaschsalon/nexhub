@@ -341,3 +341,21 @@ def test_cleanup_only_own_history(tmp_path):
     runs.own_history = lambda: True
     assert runs._cleanup() == 1 and not old.exists() and new.exists()
     assert not (hits / "old.json").exists() and (hits / "new.json").exists()
+
+
+def test_kampfkraft_und_itemlevel():
+    """combatPower/gearScore aus der History, je Boss und gesamt der höchste Wert, Text im Bild."""
+    from deckbar_daemon.runs import Run, player_info
+
+    a = fight(2400001, 0)
+    a["actors"][0].update(combatPower=163_761, gearScore=2848)
+    a["actors"][1].update(combatPower="kaputt")
+    b = fight(2400002, 120)
+    b["actors"][0].update(combatPower=163_900, gearScore=2850)
+    run = Run(DUNGEON, [parse_fight(a, 2), parse_fight(b, 2)])
+    p = next(x for x in run.total().players.values() if x.name == "Mo***n")
+    assert (p.cp, p.gear) == (163_900, 2850)
+    assert player_info(p) == "IL 2850 · KK 163,9 k"
+    g = next(x for x in run.total().players.values() if x.name == "Gamunex")
+    assert (g.cp, g.gear) == (0, 0) and player_info(g) == ""
+    assert render_run(run)[:4] == b"RIFF"
