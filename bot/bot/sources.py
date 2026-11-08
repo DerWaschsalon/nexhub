@@ -132,6 +132,10 @@ async def stream_url(track: Track) -> str:
     track.thumbnail = track.thumbnail or _best_thumbnail(info)
     track.live = track.live or bool(info.get("is_live"))
     track.headers = info.get("http_headers") or {}
+    # YouTube gibt manche Adressen erst ein paar Sekunden später frei, vorher antwortet es mit 403
+    wait = (info.get("available_at") or 0) - time.time()
+    if wait > 0:
+        await asyncio.sleep(min(wait + 0.5, 30))
     return info["url"]
 
 
