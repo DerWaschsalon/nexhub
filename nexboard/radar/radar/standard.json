@@ -23,6 +23,7 @@
   "minikarte": [],
   "ansage_stil": "beides",
   "wellen_ton": true,
+  "nur_mich": true,
   "eigene_worte": {},
   "ruf_aus": []
 }

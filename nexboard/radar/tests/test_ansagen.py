@@ -54,6 +54,23 @@ class AnsagenTest(unittest.TestCase):
     def anzeige(self):
         return [(w.regel.titel, w.regel.hinweis, round(w.rest(self.t[0]), 2)) for w in self.z.schnappschuss()]
 
+    def test_nur_mich_schweigt_bei_fremdem_ziel(self):
+        self.z.k["nur_mich"] = True
+        self.zustand.eigene_eid, self.zustand.spieler[9] = 5, "Andere"
+        self.a.leiste(70, 1604670, 9)
+        self.a.effekt(9, 1, 10000008, 5.0)
+        self.assertEqual((self.anzeige(), self.z.laut), ([], []))
+        self.assertIn("thamon", self.a.wesen[70][0])  # Boss trotzdem erkannt
+        self.a.leiste(70, 1604670, 5)                 # auf mich
+        self.assertEqual(len(self.anzeige()), 1)
+        self.t[0] += 5
+        self.a.leiste(70, 1604670, 70)                # auf sich selbst: Fläche, Angriff auf alle
+        self.assertEqual(len(self.anzeige()), 1)
+        self.z.k["nur_mich"] = False
+        self.t[0] += 5
+        self.a.leiste(70, 1604670, 9)
+        self.assertEqual(len(self.anzeige()), 1)
+
     def test_leiste_mit_anweisung_und_zeile(self):
         self.a.leiste(70, 1604670)
         self.assertEqual(self.anzeige(), [("Lila — keine Magieangriffe", "Violettes Licht schießt empor!", 1.79)])
@@ -208,7 +225,14 @@ class PaketeTest(unittest.TestCase):
         self.z.bei_welle.append(lambda *a: self.gesehen.append(("welle", *a)))
         self.z.verarbeiten(0x3809, varint(3199) + b"\x02" + struct.pack("<I", 1604670) + b"\x01\x02")
         self.z.verarbeiten(0x3803, varint(3199) + b"\x00" + varint(5000) + struct.pack("<I", 1604390))
-        self.assertEqual(self.gesehen, [("leiste", 3199, 1604670), ("welle", 3199, 1604390)])
+        self.assertEqual(self.gesehen, [("leiste", 3199, 1604670, None), ("welle", 3199, 1604390)])
+
+    def test_leiste_mit_ziel(self):
+        # wie im Ludra-Mitschnitt: Caster, Flag, Skill, 01 02, Ziel (Varint), Position ...
+        self.z.bei_leiste.append(lambda *a: self.gesehen.append(a))
+        self.z.verarbeiten(0x3809, varint(23107) + b"\x02" + struct.pack("<I", 1802730) + b"\x01\x02"
+                           + varint(7271) + bytes(16))
+        self.assertEqual(self.gesehen, [(23107, 1802730, 7271)])
 
     def test_effekt_mit_dauer_und_ende(self):
         self.z.bei_effekt.append(lambda *a: self.gesehen.append(("an", *a)))

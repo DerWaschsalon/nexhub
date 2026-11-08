@@ -323,7 +323,7 @@ class WarnZentrale:
         lernhilfe = skill not in ANSAGE_SKILLS and self.zustand.bosse.get(caster, 0) not in CAST_BOSSE | {0}
         if not regel and lernhilfe and dungeon:
             regel = cast_regel(skill, self.zustand.bosse[caster])  # Lernhilfe: jeden Boss-Cast zeigen
-        if not regel or not self.gruppe_an(regel.gruppe):
+        if not regel or not self.gruppe_an(regel.gruppe) or self.fremd(ziel):
             return
         jetzt = self.uhr()
         if skill == REGEN:
@@ -332,6 +332,13 @@ class WarnZentrale:
         name = "" if ich or ziel == self.zustand.eigene_eid else self.zustand.spieler.get(ziel, "")
         with self.lock:
             self._ausloesen(regel, jetzt, ich, name)
+
+    def fremd(self, ziel: int | None) -> bool:
+        """Einstellung „Nur was mich betrifft“ und das Ziel ist ein anderer Spieler. Kein Ziel, der Boss
+        selbst oder ein unbekanntes Wesen zaehlen nicht als fremd (Flaechen, Angriffe auf alle)."""
+        z = self.zustand
+        return bool(self.k.get("nur_mich")) and ziel is not None and ziel != z.eigene_eid \
+            and ziel in z.spieler
 
     def zeigen(self, regel: Regel, jetzt: float) -> None:
         """Eine fertige Warnung von aussen (Boss-Ansagen) zeigen und sprechen."""
@@ -360,6 +367,8 @@ class WarnZentrale:
         spieler = ziel in self.zustand.spieler and not ich
         passt = {"du": ich, "mitspieler": spieler, "spieler": ich or spieler,
                  "boss": ziel in self.zustand.bosse}[regel.auf]
+        if regel.auf != "boss" and self.fremd(ziel):
+            return
         if self.an and passt:
             name = self.zustand.spieler.get(ziel, "") if spieler else ""
             with self.lock:
@@ -423,6 +432,8 @@ class WarnZentrale:
         if not self.an or anteil >= LP_KNAPP or eid in self._knapp:
             return
         self._knapp.add(eid)
+        if self.k.get("nur_mich"):
+            return  # betrifft einen anderen
         with self.lock:
             self._hinzufuegen(GRUPPE_LP, self.uhr(), ziel=self.zustand.spieler.get(eid, ""))
 

@@ -6,6 +6,10 @@ Buff auf ihm und wie lange er liegt. Die von Hand geprüften Mechaniken bringen 
 mit („Lila — keine Magieangriffe“), einen Countdown, solange der Buff liegt, und danach „Wieder
 angreifen“. Bei Vakrons Sprung piept es zu jeder Welle.
 
+Mit „Nur was mich betrifft“ schweigt ein Ruf, dessen Cast auf einen anderen Spieler zielt oder dessen
+Effekt auf einem anderen Spieler liegt. Casts ohne Ziel oder auf den Boss selbst (Flächen, Angriffe auf
+alle) bleiben.
+
 Die Pakete kommen von jedem Wesen, auch von Spielern. Welcher Boss ein Wesen ist, merkt sich die Klasse
 erst, wenn es einen der Skills dieses Bosses einsetzt (eine halbe Stunde lang). Nur so lässt sich ein
 Buff, den jedes Monster bekommen kann (Raserei, Benommenheit), dem richtigen Boss zuordnen.
@@ -59,13 +63,15 @@ class Ansagen:
         self.vorschau_phasen: list[tuple[float, dict]] = []  # (fällig um, Ruf)
 
     # ---------- Eingänge (aus dem Mitschnitt-Thread) ----------
-    def leiste(self, caster: int, skill: int) -> None:
-        self._ausloeser("leiste", caster, skill)
+    def leiste(self, caster: int, skill: int, ziel: int | None = None) -> None:
+        self._ausloeser("leiste", caster, skill, ziel)
 
-    def skill(self, caster: int, skill: int, _ziel: int | None = None) -> None:
-        self._ausloeser("skill", caster, skill)
+    def skill(self, caster: int, skill: int, ziel: int | None = None) -> None:
+        self._ausloeser("skill", caster, skill, ziel)
 
     def effekt(self, wesen: int, instanz: int, effekt: int, dauer: float) -> None:
+        if self.zentrale.fremd(wesen):
+            return  # Effekt auf einem anderen Spieler
         for ruf in self.phasen_rufe.get(effekt, []):
             if self._an(ruf):
                 self._phase_beginnt(ruf, wesen, instanz, dauer)
@@ -109,10 +115,12 @@ class Ansagen:
                 self._phase_endet(schluessel)
 
     # ---------- Ablauf ----------
-    def _ausloeser(self, art: str, wesen: int, i: int) -> None:
+    def _ausloeser(self, art: str, wesen: int, i: int, ziel: int | None = None) -> None:
         jetzt = self.zentrale.uhr()
         if art != "effekt":
             self._lernen(wesen, i, jetzt)
+        if self.zentrale.fremd(ziel):
+            return  # zielt auf einen anderen Spieler („Nur was mich betrifft“)
         rufe = self.rufe.get((art, i))
         ruf = rufe and self._waehlen(rufe, wesen, jetzt)
         if not ruf or not self._an(ruf):
