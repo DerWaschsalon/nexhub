@@ -44,7 +44,7 @@ OP_SYNC = 0x8D00      # Punkte einer Entity (HP, MP, ...): Entity, Flags u8, bei
 EIGENE_PUNKTE = {1, 3}
 OP_CAST = 0x3802      # Skill geht los: Caster, 00, Skill u32, 2 Byte, Ziel (geprueft)
 # Aus taengu/A2Tools-Plugins (Boss Callouts), noch nicht im eigenen Mitschnitt geprueft:
-OP_LEISTE = 0x3809    # Cast-Leiste beginnt (kommt vor 0x3802): Caster, Flag u8, Skill u32
+OP_LEISTE = 0x3809    # Cast-Leiste beginnt (kommt vor 0x3802): Caster, Flag u8, Skill u32, 2 Byte, Ziel
 OP_WELLE = 0x3803     # spaetere Treffer eines Skills (Vakrons Wellen): Caster, u8, Quelle, Skill u32
 OP_EFFEKT_WEG = 0x382C  # Effekte enden: Entity, Anzahl u8, je Effekt: Art u8, Instanz, Grund u8, ...
 # Boden-Markierung eines Skills (glass-cannon, MIT): Caster, Skill u32, Cast-ID u8, u32, u16, x/y/z, Richtung,
@@ -158,7 +158,7 @@ class RadarZustand:
         # Rueckrufe: neuer Cube, Cast (caster, skill, ziel)
         self.bei_neuem_cube: list[Callable[[Cube], None]] = []
         self.bei_cast: list[Callable[[int, int, int | None], None]] = []
-        self.bei_leiste: list[Callable[[int, int], None]] = []  # (Caster, Skill), Cast-Leiste beginnt
+        self.bei_leiste: list[Callable[[int, int, int | None], None]] = []  # (Caster, Skill, Ziel), Cast-Leiste beginnt
         self.bei_welle: list[Callable[[int, int], None]] = []   # (Caster, Skill), spaeterer Treffer
         # (Entity, Instanz, Effekt-ID, Dauer s), nur IDs aus effekt_ids; und (Entity, Instanz), Effekt endet
         self.bei_effekt: list[Callable[[int, int, int, float], None]] = []
@@ -326,8 +326,9 @@ class RadarZustand:
                     f(eid, skill, ziel)
             elif op == OP_LEISTE:
                 skill = struct.unpack_from("<I", p, n + 1)[0]
+                ziel = uvarint(p, n + 7)[0] if len(p) > n + 7 else None  # Ziel wie bei 0x3802
                 for f in self.bei_leiste:
-                    f(eid, skill)
+                    f(eid, skill, ziel)
             elif op == OP_WELLE:
                 quelle_laenge = uvarint(p, n + 1)[1]
                 skill = struct.unpack_from("<I", p, n + 1 + quelle_laenge)[0]

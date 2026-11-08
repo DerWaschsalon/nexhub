@@ -123,6 +123,7 @@ function einstellungen(ctx) {
         settingsRow("Dungeons automatisch aufnehmen", "Lernmodus: jeder Lauf wird eine eigene Aufnahme", sw(k.aufnahme_auto, (v) => setzen("aufnahme_auto", v))),
         settingsRow("Art der Ansage", "Kurze Ansage: die Farbe oder was zu tun ist, mit Countdown, ohne den Satz des Bosses.", select(STIL, k.ansage_stil, (v) => setzen("ansage_stil", v))),
         settingsRow("Piepton bei jeder Welle", "Vakrons Sprung", sw(k.wellen_ton, (v) => setzen("wellen_ton", v))),
+        settingsRow("Nur was mich betrifft", "Schweigt bei Angriffen und Effekten auf andere Spieler (z. B. „Todesmal auf …“, Mitspieler mit wenig LP). Flächen und Angriffe auf alle bleiben.", sw(k.nur_mich, (v) => setzen("nur_mich", v))),
         el("div", { style: "overflow-x:auto" }, el("table", { class: "list" },
           el("thead", {}, el("tr", {}, ["Meldung", "Anzeigen", "Ton"].map((h) => el("th", { text: h })))),
           el("tbody", {}, zeilen)))),

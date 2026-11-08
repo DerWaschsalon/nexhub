@@ -109,6 +109,15 @@ class WarnungTest(unittest.TestCase):
         self.assertEqual(self.z.schnappschuss()[0].titel(), "Todesmal auf Testspieler")
         self.assertEqual(self.z.laut[0], ("ansage", "Todesmal auf Testspieler"))
 
+    def test_nur_mich_schweigt_bei_anderen(self):
+        self.z.k["nur_mich"] = True
+        self.zustand.spieler[9] = "Testspieler"
+        self.z.cast(1, TODESMAL, 9)
+        self.z.gruppe_lp(9, 0.1)
+        self.assertEqual((self.titel(), self.z.laut), ([], []))
+        self.z.cast(1, TODESMAL, 5)
+        self.assertEqual(self.z.schnappschuss()[0].titel(), "Todesmal  –  DU!")
+
     def test_lernhilfe_zeigt_boss_casts_in_dungeon_ohne_warnungen(self):
         self.zustand.dungeon = "Ferocious Horn Den"
         self.zustand.bosse[7] = 2300910
