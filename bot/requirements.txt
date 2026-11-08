@@ -1,4 +1,6 @@
 discord.py[voice]>=2.7,<3
+# davey 0.2 verschlüsselt anders, als discord.py 2.7.1 es erwartet: der Bot spielt, aber niemand hört etwas
+davey<0.2
 aiosqlite>=0.20
 yt-dlp[default]
 tzdata
