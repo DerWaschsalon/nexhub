@@ -1,5 +1,6 @@
 """Discord-Bot-Anbindung: Gruppen-DPS und Run-API gegen einen nachgebauten Bot (TheWashBot-Format)."""
 import asyncio
+import base64
 
 import pytest
 from aiohttp import web
@@ -95,6 +96,24 @@ def test_run_payload_matches_bot_contract():
         assert isinstance(p[key], int)
 
 
+async def test_run_image_rendered_once_and_reset_on_rename(monkeypatch):
+    from deckbar_daemon import runs as runs_mod
+
+    calls = []
+    monkeypatch.setattr(runs_mod, "render_run", lambda r: calls.append(1) or b"RIFF\0\0\0\0WEBPbild")
+    r = run_from_history()
+    assert await runs_mod.run_image(r) == await runs_mod.run_image(r) and len(calls) == 1
+    r.rename(dict(r.names))  # gleiche Namen: Bild bleibt
+    await runs_mod.run_image(r)
+    assert len(calls) == 1
+    key = next(p.key for f in r.fights for p in f.players)
+    r.rename({key: "Neuer Name"})  # andere Namen: neu rendern
+    await runs_mod.run_image(r)
+    assert len(calls) == 2
+    p = run_payload(r, await runs_mod.run_image(r))
+    assert base64.b64decode(p["image_webp"]).startswith(b"RIFF") and "image_webp" not in run_payload(r)
+
+
 async def fake_bot():
     got = []
 
@@ -134,6 +153,9 @@ async def test_sends_to_bot_only_when_enabled(tmp_path):
         assert got[0][2]["party"][0]["name"] == "Aria" and bot.result["dps"]["ok"]
         await bot.on_run(run_from_history())
         assert got[-1][0] == "runs" and got[-1][2]["bosses_killed"] == 2 and bot.result["runs"]["ok"]
+        # dasselbe Bild wie beim Webhook geht mit (WebP, Base64)
+        img = base64.b64decode(got[-1][2]["image_webp"])
+        assert img[:4] == b"RIFF" and img[8:12] == b"WEBP"
         bot.update({"runs_token": "falsch"})
         assert not await bot.send_run(run_from_history())
         assert "401" in bot.result["runs"]["text"]

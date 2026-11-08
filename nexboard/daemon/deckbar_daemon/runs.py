@@ -290,6 +290,7 @@ class Run:
     fights: list[Fight] = field(default_factory=list)
     complete: bool = False  # Endboss besiegt
     names: dict[str, str] = field(default_factory=dict)  # echte Namen zu maskierten (siehe rename)
+    bild: bytes | None = field(default=None, repr=False, compare=False)  # Cache für run_image
 
     @property
     def start_ms(self) -> int:
@@ -307,7 +308,10 @@ class Run:
         """Maskierte Namen beim Auswerten durch bekannte echte ersetzen (die Kämpfe bleiben unverändert).
         Nur Spieler dieses Runs: alle je gesehenen Namen sprengen die Grenze von 500 im NexLog."""
         keys = {p.key for f in self.fights for p in f.players}
-        self.names = {k: v for k, v in names.items() if k in keys}
+        names = {k: v for k, v in names.items() if k in keys}
+        if names != self.names:
+            self.bild = None  # andere Namen, anderes Bild
+        self.names = names
 
     def _display(self, p: Player) -> str:
         return self.names.get(p.key, p.name) if "*" in p.name else p.name
@@ -731,6 +735,13 @@ def render_run(run: Run) -> bytes:
     return buf.getvalue()
 
 
+async def run_image(run: Run) -> bytes:
+    """Run-Bild einmal rendern und am Run merken: Webhook und Bot posten dasselbe Bild."""
+    if run.bild is None:
+        run.bild = await asyncio.to_thread(render_run, run)
+    return run.bild
+
+
 def _trim() -> None:
     """Nach dem Rendern (~70 MB Spitze) den freien Speicher ans System zurückgeben; glibc behält
     ihn sonst im Prozess (gemessen: +28 MB statt +6 MB nach einem Run-Bild)."""
@@ -1072,7 +1083,7 @@ class DungeonRuns:
     async def post(self, session: aiohttp.ClientSession, run: Run) -> bool:
         run.rename(self.names())
         try:
-            png = await asyncio.to_thread(render_run, run)
+            png = await run_image(run)
             name = f"run-{datetime.fromtimestamp(run.start_ms / 1000):%Y%m%d-%H%M}.webp"
             await post_discord(session, self.settings.webhook, run_message(run), png, name)
         except (aiohttp.ClientError, TimeoutError, RuntimeError, OSError) as e:
