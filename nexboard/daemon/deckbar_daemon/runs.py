@@ -203,6 +203,8 @@ class Player:
     cls: str | None
     dmg: int
     you: bool = False
+    cp: int = 0  # Kampfkraft (combatPower im Meter)
+    gear: int = 0  # Ausrüstungswert/Itemlevel (gearScore im Meter)
 
     @property
     def key(self) -> str:
@@ -240,7 +242,7 @@ def parse_fight(data: dict, you_actor: int | None = None) -> Fight | None:
             dmg[s["actorId"]] = dmg.get(s["actorId"], 0) + max(0, int(s.get("dmg") or 0))
         players = [
             Player(str(a.get("nickname") or "?")[:24], JOBS.get(a.get("jobId")), dmg.get(a["actorId"], 0),
-                   a["actorId"] == you_actor)
+                   a["actorId"] == you_actor, _int(a.get("combatPower")), _int(a.get("gearScore")))
             for a in data.get("actors") or [] if dmg.get(a["actorId"])
         ]
         max_hp = int(details.get("maxHp") or 0)
@@ -252,6 +254,13 @@ def parse_fight(data: dict, you_actor: int | None = None) -> Fight | None:
         )
     except (KeyError, TypeError, ValueError):
         return None
+
+
+def _int(v) -> int:
+    try:
+        return max(0, int(v or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def load_fight(path: Path) -> Fight | None:
@@ -331,6 +340,7 @@ class Run:
                 q = b.players.setdefault(p.key, Player(self._display(p), p.cls, 0, p.you))
                 q.dmg += p.dmg
                 q.you |= p.you
+                q.cp, q.gear = max(q.cp, p.cp), max(q.gear, p.gear)
                 if "*" in q.name and "*" not in p.name:
                     q.name = p.name
         return list(out.values())
@@ -343,6 +353,7 @@ class Run:
                 q = t.players.setdefault(key, Player(p.name, p.cls, 0, p.you))
                 q.dmg += p.dmg
                 q.you |= p.you
+                q.cp, q.gear = max(q.cp, p.cp), max(q.gear, p.gear)
         return t
 
     @property
@@ -636,7 +647,23 @@ def _row(L: _Layers, x: int, y: int, w: int, rank: int, p: Player, best: int, to
     dps = fmt_amount(p.dmg / secs) + "/s"
     L.label((rx, cy), dps, df, WHITE, anchor="rm", shadow=0.95)
     rx -= L.t.textlength(dps, font=df) + 10 * S
-    L.label((rx, cy), fmt_amount(p.dmg), sf, _rgba(WHITE, 0.45), anchor="rm", shadow=0.9)
+    amount = fmt_amount(p.dmg)
+    L.label((rx, cy), amount, sf, _rgba(WHITE, 0.45), anchor="rm", shadow=0.9)
+    rx -= L.t.textlength(amount, font=sf)
+
+    # Itemlevel und Kampfkraft hinter dem Namen, nur wenn Platz bis zu den Zahlen ist
+    info = player_info(p)
+    if info:
+        inf = font("num", 11)
+        ix = cx + L.t.textlength(p.name, font=nf) + 8 * S
+        if ix + L.t.textlength(info, font=inf) <= rx - 10 * S:
+            L.label((ix, cy), info, inf, _rgba(WHITE, 0.5), anchor="lm", shadow=0.9)
+
+
+def player_info(p: Player) -> str:
+    """„IL 2848 · KK 163,8 k“; leer, wenn das Meter nichts dazu weiß."""
+    parts = ([f"IL {p.gear}"] if p.gear else []) + ([f"KK {fmt_amount(p.cp)}"] if p.cp else [])
+    return " · ".join(parts)
 
 
 def _panel(boss: Boss, height: int) -> Image.Image:
