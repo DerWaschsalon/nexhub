@@ -1,5 +1,6 @@
 /* Modul AION 2 · Dungeon-Runs: Discord-Webhook, Vorschau, Namen der Mitspieler. */
-import { fill, el, icon, api, S, on, field, input, button, chip, callout, card, settingsRow, sw, saver, toast, clampInt, fmtWhen, CLASS_LABELS } from "../core.js";
+import { fill, el, icon, api, S, on, button, chip, callout, card, saver, toast, fmtWhen, CLASS_LABELS } from "../core.js";
+import { moduleSettings } from "../form.js";
 
 // So maskiert das A2Tools-Meter (wie mask() in runs.py)
 function maskName(n) {
@@ -19,40 +20,34 @@ function stateChip(r) {
 
 function runsTab(ctx) {
   const box = el("div", { class: "stack" });
-  const save = saver("PUT", "/api/runs", (res) => { S.runs = res; draw(); }, 300, "Discord-Einstellungen gespeichert");
-  const patch = (p) => { Object.assign(S.runs.settings, p); save({ ...S.runs.settings }); };
+  // Namen speichert die Seite selbst (eigene Oberfläche), über dieselbe Route wie das Formular
+  const saveNames = saver("PUT", "/api/m/aion2.runs/settings", null, 300, "Namen gespeichert");
   const draw = () => {
     const r = S.runs;
     if (!r) return;
-    const st = r.settings;
     let img = null;
     fill(box,
       !r.history ? callout("warn", "alert", "Noch keine Kampf-History gefunden. Sie entsteht beim ersten Bosskampf mit laufendem Mitschnitt.") : null,
-      el("div", { class: "cols" },
-        card("Discord", "Nach jedem Run ein Bild mit dem Schaden pro Boss", stateChip(r),
-          settingsRow("Bild posten", "Per Webhook in einen Kanal", sw(st.enabled, (v) => patch({ enabled: v }))),
-          el("div", { class: "grid", style: "margin-top:6px" },
-            field("Discord-Webhook", input(st.webhook, (v) => patch({ webhook: v.trim() }), { type: "password", autocomplete: "off", spellcheck: "false", lazy: true, placeholder: "https://discord.com/api/webhooks/…" }), "Kanal bearbeiten → Integrationen → Webhooks"),
-            field("Run vorbei nach (min ohne Boss)", input(st.idle_minutes, (v) => patch({ idle_minutes: clampInt(v, 2, 120, 15) }), { type: "number", min: 2, max: 120 })),
-            field("History aufbewahren (Tage)", input(st.history_days, (v) => patch({ history_days: clampInt(v, 0, 3650, 0) }), { type: "number", min: 0, max: 3650 }), "0 = alles behalten. Löscht ältere Kämpfe aus dem eigenen Mitschnitt (~2,5 MB pro Spieltag), nie die des A2Tools-Meters.")),
-          r.result ? el("p", { class: "hint small", style: "margin-top:12px", text: r.result }) : null),
-        card("Letzter Run", r.last_run ? `${r.last_run.name} · ${fmtWhen(r.last_run.end)} · ${r.last_run.kills} Boss(e)` : "noch keiner seit dem Start", null,
-          el("div", { class: "row wrap" },
-            button("Vorschau", () => { img.src = `/api/runs/preview.png?t=${Date.now()}`; img.hidden = false; }, "", "image"),
-            button("Jetzt posten", async (e) => {
-              const b = e.currentTarget; // nach dem await ist currentTarget null
-              b.disabled = true;
-              try { S.runs = await api("POST", "/api/runs/test"); toast("An Discord geschickt"); draw(); } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
-            }, "", "send")),
-          (img = el("img", { class: "preview-img", hidden: true, alt: "Vorschau des letzten Runs", style: "margin-top:14px", onerror: () => { img.hidden = true; toast("Noch kein Dungeon-Run in der History", true); } })))),
+      card("Letzter Run", r.last_run ? `${r.last_run.name} · ${fmtWhen(r.last_run.end)} · ${r.last_run.kills} Boss(e)` : "noch keiner seit dem Start", stateChip(r),
+        el("div", { class: "row wrap" },
+          button("Vorschau", () => { img.src = `/api/runs/preview.png?t=${Date.now()}`; img.hidden = false; }, "", "image"),
+          button("Jetzt posten", async (e) => {
+            const b = e.currentTarget; // nach dem await ist currentTarget null
+            b.disabled = true;
+            try { S.runs = await api("POST", "/api/runs/test"); toast("An Discord geschickt"); draw(); } catch (err) { toast(err.message, true); } finally { b.disabled = false; }
+          }, "", "send")),
+        r.result ? el("p", { class: "hint small", style: "margin-top:12px", text: r.result }) : null,
+        (img = el("img", { class: "preview-img", hidden: true, alt: "Vorschau des letzten Runs", style: "margin-top:14px", onerror: () => { img.hidden = true; toast("Noch kein Dungeon-Run in der History", true); } }))),
       card("Namen der Mitspieler", "Das Meter speichert fremde Namen maskiert", null,
         el("p", { class: "hint small", style: "margin-bottom:14px", text: "Echte Namen lernt die NexBoard während des Kampfs aus der Live-Anzeige (grau vorausgefüllt). Eintragen musst du nur, was falsch oder leer ist." }),
-        namesGrid(r, patch)),
-      callout("info", "shield-check", "Die Bilder zeigen Charakternamen deiner Mitspieler. Poste sie nur in Kanäle, in denen das für alle in Ordnung ist."));
+        namesGrid(r, saveNames)));
   };
   ctx.onUnmount(on("runs", draw));
   draw();
-  return box;
+  return el("div", { class: "stack" },
+    moduleSettings(ctx, "aion2.runs", "Discord", "Nach jedem Run ein Bild mit dem Schaden pro Boss"),
+    box,
+    callout("info", "shield-check", "Die Bilder zeigen Charakternamen deiner Mitspieler. Poste sie nur in Kanäle, in denen das für alle in Ordnung ist."));
 }
 
 function namesGrid(r, patch) {

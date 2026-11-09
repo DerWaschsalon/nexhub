@@ -21,7 +21,7 @@ NO_RUN = "noch kein Dungeon-Run in der History"
 
 class RunsModule(WebModule):
     info = ModuleInfo(
-        "aion2.runs", "AION 2 · Dungeon-Runs", "games", "trophy",
+        "aion2.runs", "AION 2 · Dungeon-Runs", "share", "trophy",
         "Fasst Bosskämpfe zu Runs zusammen und postet nach jedem Run ein Bild mit dem Schaden pro "
         "Boss in einen Discord-Kanal.",
         requires=("aion2.dps",), tags=("AION 2", "Discord"),

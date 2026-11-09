@@ -2,8 +2,9 @@
    Jedes Modul hat eine eigene Datei in js/modules/ (Tabs, Dashboard-Karte, Seiten). */
 import {
   fill, $, el, icon, glyph, api, S, on, emit, connectLive, loadIcons, mod, modOn, setModule, modIcon, toast,
-  setSaveState, sw, field, input, select, button, chip, callout, card, settingsRow, seg, fmtWhen, throttle, dpsDiff,
+  setSaveState, sw, field, select, button, chip, callout, card, settingsRow, seg, throttle, dpsDiff,
 } from "./core.js";
+import { schemaForm } from "./form.js";
 import deck from "./modules/deck.js";
 import dps from "./modules/aion2-dps.js";
 import overlay from "./modules/aion2-overlay.js";
@@ -201,11 +202,12 @@ function modulesPage(ctx) {
 function settingsPage(ctx) {
   const box = el("div", { class: "stack" });
   let restartNeeded = [];
+  const view = {}; // „Erweitert“ bleibt beim Neuzeichnen offen
   const save = async (patch) => {
     setSaveState("Speichere …");
     try {
       const res = await api("PUT", "/api/settings", patch);
-      S.settings = { settings: res.settings, config_dir: res.config_dir, restart_fields: res.restart_fields };
+      S.settings = { settings: res.settings, schema: res.schema, config_dir: res.config_dir, restart_fields: res.restart_fields };
       restartNeeded = [...new Set([...restartNeeded, ...res.restart])];
       setSaveState("Gespeichert ✓");
       draw();
@@ -217,28 +219,15 @@ function settingsPage(ctx) {
   const draw = () => {
     const st = S.settings?.settings;
     if (!st) return;
-    const theme = localStorage.getItem("theme") || "auto";
+    const theme = storedTheme();
+    const patch = (p) => { Object.assign(st, p); save(p); };
     fill(box,
       restartNeeded.length ? callout("warn", "restart", el("span", { text: `Wirkt erst nach einem Neustart des Daemons: ${restartNeeded.join(", ")}` }),
         button("Jetzt neu starten", restartDaemon, "primary sm", "restart")) : null,
-      el("div", { class: "cols" },
-        card("Allgemein", "Name und Darstellung", null,
-          el("div", { class: "grid" },
-            field("Name", input(st.name, (v) => save({ name: v }), { maxlength: 40, lazy: true }), "Erscheint auf den Geräten und im Netzwerk (mDNS)."),
-            field("Darstellung", select({ auto: "Wie das System", dark: "Dunkel", light: "Hell" }, theme, (v) => { setTheme(v); }), "Gilt nur für diesen Browser."))),
-        card("Medien", "Für Media-Kacheln und Aktionen", null,
-          el("div", { class: "grid" },
-            field("Player", input(st.player || "", (v) => save({ player: v.trim() || null }), { placeholder: "leer = aktivster Player (playerctl)", lazy: true }), "z. B. spotify oder firefox")))),
-      card("Verbindung", "Wie Geräte den Daemon erreichen", null,
-        el("div", { class: "grid g3" },
-          field("Adresse", input(st.host, (v) => save({ host: v.trim() }), { lazy: true }), "0.0.0.0 = im ganzen LAN"),
-          field("Port", input(st.port, (v) => save({ port: Number(v) }), { type: "number", min: 1024, max: 65535 }), `Overlay nutzt Port ${st.port + 1}`),
-          field("Herzschlag (s)", input(st.heartbeat, (v) => save({ heartbeat: Number(v) }), { type: "number", min: 1, max: 60 })),
-          field("USB-Rückfall", input(st.usb, (v) => save({ usb: v.trim() || "auto" }), { lazy: true }), "auto, off oder /dev/serial/by-id/…"),
-          field("Geräte-Token", el("div", { class: "row" }, el("input", { value: st.token, readonly: true, class: "mono" }),
-            button(null, showToken, "icon", "eye", { title: "Anzeigen" })), "Steht in der Firmware (secrets.h)")),
-        settingsRow("mDNS", "Geräte finden den Daemon automatisch (_deckbar._tcp)", sw(st.mdns, (v) => save({ mdns: v }))),
-        settingsRow("Browser beim Start öffnen", null, sw(st.open_browser, (v) => save({ open_browser: v })))),
+      card("Allgemein", "Port, Token, USB und mDNS stehen unter „Erweitert“", null,
+        schemaForm(S.settings.schema, st, patch, view),
+        el("div", { class: "grid" }, field("Darstellung", select({ auto: "Wie das System", dark: "Dunkel", light: "Hell" }, theme, (v) => setTheme(v)), "Gilt nur für diesen Browser")),
+        settingsRow("Geräte-Token im Klartext", "Für secrets.h der Firmware", button("Anzeigen", showToken, "sm", "eye"))),
       card("Daemon", S.settings.config_dir ? `Konfiguration: ${S.settings.config_dir}` : null, null,
         el("div", { class: "row wrap" },
           button("Daemon neu starten", restartDaemon, "", "restart"),
@@ -264,10 +253,21 @@ async function restartDaemon() {
 }
 
 /* ================================================================ Gerüst */
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
+
+function storedTheme() {
+  try { return localStorage.getItem("theme") || "auto"; } catch { return "auto"; } // privates Fenster
+}
+
+/** Hell oder dunkel an <html>; „auto“ folgt dem System (tokens.css kennt nur dunkel und hell). */
+function applyTheme(choice) {
+  const dark = choice === "auto" ? systemDark.matches : choice === "dark";
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+}
+
 function setTheme(v) {
   try { if (v === "auto") localStorage.removeItem("theme"); else localStorage.setItem("theme", v); } catch { /* privat */ }
-  if (v === "auto") delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = v;
+  applyTheme(v);
 }
 
 function renderConn() {
@@ -287,7 +287,8 @@ function renderBanners() {
 }
 
 async function init() {
-  try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch { /* privat */ }
+  applyTheme(storedTheme());
+  systemDark.addEventListener("change", () => { if (storedTheme() === "auto") applyTheme("auto"); });
   await loadIcons();
   $("logo").textContent = glyph("gesture-tap-button");
   $("brand-name").textContent = BRAND;
@@ -295,12 +296,7 @@ async function init() {
   $("menu-btn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
   $("scrim").addEventListener("click", () => document.body.classList.remove("nav-open"));
   $("theme-btn").append(icon("theme-light-dark"));
-  $("theme-btn").addEventListener("click", () => {
-    const dark = document.documentElement.dataset.theme
-      ? document.documentElement.dataset.theme === "dark"
-      : matchMedia("(prefers-color-scheme: dark)").matches;
-    setTheme(dark ? "light" : "dark");
-  });
+  $("theme-btn").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
   addEventListener("hashchange", render);
   on("hello", () => { render(); renderConn(); renderBanners(); });
   on("modules", () => { renderNav(); if (route.page !== "dashboard" && route.page !== "modules" && UI[route.page]) render(); });
@@ -310,8 +306,8 @@ async function init() {
   for (const t of ["dps", "runs", "updates", "bot", "hub", "overlay", "devices"]) on(t, renderNav);
   // Erststand per REST (sofort sichtbar), danach live über den WebSocket
   try {
-    const [modules, st] = await Promise.all([api("GET", "/api/modules"), api("GET", "/api/status")]);
-    Object.assign(S, { modules, status: st, state: st.state, devices: st.devices });
+    const [modules, st, deck] = await Promise.all([api("GET", "/api/modules"), api("GET", "/api/status"), api("GET", "/api/layout")]);
+    Object.assign(S, { modules, status: st, state: st.state, devices: st.devices, layout: deck.layout });
     render();
   } catch {
     render();

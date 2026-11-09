@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 import aiohttp
-from nexcore.settings import SECRET, SettingsStore
+from nexcore.settings import ADVANCED, HIDDEN, SECRET, SettingsStore
 from nexproto.classes import JOB_CLASSES
 from nexproto.dungeons import EXTRA_DUNGEONS
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -92,15 +92,16 @@ WEBHOOK_RE = re.compile(r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api
 
 
 class RunSettings(_Strict):
-    enabled: bool = False
-    webhook: str = Field("", max_length=200, json_schema_extra=SECRET)
-    # Minuten ohne neuen Bosskampf, nach denen ein Run als beendet gilt
-    idle_minutes: int = Field(15, ge=2, le=120)
-    # „Mo***n|ranger“ → echter Name
-    names: dict[str, str] = Field(default_factory=dict, max_length=200)
-    # Kampf-History des eigenen Mitschnitts nach so vielen Tagen löschen (0 = alles behalten);
-    # die History des A2Tools-Meters bleibt immer unangetastet
-    history_days: int = Field(0, ge=0, le=3650)
+    enabled: bool = Field(False, title="Bild posten", description="Nach jedem Run per Webhook in einen Discord-Kanal")
+    webhook: str = Field("", max_length=200, title="Discord-Webhook",
+                         description="Kanal bearbeiten → Integrationen → Webhooks", json_schema_extra=SECRET)
+    idle_minutes: int = Field(15, ge=2, le=120, title="Run vorbei nach (min ohne Boss)")
+    # „Mo***n|ranger“ → echter Name; eigene Oberfläche (Namen der Mitspieler)
+    names: dict[str, str] = Field(default_factory=dict, max_length=200, json_schema_extra=HIDDEN)
+    history_days: int = Field(0, ge=0, le=3650, title="History aufbewahren (Tage)",
+                              description="0 = alles behalten. Löscht ältere Kämpfe aus dem eigenen Mitschnitt "
+                                          "(~2,5 MB pro Spieltag), nie die des A2Tools-Meters.",
+                              json_schema_extra=ADVANCED)
 
     @field_validator("webhook")
     @classmethod

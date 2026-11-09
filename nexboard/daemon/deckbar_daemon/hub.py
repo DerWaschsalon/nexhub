@@ -24,7 +24,7 @@ from typing import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import aiohttp
-from nexcore.settings import SECRET, SettingsStore
+from nexcore.settings import HIDDEN, SECRET, SettingsStore
 from pydantic import Field, field_validator
 
 from . import __version__
@@ -62,10 +62,15 @@ def _url(v: str) -> str:
 
 
 class HubSettings(_Strict):
-    url: str = Field("", max_length=200)
-    name: str = Field(default_factory=lambda: socket.gethostname()[:64] or "NexBoard", min_length=1, max_length=64)
-    token: str = Field("", max_length=200, json_schema_extra=SECRET)  # Geräte-Token, nie in der Web-UI
-    upload: bool = False  # fertige Runs hochladen (schickt Namen von Mitspielern an den Hub)
+    url: str = Field("", max_length=200, title="Adresse des Hubs", description="z. B. https://nex-hub.de")
+    name: str = Field(default_factory=lambda: socket.gethostname()[:64] or "NexBoard", min_length=1, max_length=64,
+                      title="Name dieses Geräts", description="So erscheint die NexBoard im Hub")
+    # Geräte-Token: setzt allein die Kopplung, nie die Web-UI
+    token: str = Field("", max_length=200, json_schema_extra=SECRET | HIDDEN)
+    # eigene Oberfläche mit Zustimmung (modules/hub.js), deshalb kein Formularfeld
+    upload: bool = Field(False, title="Runs hochladen",
+                         description="Schickt fertige Runs mit den Namen deiner Mitspieler an den Hub",
+                         json_schema_extra=HIDDEN)
 
     @field_validator("url")
     @classmethod

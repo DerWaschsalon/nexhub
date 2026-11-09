@@ -17,7 +17,7 @@ from .deck import DPS_RESET
 
 class DpsModule(WebModule):
     info = ModuleInfo(
-        "aion2.dps", "AION 2 · DPS-Mitschnitt", "games", "sword-cross",
+        "aion2.dps", "AION 2 · DPS-Mitschnitt", "ingame", "sword-cross",
         "Liest den Kampf passiv mit (deckbar-capture, Kern des A2Tools DPS Meter) und liefert DPS "
         "für Leiste, Overlay und Discord.",
         tags=("AION 2", "Live"),

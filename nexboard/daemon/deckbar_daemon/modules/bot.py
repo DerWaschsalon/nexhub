@@ -18,7 +18,7 @@ from .base import WebModule
 
 class BotModule(WebModule):
     info = ModuleInfo(
-        "discord.bot", "Discord-Bot", "community", "robot",
+        "discord.bot", "Discord-Bot", "share", "robot",
         "Schickt Gruppen-DPS nach Bosskämpfen und Run-Ergebnisse an einen Discord-Bot "
         "(z. B. TheWashBot), der Meldungen mehrerer Spieler zusammenführt.",
         requires=("aion2.dps",), tags=("Discord", "Gruppe"),

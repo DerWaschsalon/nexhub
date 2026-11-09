@@ -1,8 +1,8 @@
 /* Modul AION 2 · DPS-Mitschnitt: Live-Ansicht und Einstellungen (Quelle, Sprache, Seitenwechsel). */
-import { fill, el, icon, api, S, on, field, input, select, chip, callout, card, settingsRow, saver, fmtAmount, fmtTime, classColor, CLASS_LABELS, clampInt, modOn } from "../core.js";
+import { fill, el, icon, S, on, chip, callout, card, fmtAmount, fmtTime, classColor, modOn } from "../core.js";
+import { moduleSettings } from "../form.js";
 
 const DOT = { connected: "ok", capturing: "ok", bad_key: "bad", no_caps: "bad", no_capture: "bad", off: "" };
-const LANGS = { de: "Deutsch", en: "English", fr: "Français", es: "Español", pt: "Português", ru: "Русский", ja: "日本語", ko: "한국어", "zh-Hans": "简体中文", "zh-Hant": "繁體中文" };
 
 function statusChip(d) {
   if (!d) return chip("…");
@@ -70,38 +70,10 @@ function liveTab(ctx) {
 }
 
 function settingsTab(ctx) {
-  const box = el("div", { class: "stack" });
-  const save = saver("PUT", "/api/dps", (res) => { S.dps = res; draw(); }, 400, "DPS-Einstellungen gespeichert");
-  const patch = (p) => { Object.assign(S.dps.settings, p); save({ ...S.dps.settings }); };
-  const draw = () => {
-    const d = S.dps;
-    if (!d) return;
-    const st = d.settings;
-    const pages = { "": "— nicht wechseln —", ...Object.fromEntries((S.layout?.pages || []).map((p) => [p.id, p.name || p.id])) };
-    fill(box,
-      el("div", { class: "cols" },
-        card("Quelle", "Woher die Kampfdaten kommen", statusChip(d),
-          el("div", { class: "grid" },
-            field("Quelle", select({ capture: "Eigener Mitschnitt (deckbar-capture)", auto: "A2Tools-Meter, Stream-Overlay (automatisch)", manual: "A2Tools-Meter, Port und Schlüssel von Hand" }, st.source, (v) => { patch({ source: v }); draw(); })),
-            st.source === "capture" ? field("Sprache für Boss- und Skillnamen", select(LANGS, st.lang, (v) => patch({ lang: v }))) : null,
-            st.source === "capture" ? field("Programmpfad", input(st.capture_bin, (v) => patch({ capture_bin: v.trim() }), { placeholder: "leer = ~/.local/bin bzw. Build im Repo", lazy: true, spellcheck: "false" })) : null,
-            st.source === "manual" ? el("div", { class: "grid g2" },
-              field("Port", input(st.port, (v) => patch({ port: clampInt(v, 1024, 65535, 18731) }), { type: "number", min: 1024, max: 65535 })),
-              field("Schlüssel", input(st.key, (v) => patch({ key: v.trim() }), { type: "password", autocomplete: "off", lazy: true, placeholder: "key=… aus der Overlay-URL" }))) : null)),
-        card("Touch-Leiste", "Automatischer Seitenwechsel im Kampf", null,
-          modOn("deck") ? el("div", { class: "grid g2" },
-            field("Bei Kampfbeginn zeigen", select(pages, st.auto_page || "", (v) => { patch({ auto_page: v || null }); draw(); })),
-            field("Kampfende nach (s ohne Schaden)", input(st.return_after, (v) => patch({ return_after: clampInt(v, 0, 600, 20) }), { type: "number", min: 0, max: 600, disabled: !st.auto_page })))
-            : el("p", { class: "hint", text: "Das Modul Touch-Leiste ist aus." }))),
-      callout("info", "shield-check", el("span", {}, "Der Mitschnitt ist rein passiv: Er liest nur Netzwerkpakete mit (libpcap, Recht cap_net_raw), verändert nichts am Spiel und lädt nichts hoch.")));
-  };
-  ctx.onUnmount(on("dps", draw));
-  draw();
-  if (!S.layout) api("GET", "/api/layout").then((r) => { S.layout = r.layout; draw(); });
-  return box;
+  return el("div", { class: "stack" },
+    moduleSettings(ctx, "aion2.dps", "Kampfdaten", null),
+    callout("info", "shield-check", el("span", {}, "Der Mitschnitt ist rein passiv: Er liest nur Netzwerkpakete mit (libpcap, Recht cap_net_raw), verändert nichts am Spiel und lädt nichts hoch.")));
 }
-
-on("layout", ({ layout }) => { if (layout) S.layout = layout; });
 
 export default {
   tabs: [

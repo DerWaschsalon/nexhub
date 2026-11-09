@@ -71,7 +71,7 @@ class NexBoard:
         migrate(config_dir)
         self._build_components()
         self.bar = DeckModule(ctx, self.live, lambda: self.settings, self.state, config_dir, WEB_DIR,
-                              mdns and settings.mdns, auto_page=lambda: self.dps.settings.auto_page)
+                              mdns and settings.mdns)
         self.radar_module = RadarModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture))
         # Reihenfolge = Start- und Anzeigereihenfolge
         self.web_modules: list[WebModule] = [
@@ -186,7 +186,8 @@ class NexBoard:
     def settings_info(self) -> dict[str, Any]:
         s = self.settings.model_dump()
         s["token"] = MASK
-        return {"settings": s, "config_dir": str(self.config_dir), "restart_fields": list(RESTART_FIELDS)}
+        return {"settings": s, "schema": Settings.model_json_schema(), "config_dir": str(self.config_dir),
+                "restart_fields": list(RESTART_FIELDS)}
 
     # ---------------------------------------------------------------- Web-API
     def routes(self, router: web.UrlDispatcher) -> None:

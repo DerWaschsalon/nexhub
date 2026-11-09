@@ -1,0 +1,69 @@
+/* Farben, Radien und Schrift der NexBoard-Oberflächen: die einzige Stelle für diese Werte.
+   Dunkel ist Standard; hell über data-theme="light" am <html>. „Wie das System“ löst main.js auf
+   (prefers-color-scheme), deshalb stehen die hellen Werte nur einmal hier. */
+:root {
+  --font: InterDB, Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-xl: 28px;
+  --radius-l: 22px;
+  --radius-m: 16px;
+  --radius-s: 12px;
+  --sidebar: 268px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* dunkel (Standard) */
+  --bg: #070913;
+  --blob-1: #6d4dff;
+  --blob-2: #1f7bff;
+  --blob-3: #0fb5a6;
+  --blob-4: #ff4f9a;
+  --text: #f3f5ff;
+  --text-2: rgba(243, 245, 255, .68);
+  --text-3: rgba(243, 245, 255, .45);
+  --glass: rgba(255, 255, 255, .065);
+  --glass-strong: rgba(255, 255, 255, .11);
+  --glass-hover: rgba(255, 255, 255, .13);
+  --glass-solid: rgba(22, 26, 44, .92);
+  --line: rgba(255, 255, 255, .13);
+  --line-soft: rgba(255, 255, 255, .07);
+  --edge-hi: rgba(255, 255, 255, .42);
+  --edge-lo: rgba(255, 255, 255, .06);
+  --inset: rgba(0, 0, 0, .28);
+  --shadow: 0 1px 1px rgba(0, 0, 0, .25), 0 18px 50px rgba(0, 0, 0, .35);
+  --accent: #5ac8fa;
+  --accent-2: #8f7cff;
+  --on-accent: #04121a;
+  --ok: #34d17a;
+  --warn: #ffb020;
+  --bad: #ff5a52;
+  --info: #4ea8ff;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #e9edf7;
+  --blob-1: #a996ff;
+  --blob-2: #7fb6ff;
+  --blob-3: #7fe3d4;
+  --blob-4: #ffa6c9;
+  --text: #0e1324;
+  --text-2: rgba(14, 19, 36, .68);
+  --text-3: rgba(14, 19, 36, .46);
+  --glass: rgba(255, 255, 255, .5);
+  --glass-strong: rgba(255, 255, 255, .7);
+  --glass-hover: rgba(255, 255, 255, .78);
+  --glass-solid: rgba(250, 251, 255, .96);
+  --line: rgba(14, 19, 36, .1);
+  --line-soft: rgba(14, 19, 36, .06);
+  --edge-hi: rgba(255, 255, 255, .95);
+  --edge-lo: rgba(255, 255, 255, .35);
+  --inset: rgba(14, 19, 36, .06);
+  --shadow: 0 1px 1px rgba(30, 40, 80, .06), 0 18px 50px rgba(30, 40, 80, .14);
+  --accent: #0a84ff;
+  --accent-2: #7a5cff;
+  --on-accent: #fff;
+  --ok: #1fa95b;
+  --warn: #c77800;
+  --bad: #e5352c;
+  --info: #0a6fe0;
+  color-scheme: light;
+}
