@@ -16,7 +16,7 @@ from .base import WebModule
 
 class HubModule(WebModule):
     info = ModuleInfo(
-        "hub", "NexHub", "community", "link-variant",
+        "hub", "NexHub", "share", "link-variant",
         "Verbindet die NexBoard mit deinem Konto im NexHub, der Website der Gilde. Später lädt sie "
         "dorthin deine Dungeon-Runs hoch.",
         tags=("Hub", "Online"),

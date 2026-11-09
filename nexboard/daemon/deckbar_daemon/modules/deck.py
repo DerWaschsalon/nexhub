@@ -9,16 +9,16 @@ from typing import Any
 
 import yaml
 from aiohttp import web
-from nexcore import Context, ModuleInfo
+from nexcore import Context, ModuleInfo, SettingsStore
 from nexcore.errors import ApiError
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from ..actions import Executor
 from ..art import Art
 from ..audio import Audio
 from ..background import UPLOAD_MAX, Background, save_upload
 from ..claude import ClaudeUsage
-from ..config import Layout, Settings
+from ..config import ID, Layout, Settings, _Strict
 from ..core.devices import CLOSE_MODULE_OFF, DeviceHub
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
@@ -37,18 +37,26 @@ DPS_RESET = "dps.reset"  # Thema auf dem Bus: Reset-Knopf der DPS-Kachel
 BACKGROUND_POLL_S = 5
 LAYOUT_POLL_S = 1
 STATE_KEY_MAX = 32
+SETTINGS_FILE = "deck.yaml"  # im Konfig-Ordner, benannt nach dem Modul
+SETTINGS_HEADER = "Touch-Leiste – wird von der Web-UI überschrieben. Layout steht in layout.yaml."
+
+
+class DeckSettings(_Strict):
+    auto_page: ID | None = Field(None, title="Im Kampf zur Seite",
+                                 description="Bei Kampfbeginn zeigt die Leiste diese Seite, danach wieder die erste",
+                                 json_schema_extra={"choices": "pages"})
 
 
 class DeckModule(WebModule):
     info = ModuleInfo(
-        "deck", "Touch-Leiste", "device", "gesture-tap-button",
+        "deck", "Touch-Leiste", "bar", "gesture-tap-button",
         "Seiten, Kacheln und Aktionen für die Touch-Leiste (ESP32) und den Simulator: Medien, "
         "Lautstärke, Hotkeys, Befehle, Links.",
         default=True, tags=("Hardware", "Makros"),
     )
 
     def __init__(self, ctx: Context, live: LiveHub, settings: Callable[[], Settings], state: State,
-                 config_dir: Path, web_dir: Path, mdns: bool, auto_page: Callable[[], str | None]) -> None:
+                 config_dir: Path, web_dir: Path, mdns: bool) -> None:
         super().__init__(ctx, live)
         self.settings = settings
         self.state = state
@@ -56,6 +64,7 @@ class DeckModule(WebModule):
         self.mdns = mdns
         self.upload_dir = config_dir / "backgrounds"
         self.layout = DeckLayout(config_dir / "layout.yaml")
+        self._store = SettingsStore(config_dir / SETTINGS_FILE, DeckSettings, header=SETTINGS_HEADER)
         self.audio = Audio(state)
         self.media = Media(state, settings().player)
         self.executor = Executor(self.audio, self.media)
@@ -63,11 +72,16 @@ class DeckModule(WebModule):
         self.bg = Background()
         self.claude = ClaudeUsage(state, lambda: self.layout.layout.has_type("claude"))
         self.devices = DeviceHub(settings, self.layout, state, self.art, self.bg, live,
-                                 enabled=lambda: self.active, on_event=self.handle_event, auto_page=auto_page)
+                                 enabled=lambda: self.active, on_event=self.handle_event,
+                                 auto_page=lambda: self._store.value.auto_page)
         state.subscribe(self.devices.on_state)
         live.section("layout", self.layout.json)
         live.section("error", lambda: self.layout.error)
         live.handle_events(self.handle_event)
+
+    @property
+    def store(self) -> SettingsStore[Any]:
+        return self._store
 
     # ------------------------------------------------------------ Lebenszyklus
     async def start(self) -> None:

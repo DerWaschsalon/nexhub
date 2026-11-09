@@ -20,7 +20,10 @@ log = logging.getLogger("nexcore.settings")
 
 T = TypeVar("T", bound=BaseModel)
 Migration = Callable[[dict[str, Any]], dict[str, Any]]
-SECRET = {"secret": True}  # Field(json_schema_extra=SECRET): Wert verlässt den Daemon nur maskiert
+# Hinweise im Schema für das Formular der Web-UI, als Field(json_schema_extra=…), kombinierbar mit |
+SECRET = {"secret": True}  # Wert verlässt den Daemon nur maskiert
+ADVANCED = {"advanced": True}  # steht unter „Erweitert“
+HIDDEN = {"hidden": True}  # kein Formularfeld (eigene Oberfläche oder intern)
 MASK = "•" * 8  # so sieht die Web-UI ein gesetztes Geheimnis; nur Punkte zurück heißt „unverändert“
 
 

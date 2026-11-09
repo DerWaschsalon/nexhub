@@ -1,5 +1,6 @@
 /* Modul NexHub: Hub-Adresse, Gerät koppeln (Code + Link), Stand, abkoppeln. */
-import { fill, el, api, S, on, field, input, button, chip, callout, card, settingsRow, sw, saver, toast, fmtWhen, modOn, setModule } from "../core.js";
+import { fill, el, api, S, on, button, chip, callout, card, settingsRow, sw, saver, toast, fmtWhen, modOn, setModule } from "../core.js";
+import { moduleSettings } from "../form.js";
 
 const PRIVACY = "Hochgeladene Runs enthalten die Charakternamen, Klassen und Ausrüstungswerte deiner Mitspieler und jeden einzelnen Treffer. Sie sind im Hub für alle freigeschalteten Mitglieder sichtbar. Sprich das mit deiner Gruppe ab.";
 
@@ -31,12 +32,7 @@ function hubTab(ctx) {
     const left = p ? Math.max(0, p.expires_at - Math.floor(Date.now() / 1000)) : 0;
     fill(box,
       el("div", { class: "cols" },
-        card("Verbindung", "Wohin dieses NexBoard sich verbindet", chip(label, kind),
-          el("div", { class: "grid", style: "margin-top:6px" },
-            field("Adresse des Hubs", input(st.url, (v) => save({ url: v.trim() }), { spellcheck: "false", lazy: true, placeholder: "https://hub.example.com" }),
-              "Ohne Domain per SSH-Tunnel: http://localhost:8080. Unverschlüsselt nur für localhost."),
-            field("Name dieses Geräts", input(st.name, (v) => save({ name: v.trim() }), { lazy: true, maxlength: 64 }), "Vorschlag für den Hub, dort änderbar.")),
-          h.detail ? el("p", { class: "hint small", style: `margin-top:10px;color:${h.status === "offline" ? "var(--bad)" : ""}`, text: h.detail }) : null),
+        card("Stand", h.detail || "Verbindung zum Hub", chip(label, kind)),
         h.status === "paired" && h.account
           ? card("Gekoppelt", "Dieses NexBoard gehört zu einem Konto im Hub", chip("aktiv", "ok"),
               settingsRow("Gerät", h.account.device, null),
@@ -76,7 +72,7 @@ function hubTab(ctx) {
   ctx.onUnmount(on("hub", draw));
   draw();
   if (!S.hub) api("GET", "/api/hub").then((r) => { S.hub = r; draw(); });
-  return box;
+  return el("div", { class: "stack" }, moduleSettings(ctx, "hub", "Verbindung", "Wohin dieses NexBoard sich verbindet"), box);
 }
 
 function fmtLeft(s) {

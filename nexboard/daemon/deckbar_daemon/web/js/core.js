@@ -99,7 +99,7 @@ export function connectLive() {
         Object.assign(S, {
           online: true, modules: msg.modules, state: msg.state, devices: msg.devices, status: msg.status,
           dps: msg.dps, runs: msg.runs, updates: msg.updates, bot: msg.bot, hub: msg.hub, overlay: msg.overlay, settings: msg.settings,
-          layoutError: msg.error,
+          layout: msg.layout, layoutError: msg.error,
         });
         emit("hello", msg);
         emit("layout", { layout: msg.layout, initial: true });
@@ -110,7 +110,7 @@ export function connectLive() {
         emit("state", msg.values);
         break;
       case "devices": S.devices = msg.devices; emit("devices", msg.devices); break;
-      case "layout": S.layoutError = null; emit("layout", { layout: msg.layout }); break;
+      case "layout": S.layout = msg.layout; S.layoutError = null; emit("layout", { layout: msg.layout }); break;
       case "layout_error": S.layoutError = `layout.yaml: ${msg.error}`; emit("layout_error", msg.error); break;
       case "dps": S.dps = msg.dps; emit("dps", msg.dps); break;
       case "runs": S.runs = msg.runs; emit("runs", msg.runs); break;

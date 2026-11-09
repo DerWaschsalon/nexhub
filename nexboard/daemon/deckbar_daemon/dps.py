@@ -29,12 +29,12 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Literal
 
 import aiohttp
-from nexcore.settings import SECRET, SettingsStore
+from nexcore.settings import ADVANCED, HIDDEN, SECRET, SettingsStore
 from nexproto.classes import CLASS_KEYS
 from pydantic import Field
 
 from .capture import Capture
-from .config import ID, _Strict
+from .config import _Strict
 from .state import State
 
 log = logging.getLogger(__name__)
@@ -67,22 +67,29 @@ STATUS_TEXT = {
 }
 
 
+SOURCES = {"capture": "Eigener Mitschnitt (deckbar-capture)", "auto": "A2Tools-Meter, Stream-Overlay (automatisch)",
+           "manual": "A2Tools-Meter, Port und Schlüssel von Hand"}
+LANGUAGES = {"de": "Deutsch", "en": "English", "fr": "Français", "es": "Español", "pt": "Português", "ru": "Русский",
+             "ja": "日本語", "ko": "한국어", "zh-Hans": "简体中文", "zh-Hant": "繁體中文"}
+ONLY_CAPTURE = {"show_if": {"source": ["capture"]}}
+ONLY_MANUAL = {"show_if": {"source": ["manual"]}}
+
+
 class DpsSettings(_Strict):
-    enabled: bool = True
-    # capture = eigener Mitschnitt (deckbar-capture); auto = Stream-Overlay des A2Tools-Meters mit
-    # Port + Schlüssel aus dessen Einstellungen; manual = dasselbe mit Port + Schlüssel von Hand
-    source: Literal["capture", "auto", "manual"] = "capture"
-    # deckbar-capture: fester Pfad (leer = PATH, sonst capture/target/release im Repo)
-    capture_bin: str = Field("", max_length=300)
-    # Sprache für Boss- und Skillnamen (Daten des Meters)
-    lang: Literal["de", "en", "es", "fr", "ja", "ko", "pt", "ru", "zh-Hans", "zh-Hant"] = "en"
-    port: int = Field(DEFAULT_PORT, ge=1024, le=65535)
-    key: str = Field("", max_length=128, json_schema_extra=SECRET)
-    # Bei Kampfbeginn auf diese Seite wechseln (None = nie)
-    auto_page: ID | None = None
-    # Sekunden ohne neuen Schaden bis Kampfende; danach zeigt die Leiste wieder die erste Seite
-    # (0 = DEFAULT_IDLE_S)
-    return_after: int = Field(20, ge=0, le=600)
+    enabled: bool = Field(True, json_schema_extra=HIDDEN)  # schaltet das Modul selbst (modules/dps.py)
+    source: Literal["capture", "auto", "manual"] = Field(
+        "capture", title="Quelle", description="Woher die Kampfdaten kommen", json_schema_extra={"labels": SOURCES})
+    capture_bin: str = Field("", max_length=300, title="Programmpfad",
+                             description="Leer = ~/.local/bin bzw. Build im Repo",
+                             json_schema_extra=ONLY_CAPTURE | ADVANCED)
+    lang: Literal["de", "en", "es", "fr", "ja", "ko", "pt", "ru", "zh-Hans", "zh-Hant"] = Field(
+        "en", title="Sprache für Boss- und Skillnamen", json_schema_extra={"labels": LANGUAGES} | ONLY_CAPTURE)
+    port: int = Field(DEFAULT_PORT, ge=1024, le=65535, title="Port", description="Port des Stream-Overlays im Meter",
+                      json_schema_extra=ONLY_MANUAL)
+    key: str = Field("", max_length=128, title="Schlüssel", description="key=… aus der Overlay-URL des Meters",
+                     json_schema_extra=SECRET | ONLY_MANUAL)
+    return_after: int = Field(20, ge=0, le=600, title="Kampfende nach (s ohne Schaden)",
+                              description="Danach gilt der Kampf als vorbei und die Leiste zeigt wieder die erste Seite")
 
 
 def a2tools_settings_path() -> Path:

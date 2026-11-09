@@ -4,6 +4,7 @@ import {
   fill, $, el, icon, glyph, deckIcons, api, S, on, sendLive, toast, setSaveState, field, input as inputEl, select as selectEl,
   button, chip, callout, card, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, classColor, modOn, throttle, dpsDiff,
 } from "../core.js";
+import { moduleSettings } from "../form.js";
 import { LABEL_MAX, SCREEN_H, SCREEN_W } from "../nexproto.js";
 
 const W = SCREEN_W, H = SCREEN_H, PAD = 8, GAP = 8;
@@ -776,7 +777,7 @@ function devicesTab(ctx) {
   };
   ctx.onUnmount(on("devices", draw));
   draw();
-  return box;
+  return el("div", { class: "stack" }, moduleSettings(ctx, "deck", "Im Kampf", "Seitenwechsel der Leiste bei Kampfbeginn"), box);
 }
 
 export default {

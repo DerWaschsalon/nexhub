@@ -99,5 +99,7 @@ async def test_api_module_settings(client):
     r = await client.put("/api/m/aion2.dps/settings", json={"key": "••••••••", "return_after": 5})
     assert client.deck.dps.settings.key == "geheim"  # Punkte zurück: Schlüssel bleibt
     assert (await client.put("/api/m/aion2.dps/settings", json={"return_after": -1})).status == 422
-    assert (await client.get("/api/m/deck/settings")).status == 404  # Touch-Leiste: Layout statt Einstellungen
+    assert (await client.get("/api/m/updates/settings")).status == 404  # Updates: keine Einstellungen
+    r = await client.put("/api/m/deck/settings", json={"auto_page": "main"})
+    assert (await r.json())["settings"]["auto_page"] == "main"
     assert (await client.get("/api/m/gibts-nicht/settings")).status == 404

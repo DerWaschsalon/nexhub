@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, Union
 
 import yaml
+from nexcore.settings import ADVANCED, SECRET
 from nexproto import device
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -127,18 +128,25 @@ class Layout(_Strict, device.Layout):
 
 # ------------------------------------------------------------------ Einstellungen
 class Settings(_Strict):
-    host: str = "0.0.0.0"
-    port: int = Field(device.DEFAULT_PORT, ge=1, le=65535)
-    token: str = Field(min_length=8)
-    name: str = "NexBoard"
-    heartbeat: int = Field(device.HEARTBEAT_S, ge=1, le=60)
-    mdns: bool = True
-    player: str | None = Field(None, description="playerctl -p … (leer = aktivster Player)")
-    open_browser: bool = False
+    name: str = Field("NexBoard", title="Name", description="Erscheint auf den Geräten und im Netzwerk (mDNS)")
+    player: str | None = Field(None, title="Medien-Player",
+                               description="Für Media-Kacheln, z. B. spotify; leer = aktivster Player (playerctl)")
+    update_check: bool = Field(True, title="Nach Updates sehen",
+                               description="Täglich nach neuen Versionen und A2Tools-Releases (GitHub)")
+    open_browser: bool = Field(False, title="Web-UI beim Start öffnen")
+    host: str = Field("0.0.0.0", title="Adresse", description="0.0.0.0 = im ganzen LAN erreichbar",
+                      json_schema_extra=ADVANCED)
+    port: int = Field(device.DEFAULT_PORT, ge=1, le=65535, title="Port",
+                      description="Die Overlay-Seite nutzt den Port danach", json_schema_extra=ADVANCED)
+    token: str = Field(min_length=8, title="Geräte-Token", description="Steht in der Firmware (secrets.h)",
+                       json_schema_extra=SECRET | ADVANCED)
+    heartbeat: int = Field(device.HEARTBEAT_S, ge=1, le=60, title="Herzschlag (s)",
+                           description="So oft fragt der Daemon, ob ein Gerät noch da ist", json_schema_extra=ADVANCED)
+    mdns: bool = Field(True, title="mDNS", description="Geräte finden den Daemon automatisch (_deckbar._tcp)",
+                       json_schema_extra=ADVANCED)
     # Rückfall per USB-Kabel, wenn WLAN nicht klappt: "auto" (Espressif-Ports passiv prüfen), "off" oder fester Pfad
-    usb: str = "auto"
-    # Täglich nach neuen NexBoard-Commits und A2Tools-Releases sehen (GitHub), Hinweis in Tray und Web-UI
-    update_check: bool = True
+    usb: str = Field("auto", title="USB-Rückfall", description="auto, off oder /dev/serial/by-id/…",
+                     json_schema_extra=ADVANCED)
 
 
 def config_dir() -> Path:

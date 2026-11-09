@@ -16,7 +16,7 @@ from .base import WebModule
 
 class RadarModule(WebModule):
     info = ModuleInfo(
-        "aion2.radar", "AION 2 · Radar", "games", "radar",
+        "aion2.radar", "AION 2 · Radar", "ingame", "radar",
         "Hidden Cubes, Karte, Boss-Warnungen und PvP der Sitzung als Widgets im Overlay, Feldbosse und "
         "Vertraute in der Web-UI. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
         tags=("AION 2", "Desktop"),

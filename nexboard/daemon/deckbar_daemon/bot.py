@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 import aiohttp
-from nexcore.settings import SECRET, SettingsStore
+from nexcore.settings import ADVANCED, SECRET, SettingsStore
 from pydantic import Field, field_validator
 
 from .config import _Strict
@@ -68,17 +68,19 @@ def _url(v: str) -> str:
 
 class BotSettings(_Strict):
     # ---- Gruppen-DPS nach jedem Kampf
-    dps_enabled: bool = False
-    dps_url: str = Field("", max_length=300, json_schema_extra=SECRET)
-    # nur Bosse, nur besiegte, erst ab so vielen Sekunden, erst ab so vielen Gruppenmitgliedern
-    dps_boss_only: bool = True
-    dps_kills_only: bool = True
-    dps_min_seconds: int = Field(20, ge=0, le=3600)
-    dps_min_party: int = Field(2, ge=1, le=8)
+    dps_enabled: bool = Field(False, title="Gruppen-DPS senden", description="Endstand der Gruppe nach einem Kampf")
+    dps_url: str = Field("", max_length=300, title="Webhook-URL des Bots",
+                         description="TheWashBot: /dps-webhook kanal:#… zeigt die Adresse", json_schema_extra=SECRET)
+    dps_boss_only: bool = Field(True, title="Nur Bosse", description="Trash-Mobs nicht melden")
+    dps_kills_only: bool = Field(True, title="Nur besiegte", description="Wipes und Abbrüche nicht melden")
+    dps_min_seconds: int = Field(20, ge=0, le=3600, title="Mindestdauer (s)", json_schema_extra=ADVANCED)
+    dps_min_party: int = Field(2, ge=1, le=8, title="Mindestens Mitglieder", json_schema_extra=ADVANCED)
     # ---- Dungeon-Runs
-    runs_enabled: bool = False
-    runs_url: str = Field("", max_length=300, json_schema_extra=SECRET)
-    runs_token: str = Field("", max_length=200, json_schema_extra=SECRET)
+    runs_enabled: bool = Field(False, title="Runs senden",
+                               description="Run-Ergebnis zum Zusammenführen mehrerer Spieler")
+    runs_url: str = Field("", max_length=300, title="Run-API des Bots",
+                          description="TheWashBot: /aion zeigt Adresse und Token", json_schema_extra=SECRET)
+    runs_token: str = Field("", max_length=200, title="Token", json_schema_extra=SECRET)
 
     @field_validator("dps_url", "runs_url")
     @classmethod
