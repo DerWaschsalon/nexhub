@@ -2,7 +2,7 @@ import json
 import struct
 import unittest
 
-from test_radar import varint
+from tests.test_radar import varint
 
 from radar.pvp import OP_SAISON, OP_TOD, grad_name
 from radar.zustand import RadarZustand

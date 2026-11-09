@@ -466,7 +466,13 @@ Zusätzliche Icons trägt man in `tools/icons.txt` ein (Namen aus
 
 ```sh
 cd daemon && uv run python -m pytest -q
+cd radar && ../daemon/.venv/bin/python -m pytest -q tests   # mit Goldtest, siehe radar/README.md
 ```
+
+`daemon/tests/test_simulator.py` vergleicht jede Seite aus `daemon/tests/simulator_layout.yaml` mit den
+Referenzbildern in `simulator/reference/` (braucht den gebauten Simulator, sonst übersprungen). Sieht ein
+Kacheltyp gewollt anders aus: `WRITE_REFERENCE=1 uv run python -m pytest -q tests/test_simulator.py` und
+die neuen Bilder mit einchecken.
 
 ## Lizenz
 

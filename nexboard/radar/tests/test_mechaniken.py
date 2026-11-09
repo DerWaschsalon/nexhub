@@ -8,7 +8,7 @@ from pathlib import Path
 from radar.warnung import DUNGEONS, ENGLISCH, FARBEN, STAGGER_REGELN, WarnZentrale
 from radar.zustand import BOSSE, CUBE_SCHLUESSEL, MECHANIKEN, RadarZustand
 
-from test_feldbosse_vertraute import varint  # Testordner ist beim Aufruf die Wurzel
+from tests.test_radar import varint
 
 RAUR, THAMON, BERK = 2300206, 2300811, 2300171
 

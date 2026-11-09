@@ -17,6 +17,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 log = logging.getLogger(__name__)
 
 ID = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")]
+# Größte Nachricht, die die Firmware per WLAN annimmt (WEBSOCKETS_MAX_DATA_SIZE der Bibliothek
+# WebSockets); eine größere verwirft sie still. Platz für "v" und "type" der Hülle ist abgezogen.
+DEVICE_MAX_LAYOUT = 15 * 1024 - 64
 Style = Literal["default", "accent", "danger", "success", "warning"]
 
 
@@ -125,6 +128,10 @@ class Layout(_Strict):
             for i in p.items:
                 if i.nav and i.nav not in page_ids:
                     raise ValueError(f"Item '{i.id}': Seite '{i.nav}' gibt es nicht")
+        size = len(json.dumps(self.device_payload(), ensure_ascii=False, separators=(",", ":")).encode())
+        if size > DEVICE_MAX_LAYOUT:
+            raise ValueError(f"Layout zu groß für die Leiste ({size // 1024} KiB, höchstens 15 KiB): "
+                             "weniger Seiten oder Kacheln, kürzere Namen")
         return self
 
     def has_type(self, item_type: str) -> bool:

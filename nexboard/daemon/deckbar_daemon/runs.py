@@ -40,12 +40,9 @@ from typing import Any, Awaitable, Callable
 import aiohttp
 import yaml
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from nexproto.dungeons import EXTRA_DUNGEONS
+from nexproto.nexlog import JOB_CLASSES
 from pydantic import Field, ValidationError, field_validator
-
-try:  # fehlt das Paket (alte Installation), bleibt es beim Platzhalter „Dungeon <ID>“
-    from nexproto.dungeons import EXTRA_DUNGEONS
-except ImportError:
-    EXTRA_DUNGEONS: dict[int, str] = {}
 
 from .config import _atomic_write, _Strict
 from .dps import a2tools_settings_path
@@ -90,14 +87,13 @@ END_BOSSES = {
 }
 WEBHOOK_RE = re.compile(r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/\d+/[\w-]+$")
 
-# jobId der History → Klassen-Schlüssel wie im Live-Stream (dps.CLASSES)
-JOBS = {11: "gladiator", 12: "templar", 13: "assassin", 14: "ranger", 15: "sorcerer",
-        16: "spiritmaster", 17: "cleric", 18: "chanter"}
 CLASS_NAMES = {"gladiator": "Gladiator", "templar": "Templer", "assassin": "Assassine", "ranger": "Waldläufer",
-               "sorcerer": "Magier", "spiritmaster": "Beschwörer", "cleric": "Kleriker", "chanter": "Kantor"}
-# wie CLASS_COLORS in web/app.js, damit Bild und Kachel gleich aussehen
+               "sorcerer": "Magier", "spiritmaster": "Beschwörer", "cleric": "Kleriker", "chanter": "Kantor",
+               "brawler": "Faustkämpfer"}
+# wie CLASS_COLORS in web/js/core.js, damit Bild und Kachel gleich aussehen
 CLASS_COLORS = {"gladiator": "#E8A33D", "templar": "#5B8DEF", "ranger": "#6CCB5F", "assassin": "#B46AE6",
-                "sorcerer": "#4FC3F7", "cleric": "#F4E07A", "spiritmaster": "#EC7FB8", "chanter": "#4DD4B0"}
+                "sorcerer": "#4FC3F7", "cleric": "#F4E07A", "spiritmaster": "#EC7FB8", "chanter": "#4DD4B0",
+                "brawler": "#F0624D"}
 
 
 class RunSettings(_Strict):
@@ -241,7 +237,7 @@ def parse_fight(data: dict, you_actor: int | None = None) -> Fight | None:
         for s in details.get("skills") or []:
             dmg[s["actorId"]] = dmg.get(s["actorId"], 0) + max(0, int(s.get("dmg") or 0))
         players = [
-            Player(str(a.get("nickname") or "?")[:24], JOBS.get(a.get("jobId")), dmg.get(a["actorId"], 0),
+            Player(str(a.get("nickname") or "?")[:24], JOB_CLASSES.get(a.get("jobId")), dmg.get(a["actorId"], 0),
                    a["actorId"] == you_actor, _int(a.get("combatPower")), _int(a.get("gearScore")))
             for a in data.get("actors") or [] if dmg.get(a["actorId"])
         ]

@@ -5,7 +5,7 @@ import time
 import unittest
 
 from radar.zustand import CUBE_IDS, RadarZustand
-from test_feldbosse_vertraute import varint  # Testordner ist beim Aufruf die Wurzel
+from tests.test_radar import varint
 
 
 def pos(x: float, y: float, z: float = 0.0) -> bytes:

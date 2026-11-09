@@ -359,3 +359,12 @@ def test_kampfkraft_und_itemlevel():
     g = next(x for x in run.total().players.values() if x.name == "Gamunex")
     assert (g.cp, g.gear) == (0, 0) and player_info(g) == ""
     assert render_run(run)[:4] == b"RIFF"
+
+
+def test_jede_klasse_hat_name_und_farbe():
+    """Fehlte jobId 19 (Faustkämpfer), kam die Klasse ohne Icon und Farbe ins Run-Bild."""
+    from nexproto.nexlog import JOB_CLASSES
+    assert JOB_CLASSES[19] == "brawler"
+    for cls in JOB_CLASSES.values():
+        assert cls in runs_mod.CLASS_NAMES and cls in runs_mod.CLASS_COLORS
+        assert runs_mod.class_icon(cls, 20) is not None

@@ -134,3 +134,11 @@ def test_usb_parse_line():
 def test_pactl_events_only_for_devices(line, hit):
     from deckbar_daemon.audio import _EVENT_RE
     assert bool(_EVENT_RE.search(line)) is hit
+
+
+def test_layout_zu_gross_fuer_die_firmware():
+    """Über 15 KiB kam ein Layout per WLAN still nicht an; jetzt lehnt der Daemon es ab."""
+    items = [{"id": f"i{n}", "label": "x" * 24, "icon": "y" * 48} for n in range(24)]
+    pages = [{"id": f"p{n}", "items": [{**i, "id": f"{i['id']}p{n}"} for i in items]} for n in range(8)]
+    with pytest.raises(ValueError, match="zu groß"):
+        Layout.model_validate({"pages": pages})

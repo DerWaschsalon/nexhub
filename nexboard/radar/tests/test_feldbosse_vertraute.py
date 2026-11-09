@@ -3,15 +3,7 @@ import time
 import unittest
 
 from radar.zustand import OP_FELDBOSSE, OP_SEELE, OP_STUFE, OP_VERTRAUTE, RadarZustand
-
-
-def varint(wert: int) -> bytes:
-    roh = bytearray()
-    while True:
-        roh.append(wert & 0x7F | (0x80 if wert > 0x7F else 0))
-        wert >>= 7
-        if not wert:
-            return bytes(roh)
+from tests.test_radar import varint
 
 
 class FeldbosseVertrauteTest(unittest.TestCase):

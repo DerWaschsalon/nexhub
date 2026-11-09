@@ -141,6 +141,7 @@ Items, die nicht mehr passen, werden nicht angezeigt.
 | `slider` | Kachel füllt sich mit Wert; relatives Ziehen      | `slider_change`, `long_press`   |
 | `media`  | Titel/Interpret aus `state.track`, ab h ≥ 2 mit ⏮ ⏯ ⏭ | `button_press` (+ `part`)    |
 | `dps`    | DPS-Rangliste aus `state.dps` (AION 2), Balken in Klassenfarbe, ab h ≥ 2 Reset-Knopf mittig in der Kopfzeile | `button_press` (`part: reset`) |
+| `claude` | Auslastung des Claude-Abos aus `state.claude`: Balken „5 h“ und „Woche“, ab h ≥ 2 mit Zeit bis zum Zurücksetzen | –                     |
 
 **Felder**
 
@@ -160,7 +161,9 @@ Items, die nicht mehr passen, werden nicht angezeigt.
 Beim Toggle bestimmt `style`, wie der **aktive** Zustand aussieht. Ein gemutetes
 Mikro ist also `style: danger` + `bind: mic_muted`.
 
-Limits: max. 8 Seiten, max. 24 Items pro Seite, Nachricht max. 16 KiB.
+Limits: max. 8 Seiten, max. 24 Items pro Seite. Per WLAN nimmt die Firmware höchstens 15 KiB je
+Nachricht an und verwirft größere still; der Daemon lehnt deshalb ein Layout ab, dessen `layout`-Nachricht
+größer wäre. Item- und Seiten-IDs: 1–32 Zeichen aus `A–Z a–z 0–9 _ -`.
 
 ### `state`
 
@@ -185,6 +188,7 @@ Eigene Schlüssel sind erlaubt (z. B. aus Shell-Statusbefehlen) und lassen sich 
 | `track`       | object\|null | `playerctl` Metadaten                   |
 | `dps`         | object\|null | A2Tools DPS Meter (Stream-Overlay), siehe unten |
 | `dps_active`  | bool         | gerade Schaden im Kampf                 |
+| `claude`      | object\|null | Claude-Nutzung, nur solange das Layout eine `claude`-Kachel hat |
 
 `dps` ist `null`, solange keine Verbindung zum Meter besteht, sonst:
 
@@ -199,6 +203,13 @@ nach DPS (höchstens 8; ans Gerät nur so viele, wie seine DPS-Kachel zeigt). An
 (beim Wechsel dorthin sofort). `cls` ist einer von `gladiator`, `templar`, `ranger`, `assassin`,
 `sorcerer`, `cleric`, `spiritmaster`, `chanter`, `brawler` oder `null` (noch unbekannt).
 
+`claude` (alle 5 Minuten neu): `pct` = Auslastung in %, `reset` = wann das Limit zurückgesetzt wird,
+schon als Text für die Anzeige.
+
+```json
+{"session":{"pct":42,"reset":"14:00"},"week":{"pct":91,"reset":"Fr 02:00"}}
+```
+
 ### `art`
 
 ```json
@@ -210,8 +221,8 @@ Cover des aktuellen Titels (`mpris:artUrl`), mittig quadratisch zugeschnitten un
 `size` aus `art_request` skaliert. `data` ist RGB565 little-endian (LVGL-Format), Zeilen
 `y` bis `y + rows - 1`. Ein Bild kommt in mehreren Nachrichten zu je ≤ 2000 Byte Rohdaten,
 der Reihe nach von `y = 0` an. Das Gerät zeigt das Bild erst, wenn alle Zeilen da sind.
-`id: ""` heißt: kein Cover. Die URL selbst (`art_url`) bleibt im Daemon und wird nicht ans
-Gerät geschickt. Der Hintergrund (`bg`, 640×172) kommt genauso.
+`id` hat höchstens 16 Zeichen. `id: ""` heißt: kein Cover. Die URL selbst (`art_url`) bleibt im Daemon
+und wird nicht ans Gerät geschickt.
 
 **Binärframes** (Gerät mit `caps: ["bin"]`): Bildteile statt als JSON als WebSocket-Binärframe,
 ohne base64 und mit bis zu 12000 Byte Rohdaten (Firmware: höchstens 15 KB pro Nachricht):
@@ -219,12 +230,23 @@ ohne base64 und mit bis zu 12000 Byte Rohdaten (Firmware: höchstens 15 KB pro N
 | Byte | Inhalt |
 |---|---|
 | 0–1 | `DB` |
-| 2 | `a` = Cover, `b` = Hintergrund |
+| 2 | `a` = Cover (`art`), `b` = Hintergrund (`bg`) |
 | 3–18 | `id`, mit Nullbytes aufgefüllt |
 | 19–26 | `w`, `h`, `y`, `rows`, je uint16 little-endian |
 | 27– | `rows × w × 2` Byte RGB565 |
 
 `id: ""` (kein Bild) bleibt eine JSON-Nachricht.
+
+### `bg`
+
+```json
+{"v":1,"type":"bg","id":"9c01a2b3c4d5","w":640,"h":172,"y":0,"rows":3,"data":"<base64>"}
+{"v":1,"type":"bg","id":""}
+```
+
+Hintergrundbild der Leiste, immer 640×172, sonst aufgebaut wie `art` (Binärframes mit `b`).
+`id: ""` heißt: eingebauter Hintergrund. Das Gerät speichert das fertige Bild im Flash und nennt
+seine `id` im `hello` als `bg_id`; stimmt sie, schickt der Daemon nichts.
 
 ### `ping`
 
