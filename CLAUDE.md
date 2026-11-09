@@ -35,11 +35,13 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
   keine echten Hostnamen, internen IPs oder Discord-IDs von Personen. Beispielwerte:
   `bot.example.com`, `unraid-server`, `192.168.1.10`.
 - Aufbau: `nexboard/` (Touch-Leiste, Daemon, Overlay), `bot/` (TheWashBot), `hub/` (Kern + Module, auch die Log-Ansicht), `proto/`,
+  `packages/nexcore` (Kern für Module, siehe dort),
   `planner/`, `infra/` (VPS). Jeder Teil hat eine eigene README mit Tests.
 - Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Radar
   `cd nexboard/radar && ../daemon/.venv/bin/python -m pytest -q tests`, Bot
   `cd bot && python -m pytest -q tests`, Hub `cd hub/api && uv run pytest -q` und
-  `cd hub/web && npm run check`, Formate `cd proto && uv run pytest -q`.
+  `cd hub/web && npm run check`, Formate `cd proto && uv run pytest -q`, Kern
+  `cd packages/nexcore && uv run pytest -q && uv run ruff check . && uv run mypy`.
 - **Ein Arbeitszweig: `main`** (seit 21.10.2026; `monorepo` ist darin aufgegangen und gelöscht).
   Laufende NexBoard-Installationen aktualisieren per `update.sh` von `main`. `modular` läuft aus:
   `update.sh` stellt Checkouts darauf von selbst auf `main` um (beim zweiten Update-Klick, der

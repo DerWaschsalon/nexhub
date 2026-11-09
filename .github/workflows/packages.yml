@@ -1,0 +1,32 @@
+name: Pakete
+
+# nexproto: Formate und alle daraus erzeugten Dateien (Schemas, C, JS, TS, Rust) aktuell
+# nexcore: Tests, Lint, strikte Typen und Abhängigkeitsrichtung
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  nexproto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run pytest -q
+        working-directory: proto
+
+  nexcore:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/nexcore
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run pytest -q
+      - run: uv run ruff check .
+      - run: uv run mypy
