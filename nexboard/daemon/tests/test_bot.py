@@ -5,13 +5,13 @@ import base64
 import pytest
 from aiohttp import web
 from pydantic import ValidationError
+from test_runs import DUNGEON, fight
 
+from deckbar_daemon import bot as bot_mod
 from deckbar_daemon.bot import BotSettings, DiscordBot, group_payload, run_payload
 from deckbar_daemon.dps import DpsFeed, fight_view
-from deckbar_daemon.runs import parse_fight, Run
+from deckbar_daemon.runs import Run, parse_fight
 from deckbar_daemon.state import State
-
-from test_runs import DUNGEON, fight
 
 
 def view(**kw):
@@ -61,14 +61,14 @@ def test_settings_validation_and_masking(tmp_path):
     with pytest.raises(ValidationError):
         BotSettings(runs_token="mit leer")
     bot = DiscordBot(tmp_path)
-    bot.update({"dps_url": "http://10.0.0.5:8787/dps/geheim", "runs_url": "https://bot.example/api/aion/fight", "runs_token": "t0k"})
+    bot.save(bot.store.merge({"dps_url": "http://10.0.0.5:8787/dps/geheim", "runs_url": "https://bot.example/api/aion/fight", "runs_token": "t0k"}))
     info = bot.info()
     assert info["settings"]["dps_url"] == "••••••••" and info["settings"]["runs_token"] == "••••••••"
     assert info["targets"] == {"dps": "http://10.0.0.5:8787/…", "runs": "https://bot.example/…"}
     # Platzhalter lassen Geheimnisse stehen
-    bot.update({"dps_url": "••••••••", "dps_min_party": 3})
+    bot.save(bot.store.merge({"dps_url": "••••••••", "dps_min_party": 3}))
     assert bot.settings.dps_url.endswith("/dps/geheim") and bot.settings.dps_min_party == 3
-    assert (tmp_path / "bot.yaml").stat().st_mode & 0o077 == 0
+    assert (tmp_path / bot_mod.SETTINGS_FILE).stat().st_mode & 0o077 == 0
     assert DiscordBot(tmp_path).settings.runs_token == "t0k"
 
 
@@ -141,8 +141,8 @@ async def test_sends_to_bot_only_when_enabled(tmp_path):
     runner, port, got = await fake_bot()
     try:
         bot = DiscordBot(tmp_path)
-        bot.update({"dps_enabled": True, "dps_url": f"http://127.0.0.1:{port}/dps/abc",
-                    "runs_enabled": True, "runs_url": f"http://127.0.0.1:{port}/api/aion/fight", "runs_token": "t0k"})
+        bot.save(bot.store.merge({"dps_enabled": True, "dps_url": f"http://127.0.0.1:{port}/dps/abc",
+                    "runs_enabled": True, "runs_url": f"http://127.0.0.1:{port}/api/aion/fight", "runs_token": "t0k"}))
         await bot.on_fight(view())
         assert got == []  # Modul aus
         bot.enabled = True
@@ -156,7 +156,7 @@ async def test_sends_to_bot_only_when_enabled(tmp_path):
         # dasselbe Bild wie beim Webhook geht mit (WebP, Base64)
         img = base64.b64decode(got[-1][2]["image_webp"])
         assert img[:4] == b"RIFF" and img[8:12] == b"WEBP"
-        bot.update({"runs_token": "falsch"})
+        bot.save(bot.store.merge({"runs_token": "falsch"}))
         assert not await bot.send_run(run_from_history())
         assert "401" in bot.result["runs"]["text"]
         ok, text = await bot.test_fight()

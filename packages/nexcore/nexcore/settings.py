@@ -2,7 +2,7 @@
 
 Ersetzt die Lade-/Speicher-Kopien in den Daemon-Modulen. Ein ungültiges Feld (alte Version, von Hand
 vertippt) fällt auf seinen Standard zurück, statt die ganze Datei zu verwerfen. Geheime Felder
-markiert das Schema mit `Field(json_schema_extra={"secret": True})`.
+markiert das Schema mit `Field(json_schema_extra=SECRET)`.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ log = logging.getLogger("nexcore.settings")
 
 T = TypeVar("T", bound=BaseModel)
 Migration = Callable[[dict[str, Any]], dict[str, Any]]
+SECRET = {"secret": True}  # Field(json_schema_extra=SECRET): Wert verlässt den Daemon nur maskiert
 MASK = "•" * 8  # so sieht die Web-UI ein gesetztes Geheimnis; nur Punkte zurück heißt „unverändert“
 
 
@@ -33,9 +34,10 @@ def is_mask(value: Any) -> bool:
 
 
 class SettingsStore(Generic[T]):
-    def __init__(self, path: Path, model: type[T], migrate: Migration | None = None) -> None:
+    def __init__(self, path: Path, model: type[T], migrate: Migration | None = None, header: str = "") -> None:
         self.path = path
         self.model = model
+        self.header = header  # Kommentarzeile oben in der Datei (wofür, wer sie schreibt)
         self.migrate = migrate  # alte Schlüssel übersetzen, bevor geprüft wird
         self.secrets = secret_fields(model)
         self.value: T = self.load()
@@ -63,13 +65,18 @@ class SettingsStore(Generic[T]):
 
     def save(self, value: T) -> None:
         text = yaml.safe_dump(value.model_dump(mode="json", exclude_none=True), sort_keys=False, allow_unicode=True)
-        atomic_write(self.path, text, 0o600 if self.secrets else 0o644)
+        head = f"# {self.header}\n" if self.header else ""
+        atomic_write(self.path, head + text, 0o600 if self.secrets else 0o644)
         self.value = value
 
-    def update(self, patch: dict[str, Any]) -> T:
-        """Teil-Update aus der Web-UI; maskierte Geheimnisse bleiben, wie sie sind. Ungültig: ValidationError."""
+    def merge(self, patch: dict[str, Any]) -> T:
+        """Teil-Update aus der Web-UI prüfen, ohne zu speichern; maskierte Geheimnisse bleiben, wie sie
+        sind. Ungültig: ValidationError."""
         patch = {k: v for k, v in patch.items() if not (k in self.secrets and is_mask(v))}
-        value = self.model.model_validate({**self.value.model_dump(), **patch})
+        return self.model.model_validate({**self.value.model_dump(), **patch})
+
+    def update(self, patch: dict[str, Any]) -> T:
+        value = self.merge(patch)
         self.save(value)
         return value
 

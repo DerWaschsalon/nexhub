@@ -314,12 +314,12 @@ Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent
 Meter das Stream-Overlay einschalten. Port und Schlüssel liest der Daemon aus
 `~/.local/share/com.a2tools.dps-meter/settings.json`, sonst von Hand aus der Overlay-URL.
 
-Die Einstellungen liegen in `~/.config/deckbar/dps.yaml` (Modus 600, enthält ggf. den Schlüssel).
+Die Einstellungen liegen in `~/.config/deckbar/aion2.dps.yaml` (Modus 600, enthält ggf. den Schlüssel).
 
 ### Dungeon-Runs nach Discord
 
 Nach jedem Dungeon-Run postet der Daemon ein Bild mit dem Schaden pro Spieler und Boss an einen
-Discord-Webhook (Modul „AION 2 · Dungeon-Runs“, gespeichert in `~/.config/deckbar/runs.yaml`).
+Discord-Webhook (Modul „AION 2 · Dungeon-Runs“, gespeichert in `~/.config/deckbar/aion2.runs.yaml`).
 Quelle ist die Kampf-History, je nach DPS-Quelle die von `deckbar-capture` oder die des Meters. Ein Run endet, sobald der Endboss liegt, bei einem
 Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
 `daemon/deckbar_daemon/runs.py`). Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
@@ -332,7 +332,7 @@ speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von H
 Das Modul „Discord-Bot“ schickt Ergebnisse an einen Bot, der sie postet, etwa
 TheWashBot. Beides ist aus, bis eine Adresse eingetragen
 ist, und schickt Charakternamen der Mitspieler an den Server des Bots; nur mit Absprache der Gruppe
-einschalten. Einstellungen in `~/.config/deckbar/bot.yaml` (Modus 600).
+einschalten. Einstellungen in `~/.config/deckbar/discord.bot.yaml` (Modus 600).
 
 - **Gruppen-DPS:** Endet ein Kampf, geht der Endstand der eigenen Gruppe (nicht aller Spieler in
   der Nähe) per POST an die Webhook-URL des Bots, Format in `daemon/deckbar_daemon/bot.py`. Filter:

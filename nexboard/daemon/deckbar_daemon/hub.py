@@ -24,14 +24,17 @@ from typing import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import aiohttp
-import yaml
-from pydantic import Field, ValidationError, field_validator
+from nexcore.settings import SECRET, SettingsStore
+from pydantic import Field, field_validator
 
 from . import __version__
-from .config import _atomic_write, _Strict
+from .config import _Strict
 from .runs import Run, dungeon_parts_en
 
 log = logging.getLogger(__name__)
+
+SETTINGS_FILE = "hub.yaml"  # im Konfig-Ordner, benannt nach dem Modul
+SETTINGS_HEADER = "NexHub-Anbindung – wird von der Web-UI überschrieben. Enthält das Geräte-Token."
 
 TIMEOUT_S = 15
 CHECK_EVERY_S = 600  # Gerät noch gültig? So oft, solange das Modul an ist
@@ -61,7 +64,7 @@ def _url(v: str) -> str:
 class HubSettings(_Strict):
     url: str = Field("", max_length=200)
     name: str = Field(default_factory=lambda: socket.gethostname()[:64] or "NexBoard", min_length=1, max_length=64)
-    token: str = Field("", max_length=200)  # Geräte-Token, nie in der Web-UI
+    token: str = Field("", max_length=200, json_schema_extra=SECRET)  # Geräte-Token, nie in der Web-UI
     upload: bool = False  # fertige Runs hochladen (schickt Namen von Mitspielern an den Hub)
 
     @field_validator("url")
@@ -83,7 +86,10 @@ def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, c
                  deaths: list[dict] | None = None) -> bytes:
     """Run → gepacktes NexLog. Liest die Kampfdateien und Einzeltreffer des Mitschnitts von der Platte;
     läuft in einem Thread (Packen großer Runs dauert bis ~0,1 s)."""
-    from nexproto import NexLog, pack  # erst hier: fehlt das Paket, scheitert nur das Hochladen
+    from nexproto import (  # erst hier: fehlt das Paket, scheitert nur das Hochladen
+        NexLog,
+        pack,
+    )
 
     fights, hits = [], {}
     for f in run.fights:
@@ -107,8 +113,8 @@ def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, c
 
 class Hub:
     def __init__(self, config_dir: Path, outbox: Path | None = None) -> None:
-        self.path = config_dir / "hub.yaml"
-        self.settings = self._load()
+        self.store = SettingsStore(config_dir / SETTINGS_FILE, HubSettings, header=SETTINGS_HEADER)
+        self.settings = self.store.value
         self.enabled = False  # Modul an (modules/hub.py)
         self.listeners: list[Callable[[], Awaitable[None]]] = []
         # Anzeige: "unpaired" | "pairing" | "paired" | "offline"
@@ -131,19 +137,8 @@ class Hub:
         self.deaths: Callable[[int, int], list[dict]] = lambda start_ms, end_ms: []
 
     # ------------------------------------------------------------ Einstellungen
-    def _load(self) -> HubSettings:
-        try:
-            return HubSettings.model_validate(yaml.safe_load(self.path.read_text()) or {})
-        except FileNotFoundError:
-            return HubSettings()
-        except (yaml.YAMLError, ValidationError) as e:
-            log.error("%s ungültig, nutze Standardwerte: %s", self.path, e)
-            return HubSettings()
-
     def save(self, settings: HubSettings) -> None:
-        header = "# NexHub-Anbindung – wird von der Web-UI überschrieben. Enthält das Geräte-Token.\n"
-        text = yaml.safe_dump(settings.model_dump(), sort_keys=False, allow_unicode=True)
-        _atomic_write(self.path, header + text, 0o600)
+        self.store.save(settings)
         self.settings = settings
 
     def update(self, data: dict) -> HubSettings:

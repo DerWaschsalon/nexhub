@@ -6,6 +6,7 @@ from typing import Any
 from aiohttp import web
 from nexcore import Context, ModuleInfo
 from nexcore.errors import ApiError
+from nexcore.settings import SettingsStore
 
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
@@ -32,6 +33,15 @@ class HubModule(WebModule):
     def ui_info(self) -> dict[str, Any]:
         return self.hub.info()
 
+    @property
+    def store(self) -> SettingsStore[Any]:
+        return self.hub.store
+
+    async def update_settings(self, patch: dict[str, Any]) -> None:
+        """Nur Adresse, Name und Hochladen; das Token setzt allein die Kopplung (hub.update)."""
+        self.hub.update(patch)
+        await self.changed()
+
     async def start(self) -> None:
         self.spawn(self.hub.watch)
         self.hub.enabled = True
@@ -52,8 +62,7 @@ class HubModule(WebModule):
         return web.json_response(self.hub.info())
 
     async def api_put(self, request: web.Request) -> web.Response:
-        self.hub.update(await read_object(request))
-        await self.changed()
+        await self.update_settings(await read_object(request))
         return ok(**self.hub.info())
 
     async def api_action(self, request: web.Request) -> web.Response:

@@ -41,13 +41,16 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 import aiohttp
-import yaml
-from pydantic import Field, ValidationError, field_validator
+from nexcore.settings import SECRET, SettingsStore
+from pydantic import Field, field_validator
 
-from .config import _atomic_write, _Strict
+from .config import _Strict
 from .runs import Run, boss_name_en, dungeon_parts_en, run_image
 
 log = logging.getLogger(__name__)
+
+SETTINGS_FILE = "discord.bot.yaml"  # im Konfig-Ordner, benannt nach dem Modul
+SETTINGS_HEADER = "Discord-Bot-Anbindung – wird von der Web-UI überschrieben. Enthält Geheimnisse."
 
 URL_RE = re.compile(r"^https?://[^\s/?#]+(?::\d+)?(?:/[^\s]*)?$")
 TIMEOUT_S = 20
@@ -66,7 +69,7 @@ def _url(v: str) -> str:
 class BotSettings(_Strict):
     # ---- Gruppen-DPS nach jedem Kampf
     dps_enabled: bool = False
-    dps_url: str = Field("", max_length=300)
+    dps_url: str = Field("", max_length=300, json_schema_extra=SECRET)
     # nur Bosse, nur besiegte, erst ab so vielen Sekunden, erst ab so vielen Gruppenmitgliedern
     dps_boss_only: bool = True
     dps_kills_only: bool = True
@@ -74,8 +77,8 @@ class BotSettings(_Strict):
     dps_min_party: int = Field(2, ge=1, le=8)
     # ---- Dungeon-Runs
     runs_enabled: bool = False
-    runs_url: str = Field("", max_length=300)
-    runs_token: str = Field("", max_length=200)
+    runs_url: str = Field("", max_length=300, json_schema_extra=SECRET)
+    runs_token: str = Field("", max_length=200, json_schema_extra=SECRET)
 
     @field_validator("dps_url", "runs_url")
     @classmethod
@@ -169,8 +172,8 @@ async def post_json(session: aiohttp.ClientSession, url: str, payload: dict, tok
 # ---------------------------------------------------------------- Dienst
 class DiscordBot:
     def __init__(self, config_dir: Path) -> None:
-        self.path = config_dir / "bot.yaml"
-        self.settings = self._load()
+        self.store = SettingsStore(config_dir / SETTINGS_FILE, BotSettings, header=SETTINGS_HEADER)
+        self.settings = self.store.value
         self.enabled = False  # Modul an (modules/bot.py); Einstellungen gelten nur dann
         self.last_fight: dict | None = None  # letzter Kampfende-Stand (Test-Knopf)
         self.last_run: Run | None = None
@@ -179,31 +182,9 @@ class DiscordBot:
         self._session: aiohttp.ClientSession | None = None
         self._sent: tuple | None = None  # (Ziel-ID, Ziel, Dauer) des zuletzt geschickten Kampfs
 
-    def _load(self) -> BotSettings:
-        try:
-            return BotSettings.model_validate(yaml.safe_load(self.path.read_text()) or {})
-        except FileNotFoundError:
-            return BotSettings()
-        except (yaml.YAMLError, ValidationError) as e:
-            log.error("%s ungültig, nutze Standardwerte: %s", self.path, e)
-            return BotSettings()
-
     def save(self, settings: BotSettings) -> None:
-        header = "# Discord-Bot-Anbindung – wird von der Web-UI überschrieben. Enthält Geheimnisse.\n"
-        text = yaml.safe_dump(settings.model_dump(), sort_keys=False, allow_unicode=True)
-        _atomic_write(self.path, header + text, 0o600)
+        self.store.save(settings)
         self.settings = settings
-
-    def update(self, data: dict) -> BotSettings:
-        """Teil-Update aus der Web-UI; Platzhalter (•••) lassen Geheimnisse unverändert."""
-        merged = self.settings.model_dump()
-        for k, v in data.items():
-            if k in ("dps_url", "runs_url", "runs_token") and isinstance(v, str) and v and set(v) == {"•"}:
-                continue
-            merged[k] = v
-        settings = BotSettings.model_validate(merged)
-        self.save(settings)
-        return settings
 
     def info(self) -> dict:
         s = self.settings.model_dump()

@@ -7,6 +7,7 @@ from typing import Any
 from aiohttp import web
 from nexcore import Context, ModuleInfo
 from nexcore.errors import ApiError
+from nexcore.settings import SettingsStore
 
 from ..bot import DiscordBot
 from ..core.http import ok, read_object
@@ -33,6 +34,13 @@ class BotModule(WebModule):
     def ui_info(self) -> dict[str, Any]:
         return self.bot.info()
 
+    @property
+    def store(self) -> SettingsStore[Any]:
+        return self.bot.store
+
+    def save_settings(self, value: Any) -> None:
+        self.bot.save(value)
+
     async def start(self) -> None:
         self.bot.enabled = True
 
@@ -54,8 +62,7 @@ class BotModule(WebModule):
         return web.json_response(self.bot.info())
 
     async def api_put(self, request: web.Request) -> web.Response:
-        self.bot.update(await read_object(request))
-        await self.changed()
+        await self.update_settings(await read_object(request))
         return ok(**self.bot.info())
 
     async def api_test(self, request: web.Request) -> web.Response:
