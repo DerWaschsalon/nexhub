@@ -23,7 +23,7 @@ from urllib.parse import unquote
 
 from aiohttp import web
 
-from .capture import Capture, history_root
+from .capture import DEFAULT_INTERVAL_MS, Capture, history_root
 from .config import _atomic_write
 from .plugins import PluginError, PluginHost, content_policy, valid_id, with_fonts
 
@@ -44,6 +44,8 @@ QUEUE_MAX = 256
 # Nicht aus den Einstellungen des A2Tools-Meters übernehmen: Geheimnisse, Fensterlagen, Online-Kram
 # Befehle ohne plugin_-Vorsilbe, die der Plugin-Host beantwortet
 PLUGIN_COMMANDS = {"meter_shown", "set_meter_shown", "set_plugin_theme"}
+UPDATE_RATE = "dpsMeter.updateRateMs"  # Einstellung „Aktualisierung“ des Meters
+UPDATE_RATES_MS = (100, 200, 250, 500)  # Auswahl im Meter
 NO_IMPORT = re.compile(r"(?i)key|token|secret|account|^window\.|streamOverlay|autoUpload|discord|kwinRule|plugin")
 
 
@@ -116,6 +118,7 @@ class A2Ui:
         self.settings_path = settings_path
         self.clients: set[asyncio.Queue] = set()
         self.settings = self._load_settings()
+        self._apply_update_rate()
         capture.data_listeners.append(self._on_capture)
         base = plugin_dir or Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "deckbar"
         self.plugins = PluginHost(capture, lambda: self.settings, self._set_setting, self.emit,
@@ -124,6 +127,15 @@ class A2Ui:
     def _set_setting(self, key: str, value: str) -> None:
         self.settings[key] = value
         self._save_settings(self.settings)
+        if key == UPDATE_RATE:
+            self._apply_update_rate()
+
+    def _apply_update_rate(self) -> None:
+        """Takt aus den Meter-Einstellungen an den Mitschnitt; gilt ab seinem nächsten Start, damit er
+        nicht mitten im Spiel neu startet."""
+        rate = self.settings.get(UPDATE_RATE, "")
+        valid = rate.isdigit() and int(rate) in UPDATE_RATES_MS
+        self.capture.interval_ms = int(rate) if valid else DEFAULT_INTERVAL_MS
 
     # ------------------------------------------------------------ Einstellungen der Oberfläche
     def _load_settings(self) -> dict[str, str]:
@@ -290,13 +302,13 @@ class A2Ui:
             case "update_settings":
                 key, value = str(a("key")), str(a("value"))
                 if self.settings.get(key) != value:
-                    self.settings[key] = value
-                    self._save_settings(self.settings)
+                    self._set_setting(key, value)
                     await self.emit("setting-changed", {"key": key, "value": value})
                 return None
             case "clear_settings":
                 self.settings = {}
                 self._save_settings(self.settings)
+                self._apply_update_rate()
                 return None
             case "set_language":
                 if live:

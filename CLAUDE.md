@@ -36,7 +36,8 @@ wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
   `bot.example.com`, `unraid-server`, `192.168.1.10`.
 - Aufbau: `nexboard/` (Touch-Leiste, Daemon, Overlay), `bot/` (TheWashBot), `hub/` (Kern + Module, auch die Log-Ansicht), `proto/`,
   `planner/`, `infra/` (VPS). Jeder Teil hat eine eigene README mit Tests.
-- Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Bot
+- Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Radar
+  `cd nexboard/radar && ../daemon/.venv/bin/python -m pytest -q tests`, Bot
   `cd bot && python -m pytest -q tests`, Hub `cd hub/api && uv run pytest -q` und
   `cd hub/web && npm run check`, Formate `cd proto && uv run pytest -q`.
 - **Ein Arbeitszweig: `main`** (seit 21.10.2026; `monorepo` ist darin aufgegangen und gelöscht).
@@ -67,3 +68,53 @@ Wunsch von Navonex und Fabio, ohne dass man es jedes Mal dazusagen muss:
 - **Für Laien lesbar.** Lieber einfach als clever: keine verschachtelten Einzeiler, keine Tricks.
   Ein kurzer Kommentar auf Deutsch erklärt, *warum* etwas so ist, wo es nicht offensichtlich ist.
 - Das gilt auch für Tests, Skripte und `infra/`.
+
+## Neubau NexBoard: verbindliche Regeln
+Gilt seit dem Neubau-Konzept (Claude Doc „NexBoard/NexHub lokal – Umbau auf kleine Module“) für jede
+Zeile in NexBoard, danach für Hub und Bot. Ergänzt „Code-Stil“ und geht bei Widerspruch vor. Jede Zeile
+folgt SOLID, DRY und „Lesbarkeit vor Cleverness“.
+
+| Prinzip | Regel im Repo | Prüffrage beim Review |
+|---|---|---|
+| Single Responsibility | Eine Datei = eine Aufgabe, eine Klasse = ein Grund, sich zu ändern. Paket lesen, Zustand führen, Regeln auswerten, ausgeben und anzeigen sind immer getrennte Teile. | Lässt sich die Aufgabe der Datei in einem Satz ohne „und“ sagen? |
+| Open/Closed | Neue Bossmechanik, neue Kachel, neues Widget, neues Modul = neue Datei oder neuer Daten-Eintrag; der Kern wird dafür nicht angefasst. Erweiterung über Registrierung, nicht über if-Ketten. | Musste für das neue Feature eine bestehende Verzweigung ergänzt werden? |
+| Liskov Substitution | Alle Umsetzungen einer Schnittstelle sind austauschbar: echte Paketquelle und Aufnahme-Wiedergabe, echtes Gerät und Simulator, Piper und Piepton. Keine Sonderfälle per isinstance. | Laufen die Tests mit jeder Umsetzung unverändert? |
+| Interface Segregation | Schmale Schnittstellen nach Bedarf: ein Widget sieht nur seine Daten, ein Modul nur die Dienste, die es anfordert (Ereignisse, Einstellungen, Routen), nicht den ganzen Daemon. | Bekommt der Teil Methoden, die er nie aufruft? |
+| Dependency Inversion | Module hängen an Schnittstellen im Kern (typing.Protocol), nie an konkreten Klassen anderer Module. Der Kern kennt keine Module, er lädt sie über die Registrierung. Abhängigkeiten werden im Konstruktor übergeben, nicht importiert und global geholt. | Importiert ein Modul etwas aus einem anderen Modul statt aus core? |
+
+**DRY:** Jede Fachregel, Konstante, Opcode-Nummer, Übersetzung und Formatierung steht genau einmal.
+Braucht JS oder C dieselbe Zahl, wird sie aus einer gemeinsamen Quelle erzeugt (Schema oder JSON), nicht
+abgeschrieben. Paketdekodierung gibt es genau einmal (eine Paketquelle für DPS, Radar und PvP). Gemeinsame
+Web-Bausteine (Formularfeld, Schalter, Liste, Tabs, Abruf mit Fehleranzeige) und gemeinsame
+Overlay-Bausteine (Widget-Rahmen, Ziehen, Größe) gibt es genau einmal. Grenze: Zwei Stellen, die nur
+zufällig gleich aussehen, aber aus verschiedenen Gründen geändert werden, bleiben getrennt.
+
+**Lesbarkeit vor Cleverness:** Kurze Funktionen (Richtwert unter 40 Zeilen), sprechende Namen, eine Ebene
+Verschachtelung bevorzugt; frühe Rückkehr statt tiefer if-Blöcke. Keine verschachtelten Einzeiler, keine
+Metaprogrammierung, keine Magie über getattr-Ketten oder dynamisch gebaute Namen. Magische Zahlen werden
+benannt (`CUBE_RANGE_M = 60`), Opcodes stehen als benannte Konstanten in einer Tabelle. Ein kurzer
+deutscher Kommentar erklärt das Warum, wo es nicht offensichtlich ist.
+
+**Einheitlicher Stil über alle Sprachen:**
+
+| Thema | Regel |
+|---|---|
+| Sprache der Namen | Bezeichner Englisch (Code-Standard, passt zu A2Tools, Rust, LVGL), Kommentare, Doku, Oberflächentexte Deutsch und über Übersetzungsdateien. Alte Konfig-Schlüssel werden beim Laden übersetzt. |
+| Python | PEP 8, Typangaben überall, ruff + mypy --strict im Test-Lauf, Datenklassen für Daten, asyncio statt eigener Threads, außer für blockierende Hardware. |
+| JavaScript | ES-Module ohne Build, JSDoc-Typen, eslint; ein Modul = eine Datei unter web/modules/<name>/. |
+| Rust | cargo fmt, clippy -D warnings, Ausgabe nur über ein dokumentiertes Nachrichtenformat. |
+| C (Firmware, UI) | Präfix je Teil (ui_tile_, net_), clang-format, Hardware nur über hal.h. |
+| Konfiguration | Eine Ablage ~/.config/deckbar/, eine Datei je Modul, Schema je Modul; ~/.config/aion2-radar.json geht darin auf. |
+| Logging | Ein Logger je Modul (logging.getLogger("nexboard.<modul>")), keine print. |
+| Tests | Jedes Modul bringt eigene Tests mit; Fachlogik ohne Netz, Gerät oder Spiel testbar (aufgezeichnete Pakete als Eingabe). |
+
+**Entscheidungen (09.11.2026, Fabio und Navonex):** Monorepo mit `packages/` (nexcore, nexproto) und
+`apps/` als uv-Workspace; Radar nur noch für Gruppe und eigenes Ziel, keine Namen Fremder (0x3645 wird
+nicht gelesen); nur das A2Tools-Meter als Widget; Vertraute-Tabelle fällt weg (Verweis auf den Pet Soul
+Tracker); Runs nach Discord nur Daemon → Hub → Bot, das Webhook-Bild bleibt als Option.
+
+**Arbeitsregeln für den Umbau:** Jeder Schritt ist ein PR nach main mit grünen Tests (auch Goldtest und
+Referenzbilder, siehe `nexboard/README.md`, „Tests“); Pfadänderungen nur mit Weiterleitung in update.sh,
+die Wurzel-Symlinks bleiben, solange alte Installationen existieren. Den Daemon nie neu starten, solange
+AION 2 läuft (Ziel: update.sh merkt den Neustart dann nur vor). Testinstanzen nie mit echtem systemd oder echtem Mitschnitt. Jede Fachregel, die
+beim Umbau berührt wird, wandert in Daten oder nexproto. Pro Modul ein Review gegen die Prüffragen oben.

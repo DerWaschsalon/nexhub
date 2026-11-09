@@ -9,7 +9,7 @@ from radar.ansagen import Ansagen
 from radar.warnung import DUNGEONS, Sprecher, WarnZentrale
 from radar.zustand import BOSS_ANSAGEN, RadarZustand
 
-from test_feldbosse_vertraute import varint  # Testordner ist beim Aufruf die Wurzel
+from tests.test_radar import varint
 
 
 def text(de: str, en: str = "") -> dict:

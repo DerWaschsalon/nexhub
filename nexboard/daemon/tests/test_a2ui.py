@@ -71,3 +71,16 @@ async def test_commands_ohne_programm(tmp_path, monkeypatch):
         raise AssertionError("ungültige ID angenommen")
     except ValueError:
         pass
+
+
+async def test_takt_aus_den_meter_einstellungen(tmp_path, monkeypatch):
+    """„Aktualisierung“ im Meter wirkte nicht: deckbar-capture lief immer mit 500 ms."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("DECKBAR_A2TOOLS_SETTINGS", str(tmp_path / "fehlt.json"))
+    capture = FakeCapture()
+    ui = A2Ui(capture, tmp_path / "a2-settings.json")
+    assert capture.interval_ms == 500
+    await ui.call("update_settings", {"key": "dpsMeter.updateRateMs", "value": "200"})
+    assert capture.interval_ms == 200
+    await ui.call("update_settings", {"key": "dpsMeter.updateRateMs", "value": "7"})  # nicht im Meter wählbar
+    assert capture.interval_ms == 500

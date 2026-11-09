@@ -34,7 +34,7 @@ MAX_HITS_PER_FIGHT = 200_000  # gemessen: bis knapp 6 000 in Dungeon-Kämpfen
 HIT_COLUMNS = ("t_ms", "actor", "owner", "skill", "damage", "multi", "flags")
 # jobId der Kampfdateien → Klassen-Schlüssel wie im Daemon (Schlüssel von `names`: "Maske|klasse")
 JOB_CLASSES = {11: "gladiator", 12: "templar", 13: "assassin", 14: "ranger", 15: "sorcerer",
-               16: "spiritmaster", 17: "cleric", 18: "chanter"}
+               16: "spiritmaster", 17: "cleric", 18: "chanter", 19: "brawler"}
 
 
 class NexLogError(ValueError):

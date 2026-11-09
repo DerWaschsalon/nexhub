@@ -125,5 +125,10 @@ stehen alle Einstellungen, auch der Charaktername. Standardwerte und Warnungslis
 
 - Kämpfe auswerten: `python3 -m werkzeuge.auswertung mitschnitte/datei.pcap`
 - Für andere Programme auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true, "warnungen": [{"gruppe", "titel", "ich", "rest"}]}`: groggy, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s, hängt nicht an der Warnungsanzeige), dazu die gerade laufenden Warnungen (ohne Lernhilfe; auf der Seite abgeschaltete fehlen auch hier). Gruppen wie in `meldungen.json`. Dazu `boss_effekte` und `eigene_effekte`, je `[{"id", "seit"}]`: Effekte, die gerade auf dem aktuellen Ziel des DPS-Meters bzw. auf dir liegen, aus dem Capture statt aus dem Radar (genauer Anfang und Ende, z. B. Lakshmis Schadensreflexion `16059101`, Präzision/„Letalität“ vom Markierungsschuss `140900171`; Code `nexboard/daemon/deckbar_daemon/boss_effekte.py`). Ohne laufendes Capture leer (`eigene_effekte` dann `null` = unbekannt, ebenso solange die eigene ID fehlt), nach 10 s ohne Treffer am Ziel gilt der Stand als veraltet.
-- Tests: `PYTHONPATH=../../proto python3 -m unittest discover tests` (Termine kommen aus `proto/nexproto/termine.py`, im Daemon ist nexproto installiert)
+- Tests: `../daemon/.venv/bin/python -m pytest -q tests` (mit der .venv des Daemons, darin sind nexproto und
+  python-xlib). Dazu gehört der Goldtest (`tests/test_gold.py`): Er spielt jeden Mitschnitt aus
+  `~/.local/share/aion2-radar/mitschnitte/` durch den RadarDienst und durch `deckbar-capture --replay` und vergleicht
+  das Ergebnis mit den Referenzen in `~/.local/share/aion2-radar/gold/`. Referenzen schreiben:
+  `python -m werkzeuge.gold --schreiben radar` bzw. `--schreiben capture`. Sie bleiben auf dem Rechner, weil sie
+  Namen anderer Spieler enthalten; ohne Mitschnitte wird der Test übersprungen.
 - Daten: `~/.local/share/aion2-radar/` (Spawnpunkte, Karten, Spawn-Log), Einstellungen `~/.config/aion2-radar.json`.

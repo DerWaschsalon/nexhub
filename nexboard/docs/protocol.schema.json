@@ -6,7 +6,7 @@
   "required": ["v", "type"],
   "properties": {
     "v": { "const": 1 },
-    "type": { "enum": ["hello", "welcome", "error", "layout", "state", "event", "ping", "pong", "art_request", "art", "goto"] }
+    "type": { "enum": ["hello", "welcome", "error", "layout", "state", "event", "ping", "pong", "art_request", "art", "bg", "goto"] }
   },
   "allOf": [
     { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "$ref": "#/$defs/hello" } },
@@ -18,6 +18,7 @@
     { "if": { "properties": { "type": { "enum": ["ping", "pong"] } } }, "then": { "$ref": "#/$defs/heartbeat" } },
     { "if": { "properties": { "type": { "const": "art_request" } } }, "then": { "$ref": "#/$defs/art_request" } },
     { "if": { "properties": { "type": { "const": "art" } } }, "then": { "$ref": "#/$defs/art" } },
+    { "if": { "properties": { "type": { "const": "bg" } } }, "then": { "$ref": "#/$defs/bg" } },
     { "if": { "properties": { "type": { "const": "goto" } } }, "then": { "$ref": "#/$defs/goto" } }
   ],
   "$defs": {
@@ -34,19 +35,31 @@
         "have": { "type": "string", "maxLength": 16 }
       }
     },
-    "art": {
+    "image_part": {
       "type": "object",
       "required": ["id"],
       "properties": {
-        "id": { "type": "string", "maxLength": 15 },
-        "w": { "type": "integer", "minimum": 8, "maximum": 160 },
-        "h": { "type": "integer", "minimum": 8, "maximum": 160 },
+        "id": { "type": "string", "maxLength": 16 },
         "y": { "type": "integer", "minimum": 0 },
         "rows": { "type": "integer", "minimum": 1 },
         "data": { "type": "string" }
       },
       "if": { "properties": { "id": { "minLength": 1 } } },
       "then": { "required": ["w", "h", "y", "rows", "data"] }
+    },
+    "art": {
+      "$ref": "#/$defs/image_part",
+      "properties": {
+        "w": { "type": "integer", "minimum": 8, "maximum": 160 },
+        "h": { "type": "integer", "minimum": 8, "maximum": 160 }
+      }
+    },
+    "bg": {
+      "$ref": "#/$defs/image_part",
+      "properties": {
+        "w": { "const": 640 },
+        "h": { "const": 172 }
+      }
     },
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,32}$" },
     "hello": {
@@ -102,7 +115,7 @@
       "required": ["id", "type"],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["button", "toggle", "slider", "media", "dps"] },
+        "type": { "enum": ["button", "toggle", "slider", "media", "dps", "claude"] },
         "label": { "type": "string", "maxLength": 24 },
         "icon": { "type": "string", "maxLength": 48 },
         "icon_on": { "type": "string", "maxLength": 48 },
@@ -177,6 +190,21 @@
         }
       }
     },
+    "usage_limit": {
+      "type": "object",
+      "required": ["pct"],
+      "properties": {
+        "pct": { "type": "integer", "minimum": 0 },
+        "reset": { "type": "string" }
+      }
+    },
+    "claude": {
+      "type": ["object", "null"],
+      "properties": {
+        "session": { "$ref": "#/$defs/usage_limit" },
+        "week": { "$ref": "#/$defs/usage_limit" }
+      }
+    },
     "state": {
       "type": "object",
       "required": ["values"],
@@ -192,7 +220,8 @@
             "playing": { "type": "boolean" },
             "track": { "$ref": "#/$defs/track" },
             "dps": { "$ref": "#/$defs/dps" },
-            "dps_active": { "type": "boolean" }
+            "dps_active": { "type": "boolean" },
+            "claude": { "$ref": "#/$defs/claude" }
           }
         }
       }

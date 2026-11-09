@@ -27,6 +27,7 @@ from typing import Any, Awaitable, Callable, Literal
 log = logging.getLogger(__name__)
 
 BINARY = "deckbar-capture"
+DEFAULT_INTERVAL_MS = 500  # Standard von deckbar-capture
 GAME_POLL_S = 5
 STOP_AFTER_S = 30   # Spiel weg: so lange weiterlaufen lassen (Absturz mit Neustart, Ladebildschirm)
 STOP_WAIT_S = 10    # nach geschlossener Eingabe, dann SIGTERM
@@ -110,6 +111,8 @@ class Capture:
         self.error = ""
         self.game_running = aion2_running  # austauschbar für Tests
         self.game: bool | None = None  # letzter Blick auf /proc (None = noch keiner bzw. ohne Programm)
+        # Takt der DPS-Ansicht; die A2-Oberfläche setzt ihn aus den Meter-Einstellungen (a2ui.py)
+        self.interval_ms = DEFAULT_INTERVAL_MS
         # Volle DpsData (Skills je Spieler) nur, solange jemand sie braucht (Overlay, a2ui.py)
         self.full = False
         self.data_listeners: list[Callable[[str, Any], Awaitable[None]]] = []  # (Ereignis, Inhalt)
@@ -160,7 +163,8 @@ class Capture:
     async def _run_once(self, lang: str) -> None:
         await self._set("starting")
         self.hello, self.status = {}, {}
-        args = [str(self.binary), "--history-dir", str(history_root()), "--lang", lang]
+        args = [str(self.binary), "--history-dir", str(history_root()), "--lang", lang,
+                "--interval-ms", str(self.interval_ms)]
         try:
             self._proc = await asyncio.create_subprocess_exec(
                 *args, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
