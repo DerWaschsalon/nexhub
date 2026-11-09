@@ -105,7 +105,7 @@ async def test_autohide_geht_sofort_ans_laufende_programm(tmp_path):
 
 async def test_unit_untouched_for_test_instances(tmp_path):
     o = Overlay(tmp_path, manage_unit=False)
-    code, out = await o._systemctl("enable", "--now", "deckbar-overlay.service")
+    code, out = await o.systemctl("enable", "--now", "deckbar-overlay.service")
     assert code == 1 and "Testinstanz" in out
 
 
@@ -137,7 +137,7 @@ async def test_overlay_kommt_und_geht_mit_dem_spiel(tmp_path, monkeypatch):
     monkeypatch.setattr(ov, "GAME_GRACE_S", 0.06)
     o = Overlay(tmp_path, manage_unit=True)
     unit = FakeUnit(autostart=True)
-    o._systemctl = unit
+    o.systemctl = unit
     o.refresh_screens = lambda: asyncio.sleep(0)
     game = {"on": False}
 

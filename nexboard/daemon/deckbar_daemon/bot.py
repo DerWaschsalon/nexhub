@@ -171,7 +171,7 @@ class DiscordBot:
     def __init__(self, config_dir: Path) -> None:
         self.path = config_dir / "bot.yaml"
         self.settings = self._load()
-        self.enabled = False  # Modul an (ModuleManager); Einstellungen gelten nur dann
+        self.enabled = False  # Modul an (modules/bot.py); Einstellungen gelten nur dann
         self.last_fight: dict | None = None  # letzter Kampfende-Stand (Test-Knopf)
         self.last_run: Run | None = None
         self.result: dict[str, dict] = {"dps": {}, "runs": {}}  # letzter Versand je Weg

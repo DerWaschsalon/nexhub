@@ -13,9 +13,10 @@ from pathlib import Path
 from aiohttp import web
 from pydantic import ValidationError
 
-from .config import config_dir, load_settings
 from .a2ui import A2Ui
-from .server import NexBoard, build_app, local_only
+from .app import NexBoard, build_app
+from .config import config_dir, load_settings
+from .core.http import local_only
 
 log = logging.getLogger("deckbar")
 SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Standard: 60 s)
@@ -66,7 +67,7 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     a2.close_clients()
     await a2.plugins.stop()
     await deck.close_clients()
-    await deck.modules.stop_all()
+    await deck.modules.shutdown()
     await a2_runner.cleanup()
     await runner.cleanup()
     return deck

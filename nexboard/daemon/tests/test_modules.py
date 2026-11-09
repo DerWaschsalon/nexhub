@@ -1,82 +1,32 @@
 """Module: Speichern, Abhängigkeiten, Aufgaben zur Laufzeit starten und stoppen; Web-API."""
-import asyncio
-
 import pytest
 import yaml
 from aiohttp.test_utils import TestClient, TestServer
 
+from deckbar_daemon.app import NexBoard, build_app
 from deckbar_daemon.config import Settings
-from deckbar_daemon.modules import MODULES, ModuleManager, dependents, requirements
-from deckbar_daemon.server import NexBoard, build_app
 
 
-def test_dependency_graph():
-    assert requirements("discord.bot") == {"aion2.dps"}
-    assert {"aion2.overlay", "aion2.runs", "discord.bot"} <= dependents("aion2.dps")
-    assert dependents("deck") == set()
-    ids = [m.id for m in MODULES]
-    assert len(ids) == len(set(ids))
-    for m in MODULES:
-        assert all(r in ids for r in m.requires)
+def board(tmp_path) -> NexBoard:
+    return NexBoard(Settings(token="testtoken123", mdns=False, usb="off"), tmp_path, mdns=False)
 
 
-def test_load_save_and_defaults(tmp_path):
-    m = ModuleManager(tmp_path)
-    assert m.enabled == {"deck", "updates"}
+def test_dependency_graph(tmp_path):
+    m = board(tmp_path).modules
+    assert m.requirements("discord.bot") == {"aion2.dps"}
+    assert {"aion2.overlay", "aion2.runs", "discord.bot"} <= m.dependents("aion2.dps")
+    assert m.dependents("deck") == set()
+    assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.runs", "aion2.radar", "discord.bot", "hub",
+                       "updates"]
+    for mid, info in m.infos.items():
+        assert all(r in m.infos for r in info.requires), mid
+
+
+def test_load_and_first_start(tmp_path):
+    assert board(tmp_path).modules.enabled == {"deck", "updates"}  # frische Installation
     assert yaml.safe_load((tmp_path / "modules.yaml").read_text()) == {"enabled": ["deck", "updates"]}
     (tmp_path / "modules.yaml").write_text("enabled: [aion2.overlay, gibts-nicht]\n")
-    assert ModuleManager(tmp_path).enabled == {"aion2.overlay", "aion2.dps"}  # Abhängigkeit kommt dazu
-    (tmp_path / "modules.yaml").write_text("kaputt: [")
-    assert ModuleManager(tmp_path, lambda: {"deck"}).enabled == {"deck"}
-
-
-async def test_runtime_start_stop_and_hooks(tmp_path):
-    m = ModuleManager(tmp_path, lambda: {"deck"})
-    runs = {"dps": 0, "hooks": []}
-
-    async def dps_task():
-        runs["dps"] += 1
-        await asyncio.Event().wait()
-
-    async def hook(on):
-        runs["hooks"].append(on)
-
-    m.register("aion2.dps", dps_task, hook=hook, status=lambda: {"x": 1})
-    await m.start()
-    assert runs["dps"] == 0
-    changed = await m.set("discord.bot", True)
-    assert changed == ["aion2.dps", "discord.bot"]
-    await asyncio.sleep(0)
-    assert runs["dps"] == 1 and runs["hooks"] == [True]
-    info = {x["id"]: x for x in m.info()["modules"]}
-    assert info["aion2.dps"]["status"] == {"x": 1} and info["discord.bot"]["enabled"]
-    assert await m.set("aion2.dps", False) == ["aion2.dps", "discord.bot"]  # Abhängige gehen mit
-    assert runs["hooks"] == [True, False] and not m.runtime["aion2.dps"].running
-    assert ModuleManager(tmp_path).enabled == {"deck"}
-    await m.stop_all()
-    with pytest.raises(KeyError):
-        await m.set("nope", True)
-
-
-async def test_crashed_task_restarts(tmp_path, monkeypatch):
-    import deckbar_daemon.modules as mod
-    calls = []
-
-    async def flaky():
-        calls.append(1)
-        if len(calls) == 1:
-            raise RuntimeError("kaputt")
-        await asyncio.Event().wait()
-
-    real_sleep = asyncio.sleep
-    monkeypatch.setattr(mod.asyncio, "sleep", lambda s: real_sleep(0))
-    m = ModuleManager(tmp_path, lambda: {"updates"})
-    m.register("updates", flaky)
-    await m.start()
-    for _ in range(5):
-        await real_sleep(0)
-    assert len(calls) == 2
-    await m.stop_all()
+    assert board(tmp_path).modules.enabled == {"aion2.overlay", "aion2.dps"}  # Abhängigkeit kommt dazu
 
 
 @pytest.fixture
@@ -85,7 +35,7 @@ async def client(tmp_path, monkeypatch):
     import deckbar_daemon.overlay as overlay_mod
     monkeypatch.setattr(overlay_mod, "socket_path", lambda: tmp_path / "kein-overlay.sock")
     (tmp_path / "modules.yaml").write_text("enabled: [deck]\n")
-    deck = NexBoard(Settings(token="testtoken123", mdns=False, usb="off"), tmp_path, mdns=False)
+    deck = board(tmp_path)
     deck.overlay.manage_unit = False
     async with TestClient(TestServer(build_app(deck))) as c:
         c.deck = deck

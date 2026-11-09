@@ -5,7 +5,7 @@ Gespeichert wird nur, was eingeschaltet ist (eine YAML-Datei, z. B. modules.yaml
     enabled: [deck, aion2.dps]
 
 Einschalten schaltet benötigte Module mit ein, Ausschalten die davon abhängigen mit aus. Der Kern
-kennt keine Module: der Host übergibt die Klassen.
+kennt keine Module: der Host baut sie (mit ihren Abhängigkeiten im Konstruktor) und übergibt sie.
 """
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ from typing import Any
 
 import yaml
 
-from .module import Context, Module, ModuleInfo
+from .bus import EventBus
+from .module import Module, ModuleInfo
 from .paths import atomic_write
 
 log = logging.getLogger("nexcore.registry")
@@ -27,12 +28,12 @@ CHANGED = "modules.changed"  # Thema auf dem Bus, Inhalt: Liste der geänderten 
 
 
 class Registry:
-    def __init__(self, ctx: Context, modules: Sequence[type[Module]], state_file: Path,
+    def __init__(self, bus: EventBus, modules: Sequence[Module], state_file: Path,
                  initial: Callable[[], set[str]] | None = None) -> None:
-        self.ctx = ctx
-        self.order = [m.info.id for m in modules]  # Startreihenfolge = Reihenfolge der Klassen
+        self.bus = bus
+        self.order = [m.info.id for m in modules]  # Startreihenfolge = Reihenfolge der Module
         self.infos: dict[str, ModuleInfo] = {m.info.id: m.info for m in modules}
-        self.modules: dict[str, Module] = {m.info.id: m(ctx) for m in modules}
+        self.modules: dict[str, Module] = {m.info.id: m for m in modules}
         self.state_file = state_file
         self.enabled = self._load(initial)
         self.started = False
@@ -135,7 +136,7 @@ class Registry:
             log.info("Module %s: %s", "ein" if on else "aus", ", ".join(order))
             if self.started:
                 await self._switch(order, on)
-        await self.ctx.bus.emit(CHANGED, order)
+        await self.bus.emit(CHANGED, order)
         return order
 
     async def _switch(self, order: list[str], on: bool) -> None:

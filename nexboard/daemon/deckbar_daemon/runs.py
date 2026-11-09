@@ -817,7 +817,7 @@ class DungeonRuns:
         # Jeder beendete Run mit besiegtem Boss, Namen schon aufgelöst (z. B. Discord-Bot, bot.py)
         self.run_listeners: list[Callable[[Run], Awaitable[None]]] = []
         self._ready = False
-        # Wo die History liegt, hängt an der DPS-Quelle (server.py setzt das)
+        # Wo die History liegt, hängt an der DPS-Quelle (app.py setzt das)
         self.history_dir: Callable[[], Path] = lambda: a2tools_dir() / "history"
         # True = eigener Mitschnitt: gelesen wird nur nach dessen Meldung „fights_saved“ (wake()),
         # statt alle POLL_S den Ordner abzufragen. Das A2Tools-Meter meldet nichts, dort pollen.

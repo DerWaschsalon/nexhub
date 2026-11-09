@@ -36,7 +36,7 @@ class Oben(Module):
 
 def registry(tmp_path, initial=None):
     ctx = Context(EventBus(), Paths("test"))
-    return Registry(ctx, [Basis, Aufbau, Oben], tmp_path / "modules.yaml", initial)
+    return Registry(ctx.bus, [Basis(ctx), Aufbau(ctx), Oben(ctx)], tmp_path / "modules.yaml", initial)
 
 
 async def test_standard_und_speichern(tmp_path):
@@ -56,15 +56,15 @@ async def test_ein_und_aus_mit_aufraeumen(tmp_path):
     LOG.clear()
     r = registry(tmp_path)
     changed = []
-    r.ctx.bus.on(CHANGED, changed.append)
+    r.bus.on(CHANGED, changed.append)
     await r.start()
     assert await r.set("aufbau", True) == ["aufbau"]
-    await r.ctx.bus.emit("ping")
+    await r.bus.emit("ping")
     assert await r.set("basis", False) == ["basis", "aufbau"]  # Abhängige gehen mit
-    await r.ctx.bus.emit("ping")  # Abo von aufbau ist weg
+    await r.bus.emit("ping")  # Abo von aufbau ist weg
     assert LOG == ["basis an", "aufbau an", "aufbau ping", "basis aus"]
     assert changed == [["aufbau"], ["basis", "aufbau"]]
-    assert not r.modules["basis"]._tasks
+    assert not r.modules["basis"]._tasks and not r.modules["basis"].active and not r.modules["oben"].active
     assert await r.set("basis", False) == []
 
 
