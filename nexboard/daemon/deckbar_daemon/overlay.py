@@ -19,10 +19,12 @@ import json
 import logging
 import os
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Awaitable, Callable, Literal
 
 from aiohttp import web
+from nexproto.termine import TERMINE
 from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from .capture import aion2_running
@@ -80,12 +82,14 @@ class TimerEvent(_Strict):
     enabled: bool = True
 
 
-DEFAULT_EVENTS = [
-    TimerEvent(name="Shugo-Festival", every=60, at=0, open=5),
-    TimerEvent(name="Spacetime Rift", every=180, at=120, open=10),
-    TimerEvent(name="Täglicher Reset", every=1440, at=7 * 60, tz="utc"),
-    TimerEvent(name="Wöchentlicher Reset", every=10080, at=2 * 1440 + 7 * 60, tz="utc"),
-]
+def termin_event(name: str, reference: str, every: int, open_min: int) -> TimerEvent:
+    """Termin aus nexproto.termine als Timer: Beginn in Minuten ab Montag 00:00 UTC, auf den Takt gelegt."""
+    start = datetime.fromisoformat(reference)
+    at = (start.weekday() * 1440 + start.hour * 60 + start.minute) % every
+    return TimerEvent(name=name, every=every, at=at, open=open_min, tz="utc")
+
+
+DEFAULT_EVENTS = [termin_event(*t) for t in TERMINE]
 
 
 class RadarWidget(Widget):

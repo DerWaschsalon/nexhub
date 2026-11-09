@@ -1,247 +1,1278 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://deckbar.local/protocol/v1.json",
   "title": "NexBoard protocol v1 message",
-  "type": "object",
-  "required": ["v", "type"],
-  "properties": {
-    "v": { "const": 1 },
-    "type": { "enum": ["hello", "welcome", "error", "layout", "state", "event", "ping", "pong", "art_request", "art", "bg", "goto"] }
-  },
-  "allOf": [
-    { "if": { "properties": { "type": { "const": "hello" } } }, "then": { "$ref": "#/$defs/hello" } },
-    { "if": { "properties": { "type": { "const": "welcome" } } }, "then": { "$ref": "#/$defs/welcome" } },
-    { "if": { "properties": { "type": { "const": "error" } } }, "then": { "$ref": "#/$defs/error" } },
-    { "if": { "properties": { "type": { "const": "layout" } } }, "then": { "$ref": "#/$defs/layout" } },
-    { "if": { "properties": { "type": { "const": "state" } } }, "then": { "$ref": "#/$defs/state" } },
-    { "if": { "properties": { "type": { "const": "event" } } }, "then": { "$ref": "#/$defs/event" } },
-    { "if": { "properties": { "type": { "enum": ["ping", "pong"] } } }, "then": { "$ref": "#/$defs/heartbeat" } },
-    { "if": { "properties": { "type": { "const": "art_request" } } }, "then": { "$ref": "#/$defs/art_request" } },
-    { "if": { "properties": { "type": { "const": "art" } } }, "then": { "$ref": "#/$defs/art" } },
-    { "if": { "properties": { "type": { "const": "bg" } } }, "then": { "$ref": "#/$defs/bg" } },
-    { "if": { "properties": { "type": { "const": "goto" } } }, "then": { "$ref": "#/$defs/goto" } }
-  ],
   "$defs": {
-    "goto": {
-      "type": "object",
-      "required": ["page"],
-      "properties": { "page": { "$ref": "#/$defs/id" } }
-    },
-    "art_request": {
-      "type": "object",
-      "required": ["size"],
+    "Art": {
+      "description": "Cover der Medien-Kachel, genau in der Größe aus art_request.",
       "properties": {
-        "size": { "type": "integer", "minimum": 8, "maximum": 160 },
-        "have": { "type": "string", "maxLength": 16 }
-      }
-    },
-    "image_part": {
-      "type": "object",
-      "required": ["id"],
-      "properties": {
-        "id": { "type": "string", "maxLength": 16 },
-        "y": { "type": "integer", "minimum": 0 },
-        "rows": { "type": "integer", "minimum": 1 },
-        "data": { "type": "string" }
-      },
-      "if": { "properties": { "id": { "minLength": 1 } } },
-      "then": { "required": ["w", "h", "y", "rows", "data"] }
-    },
-    "art": {
-      "$ref": "#/$defs/image_part",
-      "properties": {
-        "w": { "type": "integer", "minimum": 8, "maximum": 160 },
-        "h": { "type": "integer", "minimum": 8, "maximum": 160 }
-      }
-    },
-    "bg": {
-      "$ref": "#/$defs/image_part",
-      "properties": {
-        "w": { "const": 640 },
-        "h": { "const": 172 }
-      }
-    },
-    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,32}$" },
-    "hello": {
-      "type": "object",
-      "required": ["token", "device"],
-      "properties": {
-        "token": { "type": "string", "maxLength": 128 },
-        "layout_hash": { "type": "string", "maxLength": 64 },
-        "page": { "$ref": "#/$defs/id" },
-        "bg_id": { "type": "string", "maxLength": 16 },
-        "caps": { "type": "array", "items": { "type": "string", "maxLength": 16 } },
-        "device": {
-          "type": "object",
-          "required": ["id", "width", "height"],
-          "properties": {
-            "id": { "type": "string", "maxLength": 64 },
-            "model": { "type": "string", "maxLength": 64 },
-            "fw": { "type": "string", "maxLength": 32 },
-            "width": { "type": "integer", "minimum": 1 },
-            "height": { "type": "integer", "minimum": 1 },
-            "sim": { "type": "boolean" }
-          }
-        }
-      }
-    },
-    "welcome": {
-      "type": "object",
-      "required": ["heartbeat"],
-      "properties": {
-        "server": {
-          "type": "object",
-          "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
         },
-        "heartbeat": { "type": "integer", "minimum": 1, "maximum": 60 }
-      }
-    },
-    "error": {
-      "type": "object",
-      "required": ["code"],
-      "properties": {
-        "code": { "enum": ["auth", "version", "bad_request", "disabled"] },
-        "message": { "type": "string" }
-      }
-    },
-    "heartbeat": {
-      "type": "object",
-      "required": ["t"],
-      "properties": { "t": { "type": "integer" } }
-    },
-    "style": { "enum": ["default", "accent", "danger", "success", "warning"] },
-    "item": {
-      "type": "object",
-      "required": ["id", "type"],
-      "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "type": { "enum": ["button", "toggle", "slider", "media", "dps", "claude"] },
-        "label": { "type": "string", "maxLength": 24 },
-        "icon": { "type": "string", "maxLength": 48 },
-        "icon_on": { "type": "string", "maxLength": 48 },
-        "style": { "$ref": "#/$defs/style" },
-        "bind": { "type": "string", "maxLength": 32 },
-        "mute_bind": { "type": "string", "maxLength": 32 },
-        "min": { "type": "integer" },
-        "max": { "type": "integer" },
-        "nav": { "$ref": "#/$defs/id" },
-        "players": { "type": "integer", "minimum": 1, "maximum": 8, "default": 5 },
-        "extra": { "enum": ["pct", "dmg", "none"], "default": "pct" },
-        "w": { "type": "integer", "minimum": 1, "maximum": 8, "default": 1 },
-        "h": { "type": "integer", "minimum": 1, "maximum": 3, "default": 1 }
-      }
-    },
-    "page": {
-      "type": "object",
-      "required": ["id", "items"],
-      "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "name": { "type": "string", "maxLength": 24 },
-        "cols": { "type": "integer", "minimum": 1, "maximum": 8, "default": 6 },
-        "rows": { "type": "integer", "minimum": 1, "maximum": 3, "default": 2 },
-        "items": { "type": "array", "maxItems": 24, "items": { "$ref": "#/$defs/item" } }
-      }
-    },
-    "layout": {
-      "type": "object",
-      "required": ["hash", "pages"],
-      "properties": {
-        "hash": { "type": "string", "maxLength": 64 },
-        "theme": {
-          "type": "object",
-          "properties": {
-            "accent": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
-            "background": { "type": "string" }
-          }
+        "id": {
+          "maxLength": 16,
+          "title": "Id",
+          "type": "string"
         },
-        "pages": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "$ref": "#/$defs/page" } }
-      }
-    },
-    "track": {
-      "type": ["object", "null"],
-      "properties": {
-        "title": { "type": "string" },
-        "artist": { "type": "string" },
-        "player": { "type": "string" }
-      }
-    },
-    "dps": {
-      "type": ["object", "null"],
-      "required": ["target", "time", "rows"],
-      "properties": {
-        "target": { "type": "string" },
-        "time": { "type": "integer", "minimum": 0 },
-        "hp": { "type": ["number", "null"] },
-        "rows": {
-          "type": "array",
-          "maxItems": 8,
-          "items": {
-            "type": "object",
-            "required": ["name", "dps"],
-            "properties": {
-              "name": { "type": "string", "maxLength": 24 },
-              "cls": { "enum": ["gladiator", "templar", "ranger", "assassin", "sorcerer", "cleric", "spiritmaster", "chanter", "brawler", null] },
-              "dps": { "type": "integer", "minimum": 0 },
-              "dmg": { "type": "integer", "minimum": 0 },
-              "pct": { "type": "number" },
-              "you": { "type": "boolean" }
+        "w": {
+          "anyOf": [
+            {
+              "maximum": 160,
+              "minimum": 8,
+              "type": "integer"
+            },
+            {
+              "type": "null"
             }
-          }
+          ],
+          "default": null,
+          "title": "W"
+        },
+        "h": {
+          "anyOf": [
+            {
+              "maximum": 160,
+              "minimum": 8,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "H"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "type": {
+          "const": "art",
+          "default": "art",
+          "title": "Type",
+          "type": "string"
         }
-      }
-    },
-    "usage_limit": {
-      "type": "object",
-      "required": ["pct"],
-      "properties": {
-        "pct": { "type": "integer", "minimum": 0 },
-        "reset": { "type": "string" }
-      }
-    },
-    "claude": {
-      "type": ["object", "null"],
-      "properties": {
-        "session": { "$ref": "#/$defs/usage_limit" },
-        "week": { "$ref": "#/$defs/usage_limit" }
-      }
-    },
-    "state": {
-      "type": "object",
-      "required": ["values"],
-      "properties": {
-        "full": { "type": "boolean" },
-        "values": {
-          "type": "object",
-          "properties": {
-            "out_volume": { "type": "integer" },
-            "out_muted": { "type": "boolean" },
-            "mic_volume": { "type": "integer" },
-            "mic_muted": { "type": "boolean" },
-            "playing": { "type": "boolean" },
-            "track": { "$ref": "#/$defs/track" },
-            "dps": { "$ref": "#/$defs/dps" },
-            "dps_active": { "type": "boolean" },
-            "claude": { "$ref": "#/$defs/claude" }
-          }
-        }
-      }
-    },
-    "event": {
-      "type": "object",
-      "required": ["event"],
-      "properties": {
-        "event": { "enum": ["button_press", "long_press", "slider_change", "page_change"] },
-        "item": { "$ref": "#/$defs/id" },
-        "part": { "enum": ["prev", "toggle", "next", "reset"] },
-        "page": { "$ref": "#/$defs/id" },
-        "value": { "type": "integer" },
-        "final": { "type": "boolean" }
       },
-      "allOf": [
-        { "if": { "properties": { "event": { "enum": ["button_press", "long_press"] } } }, "then": { "required": ["item"] } },
-        { "if": { "properties": { "event": { "const": "slider_change" } } }, "then": { "required": ["item", "value"] } },
-        { "if": { "properties": { "event": { "const": "page_change" } } }, "then": { "required": ["page"] } }
-      ]
+      "required": [
+        "id"
+      ],
+      "title": "Art",
+      "type": "object"
+    },
+    "ArtRequest": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "art_request",
+          "default": "art_request",
+          "title": "Type",
+          "type": "string"
+        },
+        "size": {
+          "maximum": 160,
+          "minimum": 8,
+          "title": "Size",
+          "type": "integer"
+        },
+        "have": {
+          "anyOf": [
+            {
+              "maxLength": 16,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Have"
+        }
+      },
+      "required": [
+        "size"
+      ],
+      "title": "ArtRequest",
+      "type": "object"
+    },
+    "Background": {
+      "description": "Hintergrund der Leiste, immer bildschirmgroß.",
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "id": {
+          "maxLength": 16,
+          "title": "Id",
+          "type": "string"
+        },
+        "w": {
+          "anyOf": [
+            {
+              "maximum": 640,
+              "minimum": 640,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "W"
+        },
+        "h": {
+          "anyOf": [
+            {
+              "maximum": 172,
+              "minimum": 172,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "H"
+        },
+        "y": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y"
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rows"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "type": {
+          "const": "bg",
+          "default": "bg",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Background",
+      "type": "object"
+    },
+    "ClaudeUsage": {
+      "properties": {
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UsageLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "week": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UsageLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "ClaudeUsage",
+      "type": "object"
+    },
+    "DeviceInfo": {
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "title": "Id",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "fw": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fw"
+        },
+        "width": {
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "minimum": 1,
+          "title": "Height",
+          "type": "integer"
+        },
+        "sim": {
+          "default": false,
+          "title": "Sim",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "width",
+        "height"
+      ],
+      "title": "DeviceInfo",
+      "type": "object"
+    },
+    "Dps": {
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "time": {
+          "minimum": 0,
+          "title": "Time",
+          "type": "integer"
+        },
+        "hp": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hp"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DpsRow"
+          },
+          "maxItems": 8,
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target",
+        "time",
+        "rows"
+      ],
+      "title": "Dps",
+      "type": "object"
+    },
+    "DpsRow": {
+      "properties": {
+        "name": {
+          "maxLength": 24,
+          "title": "Name",
+          "type": "string"
+        },
+        "cls": {
+          "anyOf": [
+            {
+              "enum": [
+                "gladiator",
+                "templar",
+                "assassin",
+                "ranger",
+                "sorcerer",
+                "spiritmaster",
+                "cleric",
+                "chanter",
+                "brawler"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cls"
+        },
+        "dps": {
+          "minimum": 0,
+          "title": "Dps",
+          "type": "integer"
+        },
+        "dmg": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dmg"
+        },
+        "pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pct"
+        },
+        "you": {
+          "default": false,
+          "title": "You",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "dps"
+      ],
+      "title": "DpsRow",
+      "type": "object"
+    },
+    "Error": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "error",
+          "default": "error",
+          "title": "Type",
+          "type": "string"
+        },
+        "code": {
+          "enum": [
+            "auth",
+            "version",
+            "bad_request",
+            "disabled"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "Error",
+      "type": "object"
+    },
+    "Event": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "event",
+          "default": "event",
+          "title": "Type",
+          "type": "string"
+        },
+        "event": {
+          "enum": [
+            "button_press",
+            "long_press",
+            "slider_change",
+            "page_change"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "item": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "enum": [
+                "prev",
+                "toggle",
+                "next",
+                "reset"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Part"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "final": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Final"
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "Goto": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "goto",
+          "default": "goto",
+          "title": "Type",
+          "type": "string"
+        },
+        "page": {
+          "pattern": "^[A-Za-z0-9_-]{1,32}$",
+          "title": "Page",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "title": "Goto",
+      "type": "object"
+    },
+    "Heartbeat": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "ping",
+            "pong"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "t": {
+          "title": "T",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "t"
+      ],
+      "title": "Heartbeat",
+      "type": "object"
+    },
+    "Hello": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "hello",
+          "default": "hello",
+          "title": "Type",
+          "type": "string"
+        },
+        "token": {
+          "maxLength": 128,
+          "title": "Token",
+          "type": "string"
+        },
+        "layout_hash": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Layout Hash"
+        },
+        "page": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page"
+        },
+        "bg_id": {
+          "anyOf": [
+            {
+              "maxLength": 16,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bg Id"
+        },
+        "caps": {
+          "default": [],
+          "items": {
+            "maxLength": 16,
+            "type": "string"
+          },
+          "title": "Caps",
+          "type": "array"
+        },
+        "device": {
+          "$ref": "#/$defs/DeviceInfo"
+        }
+      },
+      "required": [
+        "token",
+        "device"
+      ],
+      "title": "Hello",
+      "type": "object"
+    },
+    "Item": {
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9_-]{1,32}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "default": "button",
+          "enum": [
+            "button",
+            "toggle",
+            "slider",
+            "media",
+            "dps",
+            "claude"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 24,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon"
+        },
+        "icon_on": {
+          "anyOf": [
+            {
+              "maxLength": 48,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Icon On"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "enum": [
+                "default",
+                "accent",
+                "danger",
+                "success",
+                "warning"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style"
+        },
+        "bind": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bind"
+        },
+        "mute_bind": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mute Bind"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "nav": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nav"
+        },
+        "players": {
+          "anyOf": [
+            {
+              "maximum": 8,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Players"
+        },
+        "extra": {
+          "anyOf": [
+            {
+              "enum": [
+                "pct",
+                "dmg",
+                "none"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extra"
+        },
+        "w": {
+          "default": 1,
+          "maximum": 8,
+          "minimum": 1,
+          "title": "W",
+          "type": "integer"
+        },
+        "h": {
+          "default": 1,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "H",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Item",
+      "type": "object"
+    },
+    "LayoutMessage": {
+      "properties": {
+        "theme": {
+          "$ref": "#/$defs/Theme"
+        },
+        "pages": {
+          "items": {
+            "$ref": "#/$defs/Page"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Pages",
+          "type": "array"
+        },
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "layout",
+          "default": "layout",
+          "title": "Type",
+          "type": "string"
+        },
+        "hash": {
+          "maxLength": 64,
+          "title": "Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pages",
+        "hash"
+      ],
+      "title": "LayoutMessage",
+      "type": "object"
+    },
+    "Page": {
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9_-]{1,32}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 24,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "cols": {
+          "default": 6,
+          "maximum": 8,
+          "minimum": 1,
+          "title": "Cols",
+          "type": "integer"
+        },
+        "rows": {
+          "default": 2,
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Rows",
+          "type": "integer"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "maxItems": 24,
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Page",
+      "type": "object"
+    },
+    "ServerInfo": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "ServerInfo",
+      "type": "object"
+    },
+    "State": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "state",
+          "default": "state",
+          "title": "Type",
+          "type": "string"
+        },
+        "full": {
+          "default": false,
+          "title": "Full",
+          "type": "boolean"
+        },
+        "values": {
+          "$ref": "#/$defs/StateValues"
+        }
+      },
+      "required": [
+        "values"
+      ],
+      "title": "State",
+      "type": "object"
+    },
+    "StateValues": {
+      "additionalProperties": true,
+      "description": "Bekannte Schlüssel; eigene (z. B. aus Shell-Statusbefehlen) sind erlaubt.",
+      "properties": {
+        "out_volume": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Out Volume"
+        },
+        "out_muted": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Out Muted"
+        },
+        "mic_volume": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mic Volume"
+        },
+        "mic_muted": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mic Muted"
+        },
+        "playing": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Playing"
+        },
+        "track": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Track"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dps": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Dps"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dps_active": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dps Active"
+        },
+        "claude": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClaudeUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "StateValues",
+      "type": "object"
+    },
+    "Theme": {
+      "properties": {
+        "accent": {
+          "default": "#5AC8FA",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "title": "Accent",
+          "type": "string"
+        }
+      },
+      "title": "Theme",
+      "type": "object"
+    },
+    "Track": {
+      "properties": {
+        "title": {
+          "default": "",
+          "title": "Title",
+          "type": "string"
+        },
+        "artist": {
+          "default": "",
+          "title": "Artist",
+          "type": "string"
+        },
+        "player": {
+          "default": "",
+          "title": "Player",
+          "type": "string"
+        }
+      },
+      "title": "Track",
+      "type": "object"
+    },
+    "UsageLimit": {
+      "properties": {
+        "pct": {
+          "minimum": 0,
+          "title": "Pct",
+          "type": "integer"
+        },
+        "reset": {
+          "default": "",
+          "title": "Reset",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pct"
+      ],
+      "title": "UsageLimit",
+      "type": "object"
+    },
+    "Welcome": {
+      "properties": {
+        "v": {
+          "const": 1,
+          "default": 1,
+          "title": "V",
+          "type": "integer"
+        },
+        "type": {
+          "const": "welcome",
+          "default": "welcome",
+          "title": "Type",
+          "type": "string"
+        },
+        "server": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ServerInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "heartbeat": {
+          "default": 5,
+          "maximum": 60,
+          "minimum": 1,
+          "title": "Heartbeat",
+          "type": "integer"
+        }
+      },
+      "title": "Welcome",
+      "type": "object"
     }
-  }
+  },
+  "discriminator": {
+    "mapping": {
+      "art": "#/$defs/Art",
+      "art_request": "#/$defs/ArtRequest",
+      "bg": "#/$defs/Background",
+      "error": "#/$defs/Error",
+      "event": "#/$defs/Event",
+      "goto": "#/$defs/Goto",
+      "hello": "#/$defs/Hello",
+      "layout": "#/$defs/LayoutMessage",
+      "ping": "#/$defs/Heartbeat",
+      "pong": "#/$defs/Heartbeat",
+      "state": "#/$defs/State",
+      "welcome": "#/$defs/Welcome"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Hello"
+    },
+    {
+      "$ref": "#/$defs/Event"
+    },
+    {
+      "$ref": "#/$defs/ArtRequest"
+    },
+    {
+      "$ref": "#/$defs/Heartbeat"
+    },
+    {
+      "$ref": "#/$defs/Welcome"
+    },
+    {
+      "$ref": "#/$defs/Error"
+    },
+    {
+      "$ref": "#/$defs/LayoutMessage"
+    },
+    {
+      "$ref": "#/$defs/State"
+    },
+    {
+      "$ref": "#/$defs/Art"
+    },
+    {
+      "$ref": "#/$defs/Background"
+    },
+    {
+      "$ref": "#/$defs/Goto"
+    }
+  ]
 }

@@ -48,4 +48,3 @@
 #define DECKBAR_SLEEP_PEEK_S 15
 #endif
 
-#define DECKBAR_DEFAULT_PORT 8765

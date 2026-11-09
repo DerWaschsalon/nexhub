@@ -44,8 +44,8 @@
 
 static const char *TAG = "display";
 
-#define LW DECKBAR_W        /* logisch (quer) */
-#define LH DECKBAR_H
+#define LW DECKBAR_SCREEN_W        /* logisch (quer) */
+#define LH DECKBAR_SCREEN_H
 #define PW BOARD_LCD_PHYS_W /* physisch (hoch) */
 #define PH BOARD_LCD_PHYS_H
 #define CHUNK_ROWS 64       /* wie LVGL_DMA_BUFF_LEN im Beispiel: 172 * 64 * 2 Byte */

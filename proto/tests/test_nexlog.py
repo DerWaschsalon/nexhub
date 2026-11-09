@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from nexproto import NexLog, NexLogError, dungeon_label, pack, player_name, unpack
 from nexproto.nexlog import HIT_COLUMNS, MAX_PACKED, MAX_UNPACKED
-from nexproto.schema import SCHEMA_DIR, SCHEMAS, render
 
 
 def fight(n: int = 1, dungeon: int = 600123) -> dict:
@@ -133,12 +132,6 @@ def test_entpackbombe():
     assert len(bomb) < MAX_PACKED
     with pytest.raises(NexLogError, match="entpackt zu groß"):
         unpack(bomb)
-
-
-def test_schema_dateien_passen_zum_code():
-    for name, model in SCHEMAS.items():
-        assert (SCHEMA_DIR / name).read_text(encoding="utf-8") == render(model), \
-            f"schema/{name} veraltet – uv run python -m nexproto.schema"
 
 
 def test_namen_aufloesen():

@@ -22,11 +22,12 @@ import re
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from nexproto import device
 from PIL import Image, ImageFilter, ImageOps
 
 log = logging.getLogger(__name__)
 
-W, H = 640, 172
+W, H = device.SCREEN_W, device.SCREEN_H
 PLASMA_RC = "plasma-org.kde.plasma.desktop-appletsrc"
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".avif", ".jxl"}
 BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]

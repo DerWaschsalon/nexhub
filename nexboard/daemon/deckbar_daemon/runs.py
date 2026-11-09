@@ -35,13 +35,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from functools import cache
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Awaitable, Callable
 
 import aiohttp
 import yaml
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from nexproto.dungeons import EXTRA_DUNGEONS
-from nexproto.nexlog import JOB_CLASSES
+from nexproto.classes import JOB_CLASSES
 from pydantic import Field, ValidationError, field_validator
 
 from .config import _atomic_write, _Strict
@@ -86,14 +86,6 @@ END_BOSSES = {
     "Gargaum",  # Abyssal Horn Den
 }
 WEBHOOK_RE = re.compile(r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api/webhooks/\d+/[\w-]+$")
-
-CLASS_NAMES = {"gladiator": "Gladiator", "templar": "Templer", "assassin": "Assassine", "ranger": "Waldläufer",
-               "sorcerer": "Magier", "spiritmaster": "Beschwörer", "cleric": "Kleriker", "chanter": "Kantor",
-               "brawler": "Faustkämpfer"}
-# wie CLASS_COLORS in web/js/core.js, damit Bild und Kachel gleich aussehen
-CLASS_COLORS = {"gladiator": "#E8A33D", "templar": "#5B8DEF", "ranger": "#6CCB5F", "assassin": "#B46AE6",
-                "sorcerer": "#4FC3F7", "cleric": "#F4E07A", "spiritmaster": "#EC7FB8", "chanter": "#4DD4B0",
-                "brawler": "#F0624D"}
 
 
 class RunSettings(_Strict):

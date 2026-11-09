@@ -51,6 +51,7 @@ use tracing::{info, warn};
 
 mod hits;
 mod plugins;
+mod proto_gen;
 mod view;
 
 use a2tools_dps_meter_lib::capture::pcap_capturer::{self as pcap, PcapCapturer};

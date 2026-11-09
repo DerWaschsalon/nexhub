@@ -277,10 +277,15 @@ static char *token_from_config(void)
     return tok;
 }
 
+/* Port aus proto_gen.h als Text in die Adresse */
+#define STR_(x) #x
+#define STR(x) STR_(x)
+#define DEFAULT_URL "ws://127.0.0.1:" STR(DECKBAR_DEFAULT_PORT) "/ws"
+
 static void usage(void)
 {
     puts("deckbar-sim [Optionen]\n"
-         "  --url ws://HOST:PORT/ws   Daemon (Standard ws://127.0.0.1:8765/ws)\n"
+         "  --url ws://HOST:PORT/ws   Daemon (Standard " DEFAULT_URL ")\n"
          "  --token TOKEN             Standard: aus ~/.config/deckbar/config.yaml\n"
          "  --zoom N                  Fenster vergrößern (1–4, Standard 2)\n"
          "  --no-perf                 FPS-/CPU-Anzeige ausblenden\n"
@@ -293,7 +298,7 @@ static void usage(void)
 
 int main(int argc, char **argv)
 {
-    const char *url = "ws://127.0.0.1:8765/ws";
+    const char *url = DEFAULT_URL;
     char *token = NULL;
     int zoom = 2, perf = 1, use_cache = 1;
     const char *shot = NULL;
@@ -332,7 +337,7 @@ int main(int argc, char **argv)
 
     lv_init();
     lv_tick_set_cb(tick_cb);
-    lv_display_t *disp = lv_sdl_window_create(DECKBAR_W, DECKBAR_H);
+    lv_display_t *disp = lv_sdl_window_create(DECKBAR_SCREEN_W, DECKBAR_SCREEN_H);
     lv_sdl_window_set_zoom(disp, (uint8_t)zoom);
     lv_sdl_window_set_title(disp, "NexBoard Simulator");
     lv_sdl_mouse_create();

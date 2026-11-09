@@ -13,8 +13,7 @@ import pytest
 from aiohttp import WSMsgType, web
 from PIL import Image
 
-from deckbar_daemon.config import Layout, load_layout
-from deckbar_daemon.server import PROTO_V
+from deckbar_daemon.config import Layout, device_message, load_layout
 
 NEXBOARD = Path(__file__).resolve().parents[2]
 SIM = NEXBOARD / "simulator" / "build" / "deckbar-sim"
@@ -37,10 +36,6 @@ STATE = {
 }
 
 
-def message(kind: str, **fields: object) -> str:
-    return json.dumps({"v": PROTO_V, "type": kind, **fields}, ensure_ascii=False)
-
-
 async def fake_daemon(page: Layout) -> web.AppRunner:
     """Ein Daemon, der nur Layout und State schickt und alle Anfragen des Geräts beantwortet."""
     async def ws(request: web.Request) -> web.WebSocketResponse:
@@ -51,12 +46,12 @@ async def fake_daemon(page: Layout) -> web.AppRunner:
                 continue
             kind = json.loads(msg.data)["type"]
             if kind == "hello":
-                await sock.send_str(message("welcome", server={"name": "Test", "version": "0"}, heartbeat=5))
-                await sock.send_str(message("layout", **page.device_payload()))
-                await sock.send_str(message("state", full=True, values=STATE))
-                await sock.send_str(message("bg", id=""))
+                await sock.send_str(device_message("welcome", server={"name": "Test", "version": "0"}, heartbeat=5))
+                await sock.send_str(device_message("layout", **page.device_payload()))
+                await sock.send_str(device_message("state", full=True, values=STATE))
+                await sock.send_str(device_message("bg", id=""))
             elif kind == "art_request":
-                await sock.send_str(message("art", id=""))
+                await sock.send_str(device_message("art", id=""))
         return sock
 
     app = web.Application()

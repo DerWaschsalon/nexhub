@@ -8,6 +8,8 @@ use a2tools_dps_meter_lib::entity::dps_data::DpsData;
 use a2tools_dps_meter_lib::entity::job_class::JobClass;
 use serde::Serialize;
 
+use crate::proto_gen::CLASS_KEYS;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct View {
     pub target: String,
@@ -60,19 +62,10 @@ const ALL_CLASSES: [JobClass; 9] = [
     JobClass::Fighter,
 ];
 
-/// Englischer Schlüssel wie im Stream-Overlay (passt zu `dps.CLASSES` im Daemon).
+/// Klassen-Schlüssel aus nexproto (proto_gen.rs), über die jobId der Klasse.
 pub fn class_key(class: JobClass) -> &'static str {
-    match class {
-        JobClass::Gladiator => "gladiator",
-        JobClass::Templar => "templar",
-        JobClass::Ranger => "ranger",
-        JobClass::Assassin => "assassin",
-        JobClass::Sorcerer => "sorcerer",
-        JobClass::Cleric => "cleric",
-        JobClass::Elementalist => "spiritmaster",
-        JobClass::Chanter => "chanter",
-        JobClass::Fighter => "brawler",
-    }
+    let job = class.class_prefix();
+    CLASS_KEYS.iter().find(|(id, _)| *id == job).map_or("", |(_, key)| key)
 }
 
 fn class_of_job(job: &str) -> Option<JobClass> {

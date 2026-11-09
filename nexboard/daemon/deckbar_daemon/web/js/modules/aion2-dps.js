@@ -1,5 +1,5 @@
 /* Modul AION 2 · DPS-Mitschnitt: Live-Ansicht und Einstellungen (Quelle, Sprache, Seitenwechsel). */
-import { fill, el, icon, api, S, on, field, input, select, chip, callout, card, settingsRow, saver, fmtAmount, fmtTime, CLASS_COLORS, CLASS_LABELS, clampInt, modOn } from "../core.js";
+import { fill, el, icon, api, S, on, field, input, select, chip, callout, card, settingsRow, saver, fmtAmount, fmtTime, classColor, CLASS_LABELS, clampInt, modOn } from "../core.js";
 
 const DOT = { connected: "ok", capturing: "ok", bad_key: "bad", no_caps: "bad", no_capture: "bad", off: "" };
 const LANGS = { de: "Deutsch", en: "English", fr: "Français", es: "Español", pt: "Português", ru: "Русский", ja: "日本語", ko: "한국어", "zh-Hans": "简体中文", "zh-Hant": "繁體中文" };
@@ -30,7 +30,7 @@ function meter(d, n = 8) {
   const rows = (d?.rows || []).slice(0, n);
   const best = Math.max(1, ...rows.map((r) => r.dps));
   return el("div", { class: "minibars" }, rows.map((r, i) => el("div", { style: r.you ? "outline:1px solid var(--accent)" : "" },
-    el("i", { style: `width:${Math.max(4, (100 * r.dps) / best)}%;background:${CLASS_COLORS[r.cls] || "#8E8E93"}` }),
+    el("i", { style: `width:${Math.max(4, (100 * r.dps) / best)}%;background:${classColor(r.cls)}` }),
     el("span", { text: `${i + 1}  ${r.name}` }), el("span", { text: `${fmtAmount(r.dps)}/s · ${Math.round(r.pct || 0)} %` }))));
 }
 

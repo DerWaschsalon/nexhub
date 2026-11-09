@@ -30,6 +30,7 @@ from typing import Any, Awaitable, Callable, Literal
 
 import aiohttp
 import yaml
+from nexproto.classes import CLASS_KEYS
 from pydantic import Field, ValidationError
 
 from .capture import Capture
@@ -45,7 +46,6 @@ RETRY_S = 3
 READ_TIMEOUT_S = 40
 # Wie lange ohne neuen Schaden noch „im Kampf“, wenn return_after = 0
 DEFAULT_IDLE_S = 30
-CLASSES = ("gladiator", "templar", "ranger", "assassin", "sorcerer", "cleric", "spiritmaster", "chanter", "brawler")
 
 Status = Literal["off", "no_meter", "overlay_off", "connecting", "bad_key", "connected",
                  "no_capture", "no_game", "no_caps", "capturing"]
@@ -127,7 +127,7 @@ def compact(snap: dict, limit: int = MAX_ROWS) -> dict:
         pct = r.get("pct")
         rows.append({
             "name": str(r.get("name") or "?")[:24],
-            "cls": cls if cls in CLASSES else None,
+            "cls": cls if cls in CLASS_KEYS else None,
             "dps": _int(r.get("dps")),
             "dmg": _int(r.get("dmg")),
             "pct": round(float(pct), 1) if isinstance(pct, (int, float)) else 0.0,
@@ -153,7 +153,7 @@ def fight_view(snap: dict) -> dict:
         party = r.get("party")
         rows.append({
             "name": str(r.get("name") or "?")[:32],
-            "cls": cls if cls in CLASSES else None,
+            "cls": cls if cls in CLASS_KEYS else None,
             "dps": _int(r.get("dps")),
             "dmg": _int(r.get("dmg")),
             "you": bool(r.get("you")),

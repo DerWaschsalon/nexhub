@@ -15,28 +15,23 @@
 #include "lvgl.h"
 #include "theme.h"
 
-#define MAX_PAGES 8
-#define MAX_ITEMS_PER_PAGE 24
-#define ID_LEN 33
-#define LONG_PRESS_MS 600
-#define SLIDER_SEND_MS 50     /* max. 20 Slider-Events pro Sekunde */
+#define ID_LEN (DECKBAR_ID_MAX + 1)
+#define SLIDER_SEND_MS (1000 / DECKBAR_SLIDER_EVENTS_PER_S)
 #define SLIDER_SETTLE_MS 700  /* nach dem Loslassen veraltete Werte vom Daemon ignorieren */
 #define TOGGLE_REVERT_MS 1500 /* optimistischer Toggle ohne Bestätigung -> zurück */
 #define DRAG_THRESHOLD 6
 #define TAP_SLOP 16          /* weiter bewegt = Wischversuch, kein Tippen */
 #define SWIPE_MIN 50         /* Wischweg in px, ab dem die Seite wechselt */
 #define MARQUEE_MS 20000     /* so lange läuft ein zu langer Titel, danach endet er mit „…“ */
-#define HELLO_TIMEOUT_MS 5000
 #define CACHE_KEY "layout"
 #define BG_KEY "bg"          /* Hintergrund im Flash: nach einem Neustart nicht erneut übertragen */
 #define BG_MAGIC "DBG1"
 /* Binärframe mit einem Bildteil: "DB", Art ('a' Cover, 'b' Hintergrund), id (16 Byte, mit Nullen
  * aufgefüllt), w, h, y, rows (je uint16 little endian), dann rows*w*2 Byte RGB565 */
-#define BIN_HEAD 27
+#define IMAGE_ID_LEN (DECKBAR_IMAGE_ID_MAX + 1)
 
 typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS, IT_CLAUDE } it_type_t;
 
-#define DPS_MAX_ROWS 8
 
 typedef struct {
     lv_obj_t *row;   /* Zeile (Hintergrundspur) */
@@ -64,7 +59,7 @@ typedef struct {
     int32_t hp_w;
     int32_t hp_px;  /* zuletzt gesetzte HP-Breite */
     lv_obj_t *msg;  /* „nicht verbunden“ / „Warte auf Kampf“ */
-    dps_row_t rows[DPS_MAX_ROWS];
+    dps_row_t rows[DECKBAR_DPS_MAX_ROWS];
 } dps_view_t;
 
 /* Claude-Kachel: je Limit (Sitzung, Woche) eine Zeile [Name  Balken  Prozent  Reset] */
@@ -123,7 +118,7 @@ typedef struct {
 typedef struct {
     lv_image_dsc_t dsc[2];
     uint8_t *buf[2];
-    char id[2][17];
+    char id[2][IMAGE_ID_LEN];
     int front;          /* angezeigter Puffer, -1 = keins */
     int32_t back_rows;  /* bereits empfangene Zeilen im hinteren Puffer */
 } img_rx_t;
@@ -139,8 +134,8 @@ static struct {
 
     lv_obj_t *bg;
     lv_obj_t *tv;
-    lv_obj_t *pages[MAX_PAGES];
-    char page_ids[MAX_PAGES][ID_LEN];
+    lv_obj_t *pages[DECKBAR_MAX_PAGES];
+    char page_ids[DECKBAR_MAX_PAGES][ID_LEN];
     int page_count;
     int page_active;
     lv_obj_t *dots;
@@ -469,7 +464,7 @@ static int img_rx_chunk(img_rx_t *rx, const cJSON *msg, int32_t min_w, int32_t m
     int32_t w = jint(msg, "w", 0), h = jint(msg, "h", 0);
     int32_t y = jint(msg, "y", -1), rows = jint(msg, "rows", 0);
     const char *data = jstr(msg, "data");
-    if (!data || strlen(id) > 16) return 0;
+    if (!data || strlen(id) > DECKBAR_IMAGE_ID_MAX) return 0;
     uint8_t *dst = img_rx_target(rx, id, w, h, y, rows, min_w, max_w, max_h);
     if (!dst) return 0;
     int32_t want = rows * w * 2;
@@ -490,7 +485,7 @@ static void bg_store(void)
     }
     const lv_image_dsc_t *d = &ui.bgi.dsc[ui.bgi.front];
     uint8_t head[24] = BG_MAGIC;
-    memcpy(head + 4, ui.bgi.id[ui.bgi.front], 16);
+    memcpy(head + 4, ui.bgi.id[ui.bgi.front], DECKBAR_IMAGE_ID_MAX);
     head[20] = (uint8_t)d->header.w;
     head[21] = (uint8_t)(d->header.w >> 8);
     head[22] = (uint8_t)d->header.h;
@@ -506,15 +501,15 @@ static void bg_restore(void)
     uint8_t *raw = deckbar_hal_load_bin(BG_KEY, &len);
     if (!raw) return;
     uint32_t w = 0, h = 0;
-    char id[17] = {0};
+    char id[IMAGE_ID_LEN] = {0};
     if (len >= 24) {
         w = le16(raw + 20);
         h = le16(raw + 22);
-        memcpy(id, raw + 4, 16);
+        memcpy(id, raw + 4, DECKBAR_IMAGE_ID_MAX);
     }
     uint8_t *dst = len >= 24 && !memcmp(raw, BG_MAGIC, 4) && len == 24 + w * h * 2 && *id
-                       ? img_rx_target(&ui.bgi, id, (int32_t)w, (int32_t)h, 0, (int32_t)h, DECKBAR_W, DECKBAR_W,
-                                       DECKBAR_H)
+                       ? img_rx_target(&ui.bgi, id, (int32_t)w, (int32_t)h, 0, (int32_t)h, DECKBAR_SCREEN_W, DECKBAR_SCREEN_W,
+                                       DECKBAR_SCREEN_H)
                        : NULL;
     if (dst) {
         memcpy(dst, raw + 24, w * h * 2);
@@ -525,7 +520,7 @@ static void bg_restore(void)
 
 static void handle_art(const cJSON *msg)
 {
-    if (img_rx_chunk(&ui.art, msg, 8, 160, 160) != 0) art_apply_all();
+    if (img_rx_chunk(&ui.art, msg, DECKBAR_ART_MIN, DECKBAR_ART_MAX, DECKBAR_ART_MAX) != 0) art_apply_all();
 }
 
 static void bg_apply(int r)
@@ -537,26 +532,26 @@ static void bg_apply(int r)
 
 static void handle_bg(const cJSON *msg)
 {
-    bg_apply(img_rx_chunk(&ui.bgi, msg, DECKBAR_W, DECKBAR_W, DECKBAR_H));
+    bg_apply(img_rx_chunk(&ui.bgi, msg, DECKBAR_SCREEN_W, DECKBAR_SCREEN_W, DECKBAR_SCREEN_H));
 }
 
 void deckbar_ui_net_binary(const uint8_t *data, size_t len)
 {
     ui.last_rx = lv_tick_get();
-    if (len < BIN_HEAD || data[0] != 'D' || data[1] != 'B') return;
-    char id[17] = {0};
-    memcpy(id, data + 3, 16);
+    if (len < DECKBAR_BIN_HEADER_BYTES || data[0] != 'D' || data[1] != 'B') return;
+    char id[IMAGE_ID_LEN] = {0};
+    memcpy(id, data + 3, DECKBAR_IMAGE_ID_MAX);
     int32_t w = le16(data + 19), h = le16(data + 21), y = le16(data + 23), rows = le16(data + 25);
-    if (!*id || len != BIN_HEAD + (size_t)(rows * w * 2)) return;
+    if (!*id || len != DECKBAR_BIN_HEADER_BYTES + (size_t)(rows * w * 2)) return;
     if (data[2] == 'a') {
-        uint8_t *dst = img_rx_target(&ui.art, id, w, h, y, rows, 8, 160, 160);
+        uint8_t *dst = img_rx_target(&ui.art, id, w, h, y, rows, DECKBAR_ART_MIN, DECKBAR_ART_MAX, DECKBAR_ART_MAX);
         if (!dst) return;
-        memcpy(dst, data + BIN_HEAD, (size_t)(rows * w * 2));
+        memcpy(dst, data + DECKBAR_BIN_HEADER_BYTES, (size_t)(rows * w * 2));
         if (img_rx_done(&ui.art, y, rows, h)) art_apply_all();
     } else if (data[2] == 'b') {
-        uint8_t *dst = img_rx_target(&ui.bgi, id, w, h, y, rows, DECKBAR_W, DECKBAR_W, DECKBAR_H);
+        uint8_t *dst = img_rx_target(&ui.bgi, id, w, h, y, rows, DECKBAR_SCREEN_W, DECKBAR_SCREEN_W, DECKBAR_SCREEN_H);
         if (!dst) return;
-        memcpy(dst, data + BIN_HEAD, (size_t)(rows * w * 2));
+        memcpy(dst, data + DECKBAR_BIN_HEADER_BYTES, (size_t)(rows * w * 2));
         bg_apply(img_rx_done(&ui.bgi, y, rows, h));
     }
 }
@@ -1039,14 +1034,10 @@ static lv_color_t class_color(const char *cls)
     static const struct {
         const char *name;
         uint32_t rgb;
-    } map[] = {
-        {"gladiator", 0xE8A33D}, {"templar", 0x5B8DEF},      {"ranger", 0x6CCB5F},
-        {"assassin", 0xB46AE6},  {"sorcerer", 0x4FC3F7},     {"cleric", 0xF4E07A},
-        {"spiritmaster", 0xEC7FB8}, {"chanter", 0x4DD4B0}, {"brawler", 0xF0624D},
-    };
+    } map[] = {DECKBAR_CLASS_COLORS};
     for (size_t i = 0; cls && i < sizeof map / sizeof map[0]; i++)
         if (!strcmp(map[i].name, cls)) return lv_color_hex(map[i].rgb);
-    return lv_color_hex(0x8E8E93);
+    return lv_color_hex(DECKBAR_UNKNOWN_CLASS_COLOR);
 }
 
 /* 8432 · 18,4k · 1,23M (deutsche Schreibweise) */
@@ -1197,7 +1188,7 @@ static void build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *
     }
 
     int32_t avail = h - y - 7;
-    int n = LV_CLAMP(1, players, DPS_MAX_ROWS);
+    int n = LV_CLAMP(1, players, DECKBAR_DPS_MAX_ROWS);
     while (n > 1 && (avail - (n - 1) * gap) / n < 16) n--;
     /* wenige Spieler: höhere Zeilen und größere Schrift */
     int32_t row_h = LV_MIN((avail - (n - 1) * gap) / n, 40);
@@ -1437,15 +1428,15 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
     int cols = LV_CLAMP(1, jint(jp, "cols", 6), 8);
     int rows = LV_CLAMP(1, jint(jp, "rows", 2), 3);
     bool used[3][8] = {{0}};
-    const int32_t aw = DECKBAR_W - 2 * DB_PAD + DB_GAP;
-    const int32_t ah = DECKBAR_H - 2 * DB_PAD + DB_GAP;
+    const int32_t aw = DECKBAR_SCREEN_W - 2 * DB_PAD + DB_GAP;
+    const int32_t ah = DECKBAR_SCREEN_H - 2 * DB_PAD + DB_GAP;
 
     const cJSON *items = cJSON_GetObjectItemCaseSensitive(jp, "items");
     const cJSON *ji;
     int count = 0;
     cJSON_ArrayForEach(ji, items)
     {
-        if (count++ >= MAX_ITEMS_PER_PAGE) break;
+        if (count++ >= DECKBAR_MAX_ITEMS_PER_PAGE) break;
         const char *id = jstr(ji, "id");
         if (!valid_id(id)) continue;
         int w = LV_CLAMP(1, jint(ji, "w", 1), cols);
@@ -1497,7 +1488,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         switch (t->type) {
         case IT_SLIDER: build_slider(t, pw, ph, jstr(ji, "label")); break;
         case IT_MEDIA: build_media(t, pw, ph); break;
-        case IT_DPS: build_dps(t, pw, ph, jint(ji, "players", 5), jstr(ji, "extra")); break;
+        case IT_DPS: build_dps(t, pw, ph, jint(ji, "players", DECKBAR_DPS_DEFAULT_PLAYERS), jstr(ji, "extra")); break;
         case IT_CLAUDE: build_claude(t, pw, ph); break;
         default: build_button(t, pw, ph, jstr(ji, "label")); break;
         }
@@ -1512,7 +1503,7 @@ static bool apply_layout(const cJSON *msg)
         LV_LOG_WARN("Layout ohne Seiten verworfen");
         return false;
     }
-    if (np > MAX_PAGES) np = MAX_PAGES;
+    if (np > DECKBAR_MAX_PAGES) np = DECKBAR_MAX_PAGES;
 
     const cJSON *theme = cJSON_GetObjectItemCaseSensitive(msg, "theme");
     const char *accent = jstr(theme, "accent");
@@ -1531,10 +1522,10 @@ static bool apply_layout(const cJSON *msg)
     ui.dots = NULL;
     ui.page_count = 0;
     ui.page_active = 0;
-    ui.tiles = lv_malloc_zeroed(sizeof(tile_t) * np * MAX_ITEMS_PER_PAGE);
+    ui.tiles = lv_malloc_zeroed(sizeof(tile_t) * np * DECKBAR_MAX_ITEMS_PER_PAGE);
 
     ui.tv = lv_tileview_create(lv_screen_active());
-    lv_obj_set_size(ui.tv, DECKBAR_W, DECKBAR_H);
+    lv_obj_set_size(ui.tv, DECKBAR_SCREEN_W, DECKBAR_SCREEN_H);
     lv_obj_set_style_bg_opa(ui.tv, LV_OPA_TRANSP, 0);
     lv_obj_set_scrollbar_mode(ui.tv, LV_SCROLLBAR_MODE_OFF);
     lv_obj_add_event_cb(ui.tv, tv_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -1611,8 +1602,8 @@ static void send_hello(void)
     cJSON_AddStringToObject(d, "id", ui.cfg.device_id ? ui.cfg.device_id : "deckbar");
     cJSON_AddStringToObject(d, "model", ui.cfg.model ? ui.cfg.model : "");
     cJSON_AddStringToObject(d, "fw", ui.cfg.fw ? ui.cfg.fw : "");
-    cJSON_AddNumberToObject(d, "width", DECKBAR_W);
-    cJSON_AddNumberToObject(d, "height", DECKBAR_H);
+    cJSON_AddNumberToObject(d, "width", DECKBAR_SCREEN_W);
+    cJSON_AddNumberToObject(d, "height", DECKBAR_SCREEN_H);
     cJSON_AddBoolToObject(d, "sim", ui.cfg.sim);
     char *s = cJSON_PrintUnformatted(o);
     cJSON_Delete(o);
@@ -1726,7 +1717,7 @@ static void watchdog_cb(lv_timer_t *t)
     if (!ui.ws_open) return;
     uint32_t idle = lv_tick_elaps(ui.last_rx);
     bool dead = (ui.net == DECKBAR_NET_ONLINE && idle > (uint32_t)ui.heartbeat_s * 3000u) ||
-                (ui.net == DECKBAR_NET_SEARCHING && lv_tick_elaps(ui.hello_at) > HELLO_TIMEOUT_MS);
+                (ui.net == DECKBAR_NET_SEARCHING && lv_tick_elaps(ui.hello_at) > (DECKBAR_HELLO_TIMEOUT_S * 1000));
     if (dead) {
         LV_LOG_WARN("keine Antwort vom Daemon seit %lu ms – verbinde neu", (unsigned long)idle);
         ui.ws_open = false;
@@ -1754,7 +1745,7 @@ void deckbar_ui_init(const deckbar_config_t *cfg)
 
     /* 600 ms für long_press (Protokoll), gilt für alle Zeigergeräte */
     for (lv_indev_t *i = lv_indev_get_next(NULL); i; i = lv_indev_get_next(i))
-        if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_set_long_press_time(i, LONG_PRESS_MS);
+        if (lv_indev_get_type(i) == LV_INDEV_TYPE_POINTER) lv_indev_set_long_press_time(i, DECKBAR_LONG_PRESS_MS);
 
     lv_obj_t *scr = lv_screen_active();
     lv_obj_remove_style_all(scr);
