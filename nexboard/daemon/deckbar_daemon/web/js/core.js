@@ -1,5 +1,6 @@
 /* Kern der Web-UI: DOM-Helfer, API, Live-Verbindung (Store + Ereignisse), Bausteine. Kein
    Framework, keine Build-Stufe: ES-Module direkt aus /static/js/. */
+import { CLASSES, UNKNOWN_CLASS_COLOR } from "./nexproto.js";
 
 export const $ = (id, root = document) => root.querySelector(`#${id}`);
 
@@ -308,5 +309,7 @@ export function fmtWhen(ts) {
     : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-export const CLASS_COLORS = { gladiator: "#E8A33D", templar: "#5B8DEF", ranger: "#6CCB5F", assassin: "#B46AE6", sorcerer: "#4FC3F7", cleric: "#F4E07A", spiritmaster: "#EC7FB8", chanter: "#4DD4B0", brawler: "#F0624D" };
-export const CLASS_LABELS = { gladiator: "Gladiator", templar: "Templer", assassin: "Assassine", ranger: "Waldläufer", sorcerer: "Magier", spiritmaster: "Beschwörer", cleric: "Kleriker", chanter: "Kantor", brawler: "Faustkämpfer" };
+// Klassen aus nexproto (erzeugt): Farbe und deutscher Name je Schlüssel
+const CLASS_COLORS = Object.fromEntries(CLASSES.map((c) => [c.key, c.color]));
+export const CLASS_LABELS = Object.fromEntries(CLASSES.map((c) => [c.key, c.de]));
+export const classColor = (cls) => CLASS_COLORS[cls] || UNKNOWN_CLASS_COLOR;

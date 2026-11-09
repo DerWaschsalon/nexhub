@@ -17,13 +17,12 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import aiohttp
+from nexproto import device
 from PIL import Image, ImageOps
 
 log = logging.getLogger(__name__)
 
-MAX_SIZE = 160          # größte Kantenlänge, die ein Gerät anfordern darf
 MAX_DOWNLOAD = 8 << 20  # Cover größer als 8 MB ignorieren
-CHUNK_BYTES = 2000      # Rohdaten pro Nachricht (base64 ≈ 2,7 KB, unter dem TCP-Fenster des ESP32)
 
 
 def art_id(url: str) -> str:
@@ -47,7 +46,7 @@ def to_rgb565(img: Image.Image, size: int) -> bytes:
 def chunks(aid: str, w: int, h: int, data: bytes) -> list[dict]:
     """Zerlegt ein RGB565-Bild in `art`-/`bg`-Nachrichten (Felder ohne v/type)."""
     row_bytes = w * 2
-    rows = max(1, CHUNK_BYTES // row_bytes)
+    rows = max(1, device.ART_CHUNK_BYTES // row_bytes)
     msgs = []
     for y in range(0, h, rows):
         n = min(rows, h - y)
@@ -57,15 +56,13 @@ def chunks(aid: str, w: int, h: int, data: bytes) -> list[dict]:
     return msgs
 
 
-BIN_CHUNK_BYTES = 12000  # Rohdaten pro Binärframe (WebSockets-Lib der Firmware: max. 15 KB/Nachricht)
-
 
 def bin_chunks(kind: bytes, aid: str, w: int, h: int, data: bytes) -> list[bytes]:
     """Zerlegt ein RGB565-Bild in Binärframes für Geräte mit `caps: ["bin"]` (kind b"a" Cover,
     b"b" Hintergrund): "DB", Art, id (16 Byte), w, h, y, rows (uint16 LE), dann die Zeilen.
     Gegenüber JSON + base64 ein Drittel weniger Daten und ~9× weniger Nachrichten."""
     row_bytes = w * 2
-    rows = max(1, BIN_CHUNK_BYTES // row_bytes)
+    rows = max(1, device.BIN_CHUNK_BYTES // row_bytes)
     idb = aid.encode()[:16].ljust(16, b"\0")
     return [struct.pack("<2sc16sHHHH", b"DB", kind, idb, w, h, y, min(rows, h - y))
             + data[y * row_bytes:(y + min(rows, h - y)) * row_bytes]
@@ -113,7 +110,7 @@ class Art:
 
     async def render(self, size: int) -> tuple[str, bytes] | None:
         """(id, RGB565) in Kantenlänge `size`, oder None ohne Cover."""
-        size = max(8, min(size, MAX_SIZE))
+        size = max(device.ART_MIN, min(size, device.ART_MAX))
         async with self._lock:
             if self._image is None or not self.url:
                 return None
@@ -131,9 +128,9 @@ class Art:
     def _decode(raw: bytes) -> Image.Image:
         img = Image.open(io.BytesIO(raw))
         img.load()
-        # to_rgb565 schneidet quadratisch auf höchstens MAX_SIZE zu: kurze Seite 2 × MAX_SIZE reicht
+        # to_rgb565 schneidet quadratisch auf höchstens ART_MAX zu: kurze Seite 2 × ART_MAX reicht
         # dafür und hält den Cache klein (statt z. B. 1200 × 1200 von Spotify)
-        f = 2 * MAX_SIZE / min(img.size)
+        f = 2 * device.ART_MAX / min(img.size)
         if f < 1:
             img = img.convert("RGB").resize((round(img.width * f), round(img.height * f)), Image.Resampling.LANCZOS)
         return img

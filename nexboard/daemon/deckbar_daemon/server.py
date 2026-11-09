@@ -10,15 +10,14 @@ import time
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
-from typing import Any
 
 import yaml
 from aiohttp import ClientSession, ClientTimeout, WSCloseCode, WSMsgType, web
+from nexproto import device
 from pydantic import ValidationError
 
 from . import __version__
 from .actions import Executor
-from .art import MAX_SIZE as ART_MAX_SIZE
 from .art import Art, bin_chunks, chunks
 from .background import UPLOAD_MAX, Background, save_upload
 from .boss_effekte import BossEffekte
@@ -27,7 +26,7 @@ from .hub import Hub, HubError
 from .capture import aion2_running, history_root
 from .claude import ClaudeUsage
 from .audio import Audio
-from .config import Layout, Page, Settings, load_layout, save_layout, save_settings
+from .config import Layout, Page, Settings, device_message, load_layout, save_layout, save_settings
 from .config import config_dir as default_config_dir
 from .dps import STATUS_TEXT, DpsFeed, DpsSettings
 from .mdns import Announcer
@@ -43,15 +42,12 @@ from .usb import UsbBridge
 
 log = logging.getLogger(__name__)
 
-PROTO_V = 1
 # Einstellungen, die erst nach einem Neustart des Daemons wirken
 RESTART_FIELDS = ("host", "port", "token", "mdns", "usb", "heartbeat")
 BUILTIN_KEYS = ("out_volume", "out_muted", "mic_volume", "mic_muted", "playing", "track", "art_url", "dps", "dps_active", "claude")
 # nur für Daemon/Web-UI; das Gerät bekommt das Cover als Bild per `art`
 DEVICE_HIDDEN_KEYS = {"art_url"}
-MAX_MSG = 16 * 1024
 DPS_DEVICE_INTERVAL = 1.0  # DPS höchstens 1× pro Sekunde je Gerät (die Kachel zeigt ganze Sekunden)
-DPS_DEFAULT_PLAYERS = 5    # wie in shared-ui (build_dps)
 SWIPED_STAY_S = 30  # selbst auf die DPS-Seite gewischt: so lange bleibt sie ohne Kampf stehen
 LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
 WEB_DIR = Path(str(resources.files("deckbar_daemon").joinpath("web")))
@@ -84,10 +80,6 @@ class Device:
             "id": self.id, "model": self.model, "fw": self.fw, "sim": self.sim,
             "remote": self.remote, "page": self.page, "connected_at": self.connected_at,
         }
-
-
-def _msg(type_: str, **fields: Any) -> str:
-    return json.dumps({"v": PROTO_V, "type": type_, **fields}, ensure_ascii=False, separators=(",", ":"))
 
 
 def _validation_text(e: ValidationError) -> str:
@@ -321,7 +313,7 @@ class NexBoard:
             asyncio.ensure_future(self._update_art(diff["art_url"]))
         dev_diff = {k: v for k, v in diff.items() if k not in DEVICE_HIDDEN_KEYS and k != "dps"}
         if dev_diff:
-            await self._broadcast_devices(_msg("state", full=False, values=dev_diff))
+            await self._broadcast_devices(device_message("state", full=False, values=dev_diff))
         if "dps" in diff:
             for dev in list(self.devices):
                 self._queue_dps(dev)
@@ -332,7 +324,7 @@ class NexBoard:
         """So viele Zeilen zeigt die aktuelle Seite des Geräts (0 = keine DPS-Kachel). Seite
         unbekannt (alte Firmware): die größte DPS-Kachel im Layout."""
         pages = [p for p in self.layout.pages if p.id == dev.page] or ([] if dev.page else self.layout.pages)
-        return max((it.players or DPS_DEFAULT_PLAYERS for p in pages for it in p.items if it.type == "dps"), default=0)
+        return max((it.players or device.DPS_DEFAULT_PLAYERS for p in pages for it in p.items if it.type == "dps"), default=0)
 
     def _dps_for(self, dev: Device, rows: int) -> dict | None:
         value = self.state.values.get("dps")
@@ -356,7 +348,7 @@ class NexBoard:
         rows = self._dps_rows(dev)
         if not rows or dev.ws.closed:
             return
-        text = _msg("state", full=False, values={"dps": self._dps_for(dev, rows)})
+        text = device_message("state", full=False, values={"dps": self._dps_for(dev, rows)})
         if text == dev.dps_last:
             return
         dev.dps_sent, dev.dps_last = time.monotonic(), text
@@ -381,7 +373,7 @@ class NexBoard:
             r = await self.art.render(dev.art_size)
             if r is None:
                 if dev.art_have != "-":
-                    await self._send(dev.ws, _msg("art", id=""))
+                    await self._send(dev.ws, device_message("art", id=""))
                     dev.art_have = "-"
                 return
             aid, data = r
@@ -392,7 +384,7 @@ class NexBoard:
                     await self._send_bytes(dev.ws, frame)
             else:
                 for part in chunks(aid, dev.art_size, dev.art_size, data):
-                    await self._send(dev.ws, _msg("art", **part))
+                    await self._send(dev.ws, device_message("art", **part))
             dev.art_have = aid
 
     # ---------------------------------------------------------------- Hintergrund
@@ -402,17 +394,17 @@ class NexBoard:
             if bid == dev.bg_id:
                 return
             if not bid or data is None:
-                await self._send(dev.ws, _msg("bg", id=""))
+                await self._send(dev.ws, device_message("bg", id=""))
             elif dev.binary:
-                for frame in bin_chunks(b"b", bid, 640, 172, data):
+                for frame in bin_chunks(b"b", bid, device.SCREEN_W, device.SCREEN_H, data):
                     if dev.ws.closed:
                         return
                     await self._send_bytes(dev.ws, frame)
             else:
-                for part in chunks(bid, 640, 172, data):
+                for part in chunks(bid, device.SCREEN_W, device.SCREEN_H, data):
                     if dev.ws.closed:
                         return
-                    await self._send(dev.ws, _msg("bg", **part))
+                    await self._send(dev.ws, device_message("bg", **part))
             dev.bg_id = bid
 
     async def update_background(self, mode: str | None = None) -> None:
@@ -473,7 +465,7 @@ class NexBoard:
             dev.return_task = asyncio.ensure_future(self._return_later(dev, delay))
             return
         log.info("%s wechselt zu Seite '%s'", dev.id, target)
-        await self._send(dev.ws, _msg("goto", page=target))
+        await self._send(dev.ws, device_message("goto", page=target))
 
     async def _return_later(self, dev: Device, delay: float) -> None:
         await asyncio.sleep(delay)
@@ -490,7 +482,7 @@ class NexBoard:
         self.layout_payload = layout.device_payload()
         self.layout_error = None
         log.info("Layout aktualisiert (hash %s), an %d Gerät(e)", self.layout_payload["hash"], len(self.devices))
-        await self._broadcast_devices(_msg("layout", **self.layout_payload))
+        await self._broadcast_devices(device_message("layout", **self.layout_payload))
         await self._broadcast_ui({"type": "layout", "layout": self.layout_json(), "error": None})
         await self.update_background(layout.theme.background)
 
@@ -548,10 +540,10 @@ class NexBoard:
 
     # ---------------------------------------------------------------- Geräte-WebSocket
     async def ws_device(self, request: web.Request) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse(max_msg_size=MAX_MSG, heartbeat=None)
+        ws = web.WebSocketResponse(max_msg_size=device.MAX_MESSAGE_BYTES, heartbeat=None)
         await ws.prepare(request)
         if not self.modules.on("deck"):
-            await self._send(ws, _msg("error", code="disabled", message="Modul Touch-Leiste ist ausgeschaltet"))
+            await self._send(ws, device_message("error", code="disabled", message="Modul Touch-Leiste ist ausgeschaltet"))
             await ws.close(code=4003, message=b"module off")
             return ws
         dev = Device(ws=ws, remote=request.remote or "?")
@@ -571,17 +563,17 @@ class NexBoard:
         except json.JSONDecodeError:
             hello = {}
         if hello.get("type") != "hello":
-            await self._send(ws, _msg("error", code="bad_request", message="erste Nachricht muss hello sein"))
+            await self._send(ws, device_message("error", code="bad_request", message="erste Nachricht muss hello sein"))
             await ws.close()
             return ws
-        if hello.get("v") != PROTO_V:
-            await self._send(ws, _msg("error", code="version", message=f"Daemon spricht v{PROTO_V}"))
+        if hello.get("v") != device.PROTO_VERSION:
+            await self._send(ws, device_message("error", code="version", message=f"Daemon spricht v{device.PROTO_VERSION}"))
             await ws.close()
             return ws
         token = str(hello.get("token", ""))
         if not hmac.compare_digest(token.encode(), self.settings.token.encode()):
             log.warning("Gerät %s: falsches Token", dev.remote)
-            await self._send(ws, _msg("error", code="auth", message="falsches Token"))
+            await self._send(ws, device_message("error", code="auth", message="falsches Token"))
             await ws.close(code=4001, message=b"auth")
             return ws
 
@@ -599,13 +591,13 @@ class NexBoard:
         log.info("Gerät verbunden: %s (%s) von %s", dev.id, dev.model or "?", dev.remote)
         await self._devices_changed()
 
-        await self._send(ws, _msg("welcome", server={"name": self.settings.name, "version": __version__}, heartbeat=hb))
+        await self._send(ws, device_message("welcome", server={"name": self.settings.name, "version": __version__}, heartbeat=hb))
         if hello.get("layout_hash") != self.layout_payload["hash"]:
-            await self._send(ws, _msg("layout", **self.layout_payload))
+            await self._send(ws, device_message("layout", **self.layout_payload))
         values = {k: v for k, v in self.state.values.items() if k not in DEVICE_HIDDEN_KEYS}
         if "dps" in values:
-            values["dps"] = self._dps_for(dev, self._dps_rows(dev) or DPS_DEFAULT_PLAYERS)
-        await self._send(ws, _msg("state", full=True, values=values))
+            values["dps"] = self._dps_for(dev, self._dps_rows(dev) or device.DPS_DEFAULT_PLAYERS)
+        await self._send(ws, device_message("state", full=True, values=values))
         asyncio.ensure_future(self._send_bg(dev))
         await self._follow_combat(dev)
 
@@ -616,7 +608,7 @@ class NexBoard:
                     log.warning("Gerät %s antwortet nicht mehr, trenne", dev.id)
                     await ws.close(code=4002, message=b"heartbeat")
                     return
-                await self._send(ws, _msg("ping", t=int(time.time() * 1000)))
+                await self._send(ws, device_message("ping", t=int(time.time() * 1000)))
 
         hb_task = asyncio.ensure_future(heartbeat())
         try:
@@ -627,16 +619,16 @@ class NexBoard:
                 try:
                     msg = json.loads(m.data)
                 except json.JSONDecodeError:
-                    await self._send(ws, _msg("error", code="bad_request", message="kein JSON"))
+                    await self._send(ws, device_message("error", code="bad_request", message="kein JSON"))
                     continue
                 t = msg.get("type")
                 if t == "pong":
                     continue
                 if t == "ping":
-                    await self._send(ws, _msg("pong", t=msg.get("t", 0)))
+                    await self._send(ws, device_message("pong", t=msg.get("t", 0)))
                 elif t == "art_request":
                     size = msg.get("size")
-                    dev.art_size = size if isinstance(size, int) and 0 < size <= ART_MAX_SIZE else 0
+                    dev.art_size = size if isinstance(size, int) and device.ART_MIN <= size <= device.ART_MAX else 0
                     have = msg.get("have")
                     dev.art_have = have[:16] if isinstance(have, str) else ""
                     if dev.art_size:
@@ -651,7 +643,7 @@ class NexBoard:
                         await self._follow_combat(dev, delay=SWIPED_STAY_S)
                     err = await self.handle_event(msg, dev.id)
                     if err:
-                        await self._send(ws, _msg("error", code="bad_request", message=err))
+                        await self._send(ws, device_message("error", code="bad_request", message=err))
                 else:
                     log.debug("Gerät %s: unbekannter Typ %r", dev.id, t)
         finally:

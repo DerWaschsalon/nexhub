@@ -24,7 +24,7 @@ deckbar-daemon = "deckbar_daemon.__main__:main"
 nexproto = { path = "../../proto", editable = true }
 
 [dependency-groups]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "jsonschema>=4"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
 
 [build-system]
 requires = ["hatchling"]

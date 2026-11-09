@@ -1,15 +1,19 @@
 # nexproto
 
-Gemeinsame Formate für NexBoard-Daemon, Hub und Bot. Jede Definition steht genau einmal hier als
-Pydantic-Modell; Python-Programme im Repo importieren das Paket direkt, alle anderen nutzen das
-daraus erzeugte JSON-Schema unter [`schema/`](schema/).
+Gemeinsame Formate und Stammdaten für NexBoard-Daemon, Leiste, Hub und Bot. Jede Definition steht genau
+einmal hier; Python-Programme im Repo importieren das Paket direkt, alle anderen bekommen erzeugte
+Dateien (`uv run python -m nexproto.codegen`, ein Test und die CI prüfen, dass sie aktuell sind).
 
-| Format | Modul | Schema | Wofür |
+| Inhalt | Modul | Erzeugt | Wofür |
 |---|---|---|---|
 | NexLog v1 | `nexproto/nexlog.py` | `schema/nexlog-v1.schema.json` | ein Dungeon-Run vom Daemon an den Hub |
+| Geräteprotokoll v1 | `nexproto/device.py` | `nexboard/docs/protocol.schema.json` | Daemon ↔ Touch-Leiste, Beschreibung in [`protocol.md`](../nexboard/docs/protocol.md) |
+| Grenzwerte der Leiste | `nexproto/device.py` | `nexboard/shared-ui/include/deckbar/proto_gen.h`, `nexboard/daemon/deckbar_daemon/web/js/nexproto.js` | Bildschirmgröße, Port, Seiten- und Kachelgrenzen, Bildteile |
+| AION-2-Klassen | `nexproto/classes.py` | dieselben, dazu `hub/web/src/lib/nexproto.ts` und `nexboard/capture/src/proto_gen.rs` | Schlüssel, jobId, Namen DE/EN, eine Farbe je Klasse (wie im A2Tools-Meter) |
+| Termine | `nexproto/termine.py` | – | Riss, Shugo-Fest, Resets … für Radar, Overlay-Timer und Bot |
+| Dungeon-Namen | `nexproto/dungeons.py` | – | Namen, die A2Tools noch nicht kennt |
 
-Das Protokoll zwischen Daemon und Touch-Leiste steht weiter in
-[`nexboard/docs/protocol.schema.json`](../nexboard/docs/protocol.schema.json).
+Neue Klasse, neuer Grenzwert: im Modul ändern, `codegen` laufen lassen, beides zusammen committen.
 
 ## NexLog v1
 
@@ -116,7 +120,7 @@ Spieler im Kampf. In Dungeons ist das die eigene Gruppe (bis 8 Spieler gemessen)
 ```
 cd proto && uv sync
 uv run pytest -q                    # Tests (nur erfundene Daten)
-uv run python -m nexproto.schema    # schema/*.json nach Änderungen am Modell neu schreiben
+uv run python -m nexproto.codegen   # Schemas, C-, JS- und TS-Konstanten nach Änderungen neu schreiben
 uv run python tools/nexlog_messen.py ~/.local/share/deckbar/aion2/history
 ```
 

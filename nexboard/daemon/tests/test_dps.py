@@ -1,17 +1,15 @@
 """DPS-Feed gegen einen nachgebauten Overlay-Server des A2Tools-Meters."""
 import asyncio
 import json
-from pathlib import Path
 
-import jsonschema
 from aiohttp import web
+from nexproto import device
 
 from deckbar_daemon import dps as dps_mod
 from deckbar_daemon.config import Layout
 from deckbar_daemon.dps import DpsFeed, DpsSettings, compact, read_a2tools
 from deckbar_daemon.state import State
 
-SCHEMA = json.loads((Path(__file__).parents[2] / "docs" / "protocol.schema.json").read_text())
 
 SNAP = {
     "v": 1, "target": "Boss", "mode": "bossTargets", "timeMs": 83500, "hp": 42.57,
@@ -30,7 +28,7 @@ def test_compact():
     assert c["rows"][1]["dps"] == 900
     assert c["rows"][2] == {"name": "Odd", "cls": None, "dps": 0, "dmg": 0, "pct": 0.0, "you": False}
     assert len(compact({"rows": [SNAP["rows"][0]] * 12})["rows"]) == 8
-    jsonschema.validate({"v": 1, "type": "state", "values": {"dps": c, "dps_active": True}}, SCHEMA)
+    device.parse({"v": 1, "type": "state", "values": {"dps": c, "dps_active": True}})
 
 
 def test_read_a2tools(tmp_path):
@@ -162,7 +160,7 @@ async def test_auto_page(tmp_path):
 
     await deck._on_combat(True)
     assert ws.sent[-1] == {"v": 1, "type": "goto", "page": "aion"}
-    jsonschema.validate(ws.sent[-1], SCHEMA)
+    device.parse(ws.sent[-1])
     dev.page = "aion"  # Gerät meldet page_change
     await deck._on_combat(False)
     assert ws.sent[-1]["page"] == "main" and len(ws.sent) == 2
@@ -205,7 +203,7 @@ async def test_reset_button(tmp_path):
 
     deck.dps.capture.request = request
     msg = {"v": 1, "type": "event", "event": "button_press", "item": "d", "part": "reset"}
-    jsonschema.validate(msg, SCHEMA)
+    device.parse(msg)
 
     deck.dps.settings = DpsSettings(source="capture")
     assert await deck.handle_event(msg, "test") is None

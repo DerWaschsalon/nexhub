@@ -1,22 +1,21 @@
 import json
-from pathlib import Path
 
-import jsonschema
 import pytest
 import yaml
+from nexproto import device
+from pydantic import ValidationError
 
 from deckbar_daemon import keys
 from deckbar_daemon.audio import parse_volume
 from deckbar_daemon.config import Layout, default_layout_text
 from deckbar_daemon.media import SEP, parse_line
 
-SCHEMA = json.loads((Path(__file__).parents[2] / "docs" / "protocol.schema.json").read_text())
 
 
 def test_default_layout_valid_and_matches_schema():
     layout = Layout.model_validate(yaml.safe_load(default_layout_text()))
     payload = layout.device_payload()
-    jsonschema.validate({"v": 1, "type": "layout", **payload}, SCHEMA)
+    device.parse({"v": 1, "type": "layout", **payload})
     # keine Aktionen im Geräte-Layout
     assert "action" not in json.dumps(payload)
 
@@ -47,7 +46,8 @@ def test_parse_playerctl():
 def test_art_rgb565_chunks():
     from PIL import Image
 
-    from deckbar_daemon.art import CHUNK_BYTES, chunks, to_rgb565
+    from deckbar_daemon.art import chunks, to_rgb565
+    from nexproto.device import ART_CHUNK_BYTES
 
     img = Image.new("RGB", (300, 200), (255, 0, 0))  # wird mittig quadratisch zugeschnitten
     data = to_rgb565(img, 88)
@@ -55,7 +55,7 @@ def test_art_rgb565_chunks():
     assert data[:2] == bytes([0x00, 0xF8])  # Rot = 0xF800, little-endian
     parts = chunks("abc", 88, 88, data)
     assert sum(p["rows"] for p in parts) == 88
-    assert all(p["rows"] * 88 * 2 <= CHUNK_BYTES for p in parts)
+    assert all(p["rows"] * 88 * 2 <= ART_CHUNK_BYTES for p in parts)
 
 
 def test_keys():
@@ -71,12 +71,12 @@ def test_keys():
     {"v": 1, "type": "state", "full": False, "values": {"track": None}},
 ])
 def test_schema_examples(msg):
-    jsonschema.validate(msg, SCHEMA)
+    device.parse(msg)
 
 
 def test_schema_rejects_bad_event():
-    with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate({"v": 1, "type": "event", "event": "slider_change", "item": "vol"}, SCHEMA)
+    with pytest.raises(ValidationError):
+        device.parse({"v": 1, "type": "event", "event": "slider_change", "item": "vol"})
 
 
 def test_kde_wallpaper(tmp_path):

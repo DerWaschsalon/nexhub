@@ -361,10 +361,9 @@ def test_kampfkraft_und_itemlevel():
     assert render_run(run)[:4] == b"RIFF"
 
 
-def test_jede_klasse_hat_name_und_farbe():
-    """Fehlte jobId 19 (Faustkämpfer), kam die Klasse ohne Icon und Farbe ins Run-Bild."""
-    from nexproto.nexlog import JOB_CLASSES
+def test_jede_klasse_hat_ein_icon():
+    """Fehlte jobId 19 (Faustkämpfer), kam die Klasse ohne Icon ins Run-Bild."""
+    from nexproto.classes import CLASS_KEYS, JOB_CLASSES
     assert JOB_CLASSES[19] == "brawler"
-    for cls in JOB_CLASSES.values():
-        assert cls in runs_mod.CLASS_NAMES and cls in runs_mod.CLASS_COLORS
+    for cls in CLASS_KEYS:
         assert runs_mod.class_icon(cls, 20) is not None

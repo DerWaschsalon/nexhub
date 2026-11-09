@@ -9,18 +9,21 @@ import secrets
 import tempfile
 from importlib import resources
 from pathlib import Path
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
 import yaml
+from nexproto import device
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 log = logging.getLogger(__name__)
 
-ID = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,32}$")]
-# Größte Nachricht, die die Firmware per WLAN annimmt (WEBSOCKETS_MAX_DATA_SIZE der Bibliothek
-# WebSockets); eine größere verwirft sie still. Platz für "v" und "type" der Hülle ist abgezogen.
-DEVICE_MAX_LAYOUT = 15 * 1024 - 64
-Style = Literal["default", "accent", "danger", "success", "warning"]
+ID = device.Id
+
+
+def device_message(type_: str, **fields: Any) -> str:
+    """Eine Nachricht ans Gerät, so kompakt, wie sie über die Leitung geht."""
+    return json.dumps({"v": device.PROTO_VERSION, "type": type_, **fields}, ensure_ascii=False,
+                      separators=(",", ":"))
 
 
 class _Strict(BaseModel):
@@ -64,74 +67,31 @@ Action = Annotated[
 
 
 # ------------------------------------------------------------------ Layout
-class Item(_Strict):
-    id: ID
-    type: Literal["button", "toggle", "slider", "media", "dps", "claude"] = "button"
-    label: str | None = Field(None, max_length=24)
-    icon: str | None = Field(None, max_length=48)
-    icon_on: str | None = Field(None, max_length=48)
-    style: Style | None = None
-    bind: str | None = Field(None, max_length=32)
-    mute_bind: str | None = Field(None, max_length=32)
-    min: int | None = None
-    max: int | None = None
-    nav: ID | None = None
-    # dps: Anzahl Spieler und Zusatzwert neben der DPS-Zahl
-    players: int | None = Field(None, ge=1, le=8)
-    extra: Literal["pct", "dmg", "none"] | None = None
-    w: int = Field(1, ge=1, le=8)
-    h: int = Field(1, ge=1, le=3)
+# Felder und Regeln fürs Gerät stehen in nexproto.device; hier kommt dazu, was nur der PC kennt
+class Item(_Strict, device.Item):
     action: Action | None = None
     long_action: Action | None = None
 
-    @model_validator(mode="after")
-    def _check(self) -> "Item":
-        if self.type in ("toggle", "slider") and not self.bind:
-            raise ValueError(f"Item '{self.id}': {self.type} braucht 'bind'")
-        if self.nav and self.type != "button":
-            raise ValueError(f"Item '{self.id}': 'nav' gibt es nur bei type=button")
-        if self.type != "dps" and (self.players is not None or self.extra is not None):
-            raise ValueError(f"Item '{self.id}': 'players' und 'extra' gibt es nur bei type=dps")
-        if self.min is not None and self.max is not None and self.min >= self.max:
-            raise ValueError(f"Item '{self.id}': min muss kleiner als max sein")
-        return self
+
+class Page(_Strict, device.Page):
+    items: list[Item] = Field(default_factory=list, max_length=device.MAX_ITEMS_PER_PAGE)
 
 
-class Page(_Strict):
-    id: ID
-    name: str | None = Field(None, max_length=24)
-    cols: int = Field(6, ge=1, le=8)
-    rows: int = Field(2, ge=1, le=3)
-    items: list[Item] = Field(default_factory=list, max_length=24)
-
-
-class Theme(_Strict):
-    accent: str = Field("#5AC8FA", pattern=r"^#[0-9A-Fa-f]{6}$")
+class Theme(_Strict, device.Theme):
     # "default" | "wallpaper" (KDE-Hintergrund) | Pfad zu einer Bilddatei, siehe background.py
     background: str = Field("default", min_length=1, max_length=512)
 
 
-class Layout(_Strict):
+class Layout(_Strict, device.Layout):
     theme: Theme = Field(default_factory=Theme)
-    pages: list[Page] = Field(min_length=1, max_length=8)
+    pages: list[Page] = Field(min_length=1, max_length=device.MAX_PAGES)
 
     @model_validator(mode="after")
-    def _check(self) -> "Layout":
-        page_ids = [p.id for p in self.pages]
-        if len(set(page_ids)) != len(page_ids):
-            raise ValueError("Seiten-IDs müssen eindeutig sein")
-        item_ids = [i.id for p in self.pages for i in p.items]
-        dup = {i for i in item_ids if item_ids.count(i) > 1}
-        if dup:
-            raise ValueError(f"Item-IDs müssen seitenübergreifend eindeutig sein: {', '.join(sorted(dup))}")
-        for p in self.pages:
-            for i in p.items:
-                if i.nav and i.nav not in page_ids:
-                    raise ValueError(f"Item '{i.id}': Seite '{i.nav}' gibt es nicht")
-        size = len(json.dumps(self.device_payload(), ensure_ascii=False, separators=(",", ":")).encode())
-        if size > DEVICE_MAX_LAYOUT:
-            raise ValueError(f"Layout zu groß für die Leiste ({size // 1024} KiB, höchstens 15 KiB): "
-                             "weniger Seiten oder Kacheln, kürzere Namen")
+    def _fits_device(self) -> "Layout":
+        size = len(device_message("layout", **self.device_payload()).encode())
+        if size > device.MAX_MESSAGE_BYTES:
+            raise ValueError(f"Layout zu groß für die Leiste ({size // 1024} KiB, höchstens "
+                             f"{device.MAX_MESSAGE_BYTES // 1024} KiB): weniger Seiten oder Kacheln, kürzere Namen")
         return self
 
     def has_type(self, item_type: str) -> bool:
@@ -168,10 +128,10 @@ class Layout(_Strict):
 # ------------------------------------------------------------------ Einstellungen
 class Settings(_Strict):
     host: str = "0.0.0.0"
-    port: int = Field(8765, ge=1, le=65535)
+    port: int = Field(device.DEFAULT_PORT, ge=1, le=65535)
     token: str = Field(min_length=8)
     name: str = "NexBoard"
-    heartbeat: int = Field(5, ge=1, le=60)
+    heartbeat: int = Field(device.HEARTBEAT_S, ge=1, le=60)
     mdns: bool = True
     player: str | None = Field(None, description="playerctl -p … (leer = aktivster Player)")
     open_browser: bool = False
@@ -202,10 +162,10 @@ def load_settings(directory: Path) -> Settings:
         text = (
             "# NexBoard-Daemon – diese Datei enthält das Geräte-Token, nicht committen.\n"
             "host: 0.0.0.0        # Adresse für Geräte (LAN). Die Web-UI antwortet trotzdem nur auf localhost.\n"
-            "port: 8765\n"
+            f"port: {device.DEFAULT_PORT}\n"
             f"token: {token}\n"
             "name: NexBoard\n"
-            "heartbeat: 5\n"
+            f"heartbeat: {device.HEARTBEAT_S}\n"
             "mdns: true\n"
             "player: null          # z. B. spotify; null = playerctl wählt\n"
             "usb: auto             # Rückfall per USB-Kabel ohne WLAN; off oder fester Pfad /dev/serial/by-id/…\n"

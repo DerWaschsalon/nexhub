@@ -4,13 +4,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "deckbar/proto_gen.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define DECKBAR_PROTO_VERSION 1
-#define DECKBAR_W 640
-#define DECKBAR_H 172
 
 typedef struct {
     const char *token;     /* Geräte-Token aus der Daemon-Konfiguration */

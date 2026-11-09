@@ -2,10 +2,11 @@
    Jede Änderung wird nach kurzer Pause gespeichert; der Daemon schickt sie sofort an alle Geräte. */
 import {
   fill, $, el, icon, glyph, deckIcons, api, S, on, sendLive, toast, setSaveState, field, input as inputEl, select as selectEl,
-  button, chip, callout, card, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, CLASS_COLORS, modOn, throttle, dpsDiff,
+  button, chip, callout, card, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, classColor, modOn, throttle, dpsDiff,
 } from "../core.js";
+import { LABEL_MAX, SCREEN_H, SCREEN_W } from "../nexproto.js";
 
-const W = 640, H = 172, PAD = 8, GAP = 8;
+const W = SCREEN_W, H = SCREEN_H, PAD = 8, GAP = 8;
 const STYLES = { default: "#ffffff", accent: null, danger: "#ff453a", success: "#30d158", warning: "#ff9f0a" };
 const STYLE_NAMES = { default: "Standard", accent: "Akzent", danger: "Rot", success: "Grün", warning: "Orange" };
 const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter", claude: "Claude-Nutzung" };
@@ -213,7 +214,7 @@ function renderDps(it, b) {
   const best = Math.max(1, ...rows.map((r) => r.dps));
   rows.forEach((r, i) => {
     const row = el("div", { class: "r" + (r.you ? " you" : ""), style: `top:${y + i * (rowH + gap)}px;height:${rowH}px;${font}` });
-    row.append(el("span", { class: "b", style: `width:${Math.max(6, (100 * r.dps) / best)}%;background:${CLASS_COLORS[r.cls] || "#8E8E93"}` }));
+    row.append(el("span", { class: "b", style: `width:${Math.max(6, (100 * r.dps) / best)}%;background:${classColor(r.cls)}` }));
     row.append(el("span", { class: "n", text: `${i + 1}  ${r.name}` }), el("span", { class: "v", text: fmtAmount(r.dps) }));
     if (extra !== "none") row.append(el("span", { class: "x", style: `width:${extra === "dmg" ? 58 : 44}px`, text: extra === "dmg" ? fmtAmount(r.dmg) : `${Math.round(r.pct || 0)} %` }));
     box.append(row);
@@ -338,7 +339,7 @@ function pageCard() {
     }, "sm icon danger", "delete", { title: "Seite löschen", disabled: D.layout.pages.length === 1 }),
   ],
   el("div", { class: "grid g2" },
-    field("Name", inputEl(p.name, (v) => { curPage().name = v || undefined; changed({ tabs: true, page: false }); }, { maxlength: 24 })),
+    field("Name", inputEl(p.name, (v) => { curPage().name = v || undefined; changed({ tabs: true, page: false }); }, { maxlength: LABEL_MAX })),
     field("ID", inputEl(p.id, (v, i) => {
       v = v.trim();
       const pg = curPage();
@@ -462,7 +463,7 @@ function renderProps() {
       it.id = v;
       changed({ props: false });
     }, { maxlength: 32 })),
-    !TYPE_ICONS[type] ? field("Beschriftung", inputEl(it.label, (v) => set("label", v, { props: false }), { maxlength: 24 }), null, "span-all") : null,
+    !TYPE_ICONS[type] ? field("Beschriftung", inputEl(it.label, (v) => set("label", v, { props: false }), { maxlength: LABEL_MAX }), null, "span-all") : null,
     field("Breite (Zellen)", inputEl(it.w || 1, (v) => set("w", clampInt(v, 1, 8, 1) === 1 ? undefined : clampInt(v, 1, 8, 1)), { type: "number", min: 1, max: 8 })),
     field("Höhe (Zellen)", inputEl(it.h || 1, (v) => set("h", clampInt(v, 1, 3, 1) === 1 ? undefined : clampInt(v, 1, 3, 1)), { type: "number", min: 1, max: 3 })));
 
@@ -743,7 +744,7 @@ function designTab(ctx) {
     fill(box,
       card("Farben", "Akzent für Slider, Media und eigene Zeile", null,
         settingsRow("Akzentfarbe", theme.accent || "#5AC8FA", accentIn)),
-      card("Hintergrund", "Wird auf 640 × 172 zugeschnitten, weichgezeichnet und abgedunkelt", null,
+      card("Hintergrund", `Wird auf ${SCREEN_W} × ${SCREEN_H} zugeschnitten, weichgezeichnet und abgedunkelt`, null,
         el("div", { class: "stack" },
           prev,
           field("Quelle", selectEl({ default: "Standard", wallpaper: "Desktop-Hintergrund (folgt automatisch)", file: "Eigenes Bild" }, kind, (v) => {
