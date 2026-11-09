@@ -7,10 +7,10 @@ import pytest
 from aiohttp import WSMsgType
 from aiohttp.test_utils import TestClient, TestServer
 
-import deckbar_daemon.server as server_mod
+import deckbar_daemon.core.devices as devices_mod
+from deckbar_daemon.app import NexBoard, build_app
 from deckbar_daemon.art import bin_chunks
 from deckbar_daemon.config import Layout, Settings
-from deckbar_daemon.server import NexBoard, build_app
 from deckbar_daemon.usb import _text_only
 
 TOKEN = "testtoken123"
@@ -41,15 +41,15 @@ def test_usb_bridge_strips_binary_cap():
 async def client(tmp_path, monkeypatch):
     import deckbar_daemon.overlay as overlay_mod
     monkeypatch.setattr(overlay_mod, "socket_path", lambda: tmp_path / "kein-overlay.sock")
-    monkeypatch.setattr(server_mod, "DPS_DEVICE_INTERVAL", 0.3)
+    monkeypatch.setattr(devices_mod, "DPS_DEVICE_INTERVAL", 0.3)
     (tmp_path / "modules.yaml").write_text("enabled: [deck]\n")
     deck = NexBoard(Settings(token=TOKEN, mdns=False, usb="off"), tmp_path, mdns=False)
     deck.overlay.manage_unit = False
-    deck.layout = Layout.model_validate({"pages": [
+    deck.bar.active = True  # wie nach modules.start(), aber ohne Audio-, Medien- und Hintergrund-Aufgaben
+    deck.bar.layout.set(Layout.model_validate({"pages": [
         {"id": "main", "items": [{"id": "b", "label": "x"}]},
         {"id": "aion", "items": [{"id": "d", "type": "dps", "players": 3, "w": 6, "h": 2}]},
-    ]})
-    deck.layout_payload = deck.layout.device_payload()
+    ]}), save=False)
     async with TestClient(TestServer(build_app(deck))) as c:
         c.deck = deck
         yield c
@@ -108,14 +108,14 @@ async def test_dps_throttled_trimmed_and_only_on_dps_page(client):
 
 async def test_images_binary_and_cover_not_resent(client):
     deck = client.deck
-    deck.bg.id, deck.bg.data = "bg1", bytes(640 * 172 * 2)
+    deck.bar.bg.id, deck.bar.bg.data = "bg1", bytes(640 * 172 * 2)
     ws = await connect(client, "main", caps=["bin"])
     frames = [m for m in await drain(ws, 0.3) if m.type == WSMsgType.BINARY]
     assert len(frames) == 20 and frames[0].data[:3] == b"DBb"  # statt 172 JSON-Teilen
 
     async def render(size):
         return "cov1", bytes(size * size * 2)
-    deck.art.render = render
+    deck.bar.art.render = render
     await ws.send_json({"v": 1, "type": "art_request", "size": 88})
     frames = [m for m in await drain(ws) if m.type == WSMsgType.BINARY]
     assert frames and frames[0].data[:3] == b"DBa"
@@ -131,6 +131,7 @@ async def test_images_binary_and_cover_not_resent(client):
 
 async def test_cover_cache_and_no_download_without_device(client, tmp_path):
     from PIL import Image
+
     from deckbar_daemon.art import Art
     for name, color in (("a", "red"), ("b", "blue")):
         Image.new("RGB", (1200, 900), color).save(tmp_path / f"{name}.png")
@@ -149,7 +150,7 @@ async def test_cover_cache_and_no_download_without_device(client, tmp_path):
     assert min(art._image.size) == 320  # verkleinert gespeichert
 
     deck = client.deck
-    deck.art._fetch = counting
+    deck.bar.art._fetch = counting
     fetched.clear()
     deck.state.update(art_url=b)
     await asyncio.sleep(0.05)

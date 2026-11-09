@@ -129,8 +129,8 @@ Ist die Touch-Leiste aus, weist der Daemon Geräte mit dem Fehler `disabled` ab.
 Einstellungen** bearbeitet `config.yaml` (Name, Player, Adresse, Port, USB, mDNS) und startet den
 Daemon bei Bedarf neu.
 
-Ein neues Modul besteht aus einem Eintrag in `MODULES` (`daemon/deckbar_daemon/modules.py`), seinen
-Aufgaben (`NexBoard._register_modules` in `server.py`) und einer Seite in
+Ein neues Modul ist eine Klasse in `daemon/deckbar_daemon/modules/` (Beschreibung, Aufgaben, Status,
+Routen; Vertrag aus `packages/nexcore`), ein Eintrag in der Modulliste in `app.py` und eine Seite in
 `daemon/deckbar_daemon/web/js/modules/` (Tabs, Dashboard-Karte, Inhalt). Die Web-UI kommt ohne
 Framework und ohne Build-Schritt aus (ES-Module).
 

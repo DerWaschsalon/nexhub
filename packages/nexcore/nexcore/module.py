@@ -49,6 +49,7 @@ class Module(ABC):
     def __init__(self, ctx: Context) -> None:
         self.ctx = ctx
         self.log = logging.getLogger(f"nexboard.{self.info.id}")
+        self.active = False  # eingeschaltet und gestartet
         self._tasks: list[asyncio.Task[None]] = []
         self._subscriptions: list[Callable[[], None]] = []
 
@@ -57,7 +58,7 @@ class Module(ABC):
         """Beim Einschalten: Aufgaben mit spawn(), Abos mit on()."""
 
     async def stop(self) -> None:
-        """Beim Ausschalten durch den Nutzer, vor dem Abräumen (z. B. ein Fenster schließen)."""
+        """Beim Ausschalten durch den Nutzer, nach dem Abräumen der Aufgaben (z. B. ein Fenster schließen)."""
 
     def status(self) -> dict[str, Any]:
         """Kurzstand fürs Dashboard."""
@@ -72,14 +73,16 @@ class Module(ABC):
 
     # ------------------------------------------------------------ für die Registry
     async def activate(self) -> None:
+        self.active = True
         await self.start()
 
     async def deactivate(self) -> None:
-        await self.stop()
         await self.shutdown()
+        await self.stop()
 
     async def shutdown(self) -> None:
         """Nur abräumen: beim Beenden des Hosts bleibt, was nach außen läuft (z. B. das Overlay)."""
+        self.active = False
         for off in self._subscriptions:
             off()
         tasks, self._tasks, self._subscriptions = self._tasks, [], []

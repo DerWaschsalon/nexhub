@@ -109,7 +109,7 @@ class Hub:
     def __init__(self, config_dir: Path, outbox: Path | None = None) -> None:
         self.path = config_dir / "hub.yaml"
         self.settings = self._load()
-        self.enabled = False  # Modul an (ModuleManager)
+        self.enabled = False  # Modul an (modules/hub.py)
         self.listeners: list[Callable[[], Awaitable[None]]] = []
         # Anzeige: "unpaired" | "pairing" | "paired" | "offline"
         self.status = "paired" if self.settings.token else "unpaired"
@@ -124,7 +124,7 @@ class Hub:
         self.last_upload: dict | None = None  # {ok, text, at, url}
         self._wake = asyncio.Event()
         self._failures = 0
-        # setzt server.py: wo die Kampfdateien liegen, in welcher Sprache, welcher Mitschnitt
+        # setzt app.py: wo die Kampfdateien liegen, in welcher Sprache, welcher Mitschnitt
         self.history_dir: Callable[[], Path] = lambda: Path()
         self.language: Callable[[], str] = lambda: "en"
         self.capture_build: Callable[[], str | None] = lambda: None

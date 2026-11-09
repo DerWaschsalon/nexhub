@@ -10,7 +10,6 @@ from deckbar_daemon.config import Layout
 from deckbar_daemon.dps import DpsFeed, DpsSettings, compact, read_a2tools
 from deckbar_daemon.state import State
 
-
 SNAP = {
     "v": 1, "target": "Boss", "mode": "bossTargets", "timeMs": 83500, "hp": 42.57,
     "rows": [
@@ -147,55 +146,58 @@ class FakeWS:
 
 
 async def test_auto_page(tmp_path):
+    from deckbar_daemon.app import NexBoard
     from deckbar_daemon.config import Settings
-    from deckbar_daemon.server import NexBoard, Device
+    from deckbar_daemon.core.devices import Device
 
     deck = NexBoard(Settings(token="testtoken-123"), tmp_path)
-    deck.layout = Layout.model_validate({"pages": [{"id": "main", "items": []},
-                                                   {"id": "aion", "items": [{"id": "d", "type": "dps", "h": 2}]}]})
+    layout = Layout.model_validate({"pages": [{"id": "main", "items": []},
+                                              {"id": "aion", "items": [{"id": "d", "type": "dps", "h": 2}]}]})
+    deck.bar.layout.set(layout, save=False)
     deck.dps.settings = DpsSettings(auto_page="aion", return_after=5)
     ws = FakeWS()
     dev = Device(ws=ws, remote="test", page="main")
-    deck.devices.add(dev)
+    deck.bar.devices.devices.add(dev)
 
-    await deck._on_combat(True)
+    await deck.bar.devices.on_combat(True)
     assert ws.sent[-1] == {"v": 1, "type": "goto", "page": "aion"}
     device.parse(ws.sent[-1])
     dev.page = "aion"  # Gerät meldet page_change
-    await deck._on_combat(False)
+    await deck.bar.devices.on_combat(False)
     assert ws.sent[-1]["page"] == "main" and len(ws.sent) == 2
     dev.page = "main"
 
     # während des Kampfs selbst weggewischt → bleibt dort, auch nach dem Kampf
-    await deck._on_combat(True)
+    await deck.bar.devices.on_combat(True)
     dev.page = "main"
-    await deck._on_combat(False)
+    await deck.bar.devices.on_combat(False)
     assert len(ws.sent) == 3
 
     # ohne Kampf dort verbunden → sofort erste Seite
     dev.page = "aion"
-    await deck._follow_combat(dev)
+    await deck.bar.devices.follow_combat(dev)
     assert ws.sent[-1]["page"] == "main" and len(ws.sent) == 4
 
     # ohne Kampf selbst hingewischt → erst nach der Wartezeit zurück
-    await deck._follow_combat(dev, delay=0.01)
+    await deck.bar.devices.follow_combat(dev, delay=0.01)
     assert len(ws.sent) == 4
     await asyncio.sleep(0.05)
     assert ws.sent[-1]["page"] == "main" and len(ws.sent) == 5
 
     # im Kampf schon auf der DPS-Seite → kein goto
     deck.state.update(dps_active=True)
-    await deck._on_combat(True)
-    await deck._follow_combat(dev)
+    await deck.bar.devices.on_combat(True)
+    await deck.bar.devices.follow_combat(dev)
     assert len(ws.sent) == 5
 
 
 async def test_reset_button(tmp_path):
+    from deckbar_daemon.app import NexBoard
     from deckbar_daemon.config import Settings
-    from deckbar_daemon.server import NexBoard
 
     deck = NexBoard(Settings(token="testtoken-123"), tmp_path)
-    deck.layout = Layout.model_validate({"pages": [{"id": "aion", "items": [{"id": "d", "type": "dps", "h": 2}]}]})
+    layout = Layout.model_validate({"pages": [{"id": "aion", "items": [{"id": "d", "type": "dps", "h": 2}]}]})
+    deck.bar.layout.set(layout, save=False)
     sent = []
 
     async def request(cmd, **args):
@@ -206,10 +208,10 @@ async def test_reset_button(tmp_path):
     device.parse(msg)
 
     deck.dps.settings = DpsSettings(source="capture")
-    assert await deck.handle_event(msg, "test") is None
+    assert await deck.bar.handle_event(msg, "test") is None
     assert sent == ["reset"]
 
     # Stream-Overlay des Meters: kein Reset möglich, nur Warnung
     deck.dps.settings = DpsSettings(source="auto")
-    assert await deck.handle_event(msg, "test") is None
+    assert await deck.bar.handle_event(msg, "test") is None
     assert sent == ["reset"]

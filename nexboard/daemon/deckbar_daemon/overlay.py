@@ -309,7 +309,7 @@ class Overlay:
             q.put_nowait(None)
 
     # ------------------------------------------------------------ Programm (User-Dienst)
-    async def _systemctl(self, *args: str) -> tuple[int, str]:
+    async def systemctl(self, *args: str) -> tuple[int, str]:
         if not self.manage_unit and args[0] != "show":
             return 1, "Testinstanz: systemd bleibt unangetastet"
         if not shutil.which("systemctl"):
@@ -320,7 +320,7 @@ class Overlay:
         return proc.returncode or 0, out.decode(errors="replace").strip()
 
     async def refresh_unit(self) -> dict:
-        code, out = await self._systemctl("show", UNIT, "--property=LoadState,ActiveState,UnitFileState")
+        code, out = await self.systemctl("show", UNIT, "--property=LoadState,ActiveState,UnitFileState")
         props = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
         state = props.get("ActiveState") or "unknown"
         self.unit = {"installed": code == 0 and props.get("LoadState") == "loaded",
@@ -329,7 +329,7 @@ class Overlay:
         return self.unit
 
     async def _unit(self, action: str) -> None:
-        code, out = await self._systemctl(action, UNIT)
+        code, out = await self.systemctl(action, UNIT)
         if code:
             log.warning("deckbar-overlay %s: %s", action, out)
         await self.refresh_unit()
