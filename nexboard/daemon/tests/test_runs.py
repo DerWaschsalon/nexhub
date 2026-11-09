@@ -170,7 +170,7 @@ def test_observe_learns_full_names(tmp_path, monkeypatch):
     runs.save(RunSettings(names={"Mo***n|ranger": "Rena7o"}))
     runs.observe({"rows": [{"name": "Morgan", "cls": "ranger"}]})
     assert runs.names()["Mo***n|ranger"] == "Rena7o"
-    assert (tmp_path / "runs.yaml").stat().st_mode & 0o777 == 0o600
+    assert (tmp_path / runs_mod.SETTINGS_FILE).stat().st_mode & 0o777 == 0o600
     # Weltboss mit vielen Fremden: Obergrenze
     monkeypatch.setattr(runs_mod, "MAX_LEARNED", 3)
     runs.observe({"rows": [{"name": f"Spieler{i}", "cls": "cleric"} for i in range(5)]})

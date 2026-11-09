@@ -7,11 +7,11 @@ from typing import Any
 from aiohttp import ClientSession, ClientTimeout, web
 from nexcore import Context, ModuleInfo
 from nexcore.errors import ApiError
-from nexcore.settings import is_mask
+from nexcore.settings import SettingsStore
 
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
-from ..runs import DungeonRuns, RunSettings, render_run
+from ..runs import DungeonRuns, render_run
 from ..state import State
 from .base import WebModule
 
@@ -37,6 +37,13 @@ class RunsModule(WebModule):
     def ui_info(self) -> dict[str, Any]:
         return self.runs.info()
 
+    @property
+    def store(self) -> SettingsStore[Any]:
+        return self.runs.store
+
+    def save_settings(self, value: Any) -> None:
+        self.runs.save(value)
+
     def on_state(self, diff: dict[str, Any]) -> None:
         if diff.get("dps"):
             self.runs.observe(diff["dps"])
@@ -60,11 +67,7 @@ class RunsModule(WebModule):
         return web.json_response(self.runs.info())
 
     async def api_put(self, request: web.Request) -> web.Response:
-        data = await read_object(request)
-        if "webhook" not in data or is_mask(data["webhook"]):  # Platzhalter aus info(): Webhook bleibt
-            data["webhook"] = self.runs.settings.webhook
-        self.runs.save(RunSettings.model_validate(data))
-        await self.changed()
+        await self.update_settings(await read_object(request))
         return ok(**self.runs.info())
 
     async def latest_run(self) -> Any:

@@ -16,18 +16,21 @@ from aiohttp import WSCloseCode, web
 from nexcore import Context, EventBus, Paths, Registry
 from nexcore.errors import ApiError
 from nexcore.registry import CHANGED
-from nexcore.settings import MASK, is_mask
+from nexcore.settings import MASK, SettingsStore, is_mask
 
 from . import __version__
 from .boss_effekte import BossEffekte
+from .bot import SETTINGS_FILE as bot_settings_file
 from .bot import DiscordBot
 from .capture import aion2_running, history_root
 from .config import Settings, save_settings
 from .config import config_dir as default_config_dir
 from .core.http import api_errors, local_only, ok, read_object
 from .core.live import LiveHub
+from .dps import SETTINGS_FILE as dps_settings_file
 from .dps import DpsFeed
 from .hub import Hub
+from .migrate import migrate
 from .modules import CATEGORIES
 from .modules.base import WebModule
 from .modules.bot import BotModule
@@ -41,6 +44,7 @@ from .modules.updates import UpdatesModule
 from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
 from .radar import Radar
+from .runs import SETTINGS_FILE as runs_settings_file
 from .runs import DungeonRuns, a2tools_dir
 from .state import State
 from .updates import Updates
@@ -64,6 +68,7 @@ class NexBoard:
         ctx = Context(self.bus, Paths("deckbar"))
         self.live = LiveHub(self.bus)
         self.state = State()
+        migrate(config_dir)
         self._build_components()
         self.bar = DeckModule(ctx, self.live, lambda: self.settings, self.state, config_dir, WEB_DIR,
                               mdns and settings.mdns, auto_page=lambda: self.dps.settings.auto_page)
@@ -115,11 +120,11 @@ class NexBoard:
         ids = {"deck"}
         if self.settings.update_check:
             ids.add("updates")
-        if (c / "dps.yaml").exists() and self.dps.settings.enabled:
+        if (c / dps_settings_file).exists() and self.dps.settings.enabled:
             ids.add("aion2.dps")
-        if (c / "runs.yaml").exists():
+        if (c / runs_settings_file).exists():
             ids.add("aion2.runs")
-        if (c / "bot.yaml").exists():
+        if (c / bot_settings_file).exists():
             ids.add("discord.bot")
         unit = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / OVERLAY_UNIT
         if self.real_config and unit.exists():
@@ -194,6 +199,8 @@ class NexBoard:
         router.add_put("/api/settings", self.api_put_settings)
         router.add_post("/api/settings/token", self.api_get_token)
         router.add_post("/api/restart", self.api_restart)
+        router.add_get("/api/m/{id}/settings", self.api_get_module_settings)
+        router.add_put("/api/m/{id}/settings", self.api_put_module_settings)
         for module in self.web_modules:
             module.routes(router)
         router.add_static("/static/", WEB_DIR)
@@ -222,6 +229,27 @@ class NexBoard:
         except KeyError as e:
             raise ApiError(404, f"Modul {mid} gibt es nicht") from e
         return ok(changed=changed, **self.modules_info())
+
+    def _module_settings(self, request: web.Request) -> tuple[WebModule, SettingsStore[Any]]:
+        mid = request.match_info["id"]
+        for module in self.web_modules:
+            if module.info.id == mid and module.store:
+                return module, module.store
+        raise ApiError(404, f"Modul {mid} gibt es nicht oder es hat keine Einstellungen")
+
+    @staticmethod
+    def _settings_body(store: SettingsStore[Any]) -> dict[str, Any]:
+        """Einstellungen (Geheimnisse maskiert) und ihr Schema, aus dem die Web-UI das Formular baut."""
+        return {"settings": store.public(), "schema": store.schema()}
+
+    async def api_get_module_settings(self, request: web.Request) -> web.Response:
+        _, store = self._module_settings(request)
+        return web.json_response(self._settings_body(store))
+
+    async def api_put_module_settings(self, request: web.Request) -> web.Response:
+        module, store = self._module_settings(request)
+        await module.update_settings(await read_object(request))
+        return ok(**self._settings_body(store))
 
     async def api_get_settings(self, request: web.Request) -> web.Response:
         return web.json_response(self.settings_info())

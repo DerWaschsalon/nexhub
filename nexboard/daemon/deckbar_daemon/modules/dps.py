@@ -5,11 +5,11 @@ from typing import Any
 
 from aiohttp import web
 from nexcore import Context, ModuleInfo
-from nexcore.settings import is_mask
+from nexcore.settings import SettingsStore
 
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
-from ..dps import STATUS_TEXT, DpsFeed, DpsSettings
+from ..dps import STATUS_TEXT, DpsFeed
 from ..state import State
 from .base import WebModule
 from .deck import DPS_RESET
@@ -33,6 +33,13 @@ class DpsModule(WebModule):
 
     def ui_info(self) -> dict[str, Any]:
         return self.dps.info()
+
+    @property
+    def store(self) -> SettingsStore[Any]:
+        return self.dps.store
+
+    def save_settings(self, value: Any) -> None:
+        self.dps.save(value)
 
     async def start(self) -> None:
         self.spawn(self.dps.watch)
@@ -68,9 +75,5 @@ class DpsModule(WebModule):
         return web.json_response(self.dps.info())
 
     async def api_put(self, request: web.Request) -> web.Response:
-        data = await read_object(request)
-        if "key" not in data or is_mask(data["key"]):  # Platzhalter aus info(): Schlüssel bleibt
-            data["key"] = self.dps.settings.key
-        self.dps.save(DpsSettings.model_validate(data))
-        await self.changed()
+        await self.update_settings(await read_object(request))
         return ok(**self.dps.info())

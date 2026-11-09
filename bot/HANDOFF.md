@@ -169,7 +169,7 @@ gemergt ist.
 
 Update 2026-10-20: gamunex hat das auf dem `modular`-Branch (noch nicht in `main` gemergt)
 bereits gebaut — `daemon/deckbar_daemon/bot.py`, Discord-Bot-Modul mit genau diesem Payload
-(`run_payload()`), inklusive Settings/Web-UI (`dps_url`/`runs_url`/`runs_token` in `bot.yaml`) und
+(`run_payload()`), inklusive Settings/Web-UI (`dps_url`/`runs_url`/`runs_token` in `discord.bot.yaml`) und
 eigenen Tests. Kein Code auf unserer Seite nötig, Format passt exakt gegen unseren bestehenden
 `validate_fight_payload`/`same_api_run` (geprüft, 2026-10-20). Sobald der Branch gemergt ist: nur
 noch `/aion token:True` ausführen und die URL + den Token in DeckBars Bot-Modul eintragen.

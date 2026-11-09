@@ -86,3 +86,18 @@ async def test_device_rejected_when_deck_off(client):
     msg = await ws.receive_json()
     assert msg["type"] == "error" and msg["code"] == "disabled"
     await ws.close()
+
+
+async def test_api_module_settings(client):
+    r = await client.get("/api/m/aion2.dps/settings")
+    body = await r.json()
+    assert r.status == 200 and body["schema"]["title"] == "DpsSettings" and body["settings"]["source"] == "capture"
+    r = await client.put("/api/m/aion2.dps/settings", json={"key": "geheim", "return_after": 30})
+    body = await r.json()
+    assert body["settings"]["key"] == "••••••••" and body["settings"]["return_after"] == 30
+    assert client.deck.dps.settings.key == "geheim"  # Komponente hat den neuen Stand
+    r = await client.put("/api/m/aion2.dps/settings", json={"key": "••••••••", "return_after": 5})
+    assert client.deck.dps.settings.key == "geheim"  # Punkte zurück: Schlüssel bleibt
+    assert (await client.put("/api/m/aion2.dps/settings", json={"return_after": -1})).status == 422
+    assert (await client.get("/api/m/deck/settings")).status == 404  # Touch-Leiste: Layout statt Einstellungen
+    assert (await client.get("/api/m/gibts-nicht/settings")).status == 404

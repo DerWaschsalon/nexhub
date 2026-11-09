@@ -26,8 +26,9 @@ def test_migration(tmp_path):
 
 def test_geheimnisse(tmp_path):
     path = tmp_path / "x.yaml"
-    store = SettingsStore(path, Beispiel)
+    store = SettingsStore(path, Beispiel, header="Beispiel – enthält Geheimnisse")
     store.update({"webhook": "https://example.com/geheim"})
+    assert path.read_text().startswith("# Beispiel – enthält Geheimnisse\n")
     assert store.public()["webhook"] == MASK
     assert path.stat().st_mode & 0o777 == 0o600
     store.update({"webhook": MASK, "name": "Neu"})  # Punkte zurück: Geheimnis bleibt

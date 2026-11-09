@@ -29,15 +29,18 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Literal
 
 import aiohttp
-import yaml
+from nexcore.settings import SECRET, SettingsStore
 from nexproto.classes import CLASS_KEYS
-from pydantic import Field, ValidationError
+from pydantic import Field
 
 from .capture import Capture
-from .config import ID, _atomic_write, _Strict
+from .config import ID, _Strict
 from .state import State
 
 log = logging.getLogger(__name__)
+
+SETTINGS_FILE = "aion2.dps.yaml"  # im Konfig-Ordner, benannt nach dem Modul
+SETTINGS_HEADER = "AION-2-DPS – wird von der Web-UI überschrieben."
 
 DEFAULT_PORT = 18731
 MAX_ROWS = 8
@@ -74,7 +77,7 @@ class DpsSettings(_Strict):
     # Sprache für Boss- und Skillnamen (Daten des Meters)
     lang: Literal["de", "en", "es", "fr", "ja", "ko", "pt", "ru", "zh-Hans", "zh-Hant"] = "en"
     port: int = Field(DEFAULT_PORT, ge=1024, le=65535)
-    key: str = Field("", max_length=128)
+    key: str = Field("", max_length=128, json_schema_extra=SECRET)
     # Bei Kampfbeginn auf diese Seite wechseln (None = nie)
     auto_page: ID | None = None
     # Sekunden ohne neuen Schaden bis Kampfende; danach zeigt die Leiste wieder die erste Seite
@@ -182,9 +185,9 @@ FightListener = Callable[[dict], Awaitable[None]]
 class DpsFeed:
     def __init__(self, state: State, config_dir: Path, on_combat: CombatListener | None = None) -> None:
         self.state = state
-        self.path = config_dir / "dps.yaml"
         self.on_combat = on_combat
-        self.settings = self._load()
+        self.store = SettingsStore(config_dir / SETTINGS_FILE, DpsSettings, header=SETTINGS_HEADER)
+        self.settings = self.store.value
         self.status: Status = "off"
         self.detail = ""
         self.port: int | None = None
@@ -199,22 +202,9 @@ class DpsFeed:
         self.capture = Capture(self._on_view, self._on_capture_change)
 
     # ------------------------------------------------------------ Einstellungen
-    def _load(self) -> DpsSettings:
-        try:
-            data = yaml.safe_load(self.path.read_text()) or {}
-            return DpsSettings.model_validate(data)
-        except FileNotFoundError:
-            return DpsSettings()
-        except (yaml.YAMLError, ValidationError) as e:
-            log.error("%s ungültig, nutze Standardwerte: %s", self.path, e)
-            return DpsSettings()
-
     def save(self, settings: DpsSettings) -> None:
-        header = "# AION-2-DPS – wird von der Web-UI überschrieben.\n"
-        text = yaml.safe_dump(settings.model_dump(exclude_none=True), sort_keys=False, allow_unicode=True)
-        _atomic_write(self.path, header + text, 0o600)  # enthält ggf. den Overlay-Schlüssel
+        self.store.save(settings)
         self.settings = settings
-        self._wake.set()
 
     @property
     def idle_after(self) -> int:

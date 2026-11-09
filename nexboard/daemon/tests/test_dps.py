@@ -114,7 +114,7 @@ async def test_stream_combat_and_bad_key(tmp_path, monkeypatch):
         # 1 s ohne neuen Schaden → Kampfende
         await wait_for(lambda: combat == [True, False], timeout=4)
         assert state.values["dps_active"] is False
-        assert (tmp_path / "dps.yaml").stat().st_mode & 0o777 == 0o600
+        assert (tmp_path / dps_mod.SETTINGS_FILE).stat().st_mode & 0o777 == 0o600
     finally:
         task.cancel()
         await frames.put(None)

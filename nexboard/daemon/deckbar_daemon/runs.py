@@ -18,7 +18,7 @@ Gepostet wird jeder Run mit mindestens einem besiegten Boss, per Discord-Webhook
 Das Meter speichert fremde Namen maskiert („Mo***n“: zwei Zeichen vorn, eins hinten), der
 Live-Stream (State `dps`) zeigt sie aber voll. Die NexBoard merkt sich die vollen Namen
 (Schlüssel „Maske|Klasse“, in runs-state.json); von Hand in der Web-UI Eingetragenes
-(`names` in runs.yaml) hat Vorrang.
+(`names` in aion2.runs.yaml) hat Vorrang.
 """
 from __future__ import annotations
 
@@ -38,16 +38,19 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 import aiohttp
-import yaml
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
-from nexproto.dungeons import EXTRA_DUNGEONS
+from nexcore.settings import SECRET, SettingsStore
 from nexproto.classes import JOB_CLASSES
-from pydantic import Field, ValidationError, field_validator
+from nexproto.dungeons import EXTRA_DUNGEONS
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from pydantic import Field, field_validator
 
 from .config import _atomic_write, _Strict
 from .dps import a2tools_settings_path
 
 log = logging.getLogger(__name__)
+
+SETTINGS_FILE = "aion2.runs.yaml"  # im Konfig-Ordner, benannt nach dem Modul
+SETTINGS_HEADER = "AION-2-Dungeon-Runs nach Discord – wird von der Web-UI überschrieben."
 
 POLL_S = 5
 # Datei erst lesen, wenn das Meter sie so lange nicht mehr angefasst hat
@@ -90,7 +93,7 @@ WEBHOOK_RE = re.compile(r"^https://(?:(?:ptb|canary)\.)?discord(?:app)?\.com/api
 
 class RunSettings(_Strict):
     enabled: bool = False
-    webhook: str = Field("", max_length=200)
+    webhook: str = Field("", max_length=200, json_schema_extra=SECRET)
     # Minuten ohne neuen Bosskampf, nach denen ein Run als beendet gilt
     idle_minutes: int = Field(15, ge=2, le=120)
     # „Mo***n|ranger“ → echter Name
@@ -796,9 +799,9 @@ async def post_discord(session: aiohttp.ClientSession, webhook: str, text: str, 
 # ---------------------------------------------------------------- Dienst
 class DungeonRuns:
     def __init__(self, config_dir: Path) -> None:
-        self.path = config_dir / "runs.yaml"
+        self.store = SettingsStore(config_dir / SETTINGS_FILE, RunSettings, header=SETTINGS_HEADER)
         self.state_path = config_dir / "runs-state.json"
-        self.settings = self._load()
+        self.settings = self.store.value
         self.tracker = RunTracker(self.settings.idle_minutes * 60_000)
         self.mtimes: dict[str, float] = {}  # Dateiname → zuletzt gelesene Änderungszeit
         self.fights: dict[str, Fight] = {}  # alle Dungeon-Kämpfe nach id (Mitspielerliste, Vorschau)
@@ -828,19 +831,8 @@ class DungeonRuns:
         self._cleaned = 0.0
 
     # ------------------------------------------------------------ Einstellungen
-    def _load(self) -> RunSettings:
-        try:
-            return RunSettings.model_validate(yaml.safe_load(self.path.read_text()) or {})
-        except FileNotFoundError:
-            return RunSettings()
-        except (yaml.YAMLError, ValidationError) as e:
-            log.error("%s ungültig, nutze Standardwerte: %s", self.path, e)
-            return RunSettings()
-
     def save(self, settings: RunSettings) -> None:
-        header = "# AION-2-Dungeon-Runs nach Discord – wird von der Web-UI überschrieben.\n"
-        text = yaml.safe_dump(settings.model_dump(), sort_keys=False, allow_unicode=True)
-        _atomic_write(self.path, header + text, 0o600)  # die Webhook-URL ist ein Geheimnis
+        self.store.save(settings)
         self.settings = settings
         self.tracker.idle_ms = settings.idle_minutes * 60_000
 
