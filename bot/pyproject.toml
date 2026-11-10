@@ -9,8 +9,6 @@ select = ["E", "F", "W", "I"]
 # Übergang: Dateien, die der Umbau noch neu schreibt, dürfen lange Zeilen haben. Jeder Schritt
 # streicht seine Dateien hier.
 [tool.ruff.lint.per-file-ignores]
-"bot/modules/aion2/runs/posts.py" = ["E501"]
-"bot/modules/notify/feeds/wizard.py" = ["E501"]
 "bot/cogs/settings.py" = ["E501"]
 
 [tool.mypy]
@@ -32,8 +30,3 @@ mypy_path = ["../packages/nexcore", "../proto"]
 # bot/ und bot/cogs/ haben keine __init__.py (Namespace-Pakete)
 explicit_package_bases = true
 
-# Übergang: Klick-Assistent und Provider der Benachrichtigungen sowie die Run-Annahme (posts.py) sind
-# nur umgezogen, ihre Typangaben folgen in Schritt 7. Bis dahin prüft mypy sie nicht strikt.
-[[tool.mypy.overrides]]
-module = ["bot.modules.notify.feeds.wizard", "bot.modules.notify.feeds.providers.*", "bot.modules.aion2.runs.posts"]
-ignore_errors = true

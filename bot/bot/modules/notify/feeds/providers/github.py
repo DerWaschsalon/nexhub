@@ -45,7 +45,7 @@ COLOR = {
 }
 
 
-def _headers() -> dict:
+def _headers() -> dict[str, Any]:
     h = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     token = os.getenv("GITHUB_TOKEN", "").strip()
     if token:
@@ -63,7 +63,7 @@ def _fmt_date(iso: str | None) -> str:
     return discord.utils.format_dt(dt, "f")
 
 
-def _labels(item: dict) -> str:
+def _labels(item: dict[str, Any]) -> str:
     names = [label.get("name", "") for label in item.get("labels", []) if isinstance(label, dict)]
     return ", ".join(names) if names else "–"
 
@@ -75,7 +75,7 @@ def _add_link_field(e: discord.Embed, url: str | None) -> None:
         e.add_field(name="Link", value=f"[Auf GitHub ansehen]({url})", inline=False)
 
 
-def _match_filters(item: dict, filters: dict) -> bool:
+def _match_filters(item: dict[str, Any], filters: dict[str, Any]) -> bool:
     want_labels = filters.get("labels")
     if want_labels:
         have = {label.get("name", "").lower() for label in item.get("labels", []) if isinstance(label, dict)}
@@ -102,8 +102,8 @@ class GitHubProvider(Provider):
         Field("prereleases", "bool", "Vorab-Releases melden", default=True),
     )
 
-    def filters_from(self, values: dict) -> dict:
-        out: dict = {}
+    def filters_from(self, values: dict[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         labels = [x.strip().lower() for x in (values.get("labels") or "").split(",") if x.strip()]
         if labels:
             out["labels"] = labels
@@ -144,11 +144,11 @@ class GitHubProvider(Provider):
             raise ProviderError(f"Repository „{source}“ nicht gefunden (privat oder falsch geschrieben?).")
         if status != 200:
             raise ProviderError(f"GitHub antwortete mit Status {status}.")
-        return data["full_name"]  # übernimmt die korrekte Groß-/Kleinschreibung von GitHub
+        return str(data["full_name"])  # übernimmt die korrekte Groß-/Kleinschreibung von GitHub
 
     # ---- Einzelne Embeds ----------------------------------------------------------------
 
-    def _release_embed(self, source: str, r: dict) -> discord.Embed:
+    def _release_embed(self, source: str, r: dict[str, Any]) -> discord.Embed:
         e = discord.Embed(
             title="🚀 Neuer Release", description=f"**{r.get('name') or r.get('tag_name')}**",
             url=r.get("html_url"), colour=COLOR["release"],
@@ -161,7 +161,7 @@ class GitHubProvider(Provider):
             e.set_footer(text="Pre-Release")
         return e
 
-    def _issue_embed(self, source: str, i: dict, closed: bool) -> discord.Embed:
+    def _issue_embed(self, source: str, i: dict[str, Any], closed: bool) -> discord.Embed:
         e = discord.Embed(
             title="✅ Issue geschlossen" if closed else "🐛 Neues Issue",
             description=f"**#{i['number']} – {i['title']}**", url=i.get("html_url"),
@@ -173,7 +173,7 @@ class GitHubProvider(Provider):
         _add_link_field(e, i.get("html_url"))
         return e
 
-    def _pr_embed(self, source: str, p: dict, kind: str) -> discord.Embed:
+    def _pr_embed(self, source: str, p: dict[str, Any], kind: str) -> discord.Embed:
         status_text = {"pr_open": "🟢 Open", "pr_closed": "🔴 Closed", "pr_merged": "🟣 Merged"}[kind]
         title = {"pr_open": "🔀 Pull Request", "pr_closed": "🚫 Pull Request geschlossen",
                 "pr_merged": "🟣 Pull Request gemerged"}[kind]
@@ -185,7 +185,7 @@ class GitHubProvider(Provider):
         _add_link_field(e, p.get("html_url"))
         return e
 
-    def _commit_embed(self, source: str, c: dict) -> discord.Embed:
+    def _commit_embed(self, source: str, c: dict[str, Any]) -> discord.Embed:
         commit = c.get("commit") or {}
         message = (commit.get("message") or "").split("\n", 1)[0][:200]
         author = (c.get("author") or {}).get("login") or (commit.get("author") or {}).get("name", "–")
@@ -199,7 +199,9 @@ class GitHubProvider(Provider):
 
     # ---- Abfragen -------------------------------------------------------------------------
 
-    async def _poll_releases(self, source: str, filters: dict, seen: list, out: list[Notification]) -> list:
+    async def _poll_releases(
+        self, source: str, filters: dict[str, Any], seen: list[Any], out: list[Notification]
+    ) -> list[Any]:
         status, data = await self._get(f"/repos/{source}/releases", per_page=10)
         if status == 404:
             raise ProviderError(f"Repository „{source}“ scheint nicht mehr zu existieren.")
@@ -220,8 +222,8 @@ class GitHubProvider(Provider):
         return seen[-50:]
 
     async def _poll_issues(
-        self, source: str, filters: dict, seen: dict, events: list[str], out: list[Notification]
-    ) -> dict:
+        self, source: str, filters: dict[str, Any], seen: dict[str, Any], events: list[str], out: list[Notification]
+    ) -> dict[str, Any]:
         status, data = await self._get(
             f"/repos/{source}/issues", state="all", sort="updated", direction="desc", per_page=30
         )
@@ -247,8 +249,8 @@ class GitHubProvider(Provider):
         return seen
 
     async def _poll_prs(
-        self, source: str, filters: dict, seen: dict, events: list[str], out: list[Notification]
-    ) -> dict:
+        self, source: str, filters: dict[str, Any], seen: dict[str, Any], events: list[str], out: list[Notification]
+    ) -> dict[str, Any]:
         status, data = await self._get(
             f"/repos/{source}/pulls", state="all", sort="updated", direction="desc", per_page=30
         )
@@ -275,7 +277,7 @@ class GitHubProvider(Provider):
                     out.append(Notification("pr_closed", self._pr_embed(source, p, "pr_closed")))
         return seen
 
-    async def _poll_commits(self, source: str, seen: list, out: list[Notification]) -> list:
+    async def _poll_commits(self, source: str, seen: list[Any], out: list[Notification]) -> list[Any]:
         status, data = await self._get(f"/repos/{source}/commits", per_page=10)
         if status == 404:
             raise ProviderError(f"Repository „{source}“ scheint nicht mehr zu existieren.")
@@ -291,7 +293,9 @@ class GitHubProvider(Provider):
             out.append(Notification("commit", self._commit_embed(source, c)))
         return seen[-50:]
 
-    async def poll(self, source, events, filters, state, *, baseline):
+    async def poll(
+        self, source: str, events: list[str], filters: dict[str, Any], state: dict[str, Any], *, baseline: bool
+    ) -> tuple[list[Notification], dict[str, Any]]:
         out: list[Notification] = []
         new_state = dict(state)
         if "release" in events:

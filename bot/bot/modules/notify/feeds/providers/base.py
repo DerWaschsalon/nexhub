@@ -10,6 +10,7 @@ implementieren und sich in `PROVIDERS` eintragen.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import discord
 
@@ -34,9 +35,9 @@ class Provider:
     source_example: str = ""
     source_help: str = ""
     # Zusätzliche Filter fürs Formular im NexHub (hubpages.Field, Schlüssel wie in `filters`)
-    filter_fields: tuple = ()
+    filter_fields: tuple[Any, ...] = ()
 
-    def filters_from(self, values: dict) -> dict:
+    def filters_from(self, values: dict[str, Any]) -> dict[str, Any]:
         """Werte der `filter_fields` aus dem Hub → gespeicherte `filters` (leere fallen weg)."""
         return {k: v for k, v in values.items() if v not in (None, "", [])}
 
@@ -45,8 +46,8 @@ class Provider:
         raise NotImplementedError
 
     async def poll(
-        self, source: str, events: list[str], filters: dict, state: dict, *, baseline: bool
-    ) -> tuple[list[Notification], dict]:
+        self, source: str, events: list[str], filters: dict[str, Any], state: dict[str, Any], *, baseline: bool
+    ) -> tuple[list[Notification], dict[str, Any]]:
         """Neue Meldungen seit `state`, plus aktualisierter Zustand zum Speichern.
 
         `baseline=True` beim allerersten Abruf eines Feeds: nur den Zustand füllen, nichts

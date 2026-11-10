@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 import discord
+
+from bot.db import Database
 
 from .base import Notification, Provider, ProviderError
 from .github import GitHubProvider
@@ -22,7 +25,7 @@ PROVIDERS: dict[str, Provider] = {p.key: p for p in [GitHubProvider(), YouTubePr
 
 
 class NotificationManager:
-    def __init__(self, db) -> None:
+    def __init__(self, db: Database) -> None:
         self.db = db
 
     def provider(self, kind: str) -> Provider | None:
@@ -32,7 +35,7 @@ class NotificationManager:
         for p in PROVIDERS.values():
             await p.close()
 
-    async def poll_feed(self, feed, bot: discord.Client) -> list[Notification] | None:
+    async def poll_feed(self, feed: Any, bot: discord.Client) -> list[Notification] | None:
         """Fragt einen Feed ab, postet neue Meldungen, speichert Zustand/Fehler.
 
         None, wenn nichts zu tun war (unbekannter Provider, deaktiviert, oder ein Fehler, der
@@ -63,8 +66,14 @@ class NotificationManager:
             )
             return None
 
+        if not notifications:
+            await self.db.execute(
+                "UPDATE feeds SET state=?, error=NULL WHERE id=?", (json.dumps(new_state), feed["id"])
+            )
+            return []
+
         channel = bot.get_channel(feed["channel_id"])
-        if notifications and channel is None:
+        if not isinstance(channel, discord.abc.Messageable):
             await self.db.execute(
                 "UPDATE feeds SET error=? WHERE id=?",
                 (f"Zielkanal nicht gefunden oder keine Berechtigung (Kanal-ID {feed['channel_id']}).", feed["id"]),

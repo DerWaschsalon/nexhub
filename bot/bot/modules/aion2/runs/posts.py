@@ -4,9 +4,10 @@ Das NexBoard (nexboard/daemon/deckbar_daemon/bot.py, `run_payload`) schickt nach
 Run `POST /api/aion/fight` mit dem Token aus `/aion` (Bearer). Melden mehrere Mitspieler denselben
 Lauf (gleicher Dungeon, ähnliche Startzeit/Dauer), wartet der Bot kurz, führt die Meldungen zu
 einer Rangliste zusammen und postet genau einmal: Embed mit Text, darüber als Anhang das Run-Bild des
-NexBoards (dasselbe wie beim Discord-Webhook, `image_webp`). Schickt das NexBoard kein Bild (ältere Versionen), malt
-der Bot selbst: Rangliste als Bild und je Boss ein Bild. Der NexHub meldet danach den Link zum Run (`attach_hub_link`, über control.py), der kommt
-vorn ins Feld „📊 Analyse“, daneben die Bestenliste je Boss (`/leaderboard/<guild_id>`).
+NexBoards (dasselbe wie beim Discord-Webhook, `image_webp`). Schickt das NexBoard kein Bild (ältere
+Versionen), malt der Bot selbst: Rangliste als Bild und je Boss ein Bild. Der NexHub meldet danach den
+Link zum Run (`attach_hub_link`, über control.py), der kommt vorn ins Feld „📊 Analyse“, daneben die
+Bestenliste je Boss (`/leaderboard/<guild_id>`).
 
 Erwarteter Payload (ein POST pro abgeschlossenem Lauf, eine Zeile pro Spieler):
     {
@@ -35,7 +36,7 @@ import logging
 import os
 import secrets
 import time
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import discord
 from aiohttp import web
@@ -66,7 +67,7 @@ def public_url() -> str:
     return os.getenv("AION_PUBLIC_URL", "").strip().rstrip("/")
 
 
-def _bad_players(players, prefix: str) -> str | None:
+def _bad_players(players: Any, prefix: str) -> str | None:
     if not isinstance(players, list) or not players:
         return f"{prefix} fehlt oder ist leer"
     for p in players:
@@ -77,7 +78,7 @@ def _bad_players(players, prefix: str) -> str | None:
     return None
 
 
-def validate_fight_payload(data: dict) -> str | None:
+def validate_fight_payload(data: dict[str, Any]) -> str | None:
     """Gibt eine Fehlermeldung zurück, oder None wenn der Payload brauchbar ist."""
     if not isinstance(data.get("dungeon"), str) or not data["dungeon"].strip():
         return "dungeon fehlt"
@@ -100,7 +101,7 @@ def validate_fight_payload(data: dict) -> str | None:
     return None
 
 
-def decode_image(value) -> bytes | None:
+def decode_image(value: Any) -> bytes | None:
     """Run-Bild aus dem Payload: nur echtes WebP bis MAX_IMAGE_BYTES, sonst None (dann malt der Bot)."""
     if not isinstance(value, str) or not value or len(value) > MAX_IMAGE_BYTES * 4 // 3 + 4:
         return None
@@ -113,17 +114,19 @@ def decode_image(value) -> bytes | None:
     return raw
 
 
-def pick_image(reports: list[dict]) -> bytes | None:
+def pick_image(reports: list[dict[str, Any]]) -> bytes | None:
     """Von mehreren Meldungen desselben Laufs das Bild mit den meisten Spielern (dann dem meisten Schaden)."""
     with_image = [r for r in reports if r.get("image")]
     if not with_image:
         return None
     best = max(with_image, key=lambda r: (len(r["players"]), sum(p["damage"] for p in r["players"])))
-    return best["image"]
+    image: bytes = best["image"]
+    return image
 
 
-def same_api_run(a: dict, b: dict) -> bool:
-    if a["dungeon"] != b["dungeon"] or a["bosses_total"] != b["bosses_total"] or a["bosses_killed"] != b["bosses_killed"]:
+def same_api_run(a: dict[str, Any], b: dict[str, Any]) -> bool:
+    same_keys = ("dungeon", "bosses_total", "bosses_killed")
+    if any(a[key] != b[key] for key in same_keys):
         return False
     if abs(a["fight_ms"] - b["fight_ms"]) > DURATION_TOLERANCE_S * 1000:
         return False
@@ -132,15 +135,15 @@ def same_api_run(a: dict, b: dict) -> bool:
     return True
 
 
-def same_run_start(run: dict, dungeon: str, start_ms: int) -> bool:
+def same_run_start(run: dict[str, Any], dungeon: str, start_ms: int) -> bool:
     """Meldet der Hub denselben Lauf? Gleicher Dungeon, Start in der Toleranz wie bei Mehrfachmeldungen."""
-    return run["dungeon"] == dungeon and abs(run["start_ms"] - start_ms) <= API_START_TOLERANCE_MS
+    return bool(run["dungeon"] == dungeon and abs(run["start_ms"] - start_ms) <= API_START_TOLERANCE_MS)
 
 
-def merge_players(reports: list[dict]) -> list[dict]:
+def merge_players(reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Ein Eintrag pro Spielername, über alle Meldungen desselben Laufs — bei Abweichungen
     (unterschiedliche lokale Mitschnitte) gewinnt der höhere Schadenswert."""
-    best: dict[str, dict] = {}
+    best: dict[str, dict[str, Any]] = {}
     for report in reports:
         for p in report["players"]:
             name = p["name"].strip()
@@ -151,10 +154,10 @@ def merge_players(reports: list[dict]) -> list[dict]:
     return sorted(best.values(), key=lambda p: -p["damage"])
 
 
-def merge_bosses(reports: list[dict]) -> list[dict]:
+def merge_bosses(reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Pro Boss (Reihenfolge nach erster Meldung) die Spieler mergen wie bei merge_players."""
     order: list[str] = []
-    per_boss: dict[str, list[dict]] = {}
+    per_boss: dict[str, list[dict[str, Any]]] = {}
     for report in reports:
         for b in report.get("bosses") or []:
             name = b["name"].strip()
@@ -165,7 +168,7 @@ def merge_bosses(reports: list[dict]) -> list[dict]:
     return [{"name": name, "players": merge_players(per_boss[name])} for name in order]
 
 
-def leaderboard_rows(bosses: list[dict], players: list[dict]) -> list[dict]:
+def leaderboard_rows(bosses: list[dict[str, Any]], players: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Pro Boss und Spieler eine Zeile (Schaden, DPS, Klasse falls bekannt) — Kandidaten fürs
     Upsert in `aion_leaderboard` (dort gewinnt dann nur, wer den bisherigen Bestwert übertrifft)."""
     cls_by_name = {p["name"]: p.get("cls") for p in players}
@@ -191,7 +194,7 @@ def with_hub_link(embed: discord.Embed, url: str) -> discord.Embed:
 
 
 def build_run_embed(
-    run: dict, reporters: int, bosses: list[dict] | None = None, guild_id: int | None = None,
+    run: dict[str, Any], reporters: int, bosses: list[dict[str, Any]] | None = None, guild_id: int | None = None,
     hub_url: str | None = None, records: RunResult | None = None,
 ) -> discord.Embed:
     """Nur Text. Die Bilder hängen als Anhang an der Nachricht, nicht im Embed: Bearbeitet der Bot den
@@ -221,8 +224,10 @@ body { margin: 0; min-height: 100vh; color: var(--text); font: 14px/1.5 Inter, s
 main { padding: 20px 16px 60px; max-width: 920px; margin: 0 auto; }
 h1 { font-size: 20px; font-weight: 600; margin: 0 0 6px; }
 .sub { color: var(--dim); margin: 0 0 18px; }
-h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--dim); margin: 0 0 14px; font-weight: 600; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--dim); margin: 0 0 14px;
+  font-weight: 600; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px;
+  margin-bottom: 16px; }
 .bar-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
 .bar-name { width: 140px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-meta { font-size: 11px; color: var(--dim); }
@@ -237,9 +242,9 @@ h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: va
 """
 
 
-def leaderboard_html(guild_name: str, rows: list) -> str:
+def leaderboard_html(guild_name: str, rows: list[Any]) -> str:
     esc = html.escape
-    by_boss: dict[str, list] = {}
+    by_boss: dict[str, list[Any]] = {}
     for r in rows:
         by_boss.setdefault(r["boss"], []).append(r)
     cards = []
@@ -250,8 +255,9 @@ def leaderboard_html(guild_name: str, rows: list) -> str:
         for i, r in enumerate(top, start=1):
             pct = 100 * r["dps"] / best if best else 0
             cls = f' <span class="bar-meta">{esc(r["class"])}</span>' if r["class"] else ""
+            rank_class = f" rank-{i}" if i <= 3 else ""
             lines.append(
-                f'<div class="bar-row{f" rank-{i}" if i <= 3 else ""}"><span class="bar-name">#{i} {esc(r["player"])}{cls}</span>'
+                f'<div class="bar-row{rank_class}"><span class="bar-name">#{i} {esc(r["player"])}{cls}</span>'
                 f'<div class="bar-track"><div class="bar-fill" style="width:{pct:.1f}%"></div></div>'
                 f'<span class="bar-value">{fmt_dps(r["dps"])}</span></div>'
             )
@@ -265,11 +271,11 @@ def leaderboard_html(guild_name: str, rows: list) -> str:
 
 
 class ApiCluster:
-    def __init__(self, run: dict, guild_id: int):
+    def __init__(self, run: dict[str, Any], guild_id: int):
         self.run = run
         self.guild_id = guild_id
-        self.reports: list[dict] = [run]
-        self.task: asyncio.Task | None = None
+        self.reports: list[dict[str, Any]] = [run]
+        self.task: asyncio.Task[None] | None = None
         self.hub_url: str | None = None  # vom NexHub gemeldet (attach_hub_link), sobald hochgeladen
 
 
@@ -284,7 +290,7 @@ class RunPosts(BotModule):
         super().__init__(ctx)
         self.records = RunRecords(ctx.db)
         self.api_pending: dict[int, list[ApiCluster]] = {}  # guild_id -> offene API-Cluster
-        self.api_posted: list[tuple[float, dict, discord.Message]] = []  # (gepostet, Lauf, Nachricht)
+        self.api_posted: list[tuple[float, dict[str, Any], discord.Message]] = []  # (gepostet, Lauf, Nachricht)
         self.runner: web.AppRunner | None = None
 
     def cog(self) -> commands.Cog:
@@ -374,7 +380,7 @@ class RunPosts(BotModule):
         if cluster in clusters:
             clusters.remove(cluster)
         channel = self.client.get_channel(channel_id)
-        if not channel:
+        if not isinstance(channel, discord.abc.Messageable):
             log.warning("AION-API: Zielkanal %s nicht gefunden", channel_id)
             return
         players = merge_players(cluster.reports)
@@ -397,7 +403,9 @@ class RunPosts(BotModule):
             self.api_posted = [p for p in self.api_posted if now - p[0] < POSTED_KEEP_S][-49:]
             self.api_posted.append((now, cluster.run, message))
 
-    async def _run_images(self, cluster: ApiCluster, players: list[dict], bosses: list[dict]) -> list[discord.File]:
+    async def _run_images(
+        self, cluster: ApiCluster, players: list[dict[str, Any]], bosses: list[dict[str, Any]]
+    ) -> list[discord.File]:
         """Das Run-Bild des NexBoards (enthält schon alle Bosse). Ohne eins malt der Bot selbst: Rangliste
         und je Boss ein Bild, höchstens 10 Anhänge pro Discord-Nachricht."""
         image = pick_image(cluster.reports)
@@ -439,7 +447,9 @@ class RunPosts(BotModule):
                 return "edited"
         return "unknown"
 
-    async def _update_leaderboard(self, guild_id: int, bosses: list[dict], players: list[dict]) -> None:
+    async def _update_leaderboard(
+        self, guild_id: int, bosses: list[dict[str, Any]], players: list[dict[str, Any]]
+    ) -> None:
         created = time.time()
         for row in leaderboard_rows(bosses, players):
             await self.db.execute(
