@@ -155,7 +155,6 @@ const COLORS = {
   "aion2.dps": ["#ff7a45", "#ff3d6e"],
   "aion2.overlay": ["#8f7cff", "#4f6bff"],
   "aion2.runs": ["#ffc93d", "#ff8a1f"],
-  "discord.bot": ["#7c8cff", "#5865f2"],
   updates: ["#34d17a", "#13a3a0"],
   system: ["#9aa4bf", "#5d6782"],
 };

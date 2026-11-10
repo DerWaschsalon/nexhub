@@ -186,8 +186,13 @@ async def fake_runs_hub(*statuses):
                                      status=201)
         return web.json_response({"detail": "kaputt"}, status=status)
 
+    async def report(request):
+        got.append(("report", int(request.match_info["run_id"]), await request.json()))
+        return web.json_response({"forwarded": True}, status=202)
+
     app = web.Application()
     app.router.add_post("/api/runs", runs)
+    app.router.add_post("/api/runs/{run_id}/report", report)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "127.0.0.1", 0)
@@ -319,3 +324,24 @@ async def test_fehlende_kampfdatei(tmp_path):
     hub.history_dir = lambda: hist
     await hub.on_run(run)
     assert hub.info()["outbox"] == 0 and "nicht verpackt" in hub.last_upload["text"]
+
+
+async def test_run_bericht_geht_nach_dem_upload_an_den_hub(tmp_path, monkeypatch):
+    from deckbar_daemon import runs as runs_mod
+
+    monkeypatch.setattr(runs_mod, "render_run", lambda r: b"RIFF\0\0\0\0WEBPbild")
+    runner, url, got = await fake_runs_hub()
+    hub = uploading_hub(tmp_path, url)
+    hub.save(hub.settings.model_copy(update={"discord": True}))
+    run, hist = history_run(tmp_path)
+    hub.history_dir = lambda: hist
+    try:
+        await hub.on_run(run)
+        assert sorted(p.name.split(".", 1)[1] for p in (tmp_path / "outbox").iterdir()) == ["nexlog.gz", "report.json"]
+        await hub.flush_outbox()
+        kind, run_id, report = got[1]
+        assert (kind, run_id) == ("report", 1) and report["dungeon_id"] == DUNGEON and report["image_webp"]
+        assert list((tmp_path / "outbox").iterdir()) == []  # beides weg
+    finally:
+        await runner.cleanup()
+        await hub.close()

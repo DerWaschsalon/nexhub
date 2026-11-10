@@ -13,13 +13,14 @@ def board(tmp_path) -> NexBoard:
 
 def test_dependency_graph(tmp_path):
     m = board(tmp_path).modules
-    assert m.requirements("discord.bot") == {"aion2.dps"}
-    assert {"aion2.overlay", "aion2.runs", "discord.bot"} <= m.dependents("aion2.dps")
+    assert m.requirements("aion2.runs") == {"aion2.dps"}
+    assert {"aion2.overlay", "aion2.runs"} <= m.dependents("aion2.dps")
+    assert "discord.bot" not in m.infos  # Runs gehen über den Hub an den Bot (report.py)
     assert m.dependents("deck") == set()
     assert m.requirements("aion2.radar") == {"aion2.schedule"}  # Feldbosse stehen unter Termine
     assert m.requirements("aion2.plugins") == {"aion2.overlay", "aion2.dps"}
     assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.plugins", "aion2.runs", "aion2.schedule",
-                       "aion2.radar", "discord.bot", "hub", "updates"]
+                       "aion2.radar", "hub", "updates"]
     for mid, info in m.infos.items():
         assert all(r in m.infos for r in info.requires), mid
 
@@ -68,11 +69,7 @@ async def test_api_modules_and_settings(client):
     assert (await (await client.post("/api/settings/token")).json())["token"] == "testtoken123"
 
 
-async def test_api_bot_and_overlay(client):
-    r = await client.put("/api/bot", json={"dps_enabled": True, "dps_url": "http://127.0.0.1:1/dps/x"})
-    assert r.status == 200 and (await r.json())["settings"]["dps_url"] == "••••••••"
-    assert (await client.put("/api/bot", json={"dps_url": "nix"})).status == 422
-    assert (await client.post("/api/bot/test/dps")).status == 409  # Modul aus
+async def test_api_overlay(client):
     r = await client.put("/api/overlay", json={"fx": "brennen", "widgets": {"meter": {"x": 10, "y": 20}}})
     o = await r.json()
     assert o["layout"]["fx"] == "brennen" and o["layout"]["widgets"]["meter"]["x"] == 10

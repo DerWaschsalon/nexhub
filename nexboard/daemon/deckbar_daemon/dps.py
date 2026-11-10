@@ -13,7 +13,7 @@ Server-Sent Events:
 
 Daraus wird der State-Schlüssel `dps` (gekürzt, siehe `compact`) und `dps_active`
 (gerade Schaden im Kampf). Endet ein Kampf, bekommen `fight_listeners` den letzten Stand mit
-Gruppen-Flag (`fight_view`, z. B. für den Discord-Bot in bot.py). Port und Schlüssel stehen in
+Gruppen-Flag (`fight_view`, z. B. für den eigenen Charakter im NexLog, hub.py). Port und Schlüssel stehen in
 den Einstellungen des Meters (settings.json) und werden im Modus „auto“ von dort gelesen. Beide
 Quellen liefern dasselbe Zeilenformat, deckbar-capture baut es wie das Stream-Overlay
 (capture/src/view.rs).
@@ -149,7 +149,7 @@ def compact(snap: dict, limit: int = MAX_ROWS) -> dict:
 
 
 def fight_view(snap: dict) -> dict:
-    """Snapshot → Endstand eines Kampfs für Weitergaben (bot.py): alle Zeilen, mit Ziel-ID, Boss und
+    """Snapshot → Endstand eines Kampfs für Weitergaben (hub.py): alle Zeilen, mit Ziel-ID, Boss und
     Gruppen-Flag. `party` ist None, wenn die Quelle es nicht kennt (A2Tools-Stream, altes deckbar-capture)."""
     rows = []
     for r in snap.get("rows") or []:
@@ -197,7 +197,7 @@ class DpsFeed:
         self.detail = ""
         self.port: int | None = None
         self.status_listeners: list[Callable[[], Awaitable[None]]] = []
-        # Kampfende: letzter Stand mit Zeilen (fight_view), z. B. für den Discord-Bot
+        # Kampfende: letzter Stand mit Zeilen (fight_view), z. B. für den Hub
         self.fight_listeners: list[FightListener] = []
         self.fight: dict | None = None
         self._pending: set[asyncio.Task] = set()

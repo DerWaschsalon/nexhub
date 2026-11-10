@@ -61,6 +61,7 @@ RECORDS_FIELD = "🏆 Rekorde"
 HUB_LINK_TEXT = "Im NexHub ansehen"
 MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Run-Bild vom NexBoard, gemessen 200–400 KB
 TOKEN_BYTES = 24
+MAX_URL = 500
 POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
 
 
@@ -302,6 +303,7 @@ class RunPosts(BotModule):
         r.open("POST", "/api/aion/fight", self.handle_api_fight, max_body=2 * MAX_IMAGE_BYTES)  # Base64-Bild + Rest
         r.open("GET", "/leaderboard/{guild_id}", self.page_leaderboard)
         r.control("POST", "/control/run-link", self.run_link)
+        r.control("POST", "/control/run", self.run_from_hub)
 
     async def shutdown(self) -> None:
         for clusters in self.api_pending.values():
@@ -331,18 +333,25 @@ class RunPosts(BotModule):
         guild_id = self.db.guild_for_value("aion_api_token", auth[7:]) if auth.startswith("Bearer ") else None
         if guild_id is None:
             return web.json_response({"error": "unauthorized"}, status=401)
-        channel_id = self.db.get_int(guild_id, "aion_channel")
-        if not channel_id:
-            return web.json_response({"error": "kein aion_channel eingerichtet (/aion kanal:)"}, status=409)
         try:
             data = await request.json()
         except ValueError:
             return web.json_response({"error": "invalid json"}, status=400)
         if not isinstance(data, dict):
             return web.json_response({"error": "invalid json"}, status=400)
+        status, body = await self.accept_report(guild_id, data)
+        return web.json_response(body, status=status)
+
+    async def accept_report(self, guild_id: int, data: dict[str, Any],
+                            hub_url: str | None = None) -> tuple[int, dict[str, Any]]:
+        """Ein Run-Bericht, direkt von einem NexBoard oder über den NexHub (`/control/run`, dann mit Link):
+        prüfen und mit Meldungen desselben Runs zu einem Post zusammenführen. Antwort: (Status, Inhalt)."""
+        channel_id = self.db.get_int(guild_id, "aion_channel")
+        if not channel_id:
+            return 409, {"error": "kein aion_channel eingerichtet (/aion kanal:)"}
         error = validate_fight_payload(data)
         if error:
-            return web.json_response({"error": error}, status=400)
+            return 400, {"error": error}
 
         run = {
             "dungeon": data["dungeon"].strip(), "difficulty": (data.get("difficulty") or "").strip() or None,
@@ -355,14 +364,16 @@ class RunPosts(BotModule):
         for c in clusters:
             if same_api_run(c.run, run):
                 c.reports.append(run)
+                c.hub_url = c.hub_url or hub_url
                 log.info("AION-API: Lauf %s bekommt weitere Meldung (jetzt %d)", run["dungeon"], len(c.reports))
-                return web.json_response({"ok": True, "merged": True})
+                return 200, {"ok": True, "merged": True}
 
         delay = self.delay(guild_id)
         cluster = ApiCluster(run, guild_id)
+        cluster.hub_url = hub_url
         clusters.append(cluster)
         cluster.task = asyncio.create_task(self._finalize_api_later(cluster, delay, channel_id))
-        return web.json_response({"ok": True, "merged": False})
+        return 200, {"ok": True, "merged": False}
 
     async def _finalize_api_later(self, cluster: ApiCluster, delay: int, channel_id: int) -> None:
         await asyncio.sleep(delay)
@@ -437,6 +448,23 @@ class RunPosts(BotModule):
                 return "edited"
         return "unknown"
 
+    async def run_from_hub(self, request: web.Request) -> dict[str, Any]:
+        """Der Hub leitet den Run-Bericht eines NexBoards weiter (nexproto RunReport, im Hub geprüft), mit Link
+        zum Run im Hub: wie die Run-API, aber für den Discord-Server des Hubs."""
+        data = await json_body(request)
+        guild_id, report, url = data.get("guild_id"), data.get("report"), data.get("url")
+        if not isinstance(guild_id, int) or isinstance(guild_id, bool) or self.client.get_guild(guild_id) is None:
+            raise ApiError(400, "guild_id fehlt oder der Bot ist auf diesem Server nicht")
+        if not isinstance(report, dict):
+            raise ApiError(400, "report fehlt")
+        if url is not None and not (isinstance(url, str) and url.startswith(("https://", "http://"))
+                                    and len(url) <= MAX_URL):
+            raise ApiError(400, "url ungültig")
+        status, body = await self.accept_report(guild_id, report, url)
+        if status != 200:
+            raise ApiError(status, str(body.get("error")))
+        return body
+
     async def run_link(self, request: web.Request) -> dict[str, Any]:
         """Der Hub hat einen Run gespeichert: Link an den passenden Post (attach_hub_link)."""
         data = await json_body(request)
@@ -445,7 +473,7 @@ class RunPosts(BotModule):
             raise ApiError(400, "dungeon fehlt")
         if not isinstance(start_ms, int) or isinstance(start_ms, bool):
             raise ApiError(400, "start_ms fehlt")
-        if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > MAX_URL:
             raise ApiError(400, "url fehlt oder ungültig")
         return {"result": await self.attach_hub_link(dungeon.strip(), start_ms, url)}
 

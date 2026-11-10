@@ -458,3 +458,59 @@ def test_termin_tafel_und_pings() -> None:
     assert faellige_pings(jetzt, set(faellig)) == []  # nicht doppelt
     # läuft gerade: Riss offen bis 03:10
     assert f"läuft, bis <t:{int(um('2026-10-07 03:10'))}:t>" in str(tafel(um("2026-10-07 03:05")).description)
+
+
+def test_run_report_from_hub_with_link() -> None:
+    """accept_report: Run-API und Steuer-Route /control/run (Bericht über den NexHub) teilen die Annahme."""
+    from aiohttp.test_utils import TestClient, TestServer
+    from nexcore import EventBus, Paths
+
+    from bot.core import BotContext
+    from bot.core.host import module_routes
+    from bot.core.web import RouteTable, control_app
+    from bot.modules.aion2.runs import RunPosts
+    from bot.modules.aion2.runs.posts import ApiCluster
+
+    key = "k" * 32
+    auth = {"Authorization": f"Bearer {key}"}
+    started: list[tuple[ApiCluster, int]] = []
+    players = [{"name": "Gamunex", "cls": "chanter", "damage": 1000, "dps": 10}]
+    report = {"dungeon": "Fire Temple", "bosses_total": 1, "bosses_killed": 1, "start_ms": 1_000,
+              "fight_ms": 100, "players": players}
+
+    async def go() -> None:
+        with tempfile.TemporaryDirectory() as d:
+            db = Database(Path(d) / "t.sqlite3")
+            await db.connect()
+            await db.set(5, "aion_channel", 77)
+            client = SimpleNamespace(get_guild=lambda gid: object() if gid == 5 else None)
+            runs = RunPosts(BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=client))  # type: ignore[arg-type]
+            runs.active = True
+
+            async def finalize(cluster: ApiCluster, _delay: int, channel_id: int) -> None:
+                started.append((cluster, channel_id))
+
+            setattr(runs, "_finalize_api_later", finalize)  # Post im Test nicht abschicken
+            table = RouteTable()
+            module_routes(runs, table)
+            async with TestClient(TestServer(control_app(table, key))) as http:
+                first = await http.post("/control/run", headers=auth, json={
+                    "guild_id": 5, "report": report, "url": "https://hub.example.com/hub/runs/1"})
+                assert first.status == 200 and await first.json() == {"ok": True, "merged": False}
+                # gleicher Run, zweiter Spieler, direkt über die Run-API-Annahme
+                assert await runs.accept_report(5, dict(report)) == (200, {"ok": True, "merged": True})
+                await asyncio.sleep(0)
+                assert (await http.post("/control/run", headers=auth,
+                                        json={"guild_id": 6, "report": report})).status == 400
+                assert (await http.post("/control/run", headers=auth,
+                                        json={"guild_id": 5, "report": {"dungeon": ""}})).status == 400
+                assert (await http.post("/control/run", headers=auth,
+                                        json={"guild_id": 5, "report": report, "url": "ftp://x"})).status == 400
+            await db.set(5, "aion_channel", None)
+            assert (await runs.accept_report(5, dict(report)))[0] == 409
+            await db.close()
+
+    asyncio.run(go())
+    (cluster, channel_id), = started
+    assert channel_id == 77 and len(cluster.reports) == 2
+    assert cluster.hub_url is not None and cluster.hub_url.endswith("/runs/1")

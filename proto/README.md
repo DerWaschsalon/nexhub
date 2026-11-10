@@ -115,6 +115,12 @@ Datenschutz: Die Kampfdateien enthalten Name, Klasse, Ausrüstungswert und Serve
 Spieler im Kampf. In Dungeons ist das die eigene Gruppe (bis 8 Spieler gemessen). Weltbosse
 (Dungeon 0, bis über 200 Spieler) sind keine Runs und werden nicht hochgeladen.
 
+## RunReport
+
+Ein beendeter Dungeon-Run als Rangliste für den Discord-Post (`nexproto/runreport.py`): Dungeon und Bosse
+englisch mit IDs, Spieler mit Klasse, Schaden und DPS, dazu optional das Run-Bild als Base64-WebP. Weg:
+NexBoard (`report.py`) → Hub (`POST /api/runs/{id}/report`) → TheWashBot (Steuer-API `POST /control/run`).
+
 ## Entwickeln
 
 ```

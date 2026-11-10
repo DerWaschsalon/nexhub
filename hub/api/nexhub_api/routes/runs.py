@@ -32,6 +32,7 @@ from sqlalchemy import delete, select
 
 from nexproto import NexLogError, dungeon_label, unpack
 from nexproto.nexlog import MAX_PACKED
+from nexproto.runreport import RunReport
 
 from .. import characters
 from ..analysis import fight_detail, summarize
@@ -66,17 +67,17 @@ class Uploaded(BaseModel):
     duplicate: bool
 
 
-async def tell_bot(http: httpx.AsyncClient, settings: Settings, payload: dict) -> None:
-    """Neuer Run → TheWashBot hängt den Link an seinen Discord-Post (Modul aion2.runs, /control/run-link).
-    Läuft nach der Antwort; ein Fehler hier darf den Upload nicht stören."""
+async def tell_bot(http: httpx.AsyncClient, settings: Settings, action: str, payload: dict) -> None:
+    """An die Steuer-API von TheWashBot (Modul aion2.runs im Bot): `run-link` hängt den Link an einen
+    Post, `run` postet einen Run. Läuft nach der Antwort; ein Fehler hier darf den Upload nicht stören."""
     try:
-        r = await http.post(f"{settings.bot_control_url}/control/run-link", json=payload, timeout=10,
+        r = await http.post(f"{settings.bot_control_url}/control/{action}", json=payload, timeout=10,
                             headers={"Authorization": f"Bearer {settings.bot_control_key}"})
     except httpx.HTTPError as e:
-        log.warning("Bot nicht erreichbar, kein Link im Discord-Post: %s", e)
+        log.warning("Bot nicht erreichbar (%s): %s", action, e)
         return
     if r.status_code != 200:
-        log.warning("Bot lehnt den Run-Link ab (%d): %s", r.status_code, r.text[:200])
+        log.warning("Bot lehnt %s ab (%d): %s", action, r.status_code, r.text[:200])
 
 
 @router.post("", status_code=201)
@@ -119,9 +120,30 @@ async def upload(request: Request, device: CurrentDevice, db: DB, settings: Sett
             log.exception("Run %d: Charakterprofile nicht angelegt", run.id)
     url = f"{settings.hub_base_url}/hub/runs/{run.id}"
     if settings.bot_configured and r.bosses_killed:
-        background.add_task(tell_bot, request.app.state.http, settings,
+        # Für NexBoards, die den Run noch selbst an den Bot schicken; neue melden ihn über /report
+        background.add_task(tell_bot, request.app.state.http, settings, "run-link",
                             {"dungeon": r.dungeon, "start_ms": r.start_ms, "url": url})
     return Uploaded(id=run.id, url=url, duplicate=False)
+
+
+class Forwarded(BaseModel):
+    forwarded: bool  # False: der Hub hat keinen Bot oder keinen Discord-Server eingerichtet
+
+
+@router.post("/{run_id}/report", status_code=202)
+async def report(run_id: int, body: RunReport, request: Request, device: CurrentDevice, db: DB,
+                 settings: SettingsDep, background: BackgroundTasks) -> Forwarded:
+    """Run-Bericht eines hochgeladenen Runs → Discord-Post des Bots, mit Link zum Run im Hub. Einziger Weg
+    vom NexBoard nach Discord (Umbau-Konzept: Daemon → Hub → Bot)."""
+    run = await db.get(Run, run_id)
+    if run is None or run.user_id != device.user_id:
+        raise HTTPException(404, "Run nicht gefunden")
+    if not settings.bot_configured or settings.hub_guild_id is None:
+        return Forwarded(forwarded=False)
+    payload = {"guild_id": settings.hub_guild_id, "report": body.model_dump(),
+               "url": f"{settings.hub_base_url}/hub/runs/{run.id}"}
+    background.add_task(tell_bot, request.app.state.http, settings, "run", payload)
+    return Forwarded(forwarded=True)
 
 
 class RunOut(BaseModel):

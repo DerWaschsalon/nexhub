@@ -15,13 +15,13 @@ import yaml
 from nexcore import atomic_write
 from nexproto.termine import TERMINE
 
-from . import bot, dps, runs, schedule
+from . import dps, runs, schedule
 from .modules import deck
 
 log = logging.getLogger(__name__)
 
 # alte Datei → neue Datei (benannt nach dem Modul)
-RENAMED = {"dps.yaml": dps.SETTINGS_FILE, "runs.yaml": runs.SETTINGS_FILE, "bot.yaml": bot.SETTINGS_FILE}
+RENAMED = {"dps.yaml": dps.SETTINGS_FILE, "runs.yaml": runs.SETTINGS_FILE}
 # (Datei, Schlüssel, neue Datei, neuer Schlüssel): Einstellung am falschen Ort, z. B. eine Leisten-Funktion
 # unter DPS oder die Sprache, die jetzt für alles gilt
 MOVED_KEYS = [(dps.SETTINGS_FILE, "auto_page", deck.SETTINGS_FILE, "auto_page"),

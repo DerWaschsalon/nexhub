@@ -277,3 +277,32 @@ def test_todesursache_vom_radar(client, as_user):
     d = member.get(f"/api/runs/{run_id}/fights/auto_1").json()
     assert d["deaths"][0] == {"name": "Moonlin", "t_ms": 40_000, "revived_ms": 52_000,
                                    "skill": 1801120, "warning": "Todesmal", "lead_ms": 4100}
+
+
+def test_run_bericht_geht_ueber_den_hub_an_den_bot(make_client, fake, as_user):
+    import json
+
+    import httpx
+
+    from .test_bot import BOT
+
+    seen: list[httpx.Request] = []
+    fake.bot = lambda request: seen.append(request) or httpx.Response(200, json={"ok": True})
+    spieler = [{"name": "Testheld", "cls": "ranger", "damage": 1000, "dps": 10}]
+    bericht = {"dungeon": "Ferocious Horn Den", "difficulty": "Normal", "dungeon_id": 600123, "bosses_total": 1,
+               "bosses_killed": 1, "complete": True, "start_ms": 1, "end_ms": 2, "fight_ms": 100, "players": spieler}
+    with make_client(**BOT, hub_guild_id=4242) as c:
+        token = pair(c, as_user(MEMBER))
+        run = upload(c, token, nexlog()).json()
+        seen.clear()  # der Run-Link für alte NexBoards
+        r = c.post(f"/api/runs/{run['id']}/report", json=bericht, headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 202 and r.json() == {"forwarded": True}
+        assert len(seen) == 1 and seen[0].url.path == "/control/run"
+        assert json.loads(seen[0].content) == {"guild_id": 4242, "report": {**bericht, "bosses": [], "image_webp": None},
+                                              "url": run["url"]}
+        # kaputter Bericht und fremder Run
+        bad = c.post(f"/api/runs/{run['id']}/report", json={**bericht, "players": []},
+                     headers={"Authorization": f"Bearer {token}"})
+        assert bad.status_code == 422
+        assert c.post("/api/runs/9999/report", json=bericht,
+                      headers={"Authorization": f"Bearer {token}"}).status_code == 404

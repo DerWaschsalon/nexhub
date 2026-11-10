@@ -10,6 +10,11 @@ der Daemon ein NexLog (proto/README.md) aus den Kampfdateien und Einzeltreffern 
 legt es in den Postausgang (`~/.local/share/deckbar/outbox/`). Von dort geht es raus, sobald der Hub
 erreichbar ist; was nicht ankommt, bleibt liegen und wird später erneut versucht. Nichts davon
 hält Mitschnitt, Leiste oder Overlay auf. Ist das Modul aus, spricht der Daemon den Hub nicht an.
+
+Runs in Discord (Einstellung `discord`, braucht `upload`): Neben dem NexLog liegt im Postausgang der
+Run-Bericht (report.py, nexproto RunReport). Nach dem Upload geht er an den Hub, der ihn an TheWashBot
+weiterleitet – der einzige Weg vom NexBoard nach Discord (Daemon → Hub → Bot). Kommt der Bericht nicht
+an, entfällt nur dieser Post; der Run ist im Hub.
 """
 from __future__ import annotations
 
@@ -29,7 +34,8 @@ from pydantic import Field, field_validator
 
 from . import __version__
 from .config import _Strict
-from .runs import Run, dungeon_parts_en
+from .report import run_report
+from .runs import Run, dungeon_parts_en, run_image
 
 log = logging.getLogger(__name__)
 
@@ -41,6 +47,7 @@ CHECK_EVERY_S = 600  # Gerät noch gültig? So oft, solange das Modul an ist
 MIN_POLL_S = 1.0  # schneller fragt der Daemon nie nach, egal was der Hub sagt
 UPLOAD_TIMEOUT_S = 120
 OUTBOX_MAX_BYTES = 500 * 1024 * 1024  # darüber fliegen die ältesten Runs raus
+NEXLOG, REPORT = ".nexlog.gz", ".report.json"  # Dateien im Postausgang: <Start>-<Dungeon> + Endung
 RETRY_S = (60, 300, 900, 1800)  # Wartezeiten nach einem Fehlschlag, dann bleibt es bei der letzten
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
@@ -71,6 +78,9 @@ class HubSettings(_Strict):
     upload: bool = Field(False, title="Runs hochladen",
                          description="Schickt fertige Runs mit den Namen deiner Mitspieler an den Hub",
                          json_schema_extra=HIDDEN)
+    discord: bool = Field(False, title="Runs in Discord posten",
+                          description="Über den Bot des Hubs in dessen Kanal, mit Link zum Run im Hub",
+                          json_schema_extra=HIDDEN)
 
     @field_validator("url")
     @classmethod
@@ -316,7 +326,11 @@ class Hub:
         except (OSError, ValueError) as e:  # Datei weg oder ungültig (ValidationError ist ein ValueError)
             self._note(False, f"Run nicht verpackt: {str(e)[:200]}")
             return
-        await asyncio.to_thread(self._enqueue, f"{run.start_ms}-{run.dungeon}.nexlog.gz", data)
+        name = f"{run.start_ms}-{run.dungeon}"
+        if self.settings.discord:
+            report = run_report(run, await run_image(run)).model_dump_json()
+            await asyncio.to_thread(self._enqueue_report, name, report)
+        await asyncio.to_thread(self._enqueue, f"{name}{NEXLOG}", data)
         log.info("NexHub: Run %s in den Postausgang (%d KB)", run.name, len(data) // 1024)
         self._failures = 0
         self._wake.set()
@@ -324,7 +338,7 @@ class Hub:
 
     def _queued(self) -> list[Path]:
         try:
-            return sorted(p for p in self.outbox.iterdir() if p.name.endswith(".nexlog.gz"))
+            return sorted(p for p in self.outbox.iterdir() if p.name.endswith(NEXLOG))
         except OSError:
             return []
 
@@ -341,6 +355,28 @@ class Hub:
             total -= oldest.stat().st_size
             oldest.unlink(missing_ok=True)
             log.warning("NexHub: Postausgang voll, %s verworfen", oldest.name)
+
+    def _enqueue_report(self, name: str, report: str) -> None:
+        self.outbox.mkdir(parents=True, exist_ok=True)
+        tmp = self.outbox / (name + REPORT + ".tmp")
+        tmp.write_text(report)
+        tmp.replace(self.outbox / (name + REPORT))
+
+    async def send_report(self, nexlog: Path, run_id: int) -> None:
+        """Run-Bericht zum gerade hochgeladenen NexLog an den Hub (der leitet ihn an den Bot weiter)."""
+        path = nexlog.with_name(nexlog.name.removesuffix(NEXLOG) + REPORT)
+        if not path.exists():
+            return
+        body = await asyncio.to_thread(path.read_text)
+        headers = {"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/json"}
+        try:
+            async with self.session().post(f"{self.settings.url}/api/runs/{run_id}/report", data=body,
+                                           headers=headers, timeout=aiohttp.ClientTimeout(total=UPLOAD_TIMEOUT_S)) as r:
+                if r.status != 202:
+                    log.warning("NexHub: Run-Bericht abgelehnt (%d): %s", r.status, (await r.text())[:200])
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            log.warning("NexHub: Run-Bericht nicht angekommen, kein Discord-Post: %s", e)
+        path.unlink(missing_ok=True)
 
     def _note(self, ok: bool, text: str, url: str | None = None) -> None:
         self.last_upload = {"ok": ok, "text": text, "at": int(time.time()), "url": url}
@@ -365,6 +401,9 @@ class Hub:
                 return
             body = body if isinstance(body, dict) else {}
             if status in (200, 201):
+                if status == 201 and isinstance(body.get("id"), int):
+                    await self.send_report(path, body["id"])
+                path.with_name(path.name.removesuffix(NEXLOG) + REPORT).unlink(missing_ok=True)
                 path.unlink(missing_ok=True)
                 self._failures = 0
                 self._note(True, "schon im Hub" if body.get("duplicate") else "hochgeladen", body.get("url"))
