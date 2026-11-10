@@ -217,7 +217,7 @@ Die Formular-Bereiche stehen einmal in `SECTIONS` (Feldtyp, Beschriftung, Hinwei
 zeichnet daraus seine Formulare. Ein neues Feld = ein `Field(...)`-Eintrag dort.
 
 
-**Neue Funktion in den Hub bringen:** Der Cog bekommt eine Methode `hub_pages()`, die Seiten aus
+**Neue Funktion in den Hub bringen:** Das Modul bekommt eine Methode `pages()`, die Seiten aus
 Blöcken beschreibt (`bot/hubpages.py`): `Form` (Einstellungen aus `SECTIONS`), `Table` (Liste mit
 „Neu anlegen“ und Aktionen je Zeile), `Status` (Kennzahlen mit Knöpfen) und `Actions` (Knöpfe mit
 kleinem Formular). Jede Aktion ist eine Methode `async (ctx, werte, zeile) -> Rückmeldung`, die Werte

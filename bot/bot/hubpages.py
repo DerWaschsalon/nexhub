@@ -1,6 +1,6 @@
-"""Seiten für den NexHub: Jeder Cog beschreibt selbst, was der Bereich „Bot“ im Hub von ihm zeigt.
+"""Seiten für den NexHub: Jedes Modul beschreibt selbst, was der Bereich „Bot“ im Hub von ihm zeigt.
 
-Ein Cog mit einer Methode `hub_pages(self) -> list[Page]` taucht automatisch im Menü des Hubs auf,
+Ein Modul (bot/modules) mit einer Methode `pages(self) -> list[Page]` taucht automatisch im Menü des Hubs auf,
 der Hub kennt keine einzelnen Funktionen. Eine Seite besteht aus Blöcken:
 
 - `Form`: ein Formular-Bereich aus `control.SECTIONS` (Einstellungen, gespeichert über die DB).
@@ -12,7 +12,7 @@ Aktionen bekommen einen `Ctx` (Server, wer im Hub geklickt hat) und die geprüft
 Felder und geben eine kurze Rückmeldung zurück. `UserError`/`ApiError` werden zur Fehlermeldung im
 Hub. Wie die Steuer-API das ausliefert, steht in `cogs/control.py` (`/control/pages…`).
 
-Neue Funktion im Bot = `hub_pages()` im Cog ergänzen, im Hub ist nichts zu tun.
+Neue Funktion im Bot = `pages()` im Modul ergänzen, im Hub ist nichts zu tun.
 """
 
 from __future__ import annotations

@@ -8,7 +8,7 @@ prüft der Hub; der Bot vertraut dem Schlüssel und schreibt den Namen aus `X-Hu
 Discord-Audit-Log, wo er etwas am Server ändert.
 
 Menü und Seiten des Hubs kommen aus `/control/pages`: Formular-Bereiche aus `SECTIONS`, dazu was
-jeder Cog per `hub_pages()` beschreibt (Tabellen, Status, Aktionen, siehe `bot/hubpages.py`). Der
+jedes Modul per `pages()` beschreibt (Tabellen, Status, Aktionen, siehe `bot/hubpages.py`). Der
 Hub zeichnet das allgemein, ohne die einzelnen Funktionen zu kennen. Eigene Endpunkte haben nur
 noch die Seiten mit eigener Oberfläche (Level-Belohnungen, Ankündigungen, eigene Befehle,
 Sichtbarkeits-Matrix, Regel-Text).
@@ -51,7 +51,7 @@ VOICE_TYPES = hubpages.VOICE_TYPES
 # ---- Formular-Bereiche ---------------------------------------------------------------------
 
 # Seiten, die nicht von einem Cog kommen: Formular-Bereiche oben und eigene Seiten im Hub
-# (routes/hub/admin/bot/<id>). Alles andere liefern die Cogs per hub_pages() (siehe hubpages.py).
+# (routes/hub/admin/bot/<id>). Alles andere liefern die Module per pages() (siehe hubpages.py).
 CORE_PAGES: tuple[Page, ...] = (
     Page("", "Übersicht", "Server", order=0, custom=True),
     Page("allgemein", "Allgemein", "Server", (Form("allgemein"),), SECTIONS["allgemein"].description, order=10),
@@ -466,12 +466,7 @@ class Control(commands.Cog):
     # ---- Seiten (hubpages.py) ------------------------------------------------------------------
 
     def all_pages(self) -> list[Page]:
-        pages = list(CORE_PAGES)
-        if hasattr(self.bot, "modules"):  # neue Module (bot/modules) neben den alten Cogs
-            pages.extend(self.bot.modules.pages())
-        for cog in self.bot.cogs.values():
-            if hasattr(cog, "hub_pages"):
-                pages.extend(cog.hub_pages())
+        pages = list(CORE_PAGES) + self.bot.modules.pages()
         return sorted(pages, key=lambda p: (hubpages.group_rank(p.group), p.order, p.title))
 
     def _page(self, request: web.Request) -> Page:
