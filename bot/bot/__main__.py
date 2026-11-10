@@ -28,12 +28,8 @@ COGS = [
     "bot.cogs.aion_dedup",
     "bot.cogs.aion_ranking",
     "bot.cogs.termintafel",
-    "bot.cogs.starboard",
     "bot.cogs.polls",
-    "bot.cogs.birthdays",
-    "bot.cogs.voicestats",
     "bot.cogs.giveaways",
-    "bot.cogs.levels",
     "bot.cogs.server",
 ]
 

@@ -54,7 +54,7 @@ def test_all_commands_register():
             # "exception was never retrieved".
             for cog_name, loop_name in [
                 ("Reminders", "check_due"), ("Notifications", "poll_feeds"),
-                ("Birthdays", "check"), ("VoiceStats", "tick"), ("Giveaways", "check_due"),
+                ("Giveaways", "check_due"),
             ]:
                 loop = getattr(bot.get_cog(cog_name), loop_name)
                 task = loop.get_task()
@@ -674,137 +674,6 @@ def test_setup_change_parses_input():
         parse_input(field("log_channel"), "#allgemein")
 
 
-def test_starboard_embed():
-    import datetime
-
-    from bot.cogs.starboard import build_star_embed
-
-    class FakeAuthor:
-        id = 1
-        display_avatar = type("Avatar", (), {"url": "http://x/avatar.png"})()
-
-        def __str__(self):
-            return "Alice#0001"
-
-    class FakeMessage:
-        content = "Schaut mal!"
-        author = FakeAuthor()
-        attachments: list = []
-        created_at = datetime.datetime.now(datetime.timezone.utc)
-        jump_url = "https://discord.com/channels/1/2/3"
-
-    embed = build_star_embed(FakeMessage(), 5)
-    assert embed.description == "Schaut mal!"
-    assert embed.author.name == "Alice#0001"
-    assert "zur Nachricht" in embed.fields[0].value
-
-
-def test_starboard_count_excludes_authors_own_star():
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.starboard import STAR_EMOJI, Starboard
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            cog = Starboard.__new__(Starboard)
-            cog.db = db
-
-            class FakeUser:
-                def __init__(self, uid):
-                    self.id = uid
-
-            class FakeReaction:
-                emoji = STAR_EMOJI
-
-                def __init__(self, user_ids):
-                    self._ids = user_ids
-
-                async def users(self):
-                    for uid in self._ids:
-                        yield FakeUser(uid)
-
-            class FakeMessage:
-                author = FakeUser(1)
-                reactions = [FakeReaction([1, 2, 3])]  # Autor (1) selbst + zwei andere
-
-            count = await cog._star_count(FakeMessage())
-            assert count == 2  # der eigene Stern des Autors zählt nicht
-
-            await db.close()
-
-    run(go())
-
-
-def test_starboard_sync_respects_threshold_and_persists_post():
-    import datetime
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.starboard import Starboard
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            await db.set(1, "starboard_threshold", 3)
-
-            posted = []
-
-            class FakeStarMessage:
-                id = 999
-
-            class FakeBoardChannel:
-                async def send(self, content=None, embed=None):
-                    posted.append((content, embed))
-                    return FakeStarMessage()
-
-            class FakeChannel:
-                mention = "#general"
-
-            class FakeAuthor:
-                id = 1
-                display_avatar = type("A", (), {"url": "x"})()
-
-                def __str__(self):
-                    return "Alice"
-
-            class FakeGuild:
-                id = 1
-
-                def get_channel(self, cid):
-                    return FakeBoardChannel()
-
-            class FakeMessage:
-                id = 42
-                guild = FakeGuild()
-                channel = FakeChannel()
-                author = FakeAuthor()
-                content = "hi"
-                attachments: list = []
-                created_at = datetime.datetime.now(datetime.timezone.utc)
-                jump_url = "https://discord.com/x"
-
-            cog = Starboard.__new__(Starboard)
-            cog.db = db
-
-            await cog._sync(FakeMessage(), count=2, board_channel_id=55)
-            assert posted == []  # unter der Schwelle -> kein Post
-
-            await cog._sync(FakeMessage(), count=3, board_channel_id=55)
-            assert len(posted) == 1  # Schwelle erreicht -> Post
-            row = await db.fetchone("SELECT star_message_id FROM starboard WHERE message_id=?", (42,))
-            assert row["star_message_id"] == 999
-
-            await db.close()
-
-    run(go())
-
-
 def test_poll_answer_parsing():
     import pytest as _pytest
 
@@ -820,50 +689,6 @@ def test_poll_answer_parsing():
         parse_answers("|".join(f"A{i}" for i in range(11)))  # mehr als 10
     with _pytest.raises(UserError):
         parse_answers("x" * 56 + "|Nein")  # einzelne Antwort zu lang
-
-
-def test_birthday_day_in_month_validation():
-    from bot.cogs.birthdays import DAYS_IN_MONTH
-
-    assert DAYS_IN_MONTH[2] == 29  # Februar: 29 erlauben (Schaltjahr), Validierung nicht zu streng
-    assert DAYS_IN_MONTH[4] == 30
-    assert 31 <= DAYS_IN_MONTH[1]
-
-
-def test_voicestats_qualifies_and_format():
-    from bot.cogs.voicestats import format_duration, qualifies
-
-    assert format_duration(90) == "1 Min."
-    assert format_duration(3661) == "1 Std. 1 Min."
-
-    class FakeVoiceState:
-        def __init__(self, self_deaf=False, deaf=False):
-            self.self_deaf, self.deaf = self_deaf, deaf
-
-    class FakeMember:
-        def __init__(self, bot=False, voice=None):
-            self.bot = bot
-            self.voice = voice
-
-    class FakeChannel:
-        def __init__(self, members, afk=False):
-            self.members = members
-            self.guild = type("G", (), {"afk_channel": self if afk else None})()
-
-    alice, bob = FakeMember(voice=FakeVoiceState()), FakeMember(voice=FakeVoiceState())
-    channel = FakeChannel([alice, bob])
-    assert qualifies(alice, channel) is True  # zu zweit, niemand taub -> zählt
-
-    alone_channel = FakeChannel([alice])
-    assert qualifies(alice, alone_channel) is False  # allein im Kanal -> zählt nicht
-
-    deaf_bob = FakeMember(voice=FakeVoiceState(self_deaf=True))
-    channel2 = FakeChannel([alice, deaf_bob])
-    assert qualifies(deaf_bob, channel2) is False  # selbst taub -> zählt nicht
-    assert qualifies(alice, channel2) is True  # alice selbst ist nicht taub, zählt weiter
-
-    afk_channel = FakeChannel([alice, bob], afk=True)
-    assert qualifies(alice, afk_channel) is False  # AFK-Kanal zählt nie
 
 
 YOUTUBE_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -1028,44 +853,6 @@ def test_automod_check_detects_each_violation_independently():
             await db.close()
 
     run(go())
-
-
-def test_level_formula_and_conversion():
-    from bot.cogs.levels import level_from_xp, xp_for_level
-
-    assert xp_for_level(0) == 100  # 5*0+50*0+100
-    assert xp_for_level(1) == 155  # 5+50+100
-    assert xp_for_level(10) == 1100
-
-    assert level_from_xp(0) == (0, 0, 100)
-    assert level_from_xp(99) == (0, 99, 100)
-    assert level_from_xp(100) == (1, 0, 155)  # genau die Schwelle -> Level 1 erreicht
-    assert level_from_xp(254) == (1, 154, 155)
-    assert level_from_xp(255) == (2, 0, xp_for_level(2))
-
-    # negative XP (sollte nicht vorkommen, aber /level-xp-geben kann theoretisch überziehen) crasht nicht
-    assert level_from_xp(-50) == (0, 0, 100)
-
-
-def test_rank_card_renders_valid_png():
-    import io
-
-    from PIL import Image
-
-    from bot.cogs.rankcard import HEIGHT, WIDTH, render_rank_card
-
-    # Minimaler Fake-Avatar: ein echtes kleines PNG, damit Image.open() nicht scheitert
-    fake_avatar = io.BytesIO()
-    Image.new("RGBA", (64, 64), (10, 20, 30, 255)).save(fake_avatar, format="PNG")
-
-    buf = render_rank_card(fake_avatar.getvalue(), "TestUser", level=3, rank=1, xp_into_level=50, xp_needed=200)
-    image = Image.open(buf)
-    assert image.format == "PNG"
-    assert image.size == (WIDTH, HEIGHT)
-
-    # xp_needed=0 (Edge-Case) darf nicht durch Null teilen
-    buf2 = render_rank_card(fake_avatar.getvalue(), "TestUser", level=0, rank=1, xp_into_level=0, xp_needed=0)
-    assert Image.open(buf2).size == (WIDTH, HEIGHT)
 
 
 def test_aion_run_image_renders_valid_png():

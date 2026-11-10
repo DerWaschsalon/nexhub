@@ -1,6 +1,6 @@
 """Levelsystem: 15–25 XP je Nachricht (60 s Abklingzeit je Mitglied), Sprachzeit mit XP je Minute
-(voice.py), Rangkarte, Rollen-Belohnungen, Kanäle und Rollen ohne XP. Aus, bis ein Server es im Klick-Panel einschaltet, damit kein Server
-ungefragt ein neues Verhalten bekommt."""
+(voice.py), Rangkarte, Rollen-Belohnungen, Kanäle und Rollen ohne XP. Aus, bis ein Server es im
+Klick-Panel einschaltet, damit kein Server ungefragt ein neues Verhalten bekommt."""
 
 from __future__ import annotations
 

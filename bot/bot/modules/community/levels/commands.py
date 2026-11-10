@@ -93,7 +93,8 @@ class LevelsCog(ModuleCog):
         await self.module.store.set_reward(rolle.guild.id, level, rolle.id)
         await interaction.response.send_message(f"Ab Level {level}: {rolle.mention}.", ephemeral=True)
 
-    @app_commands.command(name="level-kanal-ohne-xp", description="Kanal zur Liste ohne XP-Sammeln hinzufügen/entfernen")
+    @app_commands.command(name="level-kanal-ohne-xp",
+                          description="Kanal zur Liste ohne XP-Sammeln hinzufügen/entfernen")
     @app_commands.describe(kanal="Betroffener Kanal", entfernen="Aus der Liste entfernen statt hinzuzufügen")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
@@ -103,7 +104,8 @@ class LevelsCog(ModuleCog):
         await interaction.response.send_message(
             f"{kanal.mention} {'sammelt wieder XP.' if entfernen else 'sammelt keine XP mehr.'}", ephemeral=True)
 
-    @app_commands.command(name="level-rolle-ohne-xp", description="Rolle zur Liste ohne XP-Sammeln hinzufügen/entfernen")
+    @app_commands.command(name="level-rolle-ohne-xp",
+                          description="Rolle zur Liste ohne XP-Sammeln hinzufügen/entfernen")
     @app_commands.describe(rolle="Betroffene Rolle", entfernen="Aus der Liste entfernen statt hinzuzufügen")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)

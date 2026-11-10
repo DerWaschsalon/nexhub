@@ -31,10 +31,14 @@ def build_star_embed(message: discord.Message) -> discord.Embed:
 
 async def star_count(message: discord.Message) -> int:
     """Sterne ohne den des Autors."""
+    count = 0
     for reaction in message.reactions:
-        if str(reaction.emoji) == STAR:
-            return sum(1 async for user in reaction.users() if user.id != message.author.id)
-    return 0
+        if str(reaction.emoji) != STAR:
+            continue
+        async for user in reaction.users():
+            if user.id != message.author.id:
+                count += 1
+    return count
 
 
 async def delete_quietly(message: discord.Message) -> None:
