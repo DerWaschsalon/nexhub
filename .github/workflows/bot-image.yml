@@ -3,7 +3,7 @@ name: Bot-Image
 on:
   push:
     branches: [main]
-    paths: ["bot/**", "proto/**", ".github/workflows/bot-image.yml"]
+    paths: ["bot/**", "proto/**", "packages/nexcore/**", ".github/workflows/bot-image.yml"]
   workflow_dispatch: {}
 
 permissions:
@@ -28,7 +28,9 @@ jobs:
         with:
           context: bot
           # Gemeinsame Formate aus dem Monorepo als Paket (bot/Dockerfile: COPY --from=proto)
-          build-contexts: proto=proto
+          build-contexts: |
+            proto=proto
+            nexcore=packages/nexcore
           push: true
           tags: |
             ghcr.io/derwaschsalon/thewashbot:latest
