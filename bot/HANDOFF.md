@@ -101,7 +101,7 @@ Für Claude Code auf dem Server. Bitte zuerst README.md und diese Datei lesen.
 ## Noch zu bauen (Daves Auswahl)
 
 Fertig:
-- **Server-Status**: `bot/cogs/server.py` + `bot/serverstatus.py` (reine Hilfsfunktionen,
+- **Server-Status**: `bot/modules/system/status/` + `bot/serverstatus.py` (reine Hilfsfunktionen,
   ohne discord.py/docker-Importe) + `bot/selfupdate_helper.py` (eigenständiges Skript). `/server`
   (CPU/RAM/Uptime aus `/proc`, Festplatte unter `/data`, laufende Container über den Docker-Socket),
   `/server-neustart container:` (mit Bestätigung), `/server-update` (zieht `ghcr.io/derwaschsalon/

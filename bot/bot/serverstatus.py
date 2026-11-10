@@ -1,4 +1,4 @@
-"""Reine Hilfsfunktionen für `/server` (siehe `cogs/server.py`) — bewusst ohne discord.py- oder
+"""Reine Hilfsfunktionen für `/server` (siehe `modules/system/status`) — bewusst ohne discord.py- oder
 docker-Importe, damit sie auch der eigenständige Selbst-Update-Helfer (`selfupdate_helper.py`)
 nutzen kann, ohne den ganzen Bot mitzuimportieren, und damit sie sich ohne laufenden Docker-Daemon
 testen lassen.
@@ -76,7 +76,7 @@ def build_recreate_config(inspect_data: dict, new_image: str) -> dict:
     """Übersetzt die Live-Inspect-Daten eines laufenden Containers in die Parameter, um ihn mit
     identischer Konfiguration (Umgebungsvariablen, Volumes, Ports, Restart-Policy, Netzwerk) neu
     anzulegen — nur das Image wird ausgetauscht. Reine Übersetzung ohne Docker-Zugriff, damit sie
-    sich ohne laufenden Daemon testen lässt; `self_update_sync` in `cogs/server.py` nutzt das
+    sich ohne laufenden Daemon testen lässt; `DockerHost` in `modules/system/status` nutzt das
     Ergebnis, um den Helfer-Container (`selfupdate_helper.py`) mit allem Nötigen zu starten."""
     config = inspect_data.get("Config") or {}
     host_config = inspect_data.get("HostConfig") or {}
