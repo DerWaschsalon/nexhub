@@ -445,7 +445,9 @@ def test_aion_update_leaderboard_keeps_only_best():
 def test_aion_records_best_time_and_dps_record():
     from bot.aion_records import RunRecords
     from bot.cogs.aion_dedup import RECORDS_FIELD, build_run_embed
-    from bot.cogs.aion_rangliste import ranking_embed
+    from bot.aion_format import records_text
+    from bot.aion_records import DungeonKey
+    from bot.cogs.aion_ranking import ranking_embed
 
     def make_run(fight_ms: int, killed: int = 3, difficulty: str | None = "Normal") -> dict:
         return {"dungeon": "Feuertempel", "difficulty": difficulty, "bosses_total": 3,
@@ -465,27 +467,29 @@ def test_aion_records_best_time_and_dps_record():
             assert await records.save(1, make_run(200_000, killed=2), make_players(50, 40)) is None
 
             first = await records.save(1, make_run(360_000), make_players(30, 20))
-            assert first.best_before_ms is None and "Erste Bestzeit" in first.lines()
-            assert first.personal_bests == []  # erster Run ist keine Bestleistung
+            assert first.best_before_ms is None and "Erste Bestzeit" in records_text(first)
+            assert first.personal_bests == ()  # erster Run ist keine Bestleistung
 
             slower = await records.save(1, make_run(400_000), make_players(25, 22))
             assert (slower.place, slower.runs) == (2, 2) and slower.dps_record is None
-            assert slower.personal_bests == ["Ben"]
-            assert "Platz 2 von 2" in slower.lines()
+            assert slower.personal_bests == ("Ben",)
+            assert "Platz 2 von 2" in records_text(slower)
 
             faster = await records.save(1, make_run(330_000), make_players(45, 21))
-            assert "Neue Bestzeit!" in faster.lines() and "6:00" in faster.lines()
-            assert faster.dps_record["player"] == "Anna" and faster.dps_record["before_dps"] == 30
-            assert faster.personal_bests == []  # Anna steht schon in der Rekordzeile, Ben unter 22
+            assert "Neue Bestzeit!" in records_text(faster) and "6:00" in records_text(faster)
+            assert faster.dps_record.player == "Anna" and faster.dps_record.previous_dps == 30
+            assert faster.personal_bests == ()  # Anna steht schon in der Rekordzeile, Ben unter 22
 
             # Andere Schwierigkeit zählt getrennt
             hard = await records.save(1, make_run(500_000, difficulty="Hard"), make_players(10, 10))
             assert hard.best_before_ms is None
 
-            times, players = await records.ranking(1, "Feuertempel", "Normal")
-            assert [t["fight_ms"] for t in times] == [330_000, 360_000, 400_000]
-            assert [(p["player"], p["dps"]) for p in players] == [("Anna", 45), ("Ben", 22)]
-            assert await records.dungeons(1, "feuer") == [("Feuertempel", "Hard"), ("Feuertempel", "Normal")]
+            normal = DungeonKey(1, "Feuertempel", "Normal")
+            times = await records.fastest(normal)
+            players = await records.best_players(normal)
+            assert [t.fight_ms for t in times] == [330_000, 360_000, 400_000]
+            assert [(p.player, p.dps) for p in players] == [("Anna", 45), ("Ben", 22)]
+            assert await records.dungeons(1, "feuer") == [DungeonKey(1, "Feuertempel", "Hard"), normal]
             assert await records.dungeons(2, "") == []  # anderer Server
 
             embed = build_run_embed(make_run(330_000), reporters=1, records=faster)
