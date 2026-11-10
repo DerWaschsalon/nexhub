@@ -1,8 +1,13 @@
 """Steuer-API für den NexHub (bot/cogs/control.py) mit nachgebautem Discord-Server."""
+
+from __future__ import annotations
+
 import asyncio
 import tempfile
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import discord
@@ -18,44 +23,46 @@ from bot.modules.server.announcements import Announcements
 from bot.modules.server.custom_commands import CustomCommands
 from bot.modules.server.verification import Verification
 
+Client = TestClient[Any, Any]
 KEY = "k" * 32
 AUTH = {"Authorization": f"Bearer {KEY}"}
 GUILD = 900000000000000001  # größer als 2^53: muss als String durch die API
 
 
 class FakeRole:
-    def __init__(self, rid, name, position, *, default=False, managed=False):
+    def __init__(self, rid: int, name: str, position: int, *, default: bool = False, managed: bool = False) -> None:
         self.id, self.name, self.position = rid, name, position
         self.managed = managed
         self._default = default
         self.color = discord.Colour(0)
         self.permissions = discord.Permissions(view_channel=default)
 
-    def is_default(self):
+    def is_default(self) -> bool:
         return self._default
 
-    def __lt__(self, other):
+    def __lt__(self, other: FakeRole) -> bool:
         return self.position < other.position
 
-    def __ge__(self, other):
+    def __ge__(self, other: FakeRole) -> bool:
         return self.position >= other.position
 
 
 class FakeChannel:
-    def __init__(self, cid, name, ctype, position, category=None):
+    def __init__(self, cid: int, name: str, ctype: discord.ChannelType, position: int,
+                 category: FakeChannel | None = None) -> None:
         self.id, self.name, self.type, self.position, self.category = cid, name, ctype, position, category
-        self.overwrites: dict = {}
-        self.channels: list = []
+        self.overwrites: dict[Any, discord.PermissionOverwrite] = {}
+        self.channels: list[FakeChannel] = []
 
-    def overwrites_for(self, target):
+    def overwrites_for(self, target: Any) -> discord.PermissionOverwrite:
         return self.overwrites.get(target, discord.PermissionOverwrite())
 
-    async def set_permissions(self, role, *, view_channel, reason):
+    async def set_permissions(self, role: FakeRole, *, view_channel: bool, reason: str) -> None:
         self.overwrites[role] = discord.PermissionOverwrite(view_channel=view_channel)
         self.last_reason = reason
 
 
-def fake_guild():
+def fake_guild() -> Any:
     everyone = FakeRole(GUILD, "@everyone", 0, default=True)
     member = FakeRole(GUILD + 10, "Mitglied", 1)
     bot_role = FakeRole(GUILD + 11, "TheWashBot", 5, managed=True)
@@ -75,9 +82,9 @@ def fake_guild():
     )
 
 
-def run(test):
+def run(test: Callable[[Client, Database, Any], Awaitable[None]]) -> None:
     """Startet die Steuer-API mit echter Datenbank und ruft `test(client, db, guild)` auf."""
-    async def go():
+    async def go() -> None:
         with tempfile.TemporaryDirectory() as d:
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
@@ -91,7 +98,7 @@ def run(test):
                                                       Verification(ctx))}
             bot.modules = SimpleNamespace(module=lambda mid, kind: modules[mid], pages=lambda: [])
             guild.bot = bot  # für Tests, die gemeldete Ereignisse prüfen
-            cog = Control(bot)
+            cog = Control(bot)  # type: ignore[arg-type]  # nachgebauter Bot statt echtem Discord-Client
             cog.key = KEY
             async with TestClient(TestServer(cog.make_app())) as client:
                 await test(client, db, guild)
@@ -99,14 +106,14 @@ def run(test):
     asyncio.run(go())
 
 
-async def call(client, method, path, body=None, status=200):
+async def call(client: Client, method: str, path: str, body: Any = None, status: int = 200) -> Any:
     resp = await client.request(method, path, headers=AUTH, json=body)
     assert resp.status == status, await resp.text()
     return None if status == 204 else await resp.json()
 
 
-def test_key_required():
-    async def test(client, db, guild):
+def test_key_required() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         assert (await client.get("/control/status")).status == 401
         bad = await client.get("/control/status", headers={"Authorization": "Bearer falsch"})
         assert bad.status == 401
@@ -114,8 +121,8 @@ def test_key_required():
     run(test)
 
 
-def test_guild_ids_are_strings_and_roles_filtered():
-    async def test(client, db, guild):
+def test_guild_ids_are_strings_and_roles_filtered() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         data = await call(client, "GET", "/control/guild")
         assert data["id"] == str(GUILD)
         assert [c["kind"] for c in data["channels"]] == ["category", "text", "voice"]
@@ -130,8 +137,8 @@ def test_guild_ids_are_strings_and_roles_filtered():
     run(test)
 
 
-def test_section_save_validates_before_writing():
-    async def test(client, db, guild):
+def test_section_save_validates_before_writing() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         sections = {s["id"]: s for s in await call(client, "GET", "/control/sections")}
         antispam = next(f for f in sections["allgemein"]["fields"] if f["key"] == "antispam")
         assert antispam["value"] is True  # Standard an, ohne gespeicherten Wert
@@ -152,8 +159,8 @@ def test_section_save_validates_before_writing():
     run(test)
 
 
-def test_section_int_zero_and_warn_action():
-    async def test(client, db, guild):
+def test_section_int_zero_and_warn_action() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         await call(client, "PUT", "/control/sections/verwarnungen",
                    {"values": {"warn_threshold": 3, "warn_action": "kick"}})
         assert (db.get(GUILD, "warn_threshold"), db.get(GUILD, "warn_action")) == ("3", "kick")
@@ -175,8 +182,8 @@ def test_section_int_zero_and_warn_action():
     run(test)
 
 
-def test_section_id_lists():
-    async def test(client, db, guild):
+def test_section_id_lists() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         values = {"level_no_xp_roles": [str(GUILD + 10), str(GUILD + 10)], "level_no_xp_channels": []}
         out = await call(client, "PUT", "/control/sections/level", {"values": values})
         assert db.get(GUILD, "level_no_xp_roles") == str(GUILD + 10)
@@ -186,8 +193,8 @@ def test_section_id_lists():
     run(test)
 
 
-def test_aion_token_action():
-    async def test(client, db, guild):
+def test_aion_token_action() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         out = await call(client, "POST", "/control/sections/aion/actions/token")
         token = db.get(GUILD, "aion_api_token")
         assert token and any(i["value"] == token for i in out["info"])
@@ -195,8 +202,8 @@ def test_aion_token_action():
     run(test)
 
 
-def test_level_rewards():
-    async def test(client, db, guild):
+def test_level_rewards() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         rows = await call(client, "PUT", "/control/level-rewards/5", {"role_id": str(GUILD + 10)})
         assert rows == [{"level": 5, "role_id": str(GUILD + 10), "role": "Mitglied"}]
         # Über der eigenen Rolle bzw. Integrationsrolle kann der Bot nicht vergeben
@@ -208,8 +215,8 @@ def test_level_rewards():
     run(test)
 
 
-def test_announcements_and_commands():
-    async def test(client, db, guild):
+def test_announcements_and_commands() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         rows = await call(client, "POST", "/control/announcements",
                           {"channel_id": str(GUILD + 21), "text": "Hallo", "interval_minutes": 60})
         assert rows[0]["channel"] == "chat" and rows[0]["interval_minutes"] == 60
@@ -226,8 +233,8 @@ def test_announcements_and_commands():
     run(test)
 
 
-def test_matrix_toggle_with_reason():
-    async def test(client, db, guild):
+def test_matrix_toggle_with_reason() -> None:
+    async def test(client: Client, db: Database, guild: Any) -> None:
         data = await call(client, "GET", "/control/matrix")
         assert [r["name"] for r in data["roles"]] == ["Admin", "Mitglied"]
         assert [(r["name"], r["category"]) for r in data["rows"]] == \
