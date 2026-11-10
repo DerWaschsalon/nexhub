@@ -1,6 +1,6 @@
 """Einstellungs-Bereiche: welche Felder zusammen auf einer Seite stehen, und wie sie gelesen, geprüft
-und gespeichert werden. Eine Stelle für Hub-Formular (cogs/control.py), Klick-Panel (panel.py) und
-`/setup ändern` (cogs/settings.py).
+und gespeichert werden. Eine Stelle für Hub-Formular (admin/control.py), Klick-Panel (panel.py) und
+`/setup ändern` (admin/setup.py).
 
 Die Felder kommen aus den Settings-Modellen der Module (`bot.core.schema.setting`). Gespeichert wird
 wie bisher ein Eintrag je Feld in der Tabelle settings. Nach dem Speichern meldet der Bot das

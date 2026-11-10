@@ -1,5 +1,5 @@
 """🔔 Klick-Assistent für Benachrichtigungen: Dienst, Quelle, Ereignisse, Kanal, Filter, dazu die
-Verwaltung bestehender Feeds. Hängt am Klick-Panel (cogs/settings.py, Knopf „Benachrichtigungen“).
+Verwaltung bestehender Feeds. Hängt am Klick-Panel (admin/setup.py, Knopf „Benachrichtigungen“).
 Kennt nur `providers.base.Provider`; ein neuer Dienst kommt in `providers/manager.py` dazu."""
 
 from __future__ import annotations
@@ -520,7 +520,7 @@ class NotificationsHomeView(discord.ui.View):
                        custom_id="notif:open:settings_back")
     async def back_to_settings(self, interaction: discord.Interaction,
                                _button: discord.ui.Button[NotificationsHomeView]) -> None:
-        from bot.cogs.settings import SettingsPanel, Setup  # lokal: das Panel öffnet seinerseits diesen Assistenten
+        from bot.admin.setup import SettingsPanel, Setup  # lokal: das Panel öffnet seinerseits diesen Assistenten
 
         client = interaction.client
         setup_cog = client.get_cog("Setup") if isinstance(client, commands.Bot) else None

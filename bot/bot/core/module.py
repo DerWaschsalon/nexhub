@@ -20,6 +20,7 @@ from nexcore import Context, Module
 
 from ..db import Database
 from ..hubpages import Page
+from .web import RouteTable
 
 Listener = Callable[..., Coroutine[Any, Any, None]]
 
@@ -48,6 +49,10 @@ class BotModule(Module):
     def pages(self) -> list[Page]:
         """Seiten des Moduls im NexHub (Tabellen, Status, Aktionen; siehe bot/hubpages.py)."""
         return []
+
+    def routes(self, r: RouteTable) -> None:
+        """Web-Routen des Moduls: `r.control(...)` für die Steuer-API des Hubs, `r.open(...)` für
+        öffentliche Endpunkte. Ist das Modul aus, antworten sie mit 503 (siehe ModuleHost)."""
 
     def every(self, seconds: float, job: Callable[[], Awaitable[Any]]) -> None:
         """job sofort nach dem Login und dann alle `seconds` Sekunden, solange das Modul an ist."""

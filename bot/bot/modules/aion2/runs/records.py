@@ -3,7 +3,7 @@
 Gewertet werden nur vollständige Runs (alle Bosse besiegt), getrennt nach Dungeon und Schwierigkeit.
 Die Rangliste der Spieler geht nach DPS, weil der Gesamtschaden mit der Kampfzeit wächst.
 Diese Datei speichert und rechnet nur; den Text für Discord baut `aion_format.records_text`.
-`aion_dedup.py` speichert jeden geposteten Run, `/dungeon-rangliste` (cogs/aion_ranking.py) liest.
+`posts.py` speichert jeden geposteten Run, `/dungeon-rangliste` (commands.py) liest.
 """
 
 from __future__ import annotations

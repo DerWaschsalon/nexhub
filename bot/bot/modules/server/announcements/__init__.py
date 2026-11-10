@@ -11,8 +11,10 @@ from discord.ext import commands
 from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule
+from bot.core.web import RouteTable
 from bot.db import Database
 from bot.errors import UserError
+from bot.hubpages import Page
 
 CHECK_EVERY_S = 60
 MINUTE_S = 60
@@ -65,6 +67,16 @@ class Announcements(BotModule):
         from .commands import AnnouncementsCog
 
         return AnnouncementsCog(self)
+
+    def pages(self) -> list[Page]:
+        from .hub import announcements_page
+
+        return [announcements_page()]
+
+    def routes(self, r: RouteTable) -> None:
+        from .hub import announcement_routes
+
+        announcement_routes(self, r)
 
     async def post_due(self) -> None:
         now = time.time()

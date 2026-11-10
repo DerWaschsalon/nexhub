@@ -9,18 +9,14 @@ import sys
 import discord
 from discord.ext import commands
 
+from .admin.control import ControlApi
+from .admin.setup import Setup
 from .core import ModuleHost
 from .db import Database
 from .errors import UserError
 from .modules import MODULES
 
 log = logging.getLogger("bot")
-
-COGS = [
-    "bot.cogs.settings",
-    "bot.cogs.control",
-]
-
 
 class Bot(commands.Bot):
     def __init__(self, db: Database, *, sync: bool = True):
@@ -36,15 +32,15 @@ class Bot(commands.Bot):
             tree_cls=CommandTree,
         )
         self.db = db
-        # Neue Module (bot/modules) neben den alten Cogs, bis alle umgezogen sind
         self.modules = ModuleHost(self, db, MODULES, db.path.parent / "modules.yaml")
+        self.setup_cog = Setup(self)
+        self.control = ControlApi(self)
         self._sync = sync
 
     async def setup_hook(self) -> None:
         await self.db.connect()
-        for cog in COGS:
-            await self.load_extension(cog)
-        await self.modules.start()
+        await self.add_cog(self.setup_cog)
+        await self.modules.start(admin=self.control.routes)
         if not self._sync:
             return
         dev_guild = os.getenv("DEV_GUILD_ID", "").strip()
@@ -58,12 +54,8 @@ class Bot(commands.Bot):
         log.info("%d Slash-Befehle registriert", len(synced))
 
     async def on_ready(self) -> None:
-        from .cogs.settings import Setup  # lokal: der Cog importiert seinerseits Bot
-
         log.info("Angemeldet als %s, %d Server", self.user, len(self.guilds))
-        setup_cog = self.get_cog("Setup")
-        if isinstance(setup_cog, Setup):
-            await setup_cog.register_persistent_views()
+        await self.setup_cog.register_persistent_views()
 
     async def close(self) -> None:
         await self.modules.stop()
