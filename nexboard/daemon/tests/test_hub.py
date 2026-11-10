@@ -345,3 +345,15 @@ async def test_run_bericht_geht_nach_dem_upload_an_den_hub(tmp_path, monkeypatch
     finally:
         await runner.cleanup()
         await hub.close()
+
+
+def test_discord_schalter_aus_der_web_ui(tmp_path):
+    """Der Schalter „In Discord posten“ (web/js/modules/hub.js) speichert `discord` und zeigt ihn wieder an."""
+    hub = Hub(tmp_path)
+    assert hub.info()["settings"]["discord"] is False
+    hub.update({"upload": True, "discord": True, "token": "darf-nicht-durch"})
+    assert hub.info()["settings"]["discord"] is True
+    again = Hub(tmp_path)
+    assert again.settings.discord is True and again.settings.token == ""
+    hub.update({"discord": False})
+    assert Hub(tmp_path).settings.discord is False
