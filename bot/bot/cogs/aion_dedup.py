@@ -3,8 +3,8 @@
 Das NexBoard (nexboard/daemon/deckbar_daemon/bot.py, `run_payload`) schickt nach jedem beendeten
 Run `POST /api/aion/fight` mit dem Token aus `/aion` (Bearer). Melden mehrere Mitspieler denselben
 Lauf (gleicher Dungeon, ähnliche Startzeit/Dauer), wartet der Bot kurz, führt die Meldungen zu
-einer Rangliste zusammen und postet genau einmal: Embed mit dem Run-Bild des NexBoards (dasselbe
-wie beim Discord-Webhook, `image_webp`). Schickt das NexBoard kein Bild (ältere Versionen), malt
+einer Rangliste zusammen und postet genau einmal: Embed mit Text, darüber als Anhang das Run-Bild des
+NexBoards (dasselbe wie beim Discord-Webhook, `image_webp`). Schickt das NexBoard kein Bild (ältere Versionen), malt
 der Bot selbst: Rangliste als Bild und je Boss ein Bild. Der NexHub meldet danach den Link zum Run (`attach_hub_link`, über control.py), der kommt
 vorn ins Feld „📊 Analyse“, daneben die Bestenliste je Boss (`/leaderboard/<guild_id>`).
 
@@ -185,33 +185,18 @@ def with_hub_link(embed: discord.Embed, url: str) -> discord.Embed:
     return embed.add_field(name=ANALYSIS_FIELD, value=hub_link(url), inline=False)
 
 
-def keep_attachment_images(embeds: list[discord.Embed], attachments) -> list[discord.Embed]:
-    """Beim Bearbeiten zeigen die Embeds auf die CDN-Adresse ihres Anhangs statt auf attachment://.
-    So zurückgeschickt, zeigt Discord den Anhang zusätzlich unter dem Post (Bild doppelt)."""
-    by_url = {}
-    for a in attachments:
-        by_url[a.url.split("?")[0]] = a.filename
-        if getattr(a, "proxy_url", None):
-            by_url[a.proxy_url.split("?")[0]] = a.filename
-    for e in embeds:
-        name = by_url.get((e.image.url or "").split("?")[0])
-        if name:
-            e.set_image(url=f"attachment://{name}")
-    return embeds
-
-
 def build_run_embed(
     run: dict, reporters: int, bosses: list[dict] | None = None, guild_id: int | None = None,
-    image_filename: str | None = None, hub_url: str | None = None, records: RunResult | None = None,
+    hub_url: str | None = None, records: RunResult | None = None,
 ) -> discord.Embed:
+    """Nur Text. Die Bilder hängen als Anhang an der Nachricht, nicht im Embed: Bearbeitet der Bot den
+    Post später (Hub-Link), zeigte Discord ein Bild im Embed sonst ein zweites Mal als Anhang."""
     title = f"⚔️ {run['dungeon']}" + (f" ({run['difficulty']})" if run.get("difficulty") else "")
     e = discord.Embed(title=title, colour=discord.Colour.gold())
     e.add_field(name="Bosse", value=f"{run['bosses_killed']}/{run['bosses_total']} besiegt")
     e.add_field(name="Kampfzeit", value=fmt_time(run["fight_ms"]))
     if records:
         e.add_field(name=RECORDS_FIELD, value=records.lines(), inline=False)
-    if image_filename:
-        e.set_image(url=f"attachment://{image_filename}")
     links = [hub_link(hub_url)] if hub_url else []
     if guild_id and bosses and public_url():
         links.append(f"[Bestenliste]({public_url()}/leaderboard/{guild_id})")
@@ -367,37 +352,13 @@ class AionDedup(commands.Cog):
         if bosses:
             await self._update_leaderboard(cluster.guild_id, bosses, players)
         records = await self.records.save(cluster.guild_id, cluster.run, players)
-        image = pick_image(cluster.reports)
-        image_filename = ("aion_run.webp" if image else "aion_run.png") if players else None
         embed = build_run_embed(
             cluster.run, len(cluster.reports), bosses, guild_id=cluster.guild_id,
-            image_filename=image_filename, hub_url=cluster.hub_url, records=records,
+            hub_url=cluster.hub_url, records=records,
         )
-        embeds = [embed]
-        files = []
-        loop = asyncio.get_running_loop()
-        if image_filename and image:  # Bild des NexBoards, enthält schon alle Bosse
-            files.append(discord.File(io.BytesIO(image), filename=image_filename))
-        elif image_filename:
-            from .aion_image import render_run_image
-
-            image_buf = await loop.run_in_executor(
-                None, render_run_image, cluster.run["dungeon"], cluster.run.get("difficulty"), players,
-                cluster.run["bosses_killed"], cluster.run["bosses_total"], cluster.run["fight_ms"],
-            )
-            files.append(discord.File(image_buf, filename=image_filename))
-        # max. 10 Embeds pro Discord-Nachricht, eines geht an das Haupt-Embed oben
-        for i, b in enumerate([] if image else bosses[:9]):
-            from .aion_image import render_boss_image
-
-            boss_buf = await loop.run_in_executor(None, render_boss_image, b["name"], b["players"])
-            boss_filename = f"aion_boss_{i}.png"
-            files.append(discord.File(boss_buf, filename=boss_filename))
-            boss_embed = discord.Embed(title=b["name"], colour=discord.Colour.gold())
-            boss_embed.set_image(url=f"attachment://{boss_filename}")
-            embeds.append(boss_embed)
+        files = await self._run_images(cluster, players, bosses)
         try:
-            message = await channel.send(embeds=embeds, files=files)
+            message = await channel.send(embed=embed, files=files)
         except discord.HTTPException as e:
             log.warning("AION-API: Posten fehlgeschlagen: %r", e)
             return
@@ -405,6 +366,28 @@ class AionDedup(commands.Cog):
             now = time.time()
             self.api_posted = [p for p in self.api_posted if now - p[0] < POSTED_KEEP_S][-49:]
             self.api_posted.append((now, cluster.run, message))
+
+    async def _run_images(self, cluster: ApiCluster, players: list[dict], bosses: list[dict]) -> list[discord.File]:
+        """Das Run-Bild des NexBoards (enthält schon alle Bosse). Ohne eins malt der Bot selbst: Rangliste
+        und je Boss ein Bild, höchstens 10 Anhänge pro Discord-Nachricht."""
+        image = pick_image(cluster.reports)
+        if image:
+            return [discord.File(io.BytesIO(image), filename="aion_run.webp")]
+        if not players:
+            return []
+        from .aion_image import render_boss_image, render_run_image
+
+        loop = asyncio.get_running_loop()
+        run = cluster.run
+        run_image = await loop.run_in_executor(
+            None, render_run_image, run["dungeon"], run.get("difficulty"), players,
+            run["bosses_killed"], run["bosses_total"], run["fight_ms"],
+        )
+        files = [discord.File(run_image, filename="aion_run.png")]
+        for i, b in enumerate(bosses[:9]):
+            boss_image = await loop.run_in_executor(None, render_boss_image, b["name"], b["players"])
+            files.append(discord.File(boss_image, filename=f"aion_boss_{i}.png"))
+        return files
 
     async def attach_hub_link(self, dungeon: str, start_ms: int, url: str) -> str:
         """Der NexHub meldet einen hochgeladenen Run: Link an den wartenden Post hängen oder den schon
@@ -419,7 +402,7 @@ class AionDedup(commands.Cog):
             posted, run, message = entry
             if now - posted < POSTED_KEEP_S and same_run_start(run, dungeon, start_ms):
                 self.api_posted.remove(entry)
-                embeds = keep_attachment_images(list(message.embeds), message.attachments)
+                embeds = list(message.embeds)
                 if embeds:
                     embeds[0] = with_hub_link(embeds[0], url)
                     await message.edit(embeds=embeds)
