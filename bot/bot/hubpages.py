@@ -17,7 +17,7 @@ Neue Funktion im Bot = `hub_pages()` im Cog ergänzen, im Hub ist nichts zu tun.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
@@ -226,7 +226,12 @@ def action_values(guild: discord.Guild, fields: tuple[Field, ...], values: Any) 
         if empty or (f.kind == "int" and v in (None, "")):
             if f.required:
                 raise ApiError(400, f"{f.label}: bitte ausfüllen")
-            out[f.key] = f.default if f.kind in ("int", "bool", "choice") else ([] if f.kind in ("multi", "channels", "roles") else None)
+            if f.kind in ("int", "bool", "choice"):
+                out[f.key] = f.default
+            elif f.kind in ("multi", "channels", "roles"):
+                out[f.key] = []
+            else:
+                out[f.key] = None
             continue
         if f.kind in ("channel", "voice"):
             ch = guild.get_channel(_id(v, f.label) or 0)

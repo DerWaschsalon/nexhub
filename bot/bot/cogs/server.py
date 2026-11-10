@@ -15,11 +15,19 @@ import shutil
 import discord
 from discord import app_commands
 from discord.ext import commands
+from docker.errors import DockerException
 
-from .cleanup import Confirm
 from ..errors import UserError
 from ..hubpages import Action, Actions, Column, Page, Status, Table
-from ..serverstatus import build_recreate_config, cpu_percent_from_samples, fmt_bytes, format_uptime, parse_meminfo, ram_usage_kb
+from ..serverstatus import (
+    build_recreate_config,
+    cpu_percent_from_samples,
+    fmt_bytes,
+    format_uptime,
+    parse_meminfo,
+    ram_usage_kb,
+)
+from .cleanup import Confirm
 
 log = logging.getLogger(__name__)
 
@@ -49,8 +57,17 @@ def _docker_client():
 
     try:
         return docker.from_env()
-    except Exception as ex:
+    except DockerException as ex:
         raise UserError(f"Docker-Socket nicht erreichbar: {ex}")
+
+
+async def _restart(client, name: str) -> None:
+    """Container neu starten (blockierender Docker-Aufruf im Executor). Fehler gehen als UserError raus."""
+    try:
+        await asyncio.get_running_loop().run_in_executor(None, lambda: client.containers.get(name).restart(timeout=10))
+    except DockerException as ex:
+        log.warning("Neustart von %s fehlgeschlagen: %r", name, ex)
+        raise UserError(f"Neustart fehlgeschlagen: {ex}")
 
 
 def self_update_sync(client, container_name: str, image_ref: str) -> None:
@@ -142,11 +159,7 @@ class Server(commands.Cog):
                  "state_tone": "ok" if status == "running" else "danger"} for name, status, image in rows]
 
     async def _hub_restart(self, ctx, _v, item):
-        client = _docker_client()
-        try:
-            await asyncio.get_running_loop().run_in_executor(None, lambda: client.containers.get(item).restart(timeout=10))
-        except Exception as ex:
-            raise UserError(f"Neustart fehlgeschlagen: {ex}")
+        await _restart(_docker_client(), item)
         return f"{item} neu gestartet."
 
     async def _hub_update(self, ctx, _v, _item):
@@ -190,11 +203,9 @@ class Server(commands.Cog):
         if not confirm.confirmed:
             return
         try:
-            await asyncio.get_running_loop().run_in_executor(
-                None, lambda: client.containers.get(container).restart(timeout=10)
-            )
-        except Exception as ex:
-            return await interaction.followup.send(f"Neustart fehlgeschlagen: {ex}", ephemeral=True)
+            await _restart(client, container)
+        except UserError as ex:
+            return await interaction.followup.send(str(ex), ephemeral=True)
         await interaction.followup.send(f"**{container}** neu gestartet.", ephemeral=True)
 
     @app_commands.command(name="server-update", description="Bot-Container mit dem neuesten Image von GHCR aktualisieren")

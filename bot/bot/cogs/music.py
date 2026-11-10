@@ -249,6 +249,9 @@ class Music(commands.Cog):
         self.session: aiohttp.ClientSession | None = None
         self.radio: RadioBrowser | None = None
         self._alone_timers: dict[int, asyncio.Task] = {}
+        # Nebenbei laufende Aufrufe festhalten: asyncio hält nur schwache Verweise, ein Task ohne
+        # Verweis kann mittendrin verschwinden.
+        self._background: set[asyncio.Task] = set()
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession()
@@ -399,7 +402,9 @@ class Music(commands.Cog):
                 station = found[0] if found else None
             if not station:
                 raise UserError(f"Keinen Sender „{sender}“ gefunden.")
-            asyncio.create_task(self.radio.click(station["stationuuid"]))
+            click = asyncio.create_task(self.radio.click(station["stationuuid"]))
+            self._background.add(click)
+            click.add_done_callback(self._background.discard)
             track = RadioBrowser.to_track(station, interaction.user.id)
         player = await self._connect(interaction)
         # Radio ersetzt, was gerade läuft; die Warteschlange bleibt.
@@ -416,7 +421,8 @@ class Music(commands.Cog):
             return []
         try:
             stations = await asyncio.wait_for(self.radio.search(current, limit=15), 2.5)
-        except Exception:
+        except Exception as e:  # Vorschläge sind entbehrlich, der Befehl geht auch ohne
+            log.debug("Radio-Vorschläge für %r: %r", current, e)
             return []
         choices = []
         for st in stations:

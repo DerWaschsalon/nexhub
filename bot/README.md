@@ -251,8 +251,9 @@ Zeit unverändert auf der Platte liegen, als Netz.
 ## Entwickeln und testen
 
 ```sh
-pip install -r requirements.txt pytest
+pip install -r requirements.txt -e ../proto pytest ruff mypy   # nexproto: Termine, Klassen, Dungeons
 python -m pytest -q tests          # ohne Discord-Verbindung
+ruff check . && mypy               # wie die CI (.github/workflows/bot.yml)
 DISCORD_TOKEN=… DB_PATH=./data/bot.sqlite3 python -m bot
 ```
 

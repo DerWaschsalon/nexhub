@@ -15,8 +15,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .rankcard import render_rank_card
 from ..errors import UserError
+from .rankcard import render_rank_card
 
 log = logging.getLogger(__name__)
 

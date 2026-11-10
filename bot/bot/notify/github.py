@@ -18,8 +18,8 @@ from typing import Any
 import aiohttp
 import discord
 
-from .base import Notification, Provider, ProviderError
 from ..hubpages import Field
+from .base import Notification, Provider, ProviderError
 
 log = logging.getLogger(__name__)
 API = "https://api.github.com"
@@ -63,7 +63,7 @@ def _fmt_date(iso: str | None) -> str:
 
 
 def _labels(item: dict) -> str:
-    names = [l.get("name", "") for l in item.get("labels", []) if isinstance(l, dict)]
+    names = [label.get("name", "") for label in item.get("labels", []) if isinstance(label, dict)]
     return ", ".join(names) if names else "–"
 
 
@@ -77,7 +77,7 @@ def _add_link_field(e: discord.Embed, url: str | None) -> None:
 def _match_filters(item: dict, filters: dict) -> bool:
     want_labels = filters.get("labels")
     if want_labels:
-        have = {l.get("name", "").lower() for l in item.get("labels", []) if isinstance(l, dict)}
+        have = {label.get("name", "").lower() for label in item.get("labels", []) if isinstance(label, dict)}
         if not (set(want_labels) & have):
             return False
     want_author = filters.get("author")

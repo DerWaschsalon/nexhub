@@ -1,0 +1,40 @@
+# Nur Werkzeug-Einstellungen; der Bot läuft per requirements.txt im Docker-Image.
+# Gleiche Regeln wie packages/nexcore (CLAUDE.md, „Neubau NexBoard: verbindliche Regeln“).
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+# Übergang: Dateien, die der Umbau noch neu schreibt, dürfen lange Zeilen haben. Jeder Schritt
+# streicht seine Dateien hier.
+[tool.ruff.lint.per-file-ignores]
+"bot/cogs/aion_dedup.py" = ["E501"]
+"bot/cogs/announcements.py" = ["E501"]
+"bot/cogs/birthdays.py" = ["E501"]
+"bot/cogs/cleanup.py" = ["E501"]
+"bot/cogs/giveaways.py" = ["E501"]
+"bot/cogs/levels.py" = ["E501"]
+"bot/cogs/moderation.py" = ["E501"]
+"bot/cogs/music.py" = ["E501"]
+"bot/cogs/notifications.py" = ["E501"]
+"bot/cogs/rankcard.py" = ["E501"]
+"bot/cogs/reminders.py" = ["E501"]
+"bot/cogs/roles.py" = ["E501"]
+"bot/cogs/server.py" = ["E501"]
+"bot/cogs/settings.py" = ["E501"]
+"bot/cogs/tempvoice.py" = ["E501"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+# Strikt geprüft wird, was schon nach den Neubau-Regeln steht. Jeder Umbauschritt hängt seine
+# Dateien hier an, bis am Ende das ganze Paket drinsteht (Konzept „TheWashBot – Umbau auf kleine Module“).
+files = [
+    "bot/aion_format.py",
+    "bot/aion_records.py",
+    "bot/cogs/aion_ranking.py",
+]
+follow_imports = "silent"
+# bot/ und bot/cogs/ haben keine __init__.py (Namespace-Pakete)
+explicit_package_bases = true

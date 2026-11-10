@@ -127,7 +127,8 @@ def test_queue_order_and_loops():
     p = make_player([a, b, c])
     seq = []
     for _ in range(3):
-        p.current = p._next(); seq.append(p.current.title)
+        p.current = p._next()
+        seq.append(p.current.title)
     assert seq == ["a", "b", "c"] and p._next() is None
 
     p = make_player([a, b], loop="song")
@@ -139,7 +140,8 @@ def test_queue_order_and_loops():
     p = make_player([a, b], loop="liste")
     seq = []
     for _ in range(5):
-        p.current = p._next(); seq.append(p.current.title)
+        p.current = p._next()
+        seq.append(p.current.title)
     assert seq == ["a", "b", "a", "b", "a"]
 
 
@@ -317,7 +319,6 @@ def test_ticket_panel_custom_ids_roundtrip():
 
 
 def test_aion_api_auth_rejects_bad_requests():
-    from unittest.mock import AsyncMock
 
     from aiohttp.test_utils import make_mocked_request
 
@@ -443,10 +444,9 @@ def test_aion_update_leaderboard_keeps_only_best():
 
 
 def test_aion_records_best_time_and_dps_record():
-    from bot.aion_records import RunRecords
-    from bot.cogs.aion_dedup import RECORDS_FIELD, build_run_embed
     from bot.aion_format import records_text
-    from bot.aion_records import DungeonKey
+    from bot.aion_records import DungeonKey, RunRecords
+    from bot.cogs.aion_dedup import RECORDS_FIELD, build_run_embed
     from bot.cogs.aion_ranking import ranking_embed
 
     def make_run(fight_ms: int, killed: int = 3, difficulty: str | None = "Normal") -> dict:
@@ -683,8 +683,15 @@ def test_new_panel_subviews_build_without_overflow():
     from pathlib import Path
 
     from bot.cogs.settings import (
-        AutomodView, BirthdayView, BumpView, LevelView, MemberCountView, SettingsPanel,
-        StarboardView, WarnView, VerifyView,
+        AutomodView,
+        BirthdayView,
+        BumpView,
+        LevelView,
+        MemberCountView,
+        SettingsPanel,
+        StarboardView,
+        VerifyView,
+        WarnView,
     )
     from bot.db import Database
 
@@ -1266,8 +1273,8 @@ def test_server_build_recreate_config_translates_inspect_data():
 
 
 def test_youtube_validate_source_rejects_non_channel_ids():
-    from bot.notify.youtube import YouTubeProvider
     from bot.notify.base import ProviderError
+    from bot.notify.youtube import YouTubeProvider
 
     provider = YouTubeProvider()
 
@@ -1346,7 +1353,8 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
 
     run(cog._finalize_api_later(dedup.ApiCluster({**run_, "image": None}, 1), 0, 5))
     embed, files = sent[-1]
-    assert embed.image.url is None and [f.filename for f in files] == ["aion_run.png", "aion_boss_0.png", "aion_boss_1.png"]
+    assert embed.image.url is None
+    assert [f.filename for f in files] == ["aion_run.png", "aion_boss_0.png", "aion_boss_1.png"]
 
 
 def test_aion_hub_link(monkeypatch):
