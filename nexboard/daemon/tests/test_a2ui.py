@@ -98,3 +98,19 @@ async def test_sprachwahl_im_meter_ist_die_allgemeine(tmp_path):
     assert deck.settings.language == "de" and deck.dps.language() == "de"
     assert "language: de" in (tmp_path / "config.yaml").read_text()
     assert ui.settings["dpsMeter.language"] == "de"
+
+
+async def test_volle_daten_gehen_als_text_durch(tmp_path):
+    import asyncio
+    from deckbar_daemon.capture import Capture
+
+    async def nothing(*a):
+        pass
+
+    ui = A2Ui(Capture(nothing, nothing), tmp_path / "a2-settings.json", plugin_dir=tmp_path)
+    q: asyncio.Queue = asyncio.Queue(4)
+    ui.clients.add(q)
+    await ui._on_capture("dps_data", '{"localPlayerId":1}')
+    text = q.get_nowait()
+    assert text == 'data: {"event": "dps-update", "payload": {"localPlayerId":1}}\n\n'
+    assert json.loads(text[6:]) == {"event": "dps-update", "payload": {"localPlayerId": 1}}
