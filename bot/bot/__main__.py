@@ -19,10 +19,7 @@ log = logging.getLogger("bot")
 COGS = [
     "bot.cogs.settings",
     "bot.cogs.music",
-    "bot.cogs.moderation",
-    "bot.cogs.cleanup",
     "bot.cogs.notifications",
-    "bot.cogs.tickets",
     "bot.cogs.control",
     "bot.cogs.aion_dedup",
     "bot.cogs.aion_ranking",
@@ -46,7 +43,6 @@ class Bot(commands.Bot):
         self.db = db
         # Neue Module (bot/modules) neben den alten Cogs, bis alle umgezogen sind
         self.modules = ModuleHost(self, db, MODULES, db.path.parent / "modules.yaml")
-        self.quiet_deletes: set[int] = set()  # vom Bot selbst gelöscht, nicht einzeln loggen
         self._sync = sync
 
     async def setup_hook(self) -> None:

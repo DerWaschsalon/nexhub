@@ -17,6 +17,7 @@ from discord import app_commands
 from discord.ext import commands
 from docker.errors import DockerException
 
+from ..core.confirm import Confirm
 from ..errors import UserError
 from ..hubpages import Action, Actions, Column, Page, Status, Table
 from ..serverstatus import (
@@ -27,7 +28,6 @@ from ..serverstatus import (
     parse_meminfo,
     ram_usage_kb,
 )
-from .cleanup import Confirm
 
 log = logging.getLogger(__name__)
 

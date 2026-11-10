@@ -148,11 +148,15 @@ def test_section_int_zero_and_warn_action():
         await call(client, "PUT", "/control/sections/verwarnungen", {"values": {"warn_threshold": 0}})
         assert guild.bot.dispatched[-1] == ("settings_changed", guild, "verwarnungen")
         # Ohne Schwelle fällt die Aktion zurück (Moderation hört auf settings_changed)
-        from bot.cogs.moderation import Moderation
+        from unittest.mock import MagicMock
 
-        moderation = Moderation.__new__(Moderation)
-        moderation.db = db
-        await moderation.on_settings_changed(guild, "verwarnungen")
+        from nexcore import EventBus, Paths
+
+        from bot.core import BotContext
+        from bot.modules.moderation.warnings import Warnings
+
+        warnings = Warnings(BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock()))
+        await warnings.on_settings_changed(guild, "verwarnungen")
         assert (db.get(GUILD, "warn_threshold"), db.get(GUILD, "warn_action")) == (None, None)
         await call(client, "PUT", "/control/sections/verwarnungen", {"values": {"warn_action": "bannen"}}, status=400)
         await call(client, "PUT", "/control/sections/community", {"values": {"starboard_threshold": 0}}, status=400)
