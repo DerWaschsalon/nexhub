@@ -74,7 +74,7 @@ def test_all_commands_register():
                      "setup log-kanal", "setup temp-voice", "setup panel", "setup management-kanal",
                      "setup verifizierung", "setup regeln-text", "setup verwarnungen", "rollen-panel", "timeout",
                      "warn", "warnungen", "warnung-loeschen", "kick", "ban", "unban",
-                     "erinnere", "erinnerungen", "erinnerung-loeschen", "aion",
+                     "erinnere", "erinnerungen", "erinnerung-loeschen", "aion", "dungeon-rangliste",
                      "setup tickets", "ticket-panel", "setup bump", "setup mitglieder-zaehler", "setup starboard",
                      "setup bots-zaehler", "umfrage", "geburtstag-setzen", "geburtstag-loeschen", "geburtstag",
                      "setup geburtstage", "embed-erstellen", "befehl-erstellen", "befehl-loeschen", "befehle",
@@ -351,7 +351,8 @@ def test_aion_api_auth_rejects_bad_requests():
 
 
 def test_aion_api_merge_and_embed():
-    from bot.cogs.aion_dedup import build_run_embed, fmt_dps, fmt_num, merge_players, same_api_run, validate_fight_payload
+    from bot.aion_format import fmt_dps, fmt_num
+    from bot.cogs.aion_dedup import build_run_embed, merge_players, same_api_run, validate_fight_payload
 
     assert fmt_num(13_290_000) == "13.29M"
     assert fmt_num(8_080) == "8.1k"
@@ -437,6 +438,61 @@ def test_aion_update_leaderboard_keeps_only_best():
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
             assert row["dps"] == 50
 
+            await db.close()
+
+    run(go())
+
+
+def test_aion_records_best_time_and_dps_record():
+    from bot.aion_records import RunRecords
+    from bot.cogs.aion_dedup import RECORDS_FIELD, build_run_embed
+    from bot.cogs.aion_rangliste import ranking_embed
+
+    def make_run(fight_ms: int, killed: int = 3, difficulty: str | None = "Normal") -> dict:
+        return {"dungeon": "Feuertempel", "difficulty": difficulty, "bosses_total": 3,
+                "bosses_killed": killed, "start_ms": 0, "fight_ms": fight_ms}
+
+    def make_players(a_dps: float, b_dps: float) -> list[dict]:
+        return [{"name": "Anna", "cls": "ranger", "damage": a_dps * 300, "dps": a_dps},
+                {"name": "Ben", "cls": None, "damage": b_dps * 300, "dps": b_dps}]
+
+    async def go():
+        with tempfile.TemporaryDirectory() as d:
+            db = Database(Path(d) / "t.sqlite3")
+            await db.connect()
+            records = RunRecords(db)
+
+            # Unvollständig: nicht gewertet
+            assert await records.save(1, make_run(200_000, killed=2), make_players(50, 40)) is None
+
+            first = await records.save(1, make_run(360_000), make_players(30, 20))
+            assert first.best_before_ms is None and "Erste Bestzeit" in first.lines()
+            assert first.personal_bests == []  # erster Run ist keine Bestleistung
+
+            slower = await records.save(1, make_run(400_000), make_players(25, 22))
+            assert (slower.place, slower.runs) == (2, 2) and slower.dps_record is None
+            assert slower.personal_bests == ["Ben"]
+            assert "Platz 2 von 2" in slower.lines()
+
+            faster = await records.save(1, make_run(330_000), make_players(45, 21))
+            assert "Neue Bestzeit!" in faster.lines() and "6:00" in faster.lines()
+            assert faster.dps_record["player"] == "Anna" and faster.dps_record["before_dps"] == 30
+            assert faster.personal_bests == []  # Anna steht schon in der Rekordzeile, Ben unter 22
+
+            # Andere Schwierigkeit zählt getrennt
+            hard = await records.save(1, make_run(500_000, difficulty="Hard"), make_players(10, 10))
+            assert hard.best_before_ms is None
+
+            times, players = await records.ranking(1, "Feuertempel", "Normal")
+            assert [t["fight_ms"] for t in times] == [330_000, 360_000, 400_000]
+            assert [(p["player"], p["dps"]) for p in players] == [("Anna", 45), ("Ben", 22)]
+            assert await records.dungeons(1, "feuer") == [("Feuertempel", "Hard"), ("Feuertempel", "Normal")]
+            assert await records.dungeons(2, "") == []  # anderer Server
+
+            embed = build_run_embed(make_run(330_000), reporters=1, records=faster)
+            assert any(f.name == RECORDS_FIELD for f in embed.fields)
+            board = ranking_embed("Feuertempel (Normal)", times, players)
+            assert "5:30" in board.fields[0].value and "Anna (ranger)" in board.fields[1].value
             await db.close()
 
     run(go())
@@ -1274,6 +1330,7 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
     cog = dedup.AionDedup.__new__(dedup.AionDedup)
     cog.bot, cog.api_pending, cog.api_posted = FakeBot(), {}, []
     cog._update_leaderboard = no_lb
+    cog.records = type("NoRecords", (), {"save": lambda self, *a: no_lb()})()
     run_ = {"dungeon": "Fire Temple", "difficulty": None, "bosses_total": 2, "bosses_killed": 2, "start_ms": 1,
             "fight_ms": 60_000, "players": [{"name": "A", "damage": 600_000, "dps": 10_000}],
             "bosses": [{"name": "B1", "players": [{"name": "A", "damage": 300_000}]},

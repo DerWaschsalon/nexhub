@@ -84,6 +84,20 @@ CREATE TABLE IF NOT EXISTS aion_leaderboard (
     class TEXT, damage REAL NOT NULL, dps REAL NOT NULL, run_id TEXT, created REAL NOT NULL,
     PRIMARY KEY (guild_id, boss, player)
 );
+-- Vollständige Runs je Dungeon und Schwierigkeit (difficulty '' wenn unbekannt) mit allen Spielern,
+-- für Bestzeiten und /dungeon-rangliste (siehe aion_records.py). Nicht aion_runs: den Namen hat
+-- die alte, ungenutzte Tabelle in älteren Datenbanken schon.
+CREATE TABLE IF NOT EXISTS aion_dungeon_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER NOT NULL, dungeon TEXT NOT NULL,
+    difficulty TEXT NOT NULL, fight_ms INTEGER NOT NULL, start_ms INTEGER NOT NULL,
+    players TEXT NOT NULL, created REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS aion_dungeon_runs_by_dungeon ON aion_dungeon_runs (guild_id, dungeon, difficulty);
+CREATE TABLE IF NOT EXISTS aion_dungeon_players (
+    run_id INTEGER NOT NULL REFERENCES aion_dungeon_runs(id), player TEXT NOT NULL, class TEXT,
+    damage REAL NOT NULL, dps REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS aion_dungeon_players_by_run ON aion_dungeon_players (run_id);
 """
 
 
