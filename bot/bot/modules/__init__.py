@@ -9,6 +9,12 @@ from .community.levels import Levels
 from .community.polls import Polls
 from .community.reminders import Reminders
 from .community.starboard import Starboard
+from .moderation.antispam import Antispam
+from .moderation.automod import Automod
+from .moderation.cleanup import Cleanup
+from .moderation.log import ModerationLog
+from .moderation.tickets import Tickets
+from .moderation.warnings import Warnings
 from .server.announcements import Announcements
 from .server.counters import Counters
 from .server.custom_commands import CustomCommands
@@ -17,7 +23,8 @@ from .server.roles import Roles
 from .server.tempvoice import TempVoice
 from .server.welcome import Welcome
 
-MODULES = (Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
+MODULES = (ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
+           Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
            Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump)
 
 __all__ = ["MODULES"]

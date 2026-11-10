@@ -410,7 +410,7 @@ class FeedDetailView(discord.ui.View):
         )
 
     async def _delete(self, interaction: discord.Interaction):
-        from .cleanup import Confirm  # lokal, um einen Zyklus settings<->notifications<->cleanup zu vermeiden
+        from ..core.confirm import Confirm
 
         view = Confirm(interaction.user.id, "Löschen")
         await interaction.response.send_message(

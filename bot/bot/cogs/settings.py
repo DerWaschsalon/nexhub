@@ -18,11 +18,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from ..core.confirm import Confirm
 from ..errors import UserError
 from ..forms import SECTIONS, Section, find_field, read_field, save_values
 from ..hubpages import ApiError, Field
 from ..panel import FieldPage, fmt_value, overview_embed, page_title
-from .cleanup import Confirm
 
 log = logging.getLogger(__name__)
 
