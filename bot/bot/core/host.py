@@ -1,15 +1,15 @@
 """Host der Module: baut sie mit ihrem Kontext, hängt ihre Ereignisse an den Discord-Client und
 schaltet sie über die nexcore-Registry.
 
-Bis alle Cogs umgezogen sind, laufen alte Cogs und neue Module nebeneinander (__main__.COGS und
-MODULES). Welche Module an sind, steht in modules.yaml neben der Datenbank; neu ist jedes an.
+Neben den Modulen gibt es nur noch die Cogs für /setup und die Steuer-API (__main__.COGS). Welche
+Module an sind, steht in modules.yaml neben der Datenbank; neu ist jedes an.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from discord.ext import commands
 from nexcore import EventBus, Paths, Registry
@@ -17,6 +17,8 @@ from nexcore import EventBus, Paths, Registry
 from ..db import Database
 from ..hubpages import Page
 from .module import BotContext, BotModule, Listener
+
+M = TypeVar("M", bound=BotModule)
 
 
 def only_while_active(module: BotModule, handler: Listener) -> Listener:
@@ -37,8 +39,12 @@ class ModuleHost:
         all_ids = {m.info.id for m in self.modules}
         self.registry = Registry(ctx.bus, self.modules, state_file, initial=lambda: all_ids)
 
-    def module(self, mid: str) -> BotModule:
-        return next(m for m in self.modules if m.info.id == mid)
+    def module(self, mid: str, kind: type[M]) -> M:
+        """Ein Modul mit seinem genauen Typ, für Teile außerhalb der Module (Steuer-API, /setup)."""
+        found = next(m for m in self.modules if m.info.id == mid)
+        if not isinstance(found, kind):
+            raise TypeError(f"{mid} ist kein {kind.__name__}")
+        return found
 
     async def start(self) -> None:
         for m in self.modules:

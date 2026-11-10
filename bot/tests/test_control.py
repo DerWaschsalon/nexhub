@@ -16,6 +16,7 @@ from bot.modules.aion2.runs import RunPosts
 from bot.modules.community.levels import Levels
 from bot.modules.server.announcements import Announcements
 from bot.modules.server.custom_commands import CustomCommands
+from bot.modules.server.verification import Verification
 
 KEY = "k" * 32
 AUTH = {"Authorization": f"Bearer {KEY}"}
@@ -86,8 +87,9 @@ def run(test):
                                   is_ready=lambda: True, dispatched=[])
             bot.dispatch = lambda event, *args: bot.dispatched.append((event, *args))
             ctx = BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock())
-            modules = {m.info.id: m for m in (RunPosts(ctx), Levels(ctx), Announcements(ctx), CustomCommands(ctx))}
-            bot.modules = SimpleNamespace(module=modules.__getitem__, pages=lambda: [])
+            modules = {m.info.id: m for m in (RunPosts(ctx), Levels(ctx), Announcements(ctx), CustomCommands(ctx),
+                                                      Verification(ctx))}
+            bot.modules = SimpleNamespace(module=lambda mid, kind: modules[mid], pages=lambda: [])
             guild.bot = bot  # für Tests, die gemeldete Ereignisse prüfen
             cog = Control(bot)
             cog.key = KEY

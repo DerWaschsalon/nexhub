@@ -12,6 +12,7 @@ ignore_missing_imports = true
 # Strikt geprüft wird, was schon nach den Neubau-Regeln steht. Jeder Umbauschritt hängt seine
 # Dateien hier an, bis am Ende das ganze Paket drinsteht (Konzept „TheWashBot – Umbau auf kleine Module“).
 files = [
+    "bot/cogs/control.py",
     "bot/cogs/settings.py",
     "bot/core",
     "bot/forms.py",
