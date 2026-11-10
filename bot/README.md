@@ -19,7 +19,7 @@ Ein Bot für alles, was ihr bisher mit mehreren Bots macht. Alle Befehle sind Sl
 | **Erinnerungen** | `/erinnere wann: text: privat:` | Zeit relativ (`2h`, `30m`, `1d2h`) oder absolut (`18:30`, `24.12. 18:00`). `/erinnerungen` zeigt eigene offene Erinnerungen, `/erinnerung-loeschen` entfernt eine. |
 | **Tickets** | `/setup tickets rolle:` (fügt hinzu/entfernt, mehrere möglich; im Klick-Panel per Mehrfachauswahl), `/ticket-panel` | Panel mit Buttons (❓ Frage, ⚠️ Meldung, 📋 Bewerbung) → Modal → privater Thread mit allen Team-Rollen. „Schließen“ im Thread beendet ihn, sperrt ihn und schickt den Verlauf als `.txt` in den Log-Kanal. |
 | **Benachrichtigungen** | Button „🔔 Benachrichtigungen" im Klick-Panel | GitHub-Repos beobachten (Releases, Issues, Pull Requests, Commits) per Klick-Assistent, komplett über Buttons/Select-Menüs/Modals, kein Befehl nötig. Modular für weitere Dienste (YouTube, Twitch, RSS, …) — siehe `bot/notify/`. |
-| **AION-2** | `/aion kanal:`, `/aion token:True` | Runs aus dem NexBoard: ein Post je Dungeon-Lauf mit Rangliste (auch wenn mehrere Mitspieler melden), Link in den NexHub und Bestenliste je Boss. Siehe „AION-2: Runs aus dem NexBoard“ unten. |
+| **AION-2** | `/aion kanal:`, `/aion token:True`, `/dungeon-rangliste dungeon:` | Runs aus dem NexBoard: ein Post je Dungeon-Lauf mit Rangliste (auch wenn mehrere Mitspieler melden), Link in den NexHub und Bestenliste je Boss. Siehe „AION-2: Runs aus dem NexBoard“ unten. |
 | **AION-2-Termine** | Hub → Bot → AION 2 → Termin-Tafel | Eine Nachricht im Kanal, die sich jede Minute aktualisiert: Riss, Shugo-Fest, Beritra-Luftangriff, Wächterin Kaira, Tages- und Wochen-Reset. Zeiten als Discord-Zeitstempel, also in der Zeitzone jedes Lesers. 5 Minuten vorher Ping an die eingestellte Rolle (nicht vor Resets), der Ping löscht sich nach Beginn. Termine aus `proto/nexproto/termine.py` wie im Radar, das Image bekommt die Datei über den zweiten Build-Kontext `proto`. |
 | **DJ-Rolle** | `/setup dj-rolle` | Optional: Dann dürfen nur DJ, Admins und wer den Song gewünscht hat, überspringen und stoppen. |
 | **Bump-Erinnerung** | `/setup bump kanal: rolle:`, auch im Klick-Panel | Erkennt die Bump-Bestätigung von [DISBOARD](https://disboard.org) im festgelegten Kanal und erinnert nach Ablauf des 2-Stunden-Cooldowns per Ping (optionale Rolle) daran, `/bump` erneut zu tippen. Rein passiv, der Bot bumpt nicht selbst. |
@@ -191,6 +191,15 @@ Content-Type: application/json
 
 Gleicher Lauf heißt: gleicher Dungeon, gleiche Boss-Anzahl und -Siege, Startzeit höchstens 30 s und
 Kampfzeit höchstens 20 s auseinander. Bei abweichenden Werten für denselben Spieler gewinnt der höhere.
+
+### Bestzeiten und Rangliste je Dungeon
+
+Jeder vollständige Run (alle Bosse besiegt) wird gespeichert, getrennt nach Dungeon und
+Schwierigkeit (`aion_records.py`). Der Post zeigt darunter im Feld „🏆 Rekorde“, was er verbessert:
+neue Bestzeit oder sonst Platz und Bestzeit, einen neuen DPS-Rekord im Dungeon und wer seine eigene
+beste DPS übertroffen hat. `/dungeon-rangliste dungeon:` (Vorschläge beim Tippen) zeigt die 5
+schnellsten Runs und die 10 Spieler mit der besten DPS. Gewertet wird nach DPS, weil der
+Gesamtschaden mit der Kampfzeit wächst. Runs vor diesem Stand gibt es dort nicht.
 
 ## Einstellungen im Browser
 

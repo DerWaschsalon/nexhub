@@ -39,7 +39,7 @@ def _font(path: str, size: int):
 
 
 def _draw_rows(draw: ImageDraw.ImageDraw, rows: list[dict], top: int) -> None:
-    from .aion_dedup import fmt_dps, fmt_num
+    from ..aion_format import fmt_dps, fmt_num
 
     max_damage = rows[0]["damage"] if rows else 0
     name_x = MARGIN

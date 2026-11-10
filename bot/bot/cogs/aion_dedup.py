@@ -41,6 +41,9 @@ from aiohttp import web
 from discord import app_commands
 from discord.ext import commands
 
+from ..aion_format import fmt_dps, fmt_time
+from ..aion_records import RunRecords, RunResult
+
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8789
@@ -48,6 +51,7 @@ DEFAULT_DELAY = 15
 DURATION_TOLERANCE_S = 20
 API_START_TOLERANCE_MS = 30_000
 ANALYSIS_FIELD = "📊 Analyse"
+RECORDS_FIELD = "🏆 Rekorde"
 HUB_LINK_TEXT = "Im NexHub ansehen"
 MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Run-Bild vom NexBoard, gemessen 200–400 KB
 POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
@@ -55,19 +59,6 @@ POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon gepo
 
 def public_url() -> str:
     return os.getenv("AION_PUBLIC_URL", "").strip().rstrip("/")
-
-
-def fmt_num(n: float) -> str:
-    n = float(n)
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.2f}M"
-    if n >= 1_000:
-        return f"{n / 1_000:.1f}k"
-    return f"{n:.0f}"
-
-
-def fmt_dps(n: float) -> str:
-    return f"{fmt_num(n)}/s"
 
 
 def _bad_players(players, prefix: str) -> str | None:
@@ -211,13 +202,14 @@ def keep_attachment_images(embeds: list[discord.Embed], attachments) -> list[dis
 
 def build_run_embed(
     run: dict, reporters: int, bosses: list[dict] | None = None, guild_id: int | None = None,
-    image_filename: str | None = None, hub_url: str | None = None,
+    image_filename: str | None = None, hub_url: str | None = None, records: RunResult | None = None,
 ) -> discord.Embed:
     title = f"⚔️ {run['dungeon']}" + (f" ({run['difficulty']})" if run.get("difficulty") else "")
-    minutes, seconds = divmod(round(run["fight_ms"] / 1000), 60)
     e = discord.Embed(title=title, colour=discord.Colour.gold())
     e.add_field(name="Bosse", value=f"{run['bosses_killed']}/{run['bosses_total']} besiegt")
-    e.add_field(name="Kampfzeit", value=f"{minutes}:{seconds:02d}")
+    e.add_field(name="Kampfzeit", value=fmt_time(run["fight_ms"]))
+    if records:
+        e.add_field(name=RECORDS_FIELD, value=records.lines(), inline=False)
     if image_filename:
         e.set_image(url=f"attachment://{image_filename}")
     links = [hub_link(hub_url)] if hub_url else []
@@ -295,6 +287,7 @@ class AionDedup(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = bot.db
+        self.records = RunRecords(bot.db)
         self.api_pending: dict[int, list[ApiCluster]] = {}  # guild_id -> offene API-Cluster
         self.api_posted: list[tuple[float, dict, discord.Message]] = []  # (gepostet, Lauf, Nachricht)
         self.runner: web.AppRunner | None = None
@@ -373,11 +366,12 @@ class AionDedup(commands.Cog):
         bosses = merge_bosses(cluster.reports)
         if bosses:
             await self._update_leaderboard(cluster.guild_id, bosses, players)
+        records = await self.records.save(cluster.guild_id, cluster.run, players)
         image = pick_image(cluster.reports)
         image_filename = ("aion_run.webp" if image else "aion_run.png") if players else None
         embed = build_run_embed(
             cluster.run, len(cluster.reports), bosses, guild_id=cluster.guild_id,
-            image_filename=image_filename, hub_url=cluster.hub_url,
+            image_filename=image_filename, hub_url=cluster.hub_url, records=records,
         )
         embeds = [embed]
         files = []
