@@ -26,9 +26,11 @@ from .server.embeds import Embeds
 from .server.roles import Roles
 from .server.tempvoice import TempVoice
 from .server.welcome import Welcome
+from .system.status import ServerStatus
 
 MODULES = (MusicPlayer, NotificationFeeds, ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
            Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
-           Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump, RunPosts, Schedule)
+           Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump, RunPosts, Schedule,
+           ServerStatus)
 
 __all__ = ["MODULES"]

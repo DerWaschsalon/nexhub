@@ -1,5 +1,5 @@
 """Einmal-Helfer für `/server-update`: läuft als eigener, kurzlebiger Container (selbes Image,
-gestartet von `cogs/server.py`), wartet bis der alte Bot-Container gestoppt ist, entfernt ihn und
+gestartet von `modules/system/status`), wartet bis der alte Bot-Container gestoppt ist, entfernt ihn und
 legt den neuen mit identischer Konfiguration (Umgebungsvariablen, Volumes, Ports, Restart-Policy,
 Netzwerk) aber dem frisch gezogenen Image an.
 

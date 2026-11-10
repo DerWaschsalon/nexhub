@@ -19,7 +19,6 @@ log = logging.getLogger("bot")
 COGS = [
     "bot.cogs.settings",
     "bot.cogs.control",
-    "bot.cogs.server",
 ]
 
 
