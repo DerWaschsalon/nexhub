@@ -1,6 +1,5 @@
 """Offline-Tests: Befehle laden, Datenbank, Warteschlangen-Logik, Quellen-Erkennung."""
 import asyncio
-import contextlib
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -49,22 +48,8 @@ def test_all_commands_register():
             await bot.setup_hook()
             names = sorted(c.qualified_name for c in bot.tree.walk_commands())
             pages = bot.get_cog("Control").all_pages()
-            # Reminders.check_due und Notifications.poll_feeds scheitern hier erwartbar an
-            # wait_until_ready() (kein echtes Login in diesem Test) — Tasks sauber abwarten statt
-            # "exception was never retrieved".
-            for cog_name, loop_name in [
-                ("Notifications", "poll_feeds"),
-
-            ]:
-                loop = getattr(bot.get_cog(cog_name), loop_name)
-                task = loop.get_task()
-                loop.cancel()
-                if task:
-                    with contextlib.suppress(Exception, asyncio.CancelledError):
-                        await task
             await bot.modules.stop()
             await bot.get_cog("AionDedup").cog_unload()
-            await bot.get_cog("Notifications").manager.close()
             await bot.db.close()
             return names, pages
     names, pages = run(go())
@@ -221,7 +206,7 @@ def test_feeds_migration_on_existing_db():
 
 
 def test_github_provider_dedup_and_transitions():
-    from bot.notify.github import GitHubProvider
+    from bot.modules.notify.feeds.providers.github import GitHubProvider
 
     provider = GitHubProvider()
     responses: dict[str, tuple[int, object]] = {}
@@ -268,7 +253,7 @@ def test_github_provider_dedup_and_transitions():
 
 
 def test_github_embeds_include_link_field():
-    from bot.notify.github import GitHubProvider
+    from bot.modules.notify.feeds.providers.github import GitHubProvider
 
     provider = GitHubProvider()
     release = {"id": 1, "name": "v1", "html_url": "https://github.com/o/r/releases/v1"}
@@ -288,7 +273,7 @@ def test_github_embeds_include_link_field():
 
 
 def test_github_provider_filters_and_baseline_skip():
-    from bot.notify.github import GitHubProvider
+    from bot.modules.notify.feeds.providers.github import GitHubProvider
 
     provider = GitHubProvider()
     data = [{"id": 1, "name": "v1", "prerelease": True, "draft": False}]
@@ -710,7 +695,7 @@ YOUTUBE_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def test_youtube_feed_parsing():
-    from bot.notify.youtube import parse_feed
+    from bot.modules.notify.feeds.providers.youtube import parse_feed
 
     videos = parse_feed(YOUTUBE_FEED_XML)
     assert [v["id"] for v in videos] == ["VIDEO1", "VIDEO2"]
@@ -720,13 +705,13 @@ def test_youtube_feed_parsing():
 
 
 def test_youtube_provider_dedup_and_baseline():
-    from bot.notify.youtube import YouTubeProvider
+    from bot.modules.notify.feeds.providers.youtube import YouTubeProvider
 
     provider = YouTubeProvider()
     feed_xml = [YOUTUBE_FEED_XML]
 
     async def fake_fetch(channel_id):
-        from bot.notify.youtube import parse_feed
+        from bot.modules.notify.feeds.providers.youtube import parse_feed
         return parse_feed(feed_xml[0])
 
     provider._fetch = fake_fetch  # keine echten HTTP-Aufrufe in Tests
@@ -892,8 +877,8 @@ def test_server_build_recreate_config_translates_inspect_data():
 
 
 def test_youtube_validate_source_rejects_non_channel_ids():
-    from bot.notify.base import ProviderError
-    from bot.notify.youtube import YouTubeProvider
+    from bot.modules.notify.feeds.providers.base import ProviderError
+    from bot.modules.notify.feeds.providers.youtube import YouTubeProvider
 
     provider = YouTubeProvider()
 

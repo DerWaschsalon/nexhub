@@ -16,6 +16,7 @@ from .moderation.log import ModerationLog
 from .moderation.tickets import Tickets
 from .moderation.warnings import Warnings
 from .music.player import MusicPlayer
+from .notify.feeds import NotificationFeeds
 from .server.announcements import Announcements
 from .server.counters import Counters
 from .server.custom_commands import CustomCommands
@@ -24,7 +25,7 @@ from .server.roles import Roles
 from .server.tempvoice import TempVoice
 from .server.welcome import Welcome
 
-MODULES = (MusicPlayer, ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
+MODULES = (MusicPlayer, NotificationFeeds, ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
            Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
            Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump)
 

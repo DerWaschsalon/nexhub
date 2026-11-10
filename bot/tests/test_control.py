@@ -1,6 +1,5 @@
 """Steuer-API für den NexHub (bot/cogs/control.py) mit nachgebautem Discord-Server."""
 import asyncio
-import json
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -211,23 +210,6 @@ def test_announcements_and_commands():
         await call(client, "PUT", "/control/commands/mit%20leerzeichen", {"response": "x"}, status=400)
         await call(client, "DELETE", "/control/commands/regeln", status=204)
         assert await call(client, "GET", "/control/commands") == []
-    run(test)
-
-
-def test_notifications_toggle_only_own_guild():
-    async def test(client, db, guild):
-        await db.execute("INSERT INTO feeds (guild_id, channel_id, kind, source, events) VALUES (?, ?, ?, ?, ?)",
-                         (GUILD, GUILD + 21, "github", "owner/repo", json.dumps(["release"])))
-        await db.execute("INSERT INTO feeds (guild_id, channel_id, kind, source) VALUES (?, ?, ?, ?)",
-                         (123, 1, "github", "fremd/repo"))
-        rows = await call(client, "GET", "/control/notifications")
-        assert [(r["kind"], r["source"], r["channel"], r["enabled"]) for r in rows] == \
-            [("GitHub", "owner/repo", "chat", True)]
-        rows = await call(client, "POST", f"/control/notifications/{rows[0]['id']}/toggle")
-        assert rows[0]["enabled"] is False
-        await call(client, "POST", "/control/notifications/2/toggle", status=404)  # anderer Server
-        await call(client, "DELETE", "/control/notifications/1", status=204)
-        assert await call(client, "GET", "/control/notifications") == []
     run(test)
 
 

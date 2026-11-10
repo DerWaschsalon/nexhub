@@ -18,7 +18,6 @@ log = logging.getLogger("bot")
 
 COGS = [
     "bot.cogs.settings",
-    "bot.cogs.notifications",
     "bot.cogs.control",
     "bot.cogs.aion_dedup",
     "bot.cogs.aion_ranking",
