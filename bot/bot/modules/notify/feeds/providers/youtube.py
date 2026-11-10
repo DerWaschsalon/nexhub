@@ -6,6 +6,7 @@ RSS-Feed sie direkt als Parameter erwartet — kein HTML-Scraping zum Auflösen 
 from __future__ import annotations
 
 import logging
+from typing import Any
 from xml.etree import ElementTree
 
 import aiohttp
@@ -24,7 +25,7 @@ NS = {
 EVENTS = {"video": "🎬 Neue Videos"}
 
 
-def parse_feed(text: str) -> list[dict]:
+def parse_feed(text: str) -> list[dict[str, Any]]:
     try:
         root = ElementTree.fromstring(text)
     except ElementTree.ParseError:
@@ -64,7 +65,7 @@ class YouTubeProvider(Provider):
         if self._session and not self._session.closed:
             await self._session.close()
 
-    async def _fetch(self, channel_id: str) -> list[dict]:
+    async def _fetch(self, channel_id: str) -> list[dict[str, Any]]:
         async with self._s().get(FEED_URL.format(channel_id=channel_id)) as resp:
             if resp.status == 404:
                 raise ProviderError(f"Kein YouTube-Kanal mit der ID „{channel_id}“ gefunden.")
@@ -80,7 +81,7 @@ class YouTubeProvider(Provider):
         await self._fetch(channel_id)  # wirft ProviderError, falls der Kanal nicht existiert
         return channel_id
 
-    def _video_embed(self, channel_id: str, v: dict) -> discord.Embed:
+    def _video_embed(self, channel_id: str, v: dict[str, Any]) -> discord.Embed:
         e = discord.Embed(
             title="🎬 Neues Video", description=f"**{v['title']}**",
             url=f"https://www.youtube.com/watch?v={v['id']}", colour=discord.Colour.red(),
@@ -90,7 +91,9 @@ class YouTubeProvider(Provider):
             e.set_image(url=v["thumbnail"])
         return e
 
-    async def poll(self, source, events, filters, state, *, baseline):
+    async def poll(
+        self, source: str, events: list[str], filters: dict[str, Any], state: dict[str, Any], *, baseline: bool
+    ) -> tuple[list[Notification], dict[str, Any]]:
         videos = await self._fetch(source)
         seen = list(state.get("seen", []))
         out: list[Notification] = []

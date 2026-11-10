@@ -3,7 +3,9 @@ import asyncio
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
+import discord
 import pytest
 
 from bot.__main__ import Bot
@@ -924,14 +926,16 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
     webp = b"RIFF\x10\0\0\0WEBPVP8L" + b"x" * 20
     sent = []
 
-    class Channel:
-        async def send(self, embed, files):
-            sent.append((embed, files))
-            return object()
+    async def send(embed, files):
+        sent.append((embed, files))
+        return object()
+
+    channel = MagicMock(spec=discord.TextChannel)
+    channel.send = send
 
     class FakeBot:
         def get_channel(self, cid):
-            return Channel()
+            return channel
 
     async def no_lb(*a, **k):
         return None
