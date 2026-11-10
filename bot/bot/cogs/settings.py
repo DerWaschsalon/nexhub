@@ -213,11 +213,11 @@ class SettingsPanel(discord.ui.View):
         await interaction.response.edit_message(view=VerifyView(self))
 
     async def open_notifications(self, interaction: discord.Interaction) -> None:
-        from .notifications import NotificationsHomeView, home_embed
+        from ..modules.notify.feeds.wizard import NotificationsHomeView, home_embed
 
-        notif_cog = self.cog.bot.get_cog("Notifications")
+        feeds = self.cog.bot.modules.module("notify.feeds")
         await interaction.response.edit_message(
-            embed=home_embed(), view=NotificationsHomeView(notif_cog, self.guild, self.persistent)
+            embed=home_embed(), view=NotificationsHomeView(feeds, self.guild, self.persistent)
         )
 
     async def close(self, interaction: discord.Interaction) -> None:

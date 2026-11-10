@@ -18,7 +18,8 @@ from typing import Any
 import aiohttp
 import discord
 
-from ..hubpages import Field
+from bot.hubpages import Field
+
 from .base import Notification, Provider, ProviderError
 
 log = logging.getLogger(__name__)

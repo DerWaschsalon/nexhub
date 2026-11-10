@@ -1,38 +1,30 @@
-"""🔔 Benachrichtigungen: GitHub (später weitere Dienste) per Klick-Assistent einrichten.
-
-Hängt am selben Klick-Panel wie die anderen /setup-Einstellungen (siehe settings.py, Button
-„Benachrichtigungen“) — kein eigener Kanal, keine eigenen Befehle. Die Discord-Seite hier kennt
-nur `bot.notify.base.Provider`, nichts GitHub-Spezifisches; ein neuer Dienst kommt in
-`bot/notify/manager.py` dazu und taucht hier automatisch in der Dienst-Auswahl auf.
-
-Hintergrund-Abfrage: `poll_feeds` prüft alle paar Minuten jeden aktiven Feed (siehe
-`bot/notify/manager.py` für Dedup/Fehlerbehandlung).
-"""
+"""🔔 Klick-Assistent für Benachrichtigungen: Dienst, Quelle, Ereignisse, Kanal, Filter, dazu die
+Verwaltung bestehender Feeds. Hängt am Klick-Panel (cogs/settings.py, Knopf „Benachrichtigungen“).
+Kennt nur `providers.base.Provider`; ein neuer Dienst kommt in `providers/manager.py` dazu."""
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import discord
-from discord.ext import commands, tasks
 
-from ..errors import UserError
-from ..hubpages import Action, Actions, Column, Field, Page, Table, channel_label
-from ..notify.base import ProviderError
-from ..notify.manager import PROVIDERS, NotificationManager
+from .providers.base import ProviderError
+from .providers.manager import PROVIDERS
+
+if TYPE_CHECKING:
+    from . import NotificationFeeds
 
 log = logging.getLogger(__name__)
-POLL_MINUTES = max(1, int(os.getenv("NOTIFY_POLL_MINUTES", "10")))
 
 
 @dataclass
 class Draft:
     """Zustand eines laufenden Einrichtungs-Assistenten, nur für die Dauer der Interaktion."""
 
-    cog: "Notifications"
+    module: "NotificationFeeds"
     guild: discord.Guild
     persistent: bool
     feed_id: int | None = None  # gesetzt beim Bearbeiten eines bestehenden Feeds
@@ -285,7 +277,7 @@ class FilterStepView(discord.ui.View):
 
 
 async def save_feed(interaction: discord.Interaction, draft: Draft) -> None:
-    db = draft.cog.db
+    db = draft.module.db
     if draft.feed_id is None:
         feed_id = await db.execute(
             "INSERT INTO feeds (guild_id, channel_id, kind, source, events, filters, enabled, state) "
@@ -302,12 +294,12 @@ async def save_feed(interaction: discord.Interaction, draft: Draft) -> None:
             (draft.channel_id, json.dumps(draft.events), json.dumps(draft.filters), feed_id),
         )
     feed = await db.fetchone("SELECT * FROM feeds WHERE id=?", (feed_id,))
-    await draft.cog.manager.poll_feed(feed, draft.cog.bot)  # stiller Baseline-Abgleich, postet nichts
+    await draft.module.manager.poll_feed(feed, draft.module.client)  # stiller Baseline-Abgleich, postet nichts
 
     embed = discord.Embed(title="✅ Gespeichert", colour=discord.Colour.green(), description=feed_summary(feed))
     channel = draft.guild.get_channel(draft.channel_id)
     embed.add_field(name="Ziel", value=channel.mention if channel else "–")
-    view = NotificationsHomeView(draft.cog, draft.guild, draft.persistent)
+    view = NotificationsHomeView(draft.module, draft.guild, draft.persistent)
     await interaction.response.edit_message(embed=embed, view=view)
 
 
@@ -315,7 +307,7 @@ async def save_feed(interaction: discord.Interaction, draft: Draft) -> None:
 
 
 class ManageSelect(discord.ui.Select):
-    def __init__(self, cog: "Notifications", guild: discord.Guild, persistent: bool, feeds: list):
+    def __init__(self, module: "NotificationFeeds", guild: discord.Guild, persistent: bool, feeds: list):
         super().__init__(
             placeholder="Benachrichtigung wählen …",
             options=[
@@ -329,30 +321,30 @@ class ManageSelect(discord.ui.Select):
             ],
             row=0, custom_id="notif:select:manage",
         )
-        self.cog, self.guild, self.persistent = cog, guild, persistent
+        self.module, self.guild, self.persistent = module, guild, persistent
 
     async def callback(self, interaction: discord.Interaction):
-        feed = await self.cog.db.fetchone("SELECT * FROM feeds WHERE id=?", (int(self.values[0]),))
+        feed = await self.module.db.fetchone("SELECT * FROM feeds WHERE id=?", (int(self.values[0]),))
         if not feed:
             return await interaction.response.send_message("Die gibt es nicht mehr.", ephemeral=True)
         await interaction.response.edit_message(
-            embed=feed_embed(self.guild, feed), view=FeedDetailView(self.cog, self.guild, self.persistent, feed)
+            embed=feed_embed(self.guild, feed), view=FeedDetailView(self.module, self.guild, self.persistent, feed)
         )
 
 
 class ManageListView(discord.ui.View):
-    def __init__(self, cog: "Notifications", guild: discord.Guild, persistent: bool, feeds: list):
+    def __init__(self, module: "NotificationFeeds", guild: discord.Guild, persistent: bool, feeds: list):
         super().__init__(timeout=_tl(persistent))
         if feeds:
-            self.add_item(ManageSelect(cog, guild, persistent, feeds))
-        draft = Draft(cog, guild, persistent)
+            self.add_item(ManageSelect(module, guild, persistent, feeds))
+        draft = Draft(module, guild, persistent)
         self.add_item(HomeButton(draft))
 
 
 class FeedDetailView(discord.ui.View):
-    def __init__(self, cog: "Notifications", guild: discord.Guild, persistent: bool, feed):
+    def __init__(self, module: "NotificationFeeds", guild: discord.Guild, persistent: bool, feed):
         super().__init__(timeout=_tl(persistent))
-        self.cog, self.guild, self.persistent, self.feed = cog, guild, persistent, feed
+        self.module, self.guild, self.persistent, self.feed = module, guild, persistent, feed
 
         edit_btn = discord.ui.Button(label="Bearbeiten", emoji="✏️", style=discord.ButtonStyle.secondary, row=0)
         edit_btn.callback = self._edit
@@ -378,16 +370,16 @@ class FeedDetailView(discord.ui.View):
         self.add_item(back_btn)
 
     async def _back(self, interaction: discord.Interaction):
-        feeds = await self.cog.db.fetchall("SELECT * FROM feeds WHERE guild_id=?", (self.guild.id,))
+        feeds = await self.module.db.fetchall("SELECT * FROM feeds WHERE guild_id=?", (self.guild.id,))
         await interaction.response.edit_message(
             embed=manage_overview_embed(feeds),
-            view=ManageListView(self.cog, self.guild, self.persistent, feeds),
+            view=ManageListView(self.module, self.guild, self.persistent, feeds),
         )
 
     async def _edit(self, interaction: discord.Interaction):
         provider = PROVIDERS.get(self.feed["kind"])
         draft = Draft(
-            self.cog, self.guild, self.persistent, feed_id=self.feed["id"], kind=self.feed["kind"],
+            self.module, self.guild, self.persistent, feed_id=self.feed["id"], kind=self.feed["kind"],
             source=self.feed["source"], events=json.loads(self.feed["events"] or "[]"),
             channel_id=self.feed["channel_id"], filters=json.loads(self.feed["filters"] or "{}"),
         )
@@ -401,16 +393,16 @@ class FeedDetailView(discord.ui.View):
 
     async def _toggle(self, interaction: discord.Interaction):
         new_state = 0 if self.feed["enabled"] else 1
-        await self.cog.db.execute("UPDATE feeds SET enabled=? WHERE id=?", (new_state, self.feed["id"]))
-        feed = await self.cog.db.fetchone("SELECT * FROM feeds WHERE id=?", (self.feed["id"],))
+        await self.module.db.execute("UPDATE feeds SET enabled=? WHERE id=?", (new_state, self.feed["id"]))
+        feed = await self.module.db.fetchone("SELECT * FROM feeds WHERE id=?", (self.feed["id"],))
         if feed is None:
             return await interaction.response.send_message("Die gibt es nicht mehr.", ephemeral=True)
         await interaction.response.edit_message(
-            embed=feed_embed(self.guild, feed), view=FeedDetailView(self.cog, self.guild, self.persistent, feed)
+            embed=feed_embed(self.guild, feed), view=FeedDetailView(self.module, self.guild, self.persistent, feed)
         )
 
     async def _delete(self, interaction: discord.Interaction):
-        from ..core.confirm import Confirm
+        from bot.core.confirm import Confirm
 
         view = Confirm(interaction.user.id, "Löschen")
         await interaction.response.send_message(
@@ -419,13 +411,13 @@ class FeedDetailView(discord.ui.View):
         await view.wait()
         if not view.confirmed:
             return
-        await self.cog.db.execute("DELETE FROM feeds WHERE id=?", (self.feed["id"],))
+        await self.module.db.execute("DELETE FROM feeds WHERE id=?", (self.feed["id"],))
         await interaction.edit_original_response(content="✅ Gelöscht.", view=None)
         # Auch das eigentliche Panel aktualisieren, sonst zeigt es noch Buttons für den
         # gelöschten Eintrag an.
-        feeds = await self.cog.db.fetchall("SELECT * FROM feeds WHERE guild_id=?", (self.guild.id,))
+        feeds = await self.module.db.fetchall("SELECT * FROM feeds WHERE guild_id=?", (self.guild.id,))
         await interaction.message.edit(
-            embed=manage_overview_embed(feeds), view=ManageListView(self.cog, self.guild, self.persistent, feeds)
+            embed=manage_overview_embed(feeds), view=ManageListView(self.module, self.guild, self.persistent, feeds)
         )
 
     async def _test(self, interaction: discord.Interaction):
@@ -469,7 +461,7 @@ class HomeButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.edit_message(
-            embed=home_embed(), view=NotificationsHomeView(self.draft.cog, self.draft.guild, self.draft.persistent)
+            embed=home_embed(), view=NotificationsHomeView(self.draft.module, self.draft.guild, self.draft.persistent)
         )
 
 
@@ -481,14 +473,14 @@ def home_embed() -> discord.Embed:
 
 
 class NotificationsHomeView(discord.ui.View):
-    def __init__(self, cog: "Notifications", guild: discord.Guild, persistent: bool):
+    def __init__(self, module: "NotificationFeeds", guild: discord.Guild, persistent: bool):
         super().__init__(timeout=_tl(persistent))
-        self.cog, self.guild, self.persistent = cog, guild, persistent
+        self.module, self.guild, self.persistent = module, guild, persistent
 
     @discord.ui.button(label="Neue Benachrichtigung", emoji="➕", style=discord.ButtonStyle.success, row=0,
                        custom_id="notif:open:new")
     async def new(self, interaction: discord.Interaction, _button: discord.ui.Button):
-        draft = Draft(self.cog, self.guild, self.persistent)
+        draft = Draft(self.module, self.guild, self.persistent)
         await interaction.response.edit_message(
             embed=discord.Embed(title="🔔 Neue Benachrichtigung – Dienst", colour=discord.Colour.blurple(),
                                 description="Welchen Dienst willst du überwachen?"),
@@ -498,157 +490,26 @@ class NotificationsHomeView(discord.ui.View):
     @discord.ui.button(label="Benachrichtigungen verwalten", emoji="⚙️", style=discord.ButtonStyle.secondary, row=0,
                        custom_id="notif:open:manage")
     async def manage(self, interaction: discord.Interaction, _button: discord.ui.Button):
-        feeds = await self.cog.db.fetchall("SELECT * FROM feeds WHERE guild_id=?", (self.guild.id,))
+        feeds = await self.module.db.fetchall("SELECT * FROM feeds WHERE guild_id=?", (self.guild.id,))
         await interaction.response.edit_message(
-            embed=manage_overview_embed(feeds), view=ManageListView(self.cog, self.guild, self.persistent, feeds)
+            embed=manage_overview_embed(feeds), view=ManageListView(self.module, self.guild, self.persistent, feeds)
         )
 
     @discord.ui.button(label="Aktualisieren", emoji="🔄", style=discord.ButtonStyle.secondary, row=0,
                        custom_id="notif:open:refresh")
     async def refresh(self, interaction: discord.Interaction, _button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        feeds = await self.cog.db.fetchall(
-            "SELECT * FROM feeds WHERE guild_id=? AND enabled=1", (self.guild.id,)
-        )
-        posted = 0
-        for feed in feeds:
-            result = await self.cog.manager.poll_feed(feed, self.cog.bot)
-            if result:
-                posted += len(result)
+        checked, posted = await self.module.poll_all(self.guild.id)
         await interaction.followup.send(
-            f"{len(feeds)} aktive Benachrichtigung(en) geprüft, {posted} neue Meldung(en) gepostet.",
+            f"{checked} aktive Benachrichtigung(en) geprüft, {posted} neue Meldung(en) gepostet.",
             ephemeral=True,
         )
 
     @discord.ui.button(label="Zurück zu den Einstellungen", emoji="⬅️", style=discord.ButtonStyle.secondary, row=1,
                        custom_id="notif:open:settings_back")
     async def back_to_settings(self, interaction: discord.Interaction, _button: discord.ui.Button):
-        from .settings import SettingsPanel  # lokal, um einen Import-Zyklus zu vermeiden
+        from bot.cogs.settings import SettingsPanel  # lokal: das Panel öffnet seinerseits diesen Assistenten
 
         setup_cog = interaction.client.get_cog("Setup")
         panel = SettingsPanel(setup_cog, self.guild, persistent=self.persistent)
         await interaction.response.edit_message(embed=panel.embed(), view=panel)
-
-
-class Notifications(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.db = bot.db
-        self.manager = NotificationManager(bot.db)
-        self.poll_feeds.start()
-
-    def cog_unload(self):
-        self.poll_feeds.cancel()
-
-    @tasks.loop(minutes=POLL_MINUTES)
-    async def poll_feeds(self):
-        feeds = await self.db.fetchall("SELECT * FROM feeds WHERE enabled=1")
-        for feed in feeds:
-            try:
-                await self.manager.poll_feed(feed, self.bot)
-            except Exception:
-                log.exception("Feed %s (%s) konnte nicht abgefragt werden", feed["id"], feed["source"])
-
-    @poll_feeds.before_loop
-    async def before_poll_feeds(self):
-        await self.bot.wait_until_ready()
-
-    # ---- NexHub ----
-
-    def hub_pages(self) -> list[Page]:
-        fields = [Field("kind", "choice", "Dienst", default=next(iter(PROVIDERS)),
-                        options=tuple((k, p.label) for k, p in PROVIDERS.items()))]
-        for key, p in PROVIDERS.items():
-            when = ("kind", (key,))
-            fields.append(Field(f"source_{key}", "text", p.source_label, hint=p.source_help, required=True, show_if=when))
-            fields.append(Field(f"events_{key}", "multi", "Ereignisse", options=tuple(p.events.items()),
-                                default=list(p.events)[:1], required=True, show_if=when))
-            fields.extend(Field(f"filter_{key}_{f.key}", f.kind, f.label, hint=f.hint, default=f.default, show_if=when)
-                          for f in p.filter_fields)
-        fields.append(Field("channel", "channel", "Kanal", required=True))
-        return [Page("benachrichtigungen", "GitHub & YouTube", "Benachrichtigungen", (
-            Table("feeds", "Benachrichtigungen", (
-                Column("service", "Dienst"), Column("source", "Quelle"), Column("events", "Ereignisse"),
-                Column("channel", "Kanal"), Column("state", "Status", "badge"),
-            ), self._hub_feeds,
-                create=Action("create", "Neue Benachrichtigung", self._hub_create, tuple(fields), submit="Anlegen"),
-                actions=(
-                    Action("pause", "Pausieren", self._hub_toggle, when="enabled"),
-                    Action("resume", "Fortsetzen", self._hub_toggle, when="disabled"),
-                    Action("test", "Test senden", self._hub_test),
-                    Action("delete", "Löschen", self._hub_delete, confirm="Benachrichtigung löschen?", danger=True),
-                ), empty="Noch keine Benachrichtigungen."),
-            Actions("pruefen", "Jetzt prüfen", (Action("check", "Alle aktiven jetzt abfragen", self._hub_check),),
-                    f"Sonst fragt der Bot alle {POLL_MINUTES} Minuten nach."),
-        ), "Neue Releases, Issues, Pull Requests, Commits oder Videos in einen Kanal posten.", order=10)]
-
-    async def _hub_feeds(self, ctx) -> list[dict]:
-        rows = await self.db.fetchall("SELECT * FROM feeds WHERE guild_id=? ORDER BY id", (ctx.guild.id,))
-        out = []
-        for f in rows:
-            p = PROVIDERS.get(f["kind"])
-            events = json.loads(f["events"] or "[]")
-            state, tone = ("Fehler", "danger") if f["error"] else (("aktiv", "ok") if f["enabled"] else ("pausiert", "warn"))
-            out.append({"id": str(f["id"]), "service": p.label if p else f["kind"], "source": f["source"],
-                        "events": ", ".join(p.events.get(e, e) if p else e for e in events),
-                        "channel": channel_label(ctx.guild, f["channel_id"]), "state": state, "state_tone": tone,
-                        "error": f["error"], "enabled": bool(f["enabled"]), "disabled": not f["enabled"]})
-        return out
-
-    async def _hub_feed(self, ctx, item):
-        feed = await self.db.fetchone("SELECT * FROM feeds WHERE id=? AND guild_id=?", (int(item or 0), ctx.guild.id))
-        if not feed:
-            raise UserError("Die Benachrichtigung gibt es nicht mehr.")
-        return feed
-
-    async def _hub_create(self, ctx, v, _item):
-        kind = v["kind"]
-        p = PROVIDERS[kind]
-        try:
-            source = await p.validate_source(v[f"source_{kind}"])
-        except ProviderError as e:
-            raise UserError(str(e))
-        filters = p.filters_from({f.key: v.get(f"filter_{kind}_{f.key}") for f in p.filter_fields})
-        feed_id = await self.db.execute(
-            "INSERT INTO feeds (guild_id, channel_id, kind, source, events, filters, enabled, state) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, '{}')",
-            (ctx.guild.id, v["channel"].id, kind, source, json.dumps(v[f"events_{kind}"]), json.dumps(filters)),
-        )
-        feed = await self.db.fetchone("SELECT * FROM feeds WHERE id=?", (feed_id,))
-        await self.manager.poll_feed(feed, self.bot)  # stiller Abgleich: Bestehendes gilt nicht als neu
-        return f"{p.label}: {source} geht jetzt nach #{v['channel'].name}."
-
-    async def _hub_toggle(self, ctx, _v, item):
-        feed = await self._hub_feed(ctx, item)
-        await self.db.execute("UPDATE feeds SET enabled=?, error=NULL WHERE id=?", (0 if feed["enabled"] else 1, feed["id"]))
-        return "Pausiert." if feed["enabled"] else "Läuft wieder."
-
-    async def _hub_test(self, ctx, _v, item):
-        feed = await self._hub_feed(ctx, item)
-        provider = PROVIDERS.get(feed["kind"])
-        channel = ctx.guild.get_channel(feed["channel_id"])
-        if provider is None or channel is None:
-            raise UserError("Dienst oder Ziel-Kanal gibt es nicht mehr.")
-        try:
-            n = await provider.test_notification(feed["source"], json.loads(feed["events"] or "[]"))
-        except ProviderError as e:
-            raise UserError(str(e))
-        n.embed.add_field(name="🧪 Hinweis", value="Dies ist eine Testbenachrichtigung von TheWashbot.", inline=False)
-        await channel.send(embed=n.embed)
-        return f"Test in #{channel.name} gesendet."
-
-    async def _hub_delete(self, ctx, _v, item):
-        feed = await self._hub_feed(ctx, item)
-        await self.db.execute("DELETE FROM feeds WHERE id=?", (feed["id"],))
-        return "Gelöscht."
-
-    async def _hub_check(self, ctx, _v, _item):
-        feeds = await self.db.fetchall("SELECT * FROM feeds WHERE guild_id=? AND enabled=1", (ctx.guild.id,))
-        posted = 0
-        for feed in feeds:
-            posted += len(await self.manager.poll_feed(feed, self.bot) or [])
-        return f"{len(feeds)} geprüft, {posted} neue Meldung(en) gepostet."
-
-
-async def setup(bot):
-    await bot.add_cog(Notifications(bot))

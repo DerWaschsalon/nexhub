@@ -181,9 +181,6 @@ class Control(commands.Cog):
         r.add_get("/control/commands", self.custom_commands)
         r.add_put("/control/commands/{name}", self.command_set)
         r.add_delete("/control/commands/{name}", self.command_delete)
-        r.add_get("/control/notifications", self.notifications)
-        r.add_post("/control/notifications/{id}/toggle", self.notification_toggle)
-        r.add_delete("/control/notifications/{id}", self.notification_delete)
         r.add_get("/control/matrix", self.matrix)
         r.add_put("/control/matrix", self.matrix_set)
         r.add_post("/control/run-link", self.run_link)
@@ -476,42 +473,6 @@ class Control(commands.Cog):
         guild = self.guild()
         await self.db.execute("DELETE FROM custom_commands WHERE guild_id=? AND name=?",
                               (guild.id, self._command_name(request)))
-
-    # ---- Benachrichtigungen --------------------------------------------------------------------
-
-    async def notifications(self, request: web.Request) -> list[dict]:
-        from ..notify.manager import PROVIDERS
-
-        guild = self.guild()
-        out = []
-        for f in await self.db.fetchall("SELECT * FROM feeds WHERE guild_id=? ORDER BY id", (guild.id,)):
-            provider = PROVIDERS.get(f["kind"])
-            events = json.loads(f["events"] or "[]")
-            ch = guild.get_channel(f["channel_id"])
-            out.append({
-                "id": f["id"], "kind": provider.label if provider else f["kind"], "source": f["source"],
-                "events": [provider.events.get(e, e) if provider else e for e in events],
-                "channel": ch.name if ch else None, "enabled": bool(f["enabled"]), "error": f["error"],
-            })
-        return out
-
-    async def _feed(self, request: web.Request):
-        guild = self.guild()
-        feed_id = request.match_info["id"]
-        row = await self.db.fetchone("SELECT id, enabled FROM feeds WHERE id=? AND guild_id=?",
-                                     (int(feed_id) if feed_id.isdigit() else -1, guild.id))
-        if row is None:
-            raise ApiError(404, "Benachrichtigung gibt es nicht")
-        return row
-
-    async def notification_toggle(self, request: web.Request) -> list[dict]:
-        row = await self._feed(request)
-        await self.db.execute("UPDATE feeds SET enabled=? WHERE id=?", (0 if row["enabled"] else 1, row["id"]))
-        return await self.notifications(request)
-
-    async def notification_delete(self, request: web.Request) -> None:
-        row = await self._feed(request)
-        await self.db.execute("DELETE FROM feeds WHERE id=?", (row["id"],))
 
     # ---- Sichtbarkeits-Matrix ------------------------------------------------------------------
 

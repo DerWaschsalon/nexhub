@@ -17,16 +17,19 @@ import socket
 import time
 from dataclasses import dataclass, field
 from html import unescape
+from typing import Any
 
 import aiohttp
 import yt_dlp
 
-from .errors import UserError
+from bot.errors import UserError
 
 log = logging.getLogger(__name__)
 
 MAX_PLAYLIST = int(os.getenv("MAX_PLAYLIST", "100"))
 USER_AGENT = "DiscordMusikBot/1.0 (+https://github.com/)"
+
+Json = dict[str, Any]  # Antworten von yt-dlp, Spotify und radio-browser.info
 
 
 @dataclass
@@ -39,13 +42,13 @@ class Track:
     thumbnail: str | None = None
     live: bool = False
     direct: bool = False           # query ist bereits ein Audiostream (Radio)
-    headers: dict = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 # ---- yt-dlp ------------------------------------------------------------------------------
 
-def _ytdl_base() -> dict:
-    opts = {
+def _ytdl_base() -> Json:
+    opts: Json = {
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
@@ -59,27 +62,28 @@ def _ytdl_base() -> dict:
     return opts
 
 
-def _extract(query: str, opts: dict) -> dict:
+def _extract(query: str, opts: Json) -> Json | None:
     with yt_dlp.YoutubeDL(opts) as ydl:
-        return ydl.extract_info(query, download=False)
+        info: Json | None = ydl.extract_info(query, download=False)
+        return info
 
 
-def _best_thumbnail(info: dict) -> str | None:
+def _best_thumbnail(info: Json) -> str | None:
     if info.get("thumbnail"):
-        return info["thumbnail"]
+        return str(info["thumbnail"])
     thumbs = info.get("thumbnails") or []
-    return thumbs[-1].get("url") if thumbs else None
+    return str(thumbs[-1].get("url")) if thumbs and thumbs[-1].get("url") else None
 
 
-def _track_from_info(info: dict, requester_id: int) -> Track:
-    url = info.get("webpage_url") or info.get("url") or info.get("original_url")
+def _track_from_info(info: Json, requester_id: int) -> Track:
+    url = str(info.get("webpage_url") or info.get("url") or info.get("original_url") or "")
     duration = info.get("duration")
     return Track(
-        title=info.get("title") or url or "Unbekannt",
+        title=str(info.get("title") or url or "Unbekannt"),
         query=url,
         requester_id=requester_id,
         duration=int(duration) if duration else None,
-        page_url=url if url and url.startswith("http") else None,
+        page_url=url if url.startswith("http") else None,
         thumbnail=_best_thumbnail(info),
         live=bool(info.get("is_live") or info.get("live_status") == "is_live"),
     )
@@ -122,7 +126,7 @@ async def stream_url(track: Track) -> str:
     opts = {**_ytdl_base(), "format": "bestaudio/best", "noplaylist": True}
     info = await asyncio.to_thread(_extract, track.query, opts)
     if info and "entries" in info:
-        info = next((e for e in info["entries"] if e), None)
+        info = next((e for e in info["entries"] if e), None)  # erster echter Eintrag einer Liste
     if not info or not info.get("url"):
         raise UserError("keine Audiospur gefunden")
     if not track.title or track.title == track.query:
@@ -136,7 +140,7 @@ async def stream_url(track: Track) -> str:
     wait = (info.get("available_at") or 0) - time.time()
     if wait > 0:
         await asyncio.sleep(min(wait + 0.5, 30))
-    return info["url"]
+    return str(info["url"])
 
 
 def _short_error(e: Exception) -> str:
@@ -182,18 +186,20 @@ async def _spotify_api_token(session: aiohttp.ClientSession) -> str | None:
     return _spotify_token[0]
 
 
-async def _spotify_via_api(session, token, kind, sid, requester_id) -> tuple[list[Track], str | None]:
+async def _spotify_via_api(session: aiohttp.ClientSession, token: str, kind: str, sid: str,
+                           requester_id: int) -> tuple[list[Track], str | None]:
     headers = {"Authorization": f"Bearer {token}"}
     base = "https://api.spotify.com/v1"
 
-    async def get(url):
+    async def get(url: str) -> Json:
         async with session.get(url, headers=headers) as r:
             if r.status == 404:
                 raise UserError("Spotify: nicht gefunden oder nicht öffentlich.")
             r.raise_for_status()
-            return await r.json()
+            data: Json = await r.json()
+            return data
 
-    def artists(t):
+    def artists(t: Json) -> str:
         return ", ".join(a["name"] for a in t.get("artists") or [])
 
     if kind == "track":
@@ -220,7 +226,7 @@ async def _spotify_via_api(session, token, kind, sid, requester_id) -> tuple[lis
     return tracks, album.get("name")
 
 
-def _find_key(obj, key):
+def _find_key(obj: Any, key: str) -> Any:
     """Erstes Vorkommen eines Schlüssels in verschachteltem JSON."""
     if isinstance(obj, dict):
         if key in obj:
@@ -237,7 +243,8 @@ def _find_key(obj, key):
     return None
 
 
-async def _spotify_via_embed(session, kind, sid, requester_id) -> tuple[list[Track], str | None]:
+async def _spotify_via_embed(session: aiohttp.ClientSession, kind: str, sid: str,
+                             requester_id: int) -> tuple[list[Track], str | None]:
     """Ohne API-Schlüssel: die öffentliche Einbettungsseite lesen (bis ~100 Titel)."""
     url = f"https://open.spotify.com/embed/{kind}/{sid}"
     async with session.get(url, headers={"User-Agent": "Mozilla/5.0"}) as r:
@@ -264,7 +271,8 @@ async def _spotify_via_embed(session, kind, sid, requester_id) -> tuple[list[Tra
     return tracks, entity.get("name") or entity.get("title")
 
 
-async def spotify_tracks(session, kind, sid, requester_id) -> tuple[list[Track], str | None]:
+async def spotify_tracks(session: aiohttp.ClientSession, kind: str, sid: str,
+                         requester_id: int) -> tuple[list[Track], str | None]:
     try:
         token = await _spotify_api_token(session)
         if token:
@@ -287,20 +295,20 @@ class RadioBrowser:
         self._hosts: list[str] = []
 
     def _lookup_hosts(self) -> list[str]:
-        hosts = set()
+        found: set[str] = set()
         try:
             for *_, addr in socket.getaddrinfo("all.api.radio-browser.info", 443, proto=socket.IPPROTO_TCP):
                 try:
-                    hosts.add(socket.gethostbyaddr(addr[0])[0])
+                    found.add(socket.gethostbyaddr(str(addr[0]))[0])
                 except OSError:
                     pass
         except OSError:
             pass
-        hosts = [h for h in hosts if h.endswith("radio-browser.info")] or ["de1.api.radio-browser.info"]
+        hosts = [h for h in found if h.endswith("radio-browser.info")] or ["de1.api.radio-browser.info"]
         random.shuffle(hosts)
         return hosts
 
-    async def _get(self, path: str, params: dict | None = None):
+    async def _get(self, path: str, params: Json | None = None) -> Any:
         if not self._hosts:
             self._hosts = await asyncio.to_thread(self._lookup_hosts)
         last = None
@@ -318,13 +326,14 @@ class RadioBrowser:
                 self._hosts.append(host)
         raise UserError(f"Radioverzeichnis nicht erreichbar ({last!r})")
 
-    async def search(self, name: str, limit: int = 15) -> list[dict]:
-        return await self._get("/json/stations/search", {
+    async def search(self, name: str, limit: int = 15) -> list[Json]:
+        found: list[Json] = await self._get("/json/stations/search", {
             "name": name, "limit": limit, "order": "votes", "reverse": "true", "hidebroken": "true",
         })
+        return found
 
-    async def station(self, uuid: str) -> dict | None:
-        result = await self._get(f"/json/stations/byuuid/{uuid}")
+    async def station(self, uuid: str) -> Json | None:
+        result: list[Json] = await self._get(f"/json/stations/byuuid/{uuid}")
         return result[0] if result else None
 
     async def click(self, uuid: str) -> None:
@@ -335,10 +344,10 @@ class RadioBrowser:
             log.debug("Radio-Klick %s: %r", uuid, e)
 
     @staticmethod
-    def to_track(st: dict, requester_id: int) -> Track:
+    def to_track(st: Json, requester_id: int) -> Track:
         return Track(
             title=st.get("name", "Radio").strip(),
-            query=st.get("url_resolved") or st.get("url"),
+            query=str(st.get("url_resolved") or st.get("url") or ""),
             requester_id=requester_id,
             page_url=st.get("homepage") or None,
             thumbnail=st.get("favicon") or None,
