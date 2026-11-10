@@ -387,8 +387,7 @@ def test_aion_api_merge_and_embed():
     assert "Ferocious Horn Den" in embed.title
     assert "2 NexBoard-Meldung" in embed.footer.text
 
-    embed_with_image = build_run_embed(base, reporters=2, image_filename="aion_run.png")
-    assert embed_with_image.image.url == "attachment://aion_run.png"
+    assert build_run_embed(base, reporters=2).image.url is None  # Bilder nur als Anhang
 
 
 def test_aion_leaderboard_rows():
@@ -1312,8 +1311,8 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
     sent = []
 
     class Channel:
-        async def send(self, embeds, files):
-            sent.append((embeds, files))
+        async def send(self, embed, files):
+            sent.append((embed, files))
             return object()
 
     class FakeBot:
@@ -1337,13 +1336,13 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
                        {"name": "B2", "players": [{"name": "A", "damage": 300_000}]}],
             "image": dedup.decode_image(base64.b64encode(webp).decode())}
     run(cog._finalize_api_later(dedup.ApiCluster(run_, 1), 0, 5))
-    embeds, files = sent[-1]
-    assert len(embeds) == 1 and embeds[0].image.url == "attachment://aion_run.webp"
+    embed, files = sent[-1]
+    assert embed.image.url is None  # Bild nur als Anhang, sonst nach dem Bearbeiten doppelt
     assert [f.filename for f in files] == ["aion_run.webp"] and files[0].fp.read() == webp
 
     run(cog._finalize_api_later(dedup.ApiCluster({**run_, "image": None}, 1), 0, 5))
-    embeds, files = sent[-1]
-    assert len(embeds) == 3 and [f.filename for f in files] == ["aion_run.png", "aion_boss_0.png", "aion_boss_1.png"]
+    embed, files = sent[-1]
+    assert embed.image.url is None and [f.filename for f in files] == ["aion_run.png", "aion_boss_0.png", "aion_boss_1.png"]
 
 
 def test_aion_hub_link(monkeypatch):
@@ -1385,17 +1384,9 @@ def test_aion_hub_link(monkeypatch):
     assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url + "8")) == "pending"
     assert cluster.hub_url == url
 
-    class Attachment:
-        filename = "aion_run.webp"
-        url = "https://cdn.discordapp.com/attachments/1/2/aion_run.webp?ex=1&is=2"
-        proxy_url = "https://media.discordapp.net/attachments/1/2/aion_run.webp?ex=1&is=2"
-
     class Message:
         def __init__(self):
-            posted = build_run_embed(base, reporters=1)
-            posted.set_image(url=Attachment.url)  # so liefert Discord das Embed nach dem Posten zurück
-            self.embeds = [posted]
-            self.attachments = [Attachment()]
+            self.embeds = [build_run_embed(base, reporters=1)]
             self.edited = None
 
         async def edit(self, embeds):
@@ -1406,8 +1397,6 @@ def test_aion_hub_link(monkeypatch):
     cog.api_posted = [(time.time(), base, msg)]
     assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "edited"
     assert msg.edited[0].fields[-1].value == f"[Im NexHub ansehen]({url})"
-    # Bild bleibt am Anhang, sonst zeigt Discord es doppelt
-    assert msg.edited[0].image.url == "attachment://aion_run.webp"
     assert run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "unknown"  # nur einmal ergänzen
 
 
