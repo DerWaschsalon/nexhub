@@ -23,7 +23,7 @@ AVATAR_SIZE = 180
 MARGIN = 40
 
 
-def _font(path: str, size: int):
+def _font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
         return ImageFont.truetype(path, size)
     except OSError:
@@ -39,7 +39,8 @@ def _circle_avatar(data: bytes, size: int) -> Image.Image:
     return out
 
 
-def render_rank_card(avatar_bytes: bytes, name: str, level: int, rank: int, xp_into_level: int, xp_needed: int) -> io.BytesIO:
+def render_rank_card(avatar_bytes: bytes, name: str, level: int, rank: int, xp_into_level: int,
+                     xp_needed: int) -> io.BytesIO:
     card = Image.new("RGB", (WIDTH, HEIGHT), BG_COLOUR)
     draw = ImageDraw.Draw(card)
 
@@ -52,11 +53,12 @@ def render_rank_card(avatar_bytes: bytes, name: str, level: int, rank: int, xp_i
 
     bar_y, bar_height = 165, 28
     bar_width = WIDTH - text_x - MARGIN
-    draw.rounded_rectangle((text_x, bar_y, text_x + bar_width, bar_y + bar_height), radius=bar_height // 2, fill=TRACK_COLOUR)
+    radius = bar_height // 2
+    draw.rounded_rectangle((text_x, bar_y, text_x + bar_width, bar_y + bar_height), radius=radius, fill=TRACK_COLOUR)
     fraction = min(1.0, xp_into_level / xp_needed) if xp_needed else 0.0
     if fraction > 0:
         filled = max(bar_height, int(bar_width * fraction))  # nie schmaler als hoch, sonst verzerrte Rundung
-        draw.rounded_rectangle((text_x, bar_y, text_x + filled, bar_y + bar_height), radius=bar_height // 2, fill=ACCENT)
+        draw.rounded_rectangle((text_x, bar_y, text_x + filled, bar_y + bar_height), radius=radius, fill=ACCENT)
     draw.text((text_x, bar_y + bar_height + 10), f"{xp_into_level} / {xp_needed} XP",
               font=_font(FONT_REGULAR, 22), fill=MUTED_COLOUR)
 

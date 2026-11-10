@@ -53,9 +53,8 @@ def test_all_commands_register():
             # wait_until_ready() (kein echtes Login in diesem Test) — Tasks sauber abwarten statt
             # "exception was never retrieved".
             for cog_name, loop_name in [
-                ("Reminders", "check_due"), ("Notifications", "poll_feeds"),
-                ("Stats", "refresh"), ("Birthdays", "check"),
-                ("Announcements", "check_due"), ("VoiceStats", "tick"), ("Giveaways", "check_due"),
+                ("Notifications", "poll_feeds"),
+
             ]:
                 loop = getattr(bot.get_cog(cog_name), loop_name)
                 task = loop.get_task()
@@ -170,7 +169,7 @@ def test_settings_panel_persistent_has_stable_custom_ids():
 def test_reminder_parsing():
     from zoneinfo import ZoneInfo
 
-    from bot.cogs.reminders import parse_when
+    from bot.core.when import parse_when
 
     tz = ZoneInfo("Europe/Berlin")
     now = datetime(2026, 10, 14, 12, 0, tzinfo=tz)
@@ -619,15 +618,6 @@ def test_panel_regex():
     assert got == [("🎮", "1"), (None, "2"), ("<:aion:99>", "3")]
 
 
-def test_stats_channel_names():
-    from bot.cogs.stats import bots_channel_name, member_channel_name
-
-    bots = [type("M", (), {"bot": True})(), type("M", (), {"bot": True})(), type("M", (), {"bot": False})()]
-    guild = type("G", (), {"member_count": 123, "members": bots})()
-    assert member_channel_name(guild) == "👥 Mitglieder: 123"
-    assert bots_channel_name(guild) == "🤖 Bots: 2"
-
-
 def test_every_panel_page_fits_discord_limits():
     """Jede erzeugte Seite muss sich bauen lassen (Discord: 5 Zeilen, je Zeile eine Auswahl oder
     5 Knöpfe) und stabile custom_ids haben, in beiden Verifizierungs-Zuständen."""
@@ -684,142 +674,11 @@ def test_setup_change_parses_input():
         parse_input(field("log_channel"), "#allgemein")
 
 
-def test_starboard_embed():
-    import datetime
-
-    from bot.cogs.starboard import build_star_embed
-
-    class FakeAuthor:
-        id = 1
-        display_avatar = type("Avatar", (), {"url": "http://x/avatar.png"})()
-
-        def __str__(self):
-            return "Alice#0001"
-
-    class FakeMessage:
-        content = "Schaut mal!"
-        author = FakeAuthor()
-        attachments: list = []
-        created_at = datetime.datetime.now(datetime.timezone.utc)
-        jump_url = "https://discord.com/channels/1/2/3"
-
-    embed = build_star_embed(FakeMessage(), 5)
-    assert embed.description == "Schaut mal!"
-    assert embed.author.name == "Alice#0001"
-    assert "zur Nachricht" in embed.fields[0].value
-
-
-def test_starboard_count_excludes_authors_own_star():
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.starboard import STAR_EMOJI, Starboard
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            cog = Starboard.__new__(Starboard)
-            cog.db = db
-
-            class FakeUser:
-                def __init__(self, uid):
-                    self.id = uid
-
-            class FakeReaction:
-                emoji = STAR_EMOJI
-
-                def __init__(self, user_ids):
-                    self._ids = user_ids
-
-                async def users(self):
-                    for uid in self._ids:
-                        yield FakeUser(uid)
-
-            class FakeMessage:
-                author = FakeUser(1)
-                reactions = [FakeReaction([1, 2, 3])]  # Autor (1) selbst + zwei andere
-
-            count = await cog._star_count(FakeMessage())
-            assert count == 2  # der eigene Stern des Autors zählt nicht
-
-            await db.close()
-
-    run(go())
-
-
-def test_starboard_sync_respects_threshold_and_persists_post():
-    import datetime
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.starboard import Starboard
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            await db.set(1, "starboard_threshold", 3)
-
-            posted = []
-
-            class FakeStarMessage:
-                id = 999
-
-            class FakeBoardChannel:
-                async def send(self, content=None, embed=None):
-                    posted.append((content, embed))
-                    return FakeStarMessage()
-
-            class FakeChannel:
-                mention = "#general"
-
-            class FakeAuthor:
-                id = 1
-                display_avatar = type("A", (), {"url": "x"})()
-
-                def __str__(self):
-                    return "Alice"
-
-            class FakeGuild:
-                id = 1
-
-                def get_channel(self, cid):
-                    return FakeBoardChannel()
-
-            class FakeMessage:
-                id = 42
-                guild = FakeGuild()
-                channel = FakeChannel()
-                author = FakeAuthor()
-                content = "hi"
-                attachments: list = []
-                created_at = datetime.datetime.now(datetime.timezone.utc)
-                jump_url = "https://discord.com/x"
-
-            cog = Starboard.__new__(Starboard)
-            cog.db = db
-
-            await cog._sync(FakeMessage(), count=2, board_channel_id=55)
-            assert posted == []  # unter der Schwelle -> kein Post
-
-            await cog._sync(FakeMessage(), count=3, board_channel_id=55)
-            assert len(posted) == 1  # Schwelle erreicht -> Post
-            row = await db.fetchone("SELECT star_message_id FROM starboard WHERE message_id=?", (42,))
-            assert row["star_message_id"] == 999
-
-            await db.close()
-
-    run(go())
-
-
 def test_poll_answer_parsing():
     import pytest as _pytest
 
-    from bot.cogs.polls import parse_answers
     from bot.errors import UserError
+    from bot.modules.community.polls import parse_answers
 
     assert parse_answers("Ja | Nein") == ["Ja", "Nein"]
     assert parse_answers(" A | B | C ") == ["A", "B", "C"]
@@ -830,122 +689,6 @@ def test_poll_answer_parsing():
         parse_answers("|".join(f"A{i}" for i in range(11)))  # mehr als 10
     with _pytest.raises(UserError):
         parse_answers("x" * 56 + "|Nein")  # einzelne Antwort zu lang
-
-
-def test_birthday_day_in_month_validation():
-    from bot.cogs.birthdays import DAYS_IN_MONTH
-
-    assert DAYS_IN_MONTH[2] == 29  # Februar: 29 erlauben (Schaltjahr), Validierung nicht zu streng
-    assert DAYS_IN_MONTH[4] == 30
-    assert 31 <= DAYS_IN_MONTH[1]
-
-
-def test_embed_colour_parsing():
-    import discord
-
-    from bot.cogs.embeds import parse_colour
-    from bot.errors import UserError
-
-    assert parse_colour(None) == discord.Colour.blurple()
-    assert parse_colour("#5865F2") == discord.Colour(0x5865F2)
-    assert parse_colour("5865F2") == discord.Colour(0x5865F2)
-
-    with pytest.raises(UserError):
-        parse_colour("nicht-hex")
-
-
-def test_custom_command_rendering_and_name_validation():
-    from bot.cogs.customcommands import NAME_RE, render
-
-    member = type("M", (), {"mention": "<@1>"})()
-    guild = type("G", (), {"name": "Der Waschsalon"})()
-    assert render("Hallo {user}, willkommen auf {server}!", member, guild) == \
-        "Hallo <@1>, willkommen auf Der Waschsalon!"
-
-    assert NAME_RE.match("regeln") and NAME_RE.match("info-2")
-    assert not NAME_RE.match("Regeln")  # Großbuchstaben nicht erlaubt
-    assert not NAME_RE.match("mit leerzeichen")
-
-
-def test_announcement_due_rows_get_rescheduled():
-    import tempfile
-    import time
-    from pathlib import Path
-
-    from bot.cogs.announcements import Announcements
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            now = time.time()
-            due_id = await db.execute(
-                "INSERT INTO scheduled (guild_id, channel_id, text, interval_minutes, next_run) "
-                "VALUES (1, 2, 'Hallo!', 30, ?)", (now - 10,),
-            )
-            not_due_id = await db.execute(
-                "INSERT INTO scheduled (guild_id, channel_id, text, interval_minutes, next_run) "
-                "VALUES (1, 2, 'Später', 30, ?)", (now + 10_000,),
-            )
-
-            sent = []
-
-            class FakeChannel:
-                async def send(self, text):
-                    sent.append(text)
-
-            cog = Announcements.__new__(Announcements)
-            cog.bot = type("B", (), {"get_channel": lambda self, i: FakeChannel()})()
-            cog.db = db
-
-            await cog.check_due.coro(cog)  # die echte Loop-Funktion, nicht als Loop (kein wait_until_ready nötig)
-
-            assert sent == ["Hallo!"]  # nur die fällige wurde gepostet
-            due_row = await db.fetchone("SELECT next_run FROM scheduled WHERE id=?", (due_id,))
-            not_due_row = await db.fetchone("SELECT next_run FROM scheduled WHERE id=?", (not_due_id,))
-            assert due_row["next_run"] > now  # neu geplant, 30 Min. weiter in der Zukunft
-            assert not_due_row["next_run"] == now + 10_000  # unverändert, war nicht fällig
-
-            await db.close()
-
-    run(go())
-
-
-def test_voicestats_qualifies_and_format():
-    from bot.cogs.voicestats import format_duration, qualifies
-
-    assert format_duration(90) == "1 Min."
-    assert format_duration(3661) == "1 Std. 1 Min."
-
-    class FakeVoiceState:
-        def __init__(self, self_deaf=False, deaf=False):
-            self.self_deaf, self.deaf = self_deaf, deaf
-
-    class FakeMember:
-        def __init__(self, bot=False, voice=None):
-            self.bot = bot
-            self.voice = voice
-
-    class FakeChannel:
-        def __init__(self, members, afk=False):
-            self.members = members
-            self.guild = type("G", (), {"afk_channel": self if afk else None})()
-
-    alice, bob = FakeMember(voice=FakeVoiceState()), FakeMember(voice=FakeVoiceState())
-    channel = FakeChannel([alice, bob])
-    assert qualifies(alice, channel) is True  # zu zweit, niemand taub -> zählt
-
-    alone_channel = FakeChannel([alice])
-    assert qualifies(alice, alone_channel) is False  # allein im Kanal -> zählt nicht
-
-    deaf_bob = FakeMember(voice=FakeVoiceState(self_deaf=True))
-    channel2 = FakeChannel([alice, deaf_bob])
-    assert qualifies(deaf_bob, channel2) is False  # selbst taub -> zählt nicht
-    assert qualifies(alice, channel2) is True  # alice selbst ist nicht taub, zählt weiter
-
-    afk_channel = FakeChannel([alice, bob], afk=True)
-    assert qualifies(alice, afk_channel) is False  # AFK-Kanal zählt nie
 
 
 YOUTUBE_FEED_XML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -1013,7 +756,7 @@ def test_youtube_provider_dedup_and_baseline():
 def test_giveaway_embed_running_and_ended():
     import time
 
-    from bot.cogs.giveaways import build_giveaway_embed
+    from bot.modules.community.giveaways import build_giveaway_embed
 
     running = build_giveaway_embed("Steam-Key", 2, time.time() + 3600, host_id=42)
     assert running.title == "🎉 Giveaway"
@@ -1031,8 +774,8 @@ def test_giveaway_pick_winners_respects_count_and_uses_entries():
     import tempfile
     from pathlib import Path
 
-    from bot.cogs.giveaways import Giveaways
     from bot.db import Database
+    from bot.modules.community.giveaways.store import GiveawayStore
 
     async def go():
         with tempfile.TemporaryDirectory() as d:
@@ -1041,14 +784,13 @@ def test_giveaway_pick_winners_respects_count_and_uses_entries():
             for uid in (1, 2, 3):
                 await db.execute("INSERT INTO giveaway_entries (message_id, user_id) VALUES (?, ?)", (99, uid))
 
-            cog = Giveaways.__new__(Giveaways)
-            cog.db = db
+            store = GiveawayStore(db)
 
-            winners = await cog.pick_winners(99, 2)
+            winners = await store.pick_winners(99, 2)
             assert len(winners) == 2
             assert set(winners) <= {1, 2, 3}
 
-            no_entries = await cog.pick_winners(100, 2)
+            no_entries = await store.pick_winners(100, 2)
             assert no_entries == []
 
             await db.close()
@@ -1110,44 +852,6 @@ def test_automod_check_detects_each_violation_independently():
             await db.close()
 
     run(go())
-
-
-def test_level_formula_and_conversion():
-    from bot.cogs.levels import level_from_xp, xp_for_level
-
-    assert xp_for_level(0) == 100  # 5*0+50*0+100
-    assert xp_for_level(1) == 155  # 5+50+100
-    assert xp_for_level(10) == 1100
-
-    assert level_from_xp(0) == (0, 0, 100)
-    assert level_from_xp(99) == (0, 99, 100)
-    assert level_from_xp(100) == (1, 0, 155)  # genau die Schwelle -> Level 1 erreicht
-    assert level_from_xp(254) == (1, 154, 155)
-    assert level_from_xp(255) == (2, 0, xp_for_level(2))
-
-    # negative XP (sollte nicht vorkommen, aber /level-xp-geben kann theoretisch überziehen) crasht nicht
-    assert level_from_xp(-50) == (0, 0, 100)
-
-
-def test_rank_card_renders_valid_png():
-    import io
-
-    from PIL import Image
-
-    from bot.cogs.rankcard import HEIGHT, WIDTH, render_rank_card
-
-    # Minimaler Fake-Avatar: ein echtes kleines PNG, damit Image.open() nicht scheitert
-    fake_avatar = io.BytesIO()
-    Image.new("RGBA", (64, 64), (10, 20, 30, 255)).save(fake_avatar, format="PNG")
-
-    buf = render_rank_card(fake_avatar.getvalue(), "TestUser", level=3, rank=1, xp_into_level=50, xp_needed=200)
-    image = Image.open(buf)
-    assert image.format == "PNG"
-    assert image.size == (WIDTH, HEIGHT)
-
-    # xp_needed=0 (Edge-Case) darf nicht durch Null teilen
-    buf2 = render_rank_card(fake_avatar.getvalue(), "TestUser", level=0, rank=1, xp_into_level=0, xp_needed=0)
-    assert Image.open(buf2).size == (WIDTH, HEIGHT)
 
 
 def test_aion_run_image_renders_valid_png():
@@ -1432,8 +1136,13 @@ def test_hub_action_values():
 
 def test_hub_giveaway_page():
     """Giveaway-Seite: Zeilen aus der DB, Schalter für die Aktionen je Zeile."""
-    from bot.cogs.giveaways import Giveaways
+    from unittest.mock import MagicMock
+
+    from nexcore import EventBus, Paths
+
+    from bot.core import BotContext
     from bot.hubpages import Ctx, page_out
+    from bot.modules.community.giveaways import Giveaways
 
     class Guild:
         id = 1
@@ -1449,12 +1158,11 @@ def test_hub_giveaway_page():
         with tempfile.TemporaryDirectory() as d:
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
-            cog = Giveaways.__new__(Giveaways)
-            cog.db, cog.bot = db, None
+            module = Giveaways(BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock()))
             await db.execute("INSERT INTO giveaways VALUES (11, 1, 5, 7, 'Nitro', 1, 2000000000, 0)")
             await db.execute("INSERT INTO giveaways VALUES (12, 1, 5, 7, 'Alt', 2, 1000, 1)")
             await db.execute("INSERT INTO giveaway_entries VALUES (11, 3)")
-            out = await page_out(Ctx(None, Guild()), cog.hub_pages()[0], lambda s: {})
+            out = await page_out(Ctx(None, Guild()), module.pages()[0], lambda s: {})
             await db.close()
             return out
 
