@@ -10,7 +10,7 @@ der Hub kennt keine einzelnen Funktionen. Eine Seite besteht aus Blöcken:
 
 Aktionen bekommen einen `Ctx` (Server, wer im Hub geklickt hat) und die geprüften Werte ihrer
 Felder und geben eine kurze Rückmeldung zurück. `UserError`/`ApiError` werden zur Fehlermeldung im
-Hub. Wie die Steuer-API das ausliefert, steht in `cogs/control.py` (`/control/pages…`).
+Hub. Wie die Steuer-API das ausliefert, steht in `admin/control.py` (`/control/pages…`).
 
 Neue Funktion im Bot = `pages()` im Modul ergänzen, im Hub ist nichts zu tun.
 """

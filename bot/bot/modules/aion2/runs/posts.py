@@ -6,7 +6,7 @@ Lauf (gleicher Dungeon, ähnliche Startzeit/Dauer), wartet der Bot kurz, führt 
 einer Rangliste zusammen und postet genau einmal: Embed mit Text, darüber als Anhang das Run-Bild des
 NexBoards (dasselbe wie beim Discord-Webhook, `image_webp`). Schickt das NexBoard kein Bild (ältere
 Versionen), malt der Bot selbst: Rangliste als Bild und je Boss ein Bild. Der NexHub meldet danach den
-Link zum Run (`attach_hub_link`, über control.py), der kommt vorn ins Feld „📊 Analyse“, daneben die
+Link zum Run (`attach_hub_link`, Steuer-API `/control/run-link`), der kommt vorn ins Feld „📊 Analyse“, daneben die
 Bestenliste je Boss (`/leaderboard/<guild_id>`).
 
 Erwarteter Payload (ein POST pro abgeschlossenem Lauf, eine Zeile pro Spieler):
@@ -21,8 +21,8 @@ Erwarteter Payload (ein POST pro abgeschlossenem Lauf, eine Zeile pro Spieler):
       ]
     }
 
-Der Webserver (Port 8789, `AION_PORT`) liefert nur diese zwei Pfade; Caddy gibt sie nach außen
-(infra/server/srv/nexhub/Caddyfile). Öffentliche Adresse für Links: `AION_PUBLIC_URL`.
+Die zwei Pfade hängen am öffentlichen Teil des WebHost (bot/core/web.py, Port 8789); Caddy gibt sie
+nach außen (infra/server/srv/nexhub/Caddyfile). Öffentliche Adresse für Links: `AION_PUBLIC_URL`.
 """
 
 from __future__ import annotations
@@ -44,6 +44,8 @@ from discord.ext import commands
 from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule
+from bot.core.web import RouteTable, json_body
+from bot.hubpages import ApiError
 
 from .format import fmt_dps, fmt_time, records_text
 from .records import RunRecords, RunResult
@@ -51,7 +53,6 @@ from .settings import RunPostSettings
 
 log = logging.getLogger(__name__)
 
-DEFAULT_PORT = 8789
 DEFAULT_DELAY = 15
 DURATION_TOLERANCE_S = 20
 API_START_TOLERANCE_MS = 30_000
@@ -291,33 +292,22 @@ class RunPosts(BotModule):
         self.records = RunRecords(ctx.db)
         self.api_pending: dict[int, list[ApiCluster]] = {}  # guild_id -> offene API-Cluster
         self.api_posted: list[tuple[float, dict[str, Any], discord.Message]] = []  # (gepostet, Lauf, Nachricht)
-        self.runner: web.AppRunner | None = None
 
     def cog(self) -> commands.Cog:
         from .commands import RunsCog
 
         return RunsCog(self)
 
-    async def start(self) -> None:
-        app = web.Application(client_max_size=2 * MAX_IMAGE_BYTES)  # Base64-Bild + Rest
-        app.add_routes([
-            web.post("/api/aion/fight", self.handle_api_fight),
-            web.get("/leaderboard/{guild_id}", self.page_leaderboard),
-        ])
-        self.runner = web.AppRunner(app)
-        await self.runner.setup()
-        port = int(os.getenv("AION_PORT", DEFAULT_PORT))
-        await web.TCPSite(self.runner, "0.0.0.0", port).start()
-        log.info("AION-API und Bestenliste hören auf Port %d", port)
+    def routes(self, r: RouteTable) -> None:
+        r.open("POST", "/api/aion/fight", self.handle_api_fight, max_body=2 * MAX_IMAGE_BYTES)  # Base64-Bild + Rest
+        r.open("GET", "/leaderboard/{guild_id}", self.page_leaderboard)
+        r.control("POST", "/control/run-link", self.run_link)
 
     async def shutdown(self) -> None:
         for clusters in self.api_pending.values():
             for c in clusters:
                 if c.task:
                     c.task.cancel()
-        if self.runner:
-            await self.runner.cleanup()
-            self.runner = None
         await super().shutdown()
 
     async def token(self, guild_id: int, *, renew: bool = False) -> str:
@@ -446,6 +436,18 @@ class RunPosts(BotModule):
                     await message.edit(embeds=embeds)
                 return "edited"
         return "unknown"
+
+    async def run_link(self, request: web.Request) -> dict[str, Any]:
+        """Der Hub hat einen Run gespeichert: Link an den passenden Post (attach_hub_link)."""
+        data = await json_body(request)
+        dungeon, start_ms, url = data.get("dungeon"), data.get("start_ms"), data.get("url")
+        if not isinstance(dungeon, str) or not dungeon.strip():
+            raise ApiError(400, "dungeon fehlt")
+        if not isinstance(start_ms, int) or isinstance(start_ms, bool):
+            raise ApiError(400, "start_ms fehlt")
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
+            raise ApiError(400, "url fehlt oder ungültig")
+        return {"result": await self.attach_hub_link(dungeon.strip(), start_ms, url)}
 
     async def _update_leaderboard(
         self, guild_id: int, bosses: list[dict[str, Any]], players: list[dict[str, Any]]

@@ -67,7 +67,7 @@ class Uploaded(BaseModel):
 
 
 async def tell_bot(http: httpx.AsyncClient, settings: Settings, payload: dict) -> None:
-    """Neuer Run → TheWashBot hängt den Link an seinen Discord-Post (bot/bot/cogs/control.py, run-link).
+    """Neuer Run → TheWashBot hängt den Link an seinen Discord-Post (Modul aion2.runs, /control/run-link).
     Läuft nach der Antwort; ein Fehler hier darf den Upload nicht stören."""
     try:
         r = await http.post(f"{settings.bot_control_url}/control/run-link", json=payload, timeout=10,

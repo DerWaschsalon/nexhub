@@ -15,6 +15,8 @@ from nexcore import ModuleInfo
 from bot.core import BotContext, BotModule, GuildSettings
 from bot.core.discord_checks import can_assign
 from bot.core.module import Listener
+from bot.core.web import RouteTable
+from bot.hubpages import Page
 
 from .settings import LevelSettings
 from .store import LevelStore, level_from_xp
@@ -64,6 +66,16 @@ class Levels(BotModule):
         from .commands import LevelsCog
 
         return LevelsCog(self)
+
+    def pages(self) -> list[Page]:
+        from .hub import level_page
+
+        return [level_page()]
+
+    def routes(self, r: RouteTable) -> None:
+        from .hub import level_routes
+
+        level_routes(self, r)
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None or not isinstance(message.author, discord.Member):

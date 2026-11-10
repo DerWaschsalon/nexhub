@@ -53,21 +53,25 @@ def test_all_commands_register() -> None:
         with tempfile.TemporaryDirectory() as d:
             bot = Bot(Database(Path(d) / "t.sqlite3"), sync=False)
             await bot.setup_hook()
-            # erst nach dem Laden importieren: load_extension lädt die Cog-Datei neu (eigene Klasse)
-            from bot.cogs.control import Control
-            from bot.cogs.settings import Setup
-
-            # So findet on_ready den Setup-Cog für die festen Management-Panels
-            assert isinstance(bot.get_cog("Setup"), Setup)
+            assert bot.get_cog("Setup") is bot.setup_cog
             names = sorted(c.qualified_name for c in bot.tree.walk_commands())
-            control = bot.get_cog("Control")
-            assert isinstance(control, Control)
-            pages = control.all_pages()
+            pages = bot.control.all_pages()
+            table = bot.modules.routes(bot.control.routes)
+            routes = [(r.method, r.path) for r in table.internal + table.public]
+            assert len(routes) == len(set(routes)), routes
             await bot.modules.stop()
             await bot.db.close()
-            return names, pages
-    names, pages = asyncio.run(go())
+            return names, pages, routes
+    names, pages, routes = asyncio.run(go())
     check_hub_pages(pages)
+    # Seiten mit eigener Oberfläche im Hub und ihre Endpunkte (hub/web/src/modules/bot)
+    for custom in ("", "verifizierung", "sichtbarkeit", "level", "ankuendigungen", "befehle"):
+        assert any(p.id == custom and p.custom for p in pages), custom
+    for want in [("GET", "/control/level-rewards"), ("POST", "/control/announcements"),
+                 ("PUT", "/control/commands/{name}"), ("PUT", "/control/verification/text"),
+                 ("POST", "/control/run-link"), ("GET", "/control/matrix"), ("POST", "/api/aion/fight"),
+                 ("GET", "/leaderboard/{guild_id}")]:
+        assert want in routes, want
     for expected in ["play", "radio", "skip", "stop", "warteschlange", "lautstaerke", "wiederholen",
                      "setup aendern", "setup anzeigen", "setup temp-voice", "setup panel", "setup management-kanal",
                      "setup verifizierung", "setup regeln-text", "rollen-panel", "timeout",
@@ -109,7 +113,7 @@ def test_db_roundtrip() -> None:
 
 
 def test_settings_panel_persistent_has_stable_custom_ids() -> None:
-    from bot.cogs.settings import SettingsPanel
+    from bot.admin.setup import SettingsPanel
     from bot.forms import SECTIONS
 
     pages = sum(len(section.groups()) for section in SECTIONS.values())
@@ -126,7 +130,7 @@ def test_settings_panel_persistent_has_stable_custom_ids() -> None:
 
 def test_role_can_view() -> None:
 
-    from bot.cogs.control import role_can_view
+    from bot.admin.control import role_can_view
 
     class FakeChannel:
         def __init__(self, overwrites: dict[Any, discord.PermissionOverwrite]) -> None:
@@ -177,7 +181,7 @@ def test_every_panel_page_fits_discord_limits() -> None:
 
     from nexcore import EventBus, Paths
 
-    from bot.cogs.settings import EXTRAS, SettingsPanel
+    from bot.admin.setup import EXTRAS, SettingsPanel
     from bot.core import BotContext
     from bot.db import Database
     from bot.forms import SECTIONS
@@ -210,7 +214,7 @@ def test_every_panel_page_fits_discord_limits() -> None:
 
 
 def test_setup_change_parses_input() -> None:
-    from bot.cogs.settings import parse_input
+    from bot.admin.setup import parse_input
     from bot.errors import UserError
     from bot.forms import find_field
     from bot.hubpages import Field

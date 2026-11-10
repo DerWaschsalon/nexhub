@@ -12,7 +12,9 @@ from nexcore import ModuleInfo
 from bot.core import BotContext, BotModule, GuildSettings
 from bot.core.discord_checks import can_assign
 from bot.core.module import Listener
+from bot.core.web import RouteTable
 from bot.errors import UserError
+from bot.hubpages import Page
 
 from .settings import VerificationSettings
 
@@ -70,6 +72,16 @@ class Verification(BotModule):
 
     def listeners(self) -> dict[str, Listener]:
         return {"on_interaction": self.on_interaction}
+
+    def pages(self) -> list[Page]:
+        from .hub import verification_page
+
+        return [verification_page()]
+
+    def routes(self, r: RouteTable) -> None:
+        from .hub import verification_routes
+
+        verification_routes(self, r)
 
     def is_active(self, guild_id: int) -> bool:
         return self.settings.get(guild_id).verify_active

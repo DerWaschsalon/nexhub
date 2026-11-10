@@ -1,7 +1,7 @@
 """TheWashBot steuern: reicht Anfragen an die Steuer-API des Bots durch (nur Admins).
 
 `/api/admin/bot/<pfad>` → `<BOT_CONTROL_URL>/control/<pfad>` mit dem gemeinsamen Schlüssel.
-Was erlaubt ist und wie Werte geprüft werden, entscheidet der Bot (bot/bot/cogs/control.py);
+Was erlaubt ist und wie Werte geprüft werden, entscheidet der Bot (bot/bot/admin/control.py);
 der Hub prüft nur, dass ein Admin fragt. Name und Discord-ID des Admins gehen als `X-Hub-User` und
 `X-Hub-User-Id` mit, der Bot schreibt den Namen ins Discord-Audit-Log.
 """

@@ -1,6 +1,6 @@
 """Verwaltet die Benachrichtigungs-Provider (aktuell nur GitHub) und fragt fällige Feeds ab.
 
-Discord-seitig (`bot/cogs/notifications.py`) kennt nur diese Klasse, nichts GitHub-Spezifisches —
+Discord-seitig (`modules/notify/feeds/wizard.py`) kennt nur diese Klasse, nichts GitHub-Spezifisches —
 ein neuer Dienst (YouTube, Twitch, RSS, …) kommt einfach in `PROVIDERS` dazu und muss nur
 `bot.notify.base.Provider` implementieren.
 """

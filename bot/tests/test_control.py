@@ -1,4 +1,4 @@
-"""Steuer-API für den NexHub (bot/cogs/control.py) mit nachgebautem Discord-Server."""
+"""Steuer-API für den NexHub (bot/admin/control.py und routes() der Module) mit nachgebautem Discord-Server."""
 
 from __future__ import annotations
 
@@ -14,8 +14,10 @@ import discord
 from aiohttp.test_utils import TestClient, TestServer
 from nexcore import EventBus, Paths
 
-from bot.cogs.control import Control
+from bot.admin.control import ControlApi
 from bot.core import BotContext
+from bot.core.host import module_routes
+from bot.core.web import RouteTable, control_app
 from bot.db import Database
 from bot.modules.aion2.runs import RunPosts
 from bot.modules.community.levels import Levels
@@ -93,14 +95,19 @@ def run(test: Callable[[Client, Database, Any], Awaitable[None]]) -> None:
                                   get_cog=lambda name: None, cogs={}, user=None, latency=float("nan"),
                                   is_ready=lambda: True, dispatched=[])
             bot.dispatch = lambda event, *args: bot.dispatched.append((event, *args))
-            ctx = BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock())
+            # nachgebauter Bot statt echtem Discord-Client
+            ctx = BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=bot)  # type: ignore[arg-type]
             modules = {m.info.id: m for m in (RunPosts(ctx), Levels(ctx), Announcements(ctx), CustomCommands(ctx),
                                                       Verification(ctx))}
+            for m in modules.values():
+                m.active = True  # sonst antworten ihre Routen mit 503
             bot.modules = SimpleNamespace(module=lambda mid, kind: modules[mid], pages=lambda: [])
             guild.bot = bot  # für Tests, die gemeldete Ereignisse prüfen
-            cog = Control(bot)  # type: ignore[arg-type]  # nachgebauter Bot statt echtem Discord-Client
-            cog.key = KEY
-            async with TestClient(TestServer(cog.make_app())) as client:
+            table = RouteTable()
+            ControlApi(bot).routes(table)  # type: ignore[arg-type]
+            for m in modules.values():
+                module_routes(m, table)
+            async with TestClient(TestServer(control_app(table, KEY))) as client:
                 await test(client, db, guild)
             await db.close()
     asyncio.run(go())
@@ -167,8 +174,6 @@ def test_section_int_zero_and_warn_action() -> None:
         await call(client, "PUT", "/control/sections/verwarnungen", {"values": {"warn_threshold": 0}})
         assert guild.bot.dispatched[-1] == ("settings_changed", guild, "verwarnungen")
         # Ohne Schwelle fällt die Aktion zurück (Moderation hört auf settings_changed)
-        from unittest.mock import MagicMock
-
         from nexcore import EventBus, Paths
 
         from bot.core import BotContext

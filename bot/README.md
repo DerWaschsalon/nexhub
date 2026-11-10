@@ -152,7 +152,7 @@ github.com/settings/tokens) sind es 5000/Stunde.
 Architektur für weitere Dienste: `bot/notify/base.py` (Schnittstelle `Provider`), `bot/notify/github.py`
 (erster Provider), `bot/notify/manager.py` (Registry + Abfrage/Dedup/Fehlerbehandlung). Ein neuer
 Dienst (YouTube, Twitch, RSS, …) implementiert nur `Provider` und trägt sich in `PROVIDERS` ein —
-die Discord-Oberfläche in `bot/cogs/notifications.py` kennt nichts Dienst-Spezifisches.
+die Discord-Oberfläche in `modules/notify/feeds/wizard.py` kennt nichts Dienst-Spezifisches.
 
 ## AION-2: Runs aus dem NexBoard
 
@@ -161,7 +161,7 @@ Jedes [NexBoard](../nexboard/) schickt nach einem beendeten Dungeon-Run die Eckd
 Dungeon, wartet der Bot kurz (`wartezeit`, Standard 15 s), führt alle Meldungen zu einer Rangliste
 zusammen und postet genau einmal: Gesamt-Rangliste als Bild, dazu je Boss ein Bild (max. 9 pro
 Nachricht, Discords Limit). Unter „📊 Analyse“ stehen „Im NexHub ansehen“ (den Link meldet der Hub
-nach dem Upload, siehe `control.py`, `run-link`) und die Bestenliste je Boss
+nach dem Upload über `/control/run-link`, Modul `aion2.runs`) und die Bestenliste je Boss
 (`<AION_PUBLIC_URL>/leaderboard/<guild_id>`, öffentlich, ohne Login).
 
 1. `AION_PUBLIC_URL` in der `.env` setzen (öffentliche Adresse ohne Slash am Ende, auf dem VPS die
@@ -208,7 +208,7 @@ mit `/setup panel`. Das alte eigene Web-Dashboard des Bots gibt es nicht mehr.
 
 ### Steuerung über den NexHub
 
-Für den Bereich „Bot“ im NexHub hat der Bot eine JSON-Steuer-API (`bot/cogs/control.py`, Port 8790), die nur startet, wenn
+Für den Bereich „Bot“ im NexHub hat der Bot eine JSON-Steuer-API (`bot/admin/control.py` plus `routes()` der Module, Port 8790), die nur startet, wenn
 `BOT_CONTROL_KEY` gesetzt ist (mindestens 24 Zeichen, derselbe Wert wie beim Hub). Jede Anfrage
 braucht `Authorization: Bearer <BOT_CONTROL_KEY>`. Den Port nie veröffentlichen: Er ist für das
 interne Docker-Netz gedacht, wer den Schlüssel hat, darf alle Einstellungen ändern.
@@ -223,6 +223,8 @@ Blöcken beschreibt (`bot/hubpages.py`): `Form` (Einstellungen aus `SECTIONS`), 
 kleinem Formular). Jede Aktion ist eine Methode `async (ctx, werte, zeile) -> Rückmeldung`, die Werte
 sind schon geprüft (Kanal, Rolle, Mitglied, Zahl …). Menüeintrag, Formulare und Tabellen zeichnet der
 Hub daraus selbst, dort ist nichts zu ändern. `UserError` wird zur Fehlermeldung im Hub.
+Braucht eine Seite eigene Endpunkte (eigene Oberfläche im Hub), meldet das Modul sie in
+`routes(r)` mit `r.control(...)` an, öffentliche Endpunkte mit `r.open(...)`.
 
 ## Server-Status einrichten
 
@@ -248,14 +250,17 @@ ist. **Falls dabei etwas schiefgeht:** auf unraid-server `cd /mnt/user/appdata/t
 compose up -d` stellt den Bot anhand der `docker-compose.yml` wieder her — die bleibt die ganze
 Zeit unverändert auf der Platte liegen, als Netz.
 
-## Aufbau (Umbau auf kleine Module, läuft)
+## Aufbau
 
-Der Bot zieht schrittweise von Cogs (`bot/cogs/`) auf Module um, siehe Konzept „TheWashBot – Umbau
-auf kleine Module“. Bis alles umgezogen ist, laufen beide nebeneinander.
+Der Bot besteht aus kleinen Modulen auf `nexcore`, siehe Konzept „TheWashBot – Umbau auf kleine
+Module“. Cogs gibt es nur noch als Oberfläche eines Moduls (`ModuleCog`) und für `/setup`.
 
 - `bot/core/`: Kern ohne Fachlogik. `BotModule` (ein `nexcore.Module` mit Datenbank und Discord-Client),
   `GuildSettings` (Einstellungen je Server mit Schema, gespeichert wie bisher in `settings`),
-  `ModuleHost` (lädt die Module, schaltet sie über die `nexcore`-Registry, Stand in `modules.yaml`).
+  `ModuleHost` (lädt die Module, schaltet sie über die `nexcore`-Registry, Stand in `modules.yaml`),
+  `WebHost` (`core/web.py`: ein Webserver für alle, öffentlich auf 8789, Steuer-API auf 8790).
+- `bot/admin/`: was alle Module betrifft. `control.py` (Grundgerüst der Steuer-API: Status, Server,
+  Formulare, Seiten, Sichtbarkeits-Matrix) und `setup.py` (`/setup` und Klick-Panel aus dem Schema).
 - `bot/modules/<bereich>/<modul>/`: ein Modul je Ordner, `__init__.py` mit der Klasse, `settings.py`
   mit dem Schema; neue Module kommen in `bot/modules/__init__.py` (`MODULES`).
 - Tests je Teil unter `tests/core/` und `tests/modules/`; `tests/test_settings_compat.py` sichert,

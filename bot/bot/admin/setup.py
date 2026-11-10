@@ -338,7 +338,3 @@ class Setup(commands.GroupCog, group_name="setup", group_description="Einstellun
     async def rules_text(self, interaction: discord.Interaction, text: str) -> None:
         channel = await self.verify_module().set_text(self.guild_of(interaction), text)
         await interaction.response.send_message(f"Regeln-Text in {channel.mention} aktualisiert.", ephemeral=True)
-
-
-async def setup(bot: Bot) -> None:
-    await bot.add_cog(Setup(bot))

@@ -12,8 +12,10 @@ from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule
 from bot.core.module import Listener
+from bot.core.web import RouteTable
 from bot.db import Database
 from bot.errors import UserError
+from bot.hubpages import Page
 
 NAME_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 PREFIX = "!"
@@ -86,6 +88,16 @@ class CustomCommands(BotModule):
         from .commands import CustomCommandsCog
 
         return CustomCommandsCog(self)
+
+    def pages(self) -> list[Page]:
+        from .hub import commands_page
+
+        return [commands_page()]
+
+    def routes(self, r: RouteTable) -> None:
+        from .hub import command_routes
+
+        command_routes(self, r)
 
     async def on_message(self, message: discord.Message) -> None:
         name = command_name(message.content)

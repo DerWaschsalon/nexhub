@@ -1,5 +1,5 @@
 <!-- Formular für einen Bereich des Bots. Felder, Beschriftungen und Hinweise kommen aus dem
-     Schema des Bots (bot/bot/cogs/control.py, SECTIONS); wie ein Feldtyp aussieht, steht in BotFieldInput.
+     Schema des Bots (bot/bot/admin/control.py, SECTIONS); wie ein Feldtyp aussieht, steht in BotFieldInput.
      Gespeichert wird der ganze Bereich auf einmal, der Bot prüft alle Werte vorher. -->
 <script lang="ts">
 	import { send } from '#lib/api.ts';

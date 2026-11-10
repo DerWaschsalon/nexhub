@@ -2,7 +2,7 @@
 
 Ein Provider (siehe `github.py` für das erste Beispiel) bekommt Quelle, gewählte Ereignisse,
 Filter und den zuletzt gespeicherten Zustand, und liefert neue Meldungen plus aktualisierten
-Zustand zurück. Der Discord-Teil (`bot/cogs/notifications.py`) kennt nur diese Schnittstelle,
+Zustand zurück. Der Discord-Teil (`modules/notify/feeds/wizard.py`) kennt nur diese Schnittstelle,
 nichts GitHub-Spezifisches — ein neuer Dienst (YouTube, Twitch, RSS, …) muss nur `Provider`
 implementieren und sich in `PROVIDERS` eintragen.
 """
