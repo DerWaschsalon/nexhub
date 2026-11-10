@@ -13,11 +13,9 @@ from pathlib import Path
 from aiohttp import web
 from pydantic import ValidationError
 
-from .a2ui import A2Ui
 from .app import NexBoard, build_app
 from .config import config_dir, is_default_config, load_settings
 from .core.http import local_only
-from .core.topics import LANGUAGE
 from .migrate import migrate
 from .radar import SETTINGS_FILE as RADAR_SETTINGS
 
@@ -38,12 +36,7 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     await web.TCPSite(runner, settings.host, settings.port).start()
     url = f"http://localhost:{settings.port}/"
     # Overlay-Seite und Oberfläche des A2Tools-Meters, eigener Port wegen ihrer absoluten Pfade
-    a2 = A2Ui(deck.dps.capture, cdir / "a2-settings.json")
-    a2.plugins.overlay = deck.overlay.plugin_command
-    a2.plugins.start()
-    # eine Sprache für alles: die der allgemeinen Einstellungen (System → Allgemein)
-    a2.on_language = deck.set_language
-    deck.bus.on(LANGUAGE, a2.apply_language)
+    a2 = deck.a2
     await a2.apply_language(settings.language)
 
     @web.middleware

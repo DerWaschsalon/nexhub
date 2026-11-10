@@ -1,8 +1,13 @@
 """Registry: welche Module es gibt, welche eingeschaltet sind, und das Ein- und Ausschalten.
 
-Gespeichert wird nur, was eingeschaltet ist (eine YAML-Datei, z. B. modules.yaml):
+Gespeichert wird, was eingeschaltet ist, und welche Module es beim Speichern gab (eine YAML-Datei,
+z. B. modules.yaml):
 
     enabled: [deck, aion2.dps]
+    known: [deck, aion2.dps, updates]
+
+Ein Modul, das neu dazukommt und `default` ist, geht bei einer bestehenden Installation einmal an, wenn
+alles, was es braucht, schon an ist. Wer es danach ausschaltet, behält es aus (es steht dann in `known`).
 
 Einschalten schaltet benötigte Module mit ein, Ausschalten die davon abhängigen mit aus. Der Kern
 kennt keine Module: der Host baut sie (mit ihren Abhängigkeiten im Konstruktor) und übergibt sie.
@@ -29,12 +34,14 @@ CHANGED = "modules.changed"  # Thema auf dem Bus, Inhalt: Liste der geänderten 
 
 class Registry:
     def __init__(self, bus: EventBus, modules: Sequence[Module], state_file: Path,
-                 initial: Callable[[], set[str]] | None = None) -> None:
+                 initial: Callable[[], set[str]] | None = None, introduced: frozenset[str] = frozenset()) -> None:
         self.bus = bus
         self.order = [m.info.id for m in modules]  # Startreihenfolge = Reihenfolge der Module
         self.infos: dict[str, ModuleInfo] = {m.info.id: m.info for m in modules}
         self.modules: dict[str, Module] = {m.info.id: m for m in modules}
         self.state_file = state_file
+        # Für Dateien von vor `known`: welche Module seitdem neu sind (alle anderen gelten als bekannt)
+        self.introduced = introduced
         self.enabled = self._load(initial)
         self.started = False
         self._lock = asyncio.Lock()
@@ -74,7 +81,8 @@ class Registry:
             unknown = [i for i in ids if i not in self.infos]
             if unknown:
                 log.warning("unbekannte Module in %s ignoriert: %s", self.state_file, ", ".join(map(str, unknown)))
-            return self._closed({i for i in ids if i in self.infos})
+            enabled = self._closed({i for i in ids if i in self.infos})
+            return self._adopt_new(enabled, data.get("known"))
         except FileNotFoundError:
             pass
         except (OSError, ValueError, yaml.YAMLError) as e:
@@ -84,9 +92,20 @@ class Registry:
         self._save(enabled)
         return enabled
 
+    def _adopt_new(self, enabled: set[str], known: Any) -> set[str]:
+        """Neue Standardmodule einschalten, wenn alles, was sie brauchen, schon an ist."""
+        if not isinstance(known, list):
+            known = [mid for mid in self.infos if mid not in self.introduced]
+        new = [mid for mid, info in self.infos.items()
+               if info.default and mid not in known and self.requirements(mid) <= enabled]
+        if new or set(self.infos) - set(known):
+            log.info("neue Module: %s", ", ".join(new) or "keins eingeschaltet")
+            self._save(enabled | set(new))
+        return enabled | set(new)
+
     def _save(self, enabled: set[str]) -> None:
-        text = ("# Eingeschaltete Module – wird von der Web-UI überschrieben.\n"
-                + yaml.safe_dump({"enabled": self._sorted(enabled)}, sort_keys=False))
+        state = {"enabled": self._sorted(enabled), "known": self._sorted(set(self.infos))}
+        text = "# Eingeschaltete Module – wird von der Web-UI überschrieben.\n" + yaml.safe_dump(state, sort_keys=False)
         atomic_write(self.state_file, text)
 
     # ------------------------------------------------------------ Abfragen

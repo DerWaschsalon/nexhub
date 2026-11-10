@@ -42,7 +42,8 @@ def registry(tmp_path, initial=None):
 async def test_standard_und_speichern(tmp_path):
     r = registry(tmp_path)
     assert r.enabled == {"basis"}
-    assert yaml.safe_load((tmp_path / "modules.yaml").read_text()) == {"enabled": ["basis"]}
+    assert yaml.safe_load((tmp_path / "modules.yaml").read_text()) == {"enabled": ["basis"],
+                                                                       "known": ["basis", "aufbau", "oben"]}
 
 
 async def test_abhaengigkeiten(tmp_path):
@@ -73,3 +74,35 @@ async def test_kaputte_datei_nimmt_standard(tmp_path):
     assert registry(tmp_path).enabled == {"aufbau", "basis"}
     (tmp_path / "modules.yaml").write_text(":::")
     assert registry(tmp_path).enabled == {"basis"}
+
+
+class Neu(Module):
+    info = ModuleInfo("neu", "Neu", "system", "cog", "", requires=("aufbau",), default=True)
+
+
+def mit_neuem(tmp_path, introduced=frozenset()):
+    ctx = Context(EventBus(), Paths("test"))
+    mods = [Basis(ctx), Aufbau(ctx), Oben(ctx), Neu(ctx)]
+    return Registry(ctx.bus, mods, tmp_path / "modules.yaml", introduced=introduced)
+
+
+async def test_neues_standardmodul_geht_einmal_an(tmp_path):
+    (tmp_path / "modules.yaml").write_text("enabled: [aufbau]\nknown: [basis, aufbau, oben]\n")
+    assert mit_neuem(tmp_path).enabled == {"basis", "aufbau", "neu"}
+    r = mit_neuem(tmp_path)
+    await r.set("neu", False)
+    assert mit_neuem(tmp_path).enabled == {"basis", "aufbau"}  # bleibt aus, es ist jetzt bekannt
+
+
+async def test_neues_standardmodul_ohne_seine_voraussetzung_bleibt_aus(tmp_path):
+    (tmp_path / "modules.yaml").write_text("enabled: [basis]\nknown: [basis, aufbau, oben]\n")
+    assert mit_neuem(tmp_path).enabled == {"basis"}
+    assert "neu" in yaml.safe_load((tmp_path / "modules.yaml").read_text())["known"]
+
+
+async def test_alte_datei_ohne_known(tmp_path):
+    # Vor `known`: nur was der Host als neu nennt, gilt als neu; basis (auch Standard) bleibt aus
+    (tmp_path / "modules.yaml").write_text("enabled: []\n")
+    assert mit_neuem(tmp_path, introduced=frozenset({"neu"})).enabled == set()
+    (tmp_path / "modules.yaml").write_text("enabled: [basis, aufbau]\n")
+    assert mit_neuem(tmp_path, introduced=frozenset({"neu"})).enabled == {"basis", "aufbau", "neu"}

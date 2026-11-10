@@ -118,7 +118,8 @@ umschalten, die Seite passt sich auch an schmale Fenster an.
 | AION 2 · Overlay | Overlay: Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
 | AION 2 · Radar | Warnungen (Aus · Nur Wichtiges · Alles, Einzelheiten unter „Erweitert“), Radar & Karte | Termine |
 | AION 2 · Termine | Termine: feste Termine der Server und eigene Ereignisse, Feldbosse des Radars | – |
-| AION 2 · Kampfdaten | Live-Ansicht, Quelle, Meter-Einstellungen und Plugins öffnen | – |
+| AION 2 · Kampfdaten | Live-Ansicht, Quelle, Meter-Einstellungen öffnen | – |
+| AION 2 · Plugins | Plugins: installiert, Katalog, Updates mit Zustimmung, ein/aus, Fenster öffnen | Overlay |
 | Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte (mit „Im Kampf zur Seite“) | – |
 | AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | Kampfdaten |
 | Discord-Bot | Gruppen-DPS und Run-API eines Bots | Kampfdaten |
@@ -296,8 +297,11 @@ kleinen Ersatz für Tauris JavaScript-API davor (`web/a2shim.js`). Daten-Befehle
 Einstellungen der Meter-Oberfläche liegen in `~/.config/deckbar/a2-settings.json`. Nicht dabei sind
 die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters.
 
-**A2Tools-Plugins** laufen ohne das Meter-Programm: In den Meter-Einstellungen unter „Plugins“
-installieren (signierter Katalog von cdn.a2tools.app, Ed25519, Zustimmung zu den Berechtigungen). Der
+**A2Tools-Plugins** laufen ohne das Meter-Programm: in der Web-UI unter Im Spiel → Plugins installieren
+(signierter Katalog von cdn.a2tools.app, Ed25519, Zustimmung zu den Berechtigungen; die Texte dazu kommen aus
+dem Meter). Die Plugin-Seite in den Meter-Einstellungen geht weiterhin. Das eigenständige A2Tools-Programm hat
+einen eigenen Plugin-Ordner, den die NexBoard nicht sieht. Ist das Modul aus, laufen keine Plugins und
+bekommen keine Spieldaten; installiert bleibt alles. Der
 Plugin-Host ist `daemon/deckbar_daemon/plugins.py`, ein Nachbau des Hosts aus dem Submodul; die Seiten
 kommen unverändert von dort. Hauptfenster sind normale Fenster des Overlay-Programms (damit die Tastatur
 geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefern
