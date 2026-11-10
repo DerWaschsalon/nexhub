@@ -54,7 +54,7 @@ def test_all_commands_register():
             # "exception was never retrieved".
             for cog_name, loop_name in [
                 ("Reminders", "check_due"), ("Notifications", "poll_feeds"),
-                ("Bump", "check_due"), ("Stats", "refresh"), ("Birthdays", "check"),
+                ("Stats", "refresh"), ("Birthdays", "check"),
                 ("Announcements", "check_due"), ("VoiceStats", "tick"), ("Giveaways", "check_due"),
             ]:
                 loop = getattr(bot.get_cog(cog_name), loop_name)
@@ -63,6 +63,7 @@ def test_all_commands_register():
                 if task:
                     with contextlib.suppress(Exception, asyncio.CancelledError):
                         await task
+            await bot.modules.stop()
             await bot.get_cog("AionDedup").cog_unload()
             await bot.get_cog("Notifications").manager.close()
             await bot.db.close()
@@ -614,58 +615,6 @@ def test_panel_regex():
     pat = re.compile(r"(?:(<a?:\w+:\d+>|[^\x00-\x7F\s]+)\s*)?<@&(\d+)>")
     got = [(m.group(1), m.group(2)) for m in pat.finditer("🎮 <@&1> und <@&2> <:aion:99> <@&3>")]
     assert got == [("🎮", "1"), (None, "2"), ("<:aion:99>", "3")]
-
-
-def test_bump_confirmation_detection():
-    import discord
-
-    from bot.cogs.bump import DISBOARD_BOT_ID, is_bump_confirmation
-
-    def fake_message(author_id, embeds):
-        return type("M", (), {"author": type("A", (), {"id": author_id})(), "embeds": embeds})()
-
-    success = discord.Embed(description="Bump done! :thumbsup: Check it out on disboard.org!")
-    cooldown = discord.Embed(description="Please wait another 23 minutes before bumping again.")
-
-    assert is_bump_confirmation(fake_message(DISBOARD_BOT_ID, [success])) is True
-    assert is_bump_confirmation(fake_message(DISBOARD_BOT_ID, [cooldown])) is False
-    assert is_bump_confirmation(fake_message(123, [success])) is False  # anderer Autor
-    assert is_bump_confirmation(fake_message(DISBOARD_BOT_ID, [])) is False  # kein Embed
-
-
-def test_bump_reminder_sends_role_mention():
-    import tempfile
-    from pathlib import Path
-
-    from bot.cogs.bump import Bump
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            await db.set(1, "bump_channel", 42)
-            await db.set(1, "bump_role", 7)
-
-            sent = []
-            role = type("R", (), {"mention": "<@&7>"})()
-
-            class FakeChannel:
-                guild = type("G", (), {"get_role": staticmethod(lambda i: role)})()
-
-                async def send(self, text, **kwargs):
-                    sent.append(text)
-
-            cog = Bump.__new__(Bump)
-            cog.bot = type("B", (), {"get_channel": lambda self, i: FakeChannel()})()
-            cog.db = db
-
-            await cog._remind(1)
-            assert sent == ["<@&7> ⏰ Bump ist wieder möglich – wer mag, tippt `/bump`!"]
-
-            await db.close()
-
-    run(go())
 
 
 def test_stats_channel_names():

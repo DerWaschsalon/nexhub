@@ -9,8 +9,10 @@ import sys
 import discord
 from discord.ext import commands
 
+from .core import ModuleHost
 from .db import Database
 from .errors import UserError
+from .modules import MODULES
 
 log = logging.getLogger("bot")
 
@@ -27,7 +29,6 @@ COGS = [
     "bot.cogs.control",
     "bot.cogs.aion_dedup",
     "bot.cogs.aion_ranking",
-    "bot.cogs.bump",
     "bot.cogs.termintafel",
     "bot.cogs.stats",
     "bot.cogs.starboard",
@@ -56,6 +57,8 @@ class Bot(commands.Bot):
             activity=discord.Activity(type=discord.ActivityType.listening, name="/play"),
         )
         self.db = db
+        # Neue Module (bot/modules) neben den alten Cogs, bis alle umgezogen sind
+        self.modules = ModuleHost(self, db, MODULES, db.path.parent / "modules.yaml")
         self.quiet_deletes: set[int] = set()  # vom Bot selbst gelöscht, nicht einzeln loggen
         self._sync = sync
 
@@ -63,6 +66,7 @@ class Bot(commands.Bot):
         await self.db.connect()
         for cog in COGS:
             await self.load_extension(cog)
+        await self.modules.start()
         if not self._sync:
             return
         dev_guild = os.getenv("DEV_GUILD_ID", "").strip()
@@ -82,6 +86,7 @@ class Bot(commands.Bot):
             await setup_cog.register_persistent_views()
 
     async def close(self) -> None:
+        await self.modules.stop()
         await super().close()
         await self.db.close()
 

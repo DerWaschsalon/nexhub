@@ -248,10 +248,23 @@ ist. **Falls dabei etwas schiefgeht:** auf unraid-server `cd /mnt/user/appdata/t
 compose up -d` stellt den Bot anhand der `docker-compose.yml` wieder her — die bleibt die ganze
 Zeit unverändert auf der Platte liegen, als Netz.
 
+## Aufbau (Umbau auf kleine Module, läuft)
+
+Der Bot zieht schrittweise von Cogs (`bot/cogs/`) auf Module um, siehe Konzept „TheWashBot – Umbau
+auf kleine Module“. Bis alles umgezogen ist, laufen beide nebeneinander.
+
+- `bot/core/`: Kern ohne Fachlogik. `BotModule` (ein `nexcore.Module` mit Datenbank und Discord-Client),
+  `GuildSettings` (Einstellungen je Server mit Schema, gespeichert wie bisher in `settings`),
+  `ModuleHost` (lädt die Module, schaltet sie über die `nexcore`-Registry, Stand in `modules.yaml`).
+- `bot/modules/<bereich>/<modul>/`: ein Modul je Ordner, `__init__.py` mit der Klasse, `settings.py`
+  mit dem Schema; neue Module kommen in `bot/modules/__init__.py` (`MODULES`).
+- Tests je Teil unter `tests/core/` und `tests/modules/`; `tests/test_settings_compat.py` sichert,
+  dass alle gespeicherten Einstellungen gleich gelesen werden.
+
 ## Entwickeln und testen
 
 ```sh
-pip install -r requirements.txt -e ../proto pytest ruff mypy   # nexproto: Termine, Klassen, Dungeons
+pip install -r requirements.txt -e ../proto -e ../packages/nexcore pytest ruff mypy   # Pakete aus dem Monorepo
 python -m pytest -q tests          # ohne Discord-Verbindung
 ruff check . && mypy               # wie die CI (.github/workflows/bot.yml)
 DISCORD_TOKEN=… DB_PATH=./data/bot.sqlite3 python -m bot
