@@ -59,9 +59,9 @@ Für Claude Code auf dem Server. Bitte zuerst README.md und diese Datei lesen.
 - **Klick-Panel: vollständig**: `bot/cogs/settings.py` deckt jetzt alle `/setup`-Einstellungen ab,
   nicht mehr nur eine Teilmenge. Neu dazugekommen: Verwarnungs-Schwelle+Strafe (`WarnView`),
   Web-Dashboard-Rolle (`DashboardRoleView`), und die komplette Verifizierung inklusive
-  Ersteinrichtung mit Vorschau/Bestätigung (`VerifyView` → `VerifySetupChannelSelect` →
-  `VerifySetupRoleView` → geteilte Logik `apply_verification`/`turn_off_verification`, auch von
-  `/setup verifizierung` selbst genutzt). Jede neue Unteransicht folgt dem bestehenden Muster
+  Ersteinrichtung mit Vorschau/Bestätigung (seit dem Bot-Umbau Modul `server.verification`:
+  Logik in `bot/modules/server/verification/__init__.py`, Klick-Ablauf `Flow` in `panel.py`, auch
+  von `/setup verifizierung` genutzt). Jede neue Unteransicht folgt dem bestehenden Muster
   (`timeout=None if panel.persistent else 180`, feste `custom_id`s) und überlebt damit Neustarts
   über den schon vorhandenen `management-kanal`-Mechanismus ohne zusätzliche Änderungen an
   `register_persistent_views`.

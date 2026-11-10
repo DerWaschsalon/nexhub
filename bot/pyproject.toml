@@ -6,17 +6,13 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
 
-# Übergang: Dateien, die der Umbau noch neu schreibt, dürfen lange Zeilen haben. Jeder Schritt
-# streicht seine Dateien hier.
-[tool.ruff.lint.per-file-ignores]
-"bot/cogs/settings.py" = ["E501"]
-
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
 # Strikt geprüft wird, was schon nach den Neubau-Regeln steht. Jeder Umbauschritt hängt seine
 # Dateien hier an, bis am Ende das ganze Paket drinsteht (Konzept „TheWashBot – Umbau auf kleine Module“).
 files = [
+    "bot/cogs/settings.py",
     "bot/core",
     "bot/forms.py",
     "bot/panel.py",

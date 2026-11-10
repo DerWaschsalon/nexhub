@@ -25,12 +25,13 @@ from .server.custom_commands import CustomCommands
 from .server.embeds import Embeds
 from .server.roles import Roles
 from .server.tempvoice import TempVoice
+from .server.verification import Verification
 from .server.welcome import Welcome
 from .system.status import ServerStatus
 
 MODULES = (MusicPlayer, NotificationFeeds, ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
            Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
            Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump, RunPosts, Schedule,
-           ServerStatus)
+           ServerStatus, Verification)
 
 __all__ = ["MODULES"]

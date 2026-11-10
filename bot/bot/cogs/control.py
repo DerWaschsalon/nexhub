@@ -215,6 +215,8 @@ class Control(commands.Cog):
             result = await handler(request)
         except ApiError as e:
             return web.json_response({"detail": e.detail}, status=e.status)
+        except UserError as e:
+            return web.json_response({"detail": str(e)}, status=400)
         except web.HTTPException as e:
             return web.json_response({"detail": e.reason}, status=e.status)
         except discord.Forbidden:
@@ -338,36 +340,26 @@ class Control(commands.Cog):
 
     # ---- Verifizierung -------------------------------------------------------------------------
 
+    def verify_module(self) -> Any:
+        """Das Modul server.verification (in Tests der Steuer-API fehlen die Module)."""
+        if not hasattr(self.bot, "modules"):
+            raise ApiError(503, "Verifizierung ist nicht geladen")
+        return self.bot.modules.module("server.verification")
+
     async def verification(self, request: web.Request) -> dict:
         guild = self.guild()
-        channel = guild.get_channel(self.db.get_int(guild.id, "verify_channel") or 0)
-        role = guild.get_role(self.db.get_int(guild.id, "verify_role") or 0)
-        text = None
-        message_id = self.db.get_int(guild.id, "verify_message")
-        if channel and message_id:
-            try:
-                message = await channel.fetch_message(message_id)
-                text = message.embeds[0].description if message.embeds else None
-            except discord.HTTPException:
-                message_id = None
+        module = self.verify_module()
+        settings = module.settings.get(guild.id)
+        channel = module.rules_channel(guild)
+        role = guild.get_role(settings.verify_role or 0)
+        message = await module.rules_message(guild)
+        text = message.embeds[0].description if message and message.embeds else None
         return {"channel": channel.name if channel else None, "role": role.name if role else None,
-                "panel": bool(channel and message_id), "text": text}
+                "panel": message is not None, "text": text}
 
     async def verification_text(self, request: web.Request) -> None:
-        guild = self.guild()
-        text = str((await self.body(request)).get("text") or "").strip()
-        if not text:
-            raise ApiError(400, "Kein Text")
-        if len(text) > 4096:
-            raise ApiError(400, "Höchstens 4096 Zeichen (Discord-Grenze)")
-        channel = guild.get_channel(self.db.get_int(guild.id, "verify_channel") or 0)
-        message_id = self.db.get_int(guild.id, "verify_message")
-        if not channel or not message_id:
-            raise ApiError(409, "Noch kein Regel-Panel – erst /setup verifizierung in Discord")
-        message = await channel.fetch_message(message_id)
-        embed = message.embeds[0] if message.embeds else discord.Embed(title="📜 Regeln")
-        embed.description = text
-        await message.edit(embed=embed)
+        text = str((await self.body(request)).get("text") or "")
+        await self.verify_module().set_text(self.guild(), text)
 
     # ---- Level-Belohnungen ---------------------------------------------------------------------
 
