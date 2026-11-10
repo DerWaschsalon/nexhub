@@ -6,6 +6,8 @@ testen lassen.
 
 from __future__ import annotations
 
+from typing import Any
+
 
 def cpu_percent_from_samples(a: list[int], b: list[int]) -> float:
     """`a`/`b`: zwei `/proc/stat`-CPU-Zeilen (user nice system idle iowait irq softirq steal …),
@@ -62,7 +64,7 @@ def format_uptime(seconds: float) -> str:
     return " ".join(parts) or "0 Min."
 
 
-def simplify_port_bindings(bindings: dict | None) -> dict:
+def simplify_port_bindings(bindings: dict[str, Any] | None) -> dict[str, Any]:
     """Docker-Inspect-Format `{'8787/tcp': [{'HostIp': '', 'HostPort': '8787'}]}` ->
     `{'8787/tcp': '8787'}`, wie es `APIClient.create_host_config(port_bindings=...)` erwartet."""
     out = {}
@@ -72,7 +74,7 @@ def simplify_port_bindings(bindings: dict | None) -> dict:
     return out
 
 
-def build_recreate_config(inspect_data: dict, new_image: str) -> dict:
+def build_recreate_config(inspect_data: dict[str, Any], new_image: str) -> dict[str, Any]:
     """Übersetzt die Live-Inspect-Daten eines laufenden Containers in die Parameter, um ihn mit
     identischer Konfiguration (Umgebungsvariablen, Volumes, Ports, Restart-Policy, Netzwerk) neu
     anzulegen — nur das Image wird ausgetauscht. Reine Übersetzung ohne Docker-Zugriff, damit sie

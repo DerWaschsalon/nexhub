@@ -33,6 +33,7 @@ class Bot(commands.Bot):
             intents=intents,
             allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
             activity=discord.Activity(type=discord.ActivityType.listening, name="/play"),
+            tree_cls=CommandTree,
         )
         self.db = db
         # Neue Module (bot/modules) neben den alten Cogs, bis alle umgezogen sind
@@ -57,9 +58,11 @@ class Bot(commands.Bot):
         log.info("%d Slash-Befehle registriert", len(synced))
 
     async def on_ready(self) -> None:
-        log.info("Angemeldet als %s (%s), %d Server", self.user, self.user.id, len(self.guilds))
+        from .cogs.settings import Setup  # lokal: der Cog importiert seinerseits Bot
+
+        log.info("Angemeldet als %s, %d Server", self.user, len(self.guilds))
         setup_cog = self.get_cog("Setup")
-        if setup_cog:
+        if isinstance(setup_cog, Setup):
             await setup_cog.register_persistent_views()
 
     async def close(self) -> None:
@@ -68,7 +71,12 @@ class Bot(commands.Bot):
         await self.db.close()
 
 
-async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+class CommandTree(discord.app_commands.CommandTree[discord.Client]):
+    async def on_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
+        await on_app_command_error(interaction, error)
+
+
+async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError) -> None:
     original = getattr(error, "original", None)
     if isinstance(original, UserError):
         text = str(original)
@@ -99,7 +107,6 @@ def main() -> None:
     if not token:
         sys.exit("DISCORD_TOKEN fehlt (siehe .env.example)")
     bot = Bot(Database(os.getenv("DB_PATH", "/data/bot.sqlite3")))
-    bot.tree.on_error = on_app_command_error
     bot.run(token, log_handler=None)
 
 

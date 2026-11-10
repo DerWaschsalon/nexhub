@@ -7,6 +7,7 @@ in den Speicher geladen, weil z. B. der Spamschutz bei jeder Nachricht nachsieht
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
 
@@ -141,19 +142,19 @@ class Database:
 
     # ---- Allgemeine Abfragen --------------------------------------------------------------
 
-    async def execute(self, sql: str, params: tuple = ()) -> int:
+    async def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int:
         """Führt aus und speichert. Gibt lastrowid zurück."""
         assert self.conn
         cur = await self.conn.execute(sql, params)
         await self.conn.commit()
-        return cur.lastrowid
+        return cur.lastrowid or 0
 
-    async def fetchone(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
+    async def fetchone(self, sql: str, params: tuple[Any, ...] = ()) -> aiosqlite.Row | None:
         assert self.conn
         async with self.conn.execute(sql, params) as cur:
             return await cur.fetchone()
 
-    async def fetchall(self, sql: str, params: tuple = ()) -> list[aiosqlite.Row]:
+    async def fetchall(self, sql: str, params: tuple[Any, ...] = ()) -> list[aiosqlite.Row]:
         assert self.conn
         async with self.conn.execute(sql, params) as cur:
             return list(await cur.fetchall())
