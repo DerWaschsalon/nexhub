@@ -6,12 +6,16 @@ import asyncio
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 import discord
+import pytest
 
 from bot.db import Database
+
+Run = dict[str, Any]  # ein gemeldeter Lauf, wie ihn das NexBoard schickt
 
 
 def test_aion_api_auth_rejects_bad_requests() -> None:
@@ -55,34 +59,34 @@ def test_aion_api_merge_and_embed() -> None:
     assert fmt_num(8_080) == "8.1k"
     assert fmt_dps(38_000) == "38.0k/s"
 
-    base = {"dungeon": "Ferocious Horn Den", "bosses_total": 3, "bosses_killed": 3,
-            "start_ms": 1_760_445_123_000, "fight_ms": 350_000,
-            "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000}]}
+    base: Run = {"dungeon": "Ferocious Horn Den", "bosses_total": 3, "bosses_killed": 3,
+                 "start_ms": 1_760_445_123_000, "fight_ms": 350_000,
+                 "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000}]}
     assert validate_fight_payload(base) is None
     assert validate_fight_payload({"dungeon": "X"}) is not None
     assert validate_fight_payload({**base, "players": []}) is not None
 
     # Zweite Meldung desselben Laufs, leicht abweichende Startzeit/Dauer -> trotzdem derselbe Lauf
-    report2 = {**base, "start_ms": base["start_ms"] + 2_000, "fight_ms": base["fight_ms"] - 1_500,
-              "players": [{"name": "Gamunex", "damage": 8_000_000, "dps": 23_000}]}
+    report2: Run = {**base, "start_ms": base["start_ms"] + 2_000, "fight_ms": base["fight_ms"] - 1_500,
+                   "players": [{"name": "Gamunex", "damage": 8_000_000, "dps": 23_000}]}
     assert same_api_run(base, report2)
 
     # 20 Minuten später, sonst identisch -> nicht derselbe Lauf
-    later = {**base, "start_ms": base["start_ms"] + 20 * 60_000}
+    later: Run = {**base, "start_ms": base["start_ms"] + 20 * 60_000}
     assert not same_api_run(base, later)
 
     # Merge: gleicher Spielername in zwei Meldungen -> höherer Schaden gewinnt, sortiert absteigend
-    reportA = {**base, "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000},
-                                   {"name": "Gamunex", "damage": 8_000_000, "dps": 23_000}]}
-    reportB = {**base, "players": [{"name": "ReZero", "damage": 13_290_000, "dps": 38_000},  # höher -> gewinnt
-                                   {"name": "Haze", "damage": 5_080_000, "dps": 14_500}]}
+    reportA: Run = {**base, "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000},
+                                        {"name": "Gamunex", "damage": 8_000_000, "dps": 23_000}]}
+    reportB: Run = {**base, "players": [{"name": "ReZero", "damage": 13_290_000, "dps": 38_000},  # höher -> gewinnt
+                                        {"name": "Haze", "damage": 5_080_000, "dps": 14_500}]}
     players = merge_players([reportA, reportB])
     assert [p["name"] for p in players] == ["ReZero", "Gamunex", "Haze"]
     assert players[0]["damage"] == 13_290_000  # der höhere der beiden gemeldeten Werte
 
     embed = build_run_embed(base, reporters=2)
-    assert "Ferocious Horn Den" in embed.title
-    assert "2 NexBoard-Meldung" in embed.footer.text
+    assert "Ferocious Horn Den" in str(embed.title)
+    assert "2 NexBoard-Meldung" in str(embed.footer.text)
 
     assert build_run_embed(base, reporters=2).image.url is None  # Bilder nur als Anhang
 
@@ -120,19 +124,19 @@ def test_aion_update_leaderboard_keeps_only_best() -> None:
             bosses = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 100, "dps": 10}]}]
             await cog._update_leaderboard(1, bosses, [])
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
-            assert row["dps"] == 10
+            assert row is not None and row["dps"] == 10
 
             # Schlechterer Lauf -> wird NICHT übernommen
             worse = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 50, "dps": 5}]}]
             await cog._update_leaderboard(1, worse, [])
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
-            assert row["dps"] == 10  # unverändert
+            assert row is not None and row["dps"] == 10  # unverändert
 
             # Besserer Lauf -> wird übernommen
             better = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 500, "dps": 50}]}]
             await cog._update_leaderboard(1, better, [])
             row = await db.fetchone("SELECT * FROM aion_leaderboard WHERE guild_id=1 AND boss='Boss 1'")
-            assert row["dps"] == 50
+            assert row is not None and row["dps"] == 50
 
             await db.close()
 
@@ -143,13 +147,13 @@ def test_aion_records_best_time_and_dps_record() -> None:
     from bot.modules.aion2.runs.commands import ranking_embed
     from bot.modules.aion2.runs.format import records_text
     from bot.modules.aion2.runs.posts import RECORDS_FIELD, build_run_embed
-    from bot.modules.aion2.runs.records import DungeonKey, RunRecords
+    from bot.modules.aion2.runs.records import DungeonKey, RunRecords, RunResult
 
-    def make_run(fight_ms: int, killed: int = 3, difficulty: str | None = "Normal") -> dict:
+    def make_run(fight_ms: int, killed: int = 3, difficulty: str | None = "Normal") -> dict[str, Any]:
         return {"dungeon": "Feuertempel", "difficulty": difficulty, "bosses_total": 3,
                 "bosses_killed": killed, "start_ms": 0, "fight_ms": fight_ms}
 
-    def make_players(a_dps: float, b_dps: float) -> list[dict]:
+    def make_players(a_dps: float, b_dps: float) -> list[dict[str, Any]]:
         return [{"name": "Anna", "cls": "ranger", "damage": a_dps * 300, "dps": a_dps},
                 {"name": "Ben", "cls": None, "damage": b_dps * 300, "dps": b_dps}]
 
@@ -159,25 +163,31 @@ def test_aion_records_best_time_and_dps_record() -> None:
             await db.connect()
             records = RunRecords(db)
 
+            async def saved(run: dict[str, Any], players: list[dict[str, Any]]) -> RunResult:
+                result = await records.save(1, run, players)
+                assert result is not None  # vollständiger Lauf wird immer gewertet
+                return result
+
             # Unvollständig: nicht gewertet
             assert await records.save(1, make_run(200_000, killed=2), make_players(50, 40)) is None
 
-            first = await records.save(1, make_run(360_000), make_players(30, 20))
+            first = await saved(make_run(360_000), make_players(30, 20))
             assert first.best_before_ms is None and "Erste Bestzeit" in records_text(first)
             assert first.personal_bests == ()  # erster Run ist keine Bestleistung
 
-            slower = await records.save(1, make_run(400_000), make_players(25, 22))
+            slower = await saved(make_run(400_000), make_players(25, 22))
             assert (slower.place, slower.runs) == (2, 2) and slower.dps_record is None
             assert slower.personal_bests == ("Ben",)
             assert "Platz 2 von 2" in records_text(slower)
 
-            faster = await records.save(1, make_run(330_000), make_players(45, 21))
+            faster = await saved(make_run(330_000), make_players(45, 21))
             assert "Neue Bestzeit!" in records_text(faster) and "6:00" in records_text(faster)
+            assert faster.dps_record is not None
             assert faster.dps_record.player == "Anna" and faster.dps_record.previous_dps == 30
             assert faster.personal_bests == ()  # Anna steht schon in der Rekordzeile, Ben unter 22
 
             # Andere Schwierigkeit zählt getrennt
-            hard = await records.save(1, make_run(500_000, difficulty="Hard"), make_players(10, 10))
+            hard = await saved(make_run(500_000, difficulty="Hard"), make_players(10, 10))
             assert hard.best_before_ms is None
 
             normal = DungeonKey(1, "Feuertempel", "Normal")
@@ -191,7 +201,7 @@ def test_aion_records_best_time_and_dps_record() -> None:
             embed = build_run_embed(make_run(330_000), reporters=1, records=faster)
             assert any(f.name == RECORDS_FIELD for f in embed.fields)
             board = ranking_embed("Feuertempel (Normal)", times, players)
-            assert "5:30" in board.fields[0].value and "Anna (ranger)" in board.fields[1].value
+            assert "5:30" in str(board.fields[0].value) and "Anna (ranger)" in str(board.fields[1].value)
             await db.close()
 
     asyncio.run(go())
@@ -219,15 +229,16 @@ def test_aion_leaderboard_page() -> None:
             bosses = [{"name": "Kromede's Desire", "players": [{"name": "Xqzmepls", "damage": 500, "dps": 50}]}]
             await cog._update_leaderboard(1, bosses, [{"name": "Xqzmepls", "cls": "ranger"}])
 
-            class Req:
-                def __init__(self, gid):
-                    self.match_info = {"guild_id": gid}
+            def req(gid: str) -> Any:
+                """Nur was page_leaderboard aus der Anfrage liest."""
+                return SimpleNamespace(match_info={"guild_id": gid})
 
-            resp = await cog.page_leaderboard(Req("1"))
+            resp = await cog.page_leaderboard(req("1"))
             assert resp.status == 200
-            assert "Kromede&#x27;s Desire" in resp.text and "Xqzmepls" in resp.text and "ranger" in resp.text
-            assert (await cog.page_leaderboard(Req("999"))).status == 404  # unbekannte Guild
-            assert (await cog.page_leaderboard(Req("not-a-number"))).status == 404
+            page = str(resp.text)
+            assert "Kromede&#x27;s Desire" in page and "Xqzmepls" in page and "ranger" in page
+            assert (await cog.page_leaderboard(req("999"))).status == 404  # unbekannte Guild
+            assert (await cog.page_leaderboard(req("not-a-number"))).status == 404
 
             await db.close()
 
@@ -237,18 +248,18 @@ def test_aion_leaderboard_page() -> None:
 def test_aion_api_boss_dps() -> None:
     from bot.modules.aion2.runs.posts import build_run_embed, merge_bosses, validate_fight_payload
 
-    base = {"dungeon": "Ferocious Horn Den", "bosses_total": 2, "bosses_killed": 2,
-            "start_ms": 1_760_445_123_000, "fight_ms": 350_000,
-            "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000}],
-            "bosses": [
-                {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 4_000_000, "dps": 40_000}]},
-                {"name": "Boss 2", "players": [{"name": "ReZero", "damage": 9_000_000, "dps": 35_000}]},
-            ]}
+    base: Run = {"dungeon": "Ferocious Horn Den", "bosses_total": 2, "bosses_killed": 2,
+                 "start_ms": 1_760_445_123_000, "fight_ms": 350_000,
+                 "players": [{"name": "ReZero", "damage": 13_000_000, "dps": 37_000}],
+                 "bosses": [
+                     {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 4_000_000, "dps": 40_000}]},
+                     {"name": "Boss 2", "players": [{"name": "ReZero", "damage": 9_000_000, "dps": 35_000}]},
+                 ]}
     assert validate_fight_payload(base) is None
     assert validate_fight_payload({**base, "bosses": [{"name": "X"}]}) is not None
     assert validate_fight_payload({**base, "bosses": "nope"}) is not None
 
-    reportB = {**base, "bosses": [
+    reportB: Run = {**base, "bosses": [
         {"name": "Boss 1", "players": [{"name": "Gamunex", "damage": 3_000_000, "dps": 30_000}]},
         {"name": "Boss 2", "players": [{"name": "ReZero", "damage": 9_500_000, "dps": 36_000}]},  # höher -> gewinnt
     ]}
@@ -315,55 +326,53 @@ def test_aion_api_run_image() -> None:
     assert decode_image(base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 20).decode()) is None
     assert decode_image(base64.b64encode(b"RIFF\0\0\0\0WEBP" + b"x" * MAX_IMAGE_BYTES).decode()) is None
 
-    base = {"dungeon": "Fire Temple", "bosses_total": 1, "bosses_killed": 1, "start_ms": 1, "fight_ms": 1,
-            "players": [{"name": "A", "damage": 5}]}
+    base: Run = {"dungeon": "Fire Temple", "bosses_total": 1, "bosses_killed": 1, "start_ms": 1, "fight_ms": 1,
+                 "players": [{"name": "A", "damage": 5}]}
     assert validate_fight_payload({**base, "image_webp": enc}) is None
     assert validate_fight_payload({**base, "image_webp": 5}) is not None
 
-    one = {"players": [{"name": "A", "damage": 9}], "image": b"eins"}
-    two = {"players": [{"name": "A", "damage": 5}, {"name": "B", "damage": 1}], "image": b"zwei"}
-    bare = {"players": [{"name": "A", "damage": 1}, {"name": "B", "damage": 1}, {"name": "C", "damage": 1}],
-            "image": None}
+    one: Run = {"players": [{"name": "A", "damage": 9}], "image": b"eins"}
+    two: Run = {"players": [{"name": "A", "damage": 5}, {"name": "B", "damage": 1}], "image": b"zwei"}
+    bare: Run = {"players": [{"name": "A", "damage": 1}, {"name": "B", "damage": 1}, {"name": "C", "damage": 1}],
+                 "image": None}
     assert pick_image([one, two, bare]) == b"zwei"
     assert pick_image([bare]) is None
 
 
-def test_aion_api_posts_nexboard_image(monkeypatch):
+def test_aion_api_posts_nexboard_image(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mit Bild: ein Embed mit dem WebP, keine eigenen Boss-Bilder; ohne Bild wie früher."""
     import base64
 
     import bot.modules.aion2.runs.posts as dedup
 
     webp = b"RIFF\x10\0\0\0WEBPVP8L" + b"x" * 20
-    sent = []
+    sent: list[tuple[discord.Embed, list[discord.File]]] = []
 
-    async def send(embed, files):
+    async def send(embed: discord.Embed, files: list[discord.File]) -> object:
         sent.append((embed, files))
         return object()
 
     channel = MagicMock(spec=discord.TextChannel)
     channel.send = send
 
-    class FakeBot:
-        def get_channel(self, cid):
-            return channel
+    client = MagicMock(spec=discord.Client)
+    client.get_channel.return_value = channel
 
-    async def no_lb(*a, **k):
+    async def nothing(*args: Any, **kwargs: Any) -> None:
         return None
 
-    async def no_sleep(*a):
-        return None
-
-    monkeypatch.setattr(dedup.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(asyncio, "sleep", nothing)  # keine echten Wartezeiten
     cog = dedup.RunPosts.__new__(dedup.RunPosts)
-    cog.client, cog.api_pending, cog.api_posted = FakeBot(), {}, []
-    cog._update_leaderboard = no_lb
-    cog.records = type("NoRecords", (), {"save": lambda self, *a: no_lb()})()
-    run_ = {"dungeon": "Fire Temple", "difficulty": None, "bosses_total": 2, "bosses_killed": 2, "start_ms": 1,
-            "fight_ms": 60_000, "players": [{"name": "A", "damage": 600_000, "dps": 10_000}],
-            "bosses": [{"name": "B1", "players": [{"name": "A", "damage": 300_000}]},
-                       {"name": "B2", "players": [{"name": "A", "damage": 300_000}]}],
-            "image": dedup.decode_image(base64.b64encode(webp).decode())}
+    cog.client, cog.api_pending, cog.api_posted = client, {}, []
+    monkeypatch.setattr(cog, "_update_leaderboard", nothing)
+    records = MagicMock()
+    records.save = nothing
+    cog.records = records
+    run_: Run = {"dungeon": "Fire Temple", "difficulty": None, "bosses_total": 2, "bosses_killed": 2, "start_ms": 1,
+                 "fight_ms": 60_000, "players": [{"name": "A", "damage": 600_000, "dps": 10_000}],
+                 "bosses": [{"name": "B1", "players": [{"name": "A", "damage": 300_000}]},
+                            {"name": "B2", "players": [{"name": "A", "damage": 300_000}]}],
+                 "image": dedup.decode_image(base64.b64encode(webp).decode())}
     asyncio.run(cog._finalize_api_later(dedup.ApiCluster(run_, 1), 0, 5))
     embed, files = sent[-1]
     assert embed.image.url is None  # Bild nur als Anhang, sonst nach dem Bearbeiten doppelt
@@ -375,7 +384,7 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
     assert [f.filename for f in files] == ["aion_run.png", "aion_boss_0.png", "aion_boss_1.png"]
 
 
-def test_aion_hub_link(monkeypatch):
+def test_aion_hub_link(monkeypatch: pytest.MonkeyPatch) -> None:
     """Der NexHub meldet einen Run: Link an den wartenden Post, sonst nachträglich an den geposteten."""
     import time
 
@@ -383,9 +392,9 @@ def test_aion_hub_link(monkeypatch):
 
     from bot.modules.aion2.runs.posts import ApiCluster, RunPosts, build_run_embed, same_run_start, with_hub_link
 
-    base = {"dungeon": "Fire Temple", "bosses_total": 4, "bosses_killed": 4,
-            "start_ms": 1_792_616_000_000, "fight_ms": 300_000,
-            "players": [{"name": "Navonex", "damage": 9_000_000, "dps": 30_000}]}
+    base: Run = {"dungeon": "Fire Temple", "bosses_total": 4, "bosses_killed": 4,
+                 "start_ms": 1_792_616_000_000, "fight_ms": 300_000,
+                 "players": [{"name": "Navonex", "damage": 9_000_000, "dps": 30_000}]}
     url = "https://hub.example.com/hub/runs/7"
     assert same_run_start(base, "Fire Temple", base["start_ms"] + 5_000)
     assert not same_run_start(base, "Fire Temple", base["start_ms"] + 10 * 60_000)
@@ -394,11 +403,11 @@ def test_aion_hub_link(monkeypatch):
     # Neuer Post mit Link: steht vorn im Analyse-Feld
     embed = build_run_embed(base, reporters=1, guild_id=1, bosses=[{"name": "B"}], hub_url=url)
     field = next(f for f in embed.fields if f.name == "📊 Analyse")
-    assert field.value.startswith(f"[Im NexHub ansehen]({url})") and "Bestenliste" in field.value
+    assert str(field.value).startswith(f"[Im NexHub ansehen]({url})") and "Bestenliste" in str(field.value)
     # Nachträglich: Link vorn ergänzen, doppelt nie
     later = with_hub_link(build_run_embed(base, reporters=1, guild_id=1, bosses=[{"name": "B"}]), url)
-    assert [f.value for f in later.fields if f.name == "📊 Analyse"][0].startswith("[Im NexHub ansehen]")
-    assert with_hub_link(later, url).fields[-1].value.count("NexHub") == 1
+    assert [str(f.value) for f in later.fields if f.name == "📊 Analyse"][0].startswith("[Im NexHub ansehen]")
+    assert str(with_hub_link(later, url).fields[-1].value).count("NexHub") == 1
     # Ohne Analyse-Feld bekommt der Post eins
     bare = with_hub_link(build_run_embed(base, reporters=1), url)
     assert bare.fields[-1].value == f"[Im NexHub ansehen]({url})"
@@ -414,19 +423,18 @@ def test_aion_hub_link(monkeypatch):
     assert asyncio.run(cog.attach_hub_link("Fire Temple", base["start_ms"], url + "8")) == "pending"
     assert cluster.hub_url == url
 
-    class Message:
-        def __init__(self):
-            self.embeds = [build_run_embed(base, reporters=1)]
-            self.edited = None
+    edited: list[list[discord.Embed]] = []
 
-        async def edit(self, embeds):
-            self.edited = embeds
+    async def edit(embeds: list[discord.Embed]) -> None:
+        edited.append(embeds)
 
+    msg = MagicMock(spec=discord.Message)
+    msg.embeds = [build_run_embed(base, reporters=1)]
+    msg.edit = edit
     cog.api_pending = {}
-    msg = Message()
     cog.api_posted = [(time.time(), base, msg)]
     assert asyncio.run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "edited"
-    assert msg.edited[0].fields[-1].value == f"[Im NexHub ansehen]({url})"
+    assert edited[0][0].fields[-1].value == f"[Im NexHub ansehen]({url})"
     assert asyncio.run(cog.attach_hub_link("Fire Temple", base["start_ms"], url)) == "unknown"  # nur einmal ergänzen
 
 
@@ -436,9 +444,11 @@ def test_termin_tafel_und_pings() -> None:
     from bot.modules.aion2.schedule import board as tafel
     from bot.modules.aion2.schedule import due_pings as faellige_pings
 
-    um = lambda s: datetime.fromisoformat(s).replace(tzinfo=timezone.utc).timestamp()  # noqa: E731
+    def um(text: str) -> float:
+        return datetime.fromisoformat(text).replace(tzinfo=timezone.utc).timestamp()
+
     jetzt = um("2026-10-07 02:57")
-    text = tafel(jetzt).description
+    text = str(tafel(jetzt).description)
     # Zeiten als Discord-Zeitstempel: jeder sieht sie in seiner Zeitzone
     assert f"**Riss** <t:{int(um('2026-10-07 03:00'))}:t>" in text
     assert f"**Wächterin Kaira** <t:{int(um('2026-10-07 04:00'))}:t>" in text
@@ -447,4 +457,4 @@ def test_termin_tafel_und_pings() -> None:
     assert [n for n, _ in faellig] == ["Riss", "Shugo-Fest"]
     assert faellige_pings(jetzt, set(faellig)) == []  # nicht doppelt
     # läuft gerade: Riss offen bis 03:10
-    assert f"läuft, bis <t:{int(um('2026-10-07 03:10'))}:t>" in tafel(um("2026-10-07 03:05")).description
+    assert f"läuft, bis <t:{int(um('2026-10-07 03:10'))}:t>" in str(tafel(um("2026-10-07 03:05")).description)
