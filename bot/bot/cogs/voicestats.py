@@ -63,7 +63,9 @@ class VoiceStats(commands.Cog):
             (guild_id, user_id, TICK_SECONDS, xp_per_minute),
         )
 
-    @app_commands.command(name="sprachzeit", description="Verbrachte Zeit im Sprachkanal anzeigen (leer = deine eigene)")
+    @app_commands.command(
+        name="sprachzeit", description="Verbrachte Zeit im Sprachkanal anzeigen (leer = deine eigene)",
+    )
     @app_commands.guild_only()
     async def voice_time(self, interaction: discord.Interaction, nutzer: discord.Member | None = None):
         member = nutzer or interaction.user

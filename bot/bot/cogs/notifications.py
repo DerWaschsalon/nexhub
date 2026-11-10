@@ -20,8 +20,8 @@ import discord
 from discord.ext import commands, tasks
 
 from ..errors import UserError
-from ..notify.base import ProviderError
 from ..hubpages import Action, Actions, Column, Field, Page, Table, channel_label
+from ..notify.base import ProviderError
 from ..notify.manager import PROVIDERS, NotificationManager
 
 log = logging.getLogger(__name__)

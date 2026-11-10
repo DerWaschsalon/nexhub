@@ -331,8 +331,8 @@ class RadioBrowser:
         """Zählt den Aufruf beim Verzeichnis, so wie die API es sich wünscht."""
         try:
             await self._get(f"/json/url/{uuid}")
-        except Exception:
-            pass
+        except Exception as e:  # nur eine Zählung beim Verzeichnis, der Sender spielt trotzdem
+            log.debug("Radio-Klick %s: %r", uuid, e)
 
     @staticmethod
     def to_track(st: dict, requester_id: int) -> Track:

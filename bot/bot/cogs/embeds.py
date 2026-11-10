@@ -46,7 +46,8 @@ class EmbedModal(discord.ui.Modal, title="Embed erstellen"):
         if image_url:
             embed.set_image(url=image_url)
         if not self.channel.permissions_for(interaction.guild.me).send_messages:
-            return await interaction.response.send_message(f"Ich darf in {self.channel.mention} nicht schreiben.", ephemeral=True)
+            text = f"Ich darf in {self.channel.mention} nicht schreiben."
+            return await interaction.response.send_message(text, ephemeral=True)
         await self.channel.send(embed=embed)
         await interaction.response.send_message(f"Embed gepostet in {self.channel.mention}.", ephemeral=True)
 

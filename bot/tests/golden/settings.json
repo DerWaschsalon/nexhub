@@ -1,0 +1,135 @@
+{
+ "allgemein.log_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "allgemein.antispam": {
+  "empty": true,
+  "stored": true
+ },
+ "allgemein.allow_invites": {
+  "empty": false,
+  "stored": true
+ },
+ "allgemein.welcome_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "allgemein.welcome_text": {
+  "empty": "",
+  "stored": "Zeile eins\nZeile zwei"
+ },
+ "allgemein.autorole": {
+  "empty": null,
+  "stored": "323456789012345678"
+ },
+ "allgemein.dj_role": {
+  "empty": null,
+  "stored": "323456789012345678"
+ },
+ "allgemein.tempvoice_hub": {
+  "empty": null,
+  "stored": "223456789012345678"
+ },
+ "automod.automod_banned_words": {
+  "empty": "",
+  "stored": "Zeile eins\nZeile zwei"
+ },
+ "automod.automod_link_filter": {
+  "empty": false,
+  "stored": true
+ },
+ "automod.automod_allowed_domains": {
+  "empty": "",
+  "stored": "Zeile eins\nZeile zwei"
+ },
+ "automod.automod_caps": {
+  "empty": false,
+  "stored": true
+ },
+ "automod.automod_emoji_limit": {
+  "empty": 0,
+  "stored": 7
+ },
+ "verwarnungen.warn_threshold": {
+  "empty": 0,
+  "stored": 7
+ },
+ "verwarnungen.warn_action": {
+  "empty": "timeout",
+  "stored": "ban"
+ },
+ "tickets.ticket_team_roles": {
+  "empty": [],
+  "stored": [
+   "33",
+   "44"
+  ]
+ },
+ "community.member_count_channel": {
+  "empty": null,
+  "stored": "223456789012345678"
+ },
+ "community.bots_count_channel": {
+  "empty": null,
+  "stored": "223456789012345678"
+ },
+ "community.starboard_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "community.starboard_threshold": {
+  "empty": 3,
+  "stored": 7
+ },
+ "community.birthday_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "community.bump_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "community.bump_role": {
+  "empty": null,
+  "stored": "323456789012345678"
+ },
+ "level.level_system_enabled": {
+  "empty": false,
+  "stored": true
+ },
+ "level.level_announce_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "level.voice_xp_per_minute": {
+  "empty": 0,
+  "stored": 7
+ },
+ "level.level_no_xp_channels": {
+  "empty": [],
+  "stored": [
+   "11",
+   "22"
+  ]
+ },
+ "level.level_no_xp_roles": {
+  "empty": [],
+  "stored": [
+   "33",
+   "44"
+  ]
+ },
+ "aion.aion_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "aion.termine_channel": {
+  "empty": null,
+  "stored": "123456789012345678"
+ },
+ "aion.termine_role": {
+  "empty": null,
+  "stored": "323456789012345678"
+ }
+}

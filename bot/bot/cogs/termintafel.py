@@ -10,18 +10,11 @@ proto/nexproto/termine.py (dieselben wie im Radar des NexBoards).
 from __future__ import annotations
 
 import logging
-import sys
 import time
-from pathlib import Path
 
 import discord
 from discord.ext import commands, tasks
-
-try:
-    import termine  # im Image: von bot/Dockerfile aus proto/nexproto/termine.py kopiert
-except ImportError:  # im Repo (Tests, Entwicklung): direkt aus proto
-    sys.path.append(str(Path(__file__).resolve().parents[3] / "proto" / "nexproto"))
-    import termine
+from nexproto import termine
 
 log = logging.getLogger(__name__)
 
