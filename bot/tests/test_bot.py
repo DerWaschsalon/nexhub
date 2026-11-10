@@ -53,8 +53,8 @@ def test_all_commands_register():
             # wait_until_ready() (kein echtes Login in diesem Test) — Tasks sauber abwarten statt
             # "exception was never retrieved".
             for cog_name, loop_name in [
-                ("Reminders", "check_due"), ("Notifications", "poll_feeds"),
-                ("Giveaways", "check_due"),
+                ("Notifications", "poll_feeds"),
+
             ]:
                 loop = getattr(bot.get_cog(cog_name), loop_name)
                 task = loop.get_task()
@@ -169,7 +169,7 @@ def test_settings_panel_persistent_has_stable_custom_ids():
 def test_reminder_parsing():
     from zoneinfo import ZoneInfo
 
-    from bot.cogs.reminders import parse_when
+    from bot.core.when import parse_when
 
     tz = ZoneInfo("Europe/Berlin")
     now = datetime(2026, 10, 14, 12, 0, tzinfo=tz)
@@ -677,8 +677,8 @@ def test_setup_change_parses_input():
 def test_poll_answer_parsing():
     import pytest as _pytest
 
-    from bot.cogs.polls import parse_answers
     from bot.errors import UserError
+    from bot.modules.community.polls import parse_answers
 
     assert parse_answers("Ja | Nein") == ["Ja", "Nein"]
     assert parse_answers(" A | B | C ") == ["A", "B", "C"]
@@ -756,7 +756,7 @@ def test_youtube_provider_dedup_and_baseline():
 def test_giveaway_embed_running_and_ended():
     import time
 
-    from bot.cogs.giveaways import build_giveaway_embed
+    from bot.modules.community.giveaways import build_giveaway_embed
 
     running = build_giveaway_embed("Steam-Key", 2, time.time() + 3600, host_id=42)
     assert running.title == "🎉 Giveaway"
@@ -774,8 +774,8 @@ def test_giveaway_pick_winners_respects_count_and_uses_entries():
     import tempfile
     from pathlib import Path
 
-    from bot.cogs.giveaways import Giveaways
     from bot.db import Database
+    from bot.modules.community.giveaways.store import GiveawayStore
 
     async def go():
         with tempfile.TemporaryDirectory() as d:
@@ -784,14 +784,13 @@ def test_giveaway_pick_winners_respects_count_and_uses_entries():
             for uid in (1, 2, 3):
                 await db.execute("INSERT INTO giveaway_entries (message_id, user_id) VALUES (?, ?)", (99, uid))
 
-            cog = Giveaways.__new__(Giveaways)
-            cog.db = db
+            store = GiveawayStore(db)
 
-            winners = await cog.pick_winners(99, 2)
+            winners = await store.pick_winners(99, 2)
             assert len(winners) == 2
             assert set(winners) <= {1, 2, 3}
 
-            no_entries = await cog.pick_winners(100, 2)
+            no_entries = await store.pick_winners(100, 2)
             assert no_entries == []
 
             await db.close()
@@ -1137,8 +1136,13 @@ def test_hub_action_values():
 
 def test_hub_giveaway_page():
     """Giveaway-Seite: Zeilen aus der DB, Schalter für die Aktionen je Zeile."""
-    from bot.cogs.giveaways import Giveaways
+    from unittest.mock import MagicMock
+
+    from nexcore import EventBus, Paths
+
+    from bot.core import BotContext
     from bot.hubpages import Ctx, page_out
+    from bot.modules.community.giveaways import Giveaways
 
     class Guild:
         id = 1
@@ -1154,12 +1158,11 @@ def test_hub_giveaway_page():
         with tempfile.TemporaryDirectory() as d:
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
-            cog = Giveaways.__new__(Giveaways)
-            cog.db, cog.bot = db, None
+            module = Giveaways(BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock()))
             await db.execute("INSERT INTO giveaways VALUES (11, 1, 5, 7, 'Nitro', 1, 2000000000, 0)")
             await db.execute("INSERT INTO giveaways VALUES (12, 1, 5, 7, 'Alt', 2, 1000, 1)")
             await db.execute("INSERT INTO giveaway_entries VALUES (11, 3)")
-            out = await page_out(Ctx(None, Guild()), cog.hub_pages()[0], lambda s: {})
+            out = await page_out(Ctx(None, Guild()), module.pages()[0], lambda s: {})
             await db.close()
             return out
 

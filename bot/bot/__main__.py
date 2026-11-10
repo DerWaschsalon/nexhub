@@ -21,15 +21,12 @@ COGS = [
     "bot.cogs.music",
     "bot.cogs.moderation",
     "bot.cogs.cleanup",
-    "bot.cogs.reminders",
     "bot.cogs.notifications",
     "bot.cogs.tickets",
     "bot.cogs.control",
     "bot.cogs.aion_dedup",
     "bot.cogs.aion_ranking",
     "bot.cogs.termintafel",
-    "bot.cogs.polls",
-    "bot.cogs.giveaways",
     "bot.cogs.server",
 ]
 
