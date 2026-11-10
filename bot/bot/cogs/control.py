@@ -8,7 +8,7 @@ prüft der Hub; der Bot vertraut dem Schlüssel und schreibt den Namen aus `X-Hu
 Discord-Audit-Log, wo er etwas am Server ändert.
 
 Menü und Seiten des Hubs kommen aus `/control/pages`: Formular-Bereiche aus `SECTIONS`, dazu was
-jeder Cog per `hub_pages()` beschreibt (Tabellen, Status, Aktionen, siehe `bot/hubpages.py`). Der
+jedes Modul per `pages()` beschreibt (Tabellen, Status, Aktionen, siehe `bot/hubpages.py`). Der
 Hub zeichnet das allgemein, ohne die einzelnen Funktionen zu kennen. Eigene Endpunkte haben nur
 noch die Seiten mit eigener Oberfläche (Level-Belohnungen, Ankündigungen, eigene Befehle,
 Sichtbarkeits-Matrix, Regel-Text).
@@ -23,23 +23,36 @@ import hmac
 import json
 import logging
 import os
-import re
 import time
 import urllib.parse
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 import discord
 from aiohttp import web
 from discord.ext import commands
 
 from .. import hubpages
+from ..core.discord_checks import can_assign
 from ..errors import UserError
 from ..forms import SECTIONS, Section, convert_field, parse_id, read_field, save_values
 from ..hubpages import ApiError, Ctx, Field, Form, Page
+from ..modules.aion2.runs import RunPosts
+from ..modules.community.levels import Levels
+from ..modules.community.levels.store import LevelStore
+from ..modules.server.announcements import Announcements, AnnouncementStore
+from ..modules.server.custom_commands import CommandStore, CustomCommands
+from ..modules.server.verification import Verification
+
+if TYPE_CHECKING:
+    from ..__main__ import Bot
 
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8790
+MAX_MESSAGE = 2000  # Länge einer Discord-Nachricht
+MIN_INTERVAL_MIN = 5
+MAX_BODY_BYTES = 256 * 1024
 STARTED = time.time()
 
 TEXT_TYPES = hubpages.TEXT_TYPES
@@ -49,7 +62,7 @@ VOICE_TYPES = hubpages.VOICE_TYPES
 # ---- Formular-Bereiche ---------------------------------------------------------------------
 
 # Seiten, die nicht von einem Cog kommen: Formular-Bereiche oben und eigene Seiten im Hub
-# (routes/hub/admin/bot/<id>). Alles andere liefern die Cogs per hub_pages() (siehe hubpages.py).
+# (routes/hub/admin/bot/<id>). Alles andere liefern die Module per pages() (siehe hubpages.py).
 CORE_PAGES: tuple[Page, ...] = (
     Page("", "Übersicht", "Server", order=0, custom=True),
     Page("allgemein", "Allgemein", "Server", (Form("allgemein"),), SECTIONS["allgemein"].description, order=10),
@@ -69,7 +82,7 @@ CORE_PAGES: tuple[Page, ...] = (
 
 # ---- Server-Daten für Auswahllisten ----------------------------------------------------------
 
-def channel_kind(ch) -> str | None:
+def channel_kind(ch: discord.abc.GuildChannel) -> str | None:
     if ch.type in TEXT_TYPES:
         return "text"
     if ch.type in VOICE_TYPES:
@@ -79,7 +92,7 @@ def channel_kind(ch) -> str | None:
     return None
 
 
-def channel_order(ch) -> tuple:
+def channel_order(ch: discord.abc.GuildChannel) -> tuple[Any, ...]:
     """Reihenfolge wie in der Discord-Seitenleiste: Kategorie für Kategorie, darin erst Text,
     dann Sprache. `position` allein zählt nur innerhalb einer Kategorie und Kanalart."""
     if ch.type == discord.ChannelType.category:
@@ -88,14 +101,15 @@ def channel_order(ch) -> tuple:
     return (cat.position if cat else -1, 1, ch.type in VOICE_TYPES, ch.position, ch.id)
 
 
-def guild_info(guild) -> dict:
+def guild_info(guild: discord.Guild) -> dict[str, Any]:
     """Kanäle und Rollen in Discord-Reihenfolge, für Auswahllisten im Hub."""
     channels = []
     for ch in sorted(guild.channels, key=channel_order):
         kind = channel_kind(ch)
         if kind:
+            category = getattr(ch, "category", None)
             channels.append({"id": str(ch.id), "name": ch.name, "kind": kind,
-                             "category": str(ch.category.id) if getattr(ch, "category", None) else None})
+                             "category": str(category.id) if category else None})
     me_top = guild.me.top_role if guild.me else None
     roles = [{"id": str(r.id), "name": r.name, "color": str(r.color) if r.color.value else None,
               # Rollen über der eigenen kann der Bot nicht vergeben (z. B. als Level-Belohnung)
@@ -114,7 +128,7 @@ def visible_roles(guild: discord.Guild) -> list[discord.Role]:
     return sorted((r for r in guild.roles if not r.is_default() and not r.managed), key=lambda r: -r.position)
 
 
-def role_can_view(channel, role: discord.Role, everyone: discord.Role) -> bool:
+def role_can_view(channel: discord.abc.GuildChannel, role: discord.Role, everyone: discord.Role) -> bool:
     """Könnte ein Mitglied, das nur @everyone + diese eine Rolle hat, den Kanal/die Kategorie
     sehen? (Admin-Rechte/Owner-Status bleiben hier bewusst außen vor — reine Rollen-Perspektive.)"""
     base = everyone.permissions.value | role.permissions.value
@@ -128,12 +142,12 @@ def role_can_view(channel, role: discord.Role, everyone: discord.Role) -> bool:
     return bool(base & VIEW)
 
 
-def matrix(guild) -> dict:
+def matrix(guild: discord.Guild) -> dict[str, Any]:
     """Wer sieht welchen Kanal: Zeilen = Kategorien mit ihren Kanälen, Spalten = Rollen."""
     everyone = guild.default_role
     roles = visible_roles(guild)
 
-    def row(ch, category: bool) -> dict:
+    def row(ch: discord.abc.GuildChannel, category: bool) -> dict[str, Any]:
         return {"id": str(ch.id), "name": ch.name, "category": category,
                 "kind": channel_kind(ch), "cells": [role_can_view(ch, r, everyone) for r in roles]}
 
@@ -152,41 +166,57 @@ def matrix(guild) -> dict:
 
 # ---- Server ------------------------------------------------------------------------------------
 
-Handler = Callable[[web.Request], Awaitable[Any]]
+Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
+JsonHandler = Callable[[web.Request], Awaitable[Any]]  # gibt JSON-Daten zurück, None heißt 204
+
+
+def as_json(handler: JsonHandler) -> Handler:
+    """Macht aus dem Rückgabewert eines Handlers die HTTP-Antwort."""
+
+    async def respond(request: web.Request) -> web.StreamResponse:
+        result = await handler(request)
+        if result is None:
+            return web.Response(status=204)
+        return web.json_response(result)
+
+    return respond
 
 
 class Control(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: Bot) -> None:
         self.bot = bot
         self.db = bot.db
         self.runner: web.AppRunner | None = None
         self.key = os.getenv("BOT_CONTROL_KEY", "").strip()
 
     def make_app(self) -> web.Application:
-        app = web.Application(middlewares=[self._middleware], client_max_size=256 * 1024)
-        r = app.router
-        r.add_get("/control/status", self.status)
-        r.add_get("/control/guild", self.guild_data)
-        r.add_get("/control/sections", self.sections)
-        r.add_put("/control/sections/{id}", self.save_section)
-        r.add_post("/control/sections/{id}/actions/{action}", self.section_action)
-        r.add_get("/control/verification", self.verification)
-        r.add_put("/control/verification/text", self.verification_text)
-        r.add_get("/control/level-rewards", self.rewards)
-        r.add_put("/control/level-rewards/{level}", self.reward_set)
-        r.add_delete("/control/level-rewards/{level}", self.reward_delete)
-        r.add_get("/control/announcements", self.announcements)
-        r.add_post("/control/announcements", self.announcement_add)
-        r.add_delete("/control/announcements/{id}", self.announcement_delete)
-        r.add_get("/control/commands", self.custom_commands)
-        r.add_put("/control/commands/{name}", self.command_set)
-        r.add_delete("/control/commands/{name}", self.command_delete)
-        r.add_get("/control/matrix", self.matrix)
-        r.add_put("/control/matrix", self.matrix_set)
-        r.add_post("/control/run-link", self.run_link)
-        r.add_get("/control/pages", self.pages)
-        r.add_get("/control/pages/{page}", self.page)
-        r.add_post("/control/pages/{page}/{block}/{action}", self.page_action)
+        app = web.Application(middlewares=[self._middleware], client_max_size=MAX_BODY_BYTES)
+        routes: list[tuple[str, str, JsonHandler]] = [
+            ("GET", "/control/status", self.status),
+            ("GET", "/control/guild", self.guild_data),
+            ("GET", "/control/sections", self.sections),
+            ("PUT", "/control/sections/{id}", self.save_section),
+            ("POST", "/control/sections/{id}/actions/{action}", self.section_action),
+            ("GET", "/control/verification", self.verification),
+            ("PUT", "/control/verification/text", self.verification_text),
+            ("GET", "/control/level-rewards", self.rewards),
+            ("PUT", "/control/level-rewards/{level}", self.reward_set),
+            ("DELETE", "/control/level-rewards/{level}", self.reward_delete),
+            ("GET", "/control/announcements", self.announcements),
+            ("POST", "/control/announcements", self.announcement_add),
+            ("DELETE", "/control/announcements/{id}", self.announcement_delete),
+            ("GET", "/control/commands", self.custom_commands),
+            ("PUT", "/control/commands/{name}", self.command_set),
+            ("DELETE", "/control/commands/{name}", self.command_delete),
+            ("GET", "/control/matrix", self.matrix),
+            ("PUT", "/control/matrix", self.matrix_set),
+            ("POST", "/control/run-link", self.run_link),
+            ("GET", "/control/pages", self.pages),
+            ("GET", "/control/pages/{page}", self.page),
+            ("POST", "/control/pages/{page}/{block}/{action}", self.page_action),
+        ]
+        for method, path, handler in routes:
+            app.router.add_route(method, path, as_json(handler))
         return app
 
     async def cog_load(self) -> None:
@@ -212,7 +242,7 @@ class Control(commands.Cog):
         if scheme.lower() != "bearer" or not hmac.compare_digest(token.encode(), self.key.encode()):
             return web.json_response({"detail": "Schlüssel fehlt oder falsch"}, status=401)
         try:
-            result = await handler(request)
+            return await handler(request)
         except ApiError as e:
             return web.json_response({"detail": e.detail}, status=e.status)
         except UserError as e:
@@ -226,23 +256,24 @@ class Control(commands.Cog):
         except Exception:
             log.exception("Steuer-API: Fehler bei %s %s", request.method, request.path)
             return web.json_response({"detail": "Fehler im Bot, Details stehen im Log"}, status=500)
-        if isinstance(result, web.StreamResponse):
-            return result
-        if result is None:
-            return web.Response(status=204)
-        return web.json_response(result)
 
     # ---- Hilfsfunktionen -----------------------------------------------------------------------
 
-    def guild(self) -> discord.Guild:
+    def find_guild(self) -> discord.Guild | None:
+        """Der Server aus DEV_GUILD_ID, sonst der erste, auf dem der Bot ist."""
         gid = os.getenv("DEV_GUILD_ID", "").strip()
-        guild = self.bot.get_guild(int(gid)) if gid.isdigit() else (self.bot.guilds[0] if self.bot.guilds else None)
+        if gid.isdigit():
+            return self.bot.get_guild(int(gid))
+        return self.bot.guilds[0] if self.bot.guilds else None
+
+    def guild(self) -> discord.Guild:
+        guild = self.find_guild()
         if guild is None:
             raise ApiError(503, "Bot ist mit keinem Discord-Server verbunden")
         return guild
 
     @staticmethod
-    async def body(request: web.Request) -> dict:
+    async def body(request: web.Request) -> dict[str, Any]:
         try:
             data = await request.json()
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -259,10 +290,9 @@ class Control(commands.Cog):
 
     # ---- Status und Server ---------------------------------------------------------------------
 
-    async def status(self, request: web.Request) -> dict:
+    async def status(self, request: web.Request) -> dict[str, Any]:
         user = self.bot.user
-        gid = os.getenv("DEV_GUILD_ID", "").strip()
-        guild = self.bot.get_guild(int(gid)) if gid.isdigit() else (self.bot.guilds[0] if self.bot.guilds else None)
+        guild = self.find_guild()
         latency = self.bot.latency
         return {
             "ready": self.bot.is_ready(),
@@ -277,28 +307,24 @@ class Control(commands.Cog):
             "cogs": sorted(self.bot.cogs),
         }
 
-    async def guild_data(self, request: web.Request) -> dict:
+    async def guild_data(self, request: web.Request) -> dict[str, Any]:
         return guild_info(self.guild())
 
     # ---- Formular-Bereiche ---------------------------------------------------------------------
 
-    def runs(self) -> Any:
-        """Das Modul aion2.runs, wenn der Bot Module hat (in Tests der Steuer-API fehlen sie)."""
-        if not hasattr(self.bot, "modules"):
-            return None
-        return self.bot.modules.module("aion2.runs")
+    def runs(self) -> RunPosts:
+        return self.bot.modules.module("aion2.runs", RunPosts)
 
-    def section_info(self, guild, s: Section) -> list[dict]:
+    def section_info(self, guild: discord.Guild, s: Section) -> list[dict[str, Any]]:
         """Nur-Lese-Angaben unter einem Formular, z. B. Adresse und Token für das NexBoard."""
         if s.id == "aion":
-            aion = self.runs()
             return [
-                {"label": "Endpunkt", "value": aion.api_url() if aion else None, "code": True},
+                {"label": "Endpunkt", "value": self.runs().api_url(), "code": True},
                 {"label": "Token", "value": self.db.get(guild.id, "aion_api_token"), "code": True, "secret": True},
             ]
         return []
 
-    def section_out(self, guild, s: Section) -> dict:
+    def section_out(self, guild: discord.Guild, s: Section) -> dict[str, Any]:
         return {
             "id": s.id, "title": s.title, "description": s.description, "note": s.note,
             "fields": [f.out(read_field(self.db, guild.id, f)) for f in s.fields],
@@ -312,11 +338,11 @@ class Control(commands.Cog):
             raise ApiError(404, "Bereich gibt es nicht")
         return s
 
-    async def sections(self, request: web.Request) -> list[dict]:
+    async def sections(self, request: web.Request) -> list[dict[str, Any]]:
         guild = self.guild()
         return [self.section_out(guild, s) for s in SECTIONS.values()]
 
-    async def save_section(self, request: web.Request) -> dict:
+    async def save_section(self, request: web.Request) -> dict[str, Any]:
         """Speichert die mitgeschickten Felder eines Bereichs (fehlende bleiben, wie sie sind)."""
         guild = self.guild()
         s = self._section(request)
@@ -326,27 +352,22 @@ class Control(commands.Cog):
         await save_values(self.bot, self.db, guild, s, values)
         return self.section_out(guild, s)
 
-    async def section_action(self, request: web.Request) -> dict:
+    async def section_action(self, request: web.Request) -> dict[str, Any]:
         guild = self.guild()
         s = self._section(request)
         action = request.match_info["action"]
         if action not in s.actions:
             raise ApiError(404, "Aktion gibt es nicht")
         if (s.id, action) == ("aion", "token"):
-            aion = self.runs()
-            if aion is not None:
-                await aion.token(guild.id, renew=True)
+            await self.runs().token(guild.id, renew=True)
         return self.section_out(guild, s)
 
     # ---- Verifizierung -------------------------------------------------------------------------
 
-    def verify_module(self) -> Any:
-        """Das Modul server.verification (in Tests der Steuer-API fehlen die Module)."""
-        if not hasattr(self.bot, "modules"):
-            raise ApiError(503, "Verifizierung ist nicht geladen")
-        return self.bot.modules.module("server.verification")
+    def verify_module(self) -> Verification:
+        return self.bot.modules.module("server.verification", Verification)
 
-    async def verification(self, request: web.Request) -> dict:
+    async def verification(self, request: web.Request) -> dict[str, Any]:
         guild = self.guild()
         module = self.verify_module()
         settings = module.settings.get(guild.id)
@@ -361,14 +382,22 @@ class Control(commands.Cog):
         text = str((await self.body(request)).get("text") or "")
         await self.verify_module().set_text(self.guild(), text)
 
-    # ---- Level-Belohnungen ---------------------------------------------------------------------
+    # ---- Daten der Module (Level-Belohnungen, Ankündigungen, eigene Befehle) --------------------
 
-    async def rewards(self, request: web.Request) -> list[dict]:
+    # Dieselben Stores, die auch die Slash-Befehle der Module benutzen
+    def levels(self) -> LevelStore:
+        return self.bot.modules.module("community.levels", Levels).store
+
+    def announcement_store(self) -> AnnouncementStore:
+        return self.bot.modules.module("server.announcements", Announcements).store
+
+    def command_store(self) -> CommandStore:
+        return self.bot.modules.module("server.custom_commands", CustomCommands).store
+
+    async def rewards(self, request: web.Request) -> list[dict[str, Any]]:
         guild = self.guild()
-        rows = await self.db.fetchall(
-            "SELECT level, role_id FROM level_rewards WHERE guild_id=? ORDER BY level", (guild.id,))
         out = []
-        for r in rows:
+        for r in await self.levels().rewards(guild.id):
             role = guild.get_role(r["role_id"])
             out.append({"level": r["level"], "role_id": str(r["role_id"]), "role": role.name if role else None})
         return out
@@ -380,41 +409,30 @@ class Control(commands.Cog):
             raise ApiError(400, "Level zwischen 1 und 1000")
         return int(level)
 
-    async def reward_set(self, request: web.Request) -> list[dict]:
+    async def reward_set(self, request: web.Request) -> list[dict[str, Any]]:
         guild = self.guild()
         level = self._level(request)
-        role_id = parse_id((await self.body(request)).get("role_id"), "Rolle")
-        role = guild.get_role(role_id or 0)
+        role = guild.get_role(parse_id((await self.body(request)).get("role_id"), "Rolle") or 0)
         if role is None:
             raise ApiError(400, "Rolle gibt es nicht")
-        if role.managed or (guild.me and role >= guild.me.top_role):
+        if not can_assign(guild, role):
             raise ApiError(400, f"{role.name} kann der Bot nicht vergeben (muss unter seiner eigenen Rolle stehen)")
-        await self.db.execute(
-            "INSERT INTO level_rewards (guild_id, level, role_id) VALUES (?, ?, ?) "
-            "ON CONFLICT(guild_id, level) DO UPDATE SET role_id=excluded.role_id",
-            (guild.id, level, role.id))
+        await self.levels().set_reward(guild.id, level, role.id)
         return await self.rewards(request)
 
     async def reward_delete(self, request: web.Request) -> None:
-        guild = self.guild()
-        await self.db.execute("DELETE FROM level_rewards WHERE guild_id=? AND level=?",
-                              (guild.id, self._level(request)))
+        await self.levels().set_reward(self.guild().id, self._level(request), None)
 
-    # ---- Ankündigungen -------------------------------------------------------------------------
-
-    async def announcements(self, request: web.Request) -> list[dict]:
+    async def announcements(self, request: web.Request) -> list[dict[str, Any]]:
         guild = self.guild()
-        rows = await self.db.fetchall(
-            "SELECT id, channel_id, text, interval_minutes, next_run FROM scheduled WHERE guild_id=? ORDER BY id",
-            (guild.id,))
         out = []
-        for r in rows:
+        for r in await self.announcement_store().of_guild(guild.id):
             ch = guild.get_channel(r["channel_id"])
             out.append({"id": r["id"], "channel_id": str(r["channel_id"]), "channel": ch.name if ch else None,
                         "text": r["text"], "interval_minutes": r["interval_minutes"], "next_run": r["next_run"]})
         return out
 
-    async def announcement_add(self, request: web.Request) -> list[dict]:
+    async def announcement_add(self, request: web.Request) -> list[dict[str, Any]]:
         guild = self.guild()
         data = await self.body(request)
         channel_id = convert_field(guild, Field("channel", "channel", "Kanal"), data.get("channel_id"))
@@ -422,62 +440,42 @@ class Control(commands.Cog):
         interval = data.get("interval_minutes")
         if channel_id is None or not text:
             raise ApiError(400, "Kanal und Text angeben")
-        if len(text) > 2000:
-            raise ApiError(400, "Höchstens 2000 Zeichen (Discord-Grenze)")
-        if isinstance(interval, bool) or not isinstance(interval, int) or interval < 5:
-            raise ApiError(400, "Intervall mindestens 5 Minuten")
-        await self.db.execute(
-            "INSERT INTO scheduled (guild_id, channel_id, text, interval_minutes, next_run) VALUES (?, ?, ?, ?, ?)",
-            (guild.id, channel_id, text, interval, time.time()))
+        if len(text) > MAX_MESSAGE:
+            raise ApiError(400, f"Höchstens {MAX_MESSAGE} Zeichen (Discord-Grenze)")
+        if isinstance(interval, bool) or not isinstance(interval, int) or interval < MIN_INTERVAL_MIN:
+            raise ApiError(400, f"Intervall mindestens {MIN_INTERVAL_MIN} Minuten")
+        await self.announcement_store().add(guild.id, int(channel_id), text, interval)
         return await self.announcements(request)
 
     async def announcement_delete(self, request: web.Request) -> None:
-        guild = self.guild()
         ann_id = request.match_info["id"]
         if not ann_id.isdigit():
             raise ApiError(404, "Ankündigung gibt es nicht")
-        await self.db.execute("DELETE FROM scheduled WHERE id=? AND guild_id=?", (int(ann_id), guild.id))
+        await self.announcement_store().delete(self.guild().id, int(ann_id))
 
-    # ---- Eigene Befehle ------------------------------------------------------------------------
-
-    async def custom_commands(self, request: web.Request) -> list[dict]:
-        guild = self.guild()
-        rows = await self.db.fetchall(
-            "SELECT name, response FROM custom_commands WHERE guild_id=? ORDER BY name", (guild.id,))
+    async def custom_commands(self, request: web.Request) -> list[dict[str, Any]]:
+        rows = await self.command_store().of_guild(self.guild().id)
         return [{"name": r["name"], "response": r["response"]} for r in rows]
 
-    @staticmethod
-    def _command_name(request: web.Request) -> str:
-        name = request.match_info["name"].strip().lower().lstrip("!")
-        if not re.fullmatch(r"[a-z0-9_-]{1,32}", name):
-            raise ApiError(400, "Name: 1–32 Zeichen, nur a–z, 0–9, _ und -")
-        return name
-
-    async def command_set(self, request: web.Request) -> list[dict]:
+    async def command_set(self, request: web.Request) -> list[dict[str, Any]]:
         guild = self.guild()
-        name = self._command_name(request)
         response = str((await self.body(request)).get("response") or "").strip()
         if not response:
             raise ApiError(400, "Antwort fehlt")
-        if len(response) > 2000:
-            raise ApiError(400, "Höchstens 2000 Zeichen (Discord-Grenze)")
-        await self.db.execute(
-            "INSERT INTO custom_commands (guild_id, name, response) VALUES (?, ?, ?) "
-            "ON CONFLICT(guild_id, name) DO UPDATE SET response=excluded.response",
-            (guild.id, name, response))
+        if len(response) > MAX_MESSAGE:
+            raise ApiError(400, f"Höchstens {MAX_MESSAGE} Zeichen (Discord-Grenze)")
+        await self.command_store().put(guild.id, request.match_info["name"], response)
         return await self.custom_commands(request)
 
     async def command_delete(self, request: web.Request) -> None:
-        guild = self.guild()
-        await self.db.execute("DELETE FROM custom_commands WHERE guild_id=? AND name=?",
-                              (guild.id, self._command_name(request)))
+        await self.command_store().delete(self.guild().id, request.match_info["name"])
 
     # ---- Sichtbarkeits-Matrix ------------------------------------------------------------------
 
-    async def matrix(self, request: web.Request) -> dict:
+    async def matrix(self, request: web.Request) -> dict[str, Any]:
         return matrix(self.guild())
 
-    async def matrix_set(self, request: web.Request) -> dict:
+    async def matrix_set(self, request: web.Request) -> dict[str, Any]:
         """Eine Zelle umschalten: diese Rolle darf den Kanal sehen (`allow`) oder nicht."""
         guild = self.guild()
         data = await self.body(request)
@@ -493,12 +491,7 @@ class Control(commands.Cog):
     # ---- Seiten (hubpages.py) ------------------------------------------------------------------
 
     def all_pages(self) -> list[Page]:
-        pages = list(CORE_PAGES)
-        if hasattr(self.bot, "modules"):  # neue Module (bot/modules) neben den alten Cogs
-            pages.extend(self.bot.modules.pages())
-        for cog in self.bot.cogs.values():
-            if hasattr(cog, "hub_pages"):
-                pages.extend(cog.hub_pages())
+        pages = list(CORE_PAGES) + self.bot.modules.pages()
         return sorted(pages, key=lambda p: (hubpages.group_rank(p.group), p.order, p.title))
 
     def _page(self, request: web.Request) -> Page:
@@ -513,16 +506,16 @@ class Control(commands.Cog):
         uid = request.headers.get("X-Hub-User-Id", "")
         return Ctx(self.bot, self.guild(), who, int(uid) if uid.isdigit() else None)
 
-    async def pages(self, request: web.Request) -> list[dict]:
+    async def pages(self, request: web.Request) -> list[dict[str, Any]]:
         self.guild()
         return [p.nav() for p in self.all_pages()]
 
-    async def page(self, request: web.Request) -> dict:
+    async def page(self, request: web.Request) -> dict[str, Any]:
         ctx = self.ctx(request)
         return await hubpages.page_out(ctx, self._page(request),
                                        lambda sid: self.section_out(ctx.guild, SECTIONS[sid]))
 
-    async def page_action(self, request: web.Request) -> dict:
+    async def page_action(self, request: web.Request) -> dict[str, Any]:
         """Aktion ausführen, danach die Seite neu liefern (Tabellen und Status sind dann aktuell)."""
         ctx = self.ctx(request)
         page = self._page(request)
@@ -540,7 +533,7 @@ class Control(commands.Cog):
 
     # ---- Runs aus dem Hub ---------------------------------------------------------------------
 
-    async def run_link(self, request: web.Request) -> dict:
+    async def run_link(self, request: web.Request) -> dict[str, Any]:
         """Der Hub hat einen Run gespeichert: Link an den passenden AION-Post (aion2.runs, attach_hub_link)."""
         data = await self.body(request)
         dungeon, start_ms, url = data.get("dungeon"), data.get("start_ms"), data.get("url")
@@ -550,11 +543,8 @@ class Control(commands.Cog):
             raise ApiError(400, "start_ms fehlt")
         if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
             raise ApiError(400, "url fehlt oder ungültig")
-        aion = self.runs()
-        if aion is None:
-            raise ApiError(503, "AION-Modul ist nicht geladen")
-        return {"result": await aion.attach_hub_link(dungeon.strip(), start_ms, url)}
+        return {"result": await self.runs().attach_hub_link(dungeon.strip(), start_ms, url)}
 
 
-async def setup(bot) -> None:
+async def setup(bot: Bot) -> None:
     await bot.add_cog(Control(bot))

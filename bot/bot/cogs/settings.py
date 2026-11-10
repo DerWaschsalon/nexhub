@@ -11,13 +11,12 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from ..core import BotModule
 from ..core.buttons import ActionButton, ClickHandler
 from ..core.confirm import Confirm
 from ..errors import UserError
@@ -32,7 +31,6 @@ if TYPE_CHECKING:
     from ..__main__ import Bot
 
 log = logging.getLogger(__name__)
-M = TypeVar("M", bound=BotModule)
 
 TIMEOUT_S = 180
 MAX_CHOICES = 25  # Discord zeigt beim Tippen höchstens 25 Vorschläge
@@ -73,7 +71,7 @@ class AionTokenButton(discord.ui.Button[FieldPage]):
         self.panel = panel
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        runs = self.panel.cog.module("aion2.runs", RunPosts)
+        runs = self.panel.cog.bot.modules.module("aion2.runs", RunPosts)
         token = await runs.token(self.panel.guild.id)
         await interaction.response.send_message(
             f"Im NexBoard unter Discord-Bot eintragen:\n`{runs.api_url()}`\nToken: `{token}`\n\n"
@@ -139,7 +137,7 @@ class SettingsPanel(discord.ui.View):
     async def open_notifications(self, interaction: discord.Interaction) -> None:
         from ..modules.notify.feeds.wizard import NotificationsHomeView, home_embed
 
-        feeds = self.cog.module("notify.feeds", NotificationFeeds)
+        feeds = self.cog.bot.modules.module("notify.feeds", NotificationFeeds)
         await interaction.response.edit_message(
             embed=home_embed(), view=NotificationsHomeView(feeds, self.guild, self.persistent)
         )
@@ -185,14 +183,8 @@ class Setup(commands.GroupCog, group_name="setup", group_description="Einstellun
         self.bot = bot
         self.db = bot.db
 
-    def module(self, module_id: str, kind: type[M]) -> M:
-        """Ein Modul des Bots mit seinem genauen Typ (für Token, Assistenten und Verifizierung)."""
-        module = self.bot.modules.module(module_id)
-        assert isinstance(module, kind)
-        return module
-
     def verify_module(self) -> Verification:
-        return self.module("server.verification", Verification)
+        return self.bot.modules.module("server.verification", Verification)
 
     @staticmethod
     def guild_of(interaction: discord.Interaction) -> discord.Guild:

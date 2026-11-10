@@ -1,6 +1,6 @@
-"""Seiten für den NexHub: Jeder Cog beschreibt selbst, was der Bereich „Bot“ im Hub von ihm zeigt.
+"""Seiten für den NexHub: Jedes Modul beschreibt selbst, was der Bereich „Bot“ im Hub von ihm zeigt.
 
-Ein Cog mit einer Methode `hub_pages(self) -> list[Page]` taucht automatisch im Menü des Hubs auf,
+Ein Modul (bot/modules) mit einer Methode `pages(self) -> list[Page]` taucht automatisch im Menü des Hubs auf,
 der Hub kennt keine einzelnen Funktionen. Eine Seite besteht aus Blöcken:
 
 - `Form`: ein Formular-Bereich aus `control.SECTIONS` (Einstellungen, gespeichert über die DB).
@@ -12,7 +12,7 @@ Aktionen bekommen einen `Ctx` (Server, wer im Hub geklickt hat) und die geprüft
 Felder und geben eine kurze Rückmeldung zurück. `UserError`/`ApiError` werden zur Fehlermeldung im
 Hub. Wie die Steuer-API das ausliefert, steht in `cogs/control.py` (`/control/pages…`).
 
-Neue Funktion im Bot = `hub_pages()` im Cog ergänzen, im Hub ist nichts zu tun.
+Neue Funktion im Bot = `pages()` im Modul ergänzen, im Hub ist nichts zu tun.
 """
 
 from __future__ import annotations
@@ -54,14 +54,14 @@ class Field:
     max: int | None = None
     # int: 0 heißt „aus“ und löscht den Wert, statt 0 zu speichern
     zero_is_off: bool = False
-    options: tuple = ()
+    options: tuple[Any, ...] = ()
     required: bool = False
     show_if: tuple[str, tuple[str, ...]] | None = None
 
     def choices(self) -> list[tuple[str, str]]:
         return [(o, o) if isinstance(o, str) else (str(o[0]), str(o[1])) for o in self.options]
 
-    def out(self, value: Any = None) -> dict:
+    def out(self, value: Any = None) -> dict[str, Any]:
         return {
             "key": self.key, "kind": self.kind, "label": self.label, "group": self.group, "hint": self.hint,
             "min": self.min, "max": self.max, "required": self.required,
@@ -88,7 +88,7 @@ class Ctx:
         return self.guild.get_member(self.who_id) if self.who_id else None
 
 
-Runner = Callable[[Ctx, dict, "str | None"], Awaitable["str | None"]]
+Runner = Callable[[Ctx, dict[str, Any], "str | None"], Awaitable["str | None"]]
 
 
 @dataclass(frozen=True)
@@ -104,7 +104,7 @@ class Action:
     # Beschriftung des Absende-Knopfs im Formular (leer = wie label)
     submit: str = ""
 
-    def out(self) -> dict:
+    def out(self) -> dict[str, Any]:
         return {"id": self.id, "label": self.label, "submit": self.submit or self.label,
                 "confirm": self.confirm, "danger": self.danger,
                 "when": self.when, "fields": [f.out() for f in self.fields]}
@@ -129,7 +129,7 @@ class Table:
     id: str
     title: str
     columns: tuple[Column, ...]
-    rows: Callable[[Ctx], Awaitable[list[dict]]]
+    rows: Callable[[Ctx], Awaitable[list[dict[str, Any]]]]
     create: Action | None = None
     actions: tuple[Action, ...] = ()
     empty: str = "Noch nichts da."
@@ -141,7 +141,7 @@ class Status:
     id: str
     title: str
     # [{"label": …, "value": …, "href"?: …}]; Einträge ohne label sind Schalter für Action.when
-    items: Callable[[Ctx], Awaitable[list[dict]]]
+    items: Callable[[Ctx], Awaitable[list[dict[str, Any]]]]
     actions: tuple[Action, ...] = ()
     description: str = ""
 
@@ -162,20 +162,20 @@ class Page:
     id: str
     title: str
     group: str
-    blocks: tuple = ()
+    blocks: tuple[Any, ...] = ()
     description: str = ""
     order: int = 100
     # True: eigene Seite im Hub (routes/hub/admin/bot/<id>), der Bot liefert nur den Menüeintrag
     custom: bool = False
 
-    def nav(self) -> dict:
+    def nav(self) -> dict[str, Any]:
         return {"id": self.id, "title": self.title, "group": self.group, "order": self.order, "custom": self.custom}
 
     def action(self, block_id: str, action_id: str) -> Action:
         for b in self.blocks:
             if getattr(b, "id", None) != block_id:
                 continue
-            candidates = [*getattr(b, "actions", ())]
+            candidates: list[Action] = [*getattr(b, "actions", ())]
             if isinstance(b, Table) and b.create:
                 candidates.append(b.create)
             for a in candidates:
@@ -208,11 +208,11 @@ def _id(value: Any, label: str) -> int | None:
     raise ApiError(400, f"{label}: ungültige ID")
 
 
-def visible(f: Field, values: dict) -> bool:
+def visible(f: Field, values: dict[str, Any]) -> bool:
     return f.show_if is None or str(values.get(f.show_if[0]) or "") in f.show_if[1]
 
 
-def action_values(guild: discord.Guild, fields: tuple[Field, ...], values: Any) -> dict:
+def action_values(guild: discord.Guild, fields: tuple[Field, ...], values: Any) -> dict[str, Any]:
     """Werte einer Aktion prüfen und als Python-Objekte liefern (Kanal, Rolle, Mitglied, Zahl, …).
     Ausgeblendete Felder (`show_if`) fallen weg; Pflichtfelder müssen gesetzt sein."""
     if not isinstance(values, dict):
@@ -284,7 +284,7 @@ def action_values(guild: discord.Guild, fields: tuple[Field, ...], values: Any) 
 
 # ---- Ausliefern ------------------------------------------------------------------------------
 
-async def block_out(ctx: Ctx, block: Block, section_out: Callable[[str], dict]) -> dict:
+async def block_out(ctx: Ctx, block: Block, section_out: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
     if isinstance(block, Form):
         return {"type": "form", "id": block.section, "section": section_out(block.section)}
     if isinstance(block, Table):
@@ -305,7 +305,7 @@ async def block_out(ctx: Ctx, block: Block, section_out: Callable[[str], dict]) 
     raise TypeError(block)
 
 
-async def page_out(ctx: Ctx, page: Page, section_out: Callable[[str], dict]) -> dict:
+async def page_out(ctx: Ctx, page: Page, section_out: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
     return {**page.nav(), "description": page.description,
             "blocks": [await block_out(ctx, b, section_out) for b in page.blocks]}
 

@@ -68,6 +68,10 @@ class LevelStore:
                                       (guild_id, level))
         return [int(r["role_id"]) for r in rows]
 
+    async def rewards(self, guild_id: int) -> list[Any]:
+        return await self.db.fetchall("SELECT level, role_id FROM level_rewards WHERE guild_id=? ORDER BY level",
+                                      (guild_id,))
+
     async def set_reward(self, guild_id: int, level: int, role_id: int | None) -> None:
         """Belohnungsrolle für ein Level setzen; None entfernt sie."""
         if role_id is None:
