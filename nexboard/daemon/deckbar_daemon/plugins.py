@@ -85,6 +85,9 @@ EMBEDDED_PREFS = {"pet-souls": {"nearby": True, "mapPopped": True, "farmPopup": 
 # signierten Katalog, er steht in keiner Liste und lässt sich nicht ausschalten oder entfernen. Die Dateien
 # liegen nicht im Repo: Die Kartenbilder sind von aion2timers.com für den Tracker freigegeben.
 BUILTIN = {"pet-souls"}
+# Nummerierte Ereignisse aus deckbar-capture (feed.rs) → Recht, das ein Plugin dafür braucht (wie mod.rs im Meter)
+NUMBERED_FEEDS = {"deathRecap": "events:death-recap", "lootRoll": "events:loot-rolls",
+                  "blackMarket": "events:black-market", "kda": "events:kda"}
 BUILTIN_RETRY = 60.0
 # Was eine Plugin-Seite (Fenster oder Widget) aufrufen darf, wie PLUGIN_SURFACE_COMMANDS im Original
 SURFACE = {
@@ -276,6 +279,9 @@ class PluginHost:
         self.loaded: dict[str, Loaded] = {}
         self.errors: dict[str, dict] = {}
         self.decoder_errors: dict[str, str] = {}
+        # Eingebaute Plugins, deren Update neue Rechte will: bis zur Zustimmung in der Plugin-Liste sichtbar
+        self.awaiting_consent: set[str] = set()
+        self.active = False  # Modul AION 2 · Plugins an: Plugins laufen und bekommen Spieldaten
         self.widgets: dict[str, WidgetState] = {}
         self.pending: list[Pending] = []
         self.logs: dict[str, EventLog] = {}
@@ -376,14 +382,20 @@ class PluginHost:
                 "description": m.get("description", ""), "path": str(p.folder), "permissions": p.permissions,
                 "reviewed": True, "error": self.decoder_errors.get(p.id)}
 
+    def _listed_plugin(self, plugin: str) -> bool:
+        """In der Plugin-Liste des Meters: alle außer den eingebauten, die nur zur Zustimmung erscheinen."""
+        return plugin not in BUILTIN or plugin in self.awaiting_consent
+
     def view(self) -> dict:
         return {"devMode": False, "online": True,
-                "plugins": [self.info(p) for p in self.loaded.values() if p.id not in BUILTIN]
+                "plugins": [self.info(p) for p in self.loaded.values() if self._listed_plugin(p.id)]
                 + [e for e in self.errors.values() if e["id"] not in BUILTIN],
                 "disabled": self.disabled(), "hideClosed": self._listed(HIDE_CLOSED_KEY),
                 "hideUnfocused": self._listed(HIDE_UNFOCUSED_KEY),
                 # Ein Dock wie im Meter gibt es nicht: jedes Plugin hat sein Fenster
-                "ownWindow": [p for p in self.loaded if p not in BUILTIN]}
+                "ownWindow": [p for p in self.loaded if p not in BUILTIN],
+                # Für die Web-UI: fest eingebaut, ohne Ausschalter und Entfernen
+                "builtIn": [self.info(p) for p in self.loaded.values() if p.id in BUILTIN]}
 
     async def send_decoders(self) -> None:
         """Decoder der laufenden Plugins an deckbar-capture (auch nach dessen Neustart)."""
@@ -391,7 +403,7 @@ class PluginHost:
             return
         off = set(self.disabled())
         plugins = [{"plugin": p.id, "decoders": p.manifest.get("decoders") or []}
-                   for p in self.loaded.values() if p.id not in off]
+                   for p in self.loaded.values() if self.active and p.id not in off]
         try:
             result = await self.capture.request("plugin_decoders", timeout=10, plugins=plugins)
         except (RuntimeError, TimeoutError) as e:
@@ -404,6 +416,7 @@ class PluginHost:
             log.warning("Plugin %s: Decoder abgelehnt: %s", plugin, why)
 
     def start(self) -> None:
+        self.active = True
         if not self._tasks:
             self._tasks = [asyncio.create_task(self._flusher()), asyncio.create_task(self._game_loop()),
                            asyncio.create_task(self._keep_builtin())]
@@ -427,12 +440,23 @@ class PluginHost:
             p = self.loaded.get(plugin)
             if p and not newer(str(entry.get("version")), str(p.manifest.get("version"))):
                 continue
-            # Ohne Dialog gibt es keine Zustimmung zu Neuem: Solche Updates bleiben liegen
+            # Ohne Dialog gibt es keine Zustimmung zu Neuem: Solche Updates warten auf den Dialog im Meter
             added = [x for x in entry.get("permissions") or [] if p and x not in p.permissions]
             if added:
-                log.warning("%s %s will mehr dürfen (%s), bleibt auf der alten Version", plugin, entry.get("version"), added)
+                self.awaiting_consent.add(plugin)
+                log.warning("%s %s will mehr dürfen (%s): Zustimmung unter Meter-Einstellungen → Plugins → "
+                            "Nach Updates suchen", plugin, entry.get("version"), added)
                 continue
             await self.install(plugin)
+
+    async def deactivate(self) -> None:
+        """Modul aus: Fenster und Widgets zu, keine Spieldaten mehr. Installiert bleibt alles."""
+        self.active = False
+        for plugin in self.loaded:
+            await self._overlay({"action": "close", "id": plugin})
+            await self._drop_widgets(plugin)
+        await self.stop()
+        await self.send_decoders()
 
     async def stop(self) -> None:
         for task in [*self._tasks, *self._live.values()]:
@@ -445,7 +469,7 @@ class PluginHost:
 
     # ------------------------------------------------------------ Ereignisse aus dem Mitschnitt
     async def _on_capture(self, event: str, payload: Any) -> None:
-        if event == "hello":
+        if event == "hello" and self.active:
             self.start()
             asyncio.ensure_future(self.send_decoders())
         elif event == "ping":
@@ -478,7 +502,7 @@ class PluginHost:
         if event in ("bossMap", "abyss"):
             await self.tell_permitted("feed:boss-timers", event, data)
             return
-        permission = {"deathRecap": "events:death-recap", "lootRoll": "events:loot-rolls"}.get(event)
+        permission = NUMBERED_FEEDS.get(event)
         if permission:
             now = time.monotonic()
             self.pending.extend(Pending(now, False, int(msg.get("at") or 0), plugin, event, data)
@@ -596,6 +620,7 @@ class PluginHost:
         await self.emit("plugin-install-phase", {"id": plugin, "phase": "installing"})
         updating = plugin in self.loaded
         await asyncio.to_thread(self._write_install, entry, files)
+        self.awaiting_consent.discard(plugin)  # zugestimmt: wieder nur eingebaut
         self.reload()
         await self.send_decoders()
         if plugin in self.errors:
@@ -700,7 +725,7 @@ class PluginHost:
             catalog = await self.fetch_catalog()
             for entry in catalog.get("plugins", []):
                 p = self.loaded.get(entry.get("id"))
-                if p and p.id not in BUILTIN and newer(str(entry.get("version")), str(p.manifest.get("version"))):
+                if p and self._listed_plugin(p.id) and newer(str(entry.get("version")), str(p.manifest.get("version"))):
                     frm, to = str(p.manifest.get("version")), str(entry.get("version"))
                     available.append({
                         "id": p.id, "name": entry.get("name"), "from": frm, "to": to,

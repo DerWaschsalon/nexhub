@@ -16,17 +16,20 @@ def test_dependency_graph(tmp_path):
     assert m.requirements("discord.bot") == {"aion2.dps"}
     assert {"aion2.overlay", "aion2.runs", "discord.bot"} <= m.dependents("aion2.dps")
     assert m.dependents("deck") == set()
-    assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.runs", "aion2.radar", "discord.bot", "hub",
-                       "updates"]
+    assert m.requirements("aion2.radar") == {"aion2.schedule"}  # Feldbosse stehen unter Termine
+    assert m.requirements("aion2.plugins") == {"aion2.overlay", "aion2.dps"}
+    assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.plugins", "aion2.runs", "aion2.schedule",
+                       "aion2.radar", "discord.bot", "hub", "updates"]
     for mid, info in m.infos.items():
         assert all(r in m.infos for r in info.requires), mid
 
 
 def test_load_and_first_start(tmp_path):
     assert board(tmp_path).modules.enabled == {"deck", "updates"}  # frische Installation
-    assert yaml.safe_load((tmp_path / "modules.yaml").read_text()) == {"enabled": ["deck", "updates"]}
+    assert yaml.safe_load((tmp_path / "modules.yaml").read_text())["enabled"] == ["deck", "updates"]
     (tmp_path / "modules.yaml").write_text("enabled: [aion2.overlay, gibts-nicht]\n")
-    assert board(tmp_path).modules.enabled == {"aion2.overlay", "aion2.dps"}  # Abhängigkeit kommt dazu
+    # Abhängigkeit kommt dazu; Plugins liefen bisher mit dem Overlay und sind jetzt ein eigenes Modul
+    assert board(tmp_path).modules.enabled == {"aion2.overlay", "aion2.dps", "aion2.plugins"}
 
 
 @pytest.fixture
@@ -103,3 +106,13 @@ async def test_api_module_settings(client):
     r = await client.put("/api/m/deck/settings", json={"auto_page": "main"})
     assert (await r.json())["settings"]["auto_page"] == "main"
     assert (await client.get("/api/m/gibts-nicht/settings")).status == 404
+
+
+async def test_api_plugins_nur_verwalten(client):
+    r = await client.post("/api/plugins", json={"cmd": "plugin_list"})
+    assert r.status == 200 and "builtIn" in (await r.json())["result"]
+    # Was eine Plugin-Seite darf (Daten lesen, Fenster steuern), darf die Web-UI nicht
+    r = await client.post("/api/plugins", json={"cmd": "plugin_storage_get", "args": {}})
+    assert r.status == 400
+    r = await client.get("/api/plugins/texts")
+    assert r.status == 200 and "permStorage" in await r.json()

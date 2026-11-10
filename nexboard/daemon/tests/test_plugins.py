@@ -95,6 +95,7 @@ async def host(tmp_path, cdn):
     h = PluginHost(FakeCapture(), lambda: settings, save, emit, tmp_path / "plugins", tmp_path / "data",
                    base_url=cdn.url, key_hex=cdn.key_hex)
     h.emitted, h.saved = emitted, settings
+    h.active = True  # Modul AION 2 · Plugins an
     h.overlay_calls = []
 
     async def overlay(command):
@@ -300,6 +301,16 @@ async def test_ereignisse_nur_mit_berechtigung(host, cdn):
     assert {e[1]["plugin"] for e in host.emitted} == {"beute", "ping"}
 
 
+async def test_schwarzmarkt_und_kda_nur_mit_ihrem_recht(host, cdn):
+    cdn.add("markt", permissions=["storage", "events:black-market"])
+    cdn.add("pvp", permissions=["storage", "events:kda"])
+    await host.install("markt")
+    await host.install("pvp")
+    await host._on_capture("plugin_feed", {"event": "blackMarket", "data": {"tab": 1}, "at": 7})
+    await host._on_capture("plugin_feed", {"event": "kda", "data": {"kind": "kill"}, "at": 8})
+    assert [(p.plugin, p.event) for p in host.pending] == [("markt", "blackMarket"), ("pvp", "kda")]
+
+
 async def test_ausgeschaltet_bekommt_nichts(host, cdn):
     cdn.add("seelen", permissions=["storage", "decoder:s"], decoders=[{"name": "s", "opcode": "0D 90", "fields": []}])
     await host.install("seelen")
@@ -311,6 +322,18 @@ async def test_ausgeschaltet_bekommt_nichts(host, cdn):
     assert host.pending == [] and host.windows_to_restore() == []
     await host.call("plugin_set_enabled", {"id": "seelen", "enabled": True}, None)
     assert host.capture.sent[-1][1]["plugins"][0]["plugin"] == "seelen"
+
+
+async def test_modul_aus_schliesst_fenster_und_nimmt_die_decoder(host, cdn):
+    cdn.add("seelen", permissions=["storage", "decoder:s"], decoders=[{"name": "s", "opcode": "0D 90", "fields": []}])
+    await host.install("seelen")
+    host.capture.running = True
+    await host.deactivate()
+    assert not host.active and host.overlay_calls[-1] == {"action": "close", "id": "seelen"}
+    assert host.capture.sent[-1] == ("plugin_decoders", {"plugins": []})
+    await host._on_capture("hello", {})  # Mitschnitt startet neu: Plugins bleiben aus
+    assert host.capture.sent[-1] == ("plugin_decoders", {"plugins": []}) and not host._tasks
+    assert "seelen" in host.loaded  # installiert bleibt es
 
 
 async def test_widgets(host, cdn):
@@ -483,10 +506,15 @@ async def test_pet_soul_installiert_und_aktualisiert_sich_selbst(host, cdn):
     cdn.add("pet-souls", "1.1.0", permissions=["storage"])
     await host._install_builtin()
     assert host.loaded["pet-souls"].manifest["version"] == "1.1.0"
-    # Will es mehr dürfen, fragt niemand: bleibt auf der alten Version
+    # Will es mehr dürfen: bleibt auf der alten Version und erscheint zur Zustimmung im Meter
     cdn.add("pet-souls", "2.0.0", permissions=["storage", "screenshot"])
     await host._install_builtin()
     assert host.loaded["pet-souls"].manifest["version"] == "1.1.0"
+    assert [p["id"] for p in host.view()["plugins"]] == ["pet-souls"]
+    waiting = (await host.check_updates())["available"]
+    assert [(a["id"], a["newPermissions"]) for a in waiting] == [("pet-souls", ["screenshot"])]
+    await host.install("pet-souls")  # Zustimmung im Dialog
+    assert host.loaded["pet-souls"].manifest["version"] == "2.0.0" and host.view()["plugins"] == []
 
 
 async def test_pet_soul_steht_in_keiner_liste_und_bleibt_an(host, cdn):

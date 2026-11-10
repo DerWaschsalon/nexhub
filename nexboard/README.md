@@ -18,9 +18,9 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
   Eigene Werte kommen per `POST /api/state` dazu.
 - **Mehrere Seiten** mit Wischgesten, Hintergrund wählbar (Standard, Desktop-Hintergrund, eigenes Bild)
 - **AION 2:** DPS-Meter der Gruppe als eigene Seite, ein Overlay über dem Spiel (Meter, Boss-Leiste,
-  Event-Timer, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
-- **AION-2-Radar:** Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse und Vertraute
-  in der Web-UI (`radar/`), läuft im Daemon mit dem Spiel, alle Einstellungen in der Web-UI
+  Termine, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
+- **AION-2-Radar:** Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse unter
+  Termine in der Web-UI (`radar/`), läuft im Daemon mit dem Spiel, alle Einstellungen in der Web-UI
 - **Discord-Bot:** Gruppen-DPS und Run-Ergebnisse an einen Bot, der Meldungen mehrerer Spieler zusammenführt
 - **Verbindung** per WLAN, bei Bedarf per USB-Kabel als Rückfall
 - **Ruhemodus:** Ist 30 s lang kein PC verbunden (weder WLAN noch USB), blendet das Display aus und
@@ -108,17 +108,21 @@ Port im Heimnetz offen sein. Die Web-UI und `/api/*` antworten trotzdem nur auf 
 ## Web-UI und Module
 
 <http://localhost:8765> (nur von diesem PC aus erreichbar). Die Startseite ist ein Dashboard mit
-einer Karte je eingeschaltetem Modul; jedes Modul hat eine eigene Seite mit Tabs, thematisch
-gruppiert in der Seitenleiste (Geräte, Spiele, Community, System). Hell und dunkel folgen dem
-System oder lassen sich umschalten, die Seite passt sich auch an schmale Fenster an.
+einer Karte je eingeschaltetem Modul. Die Seitenleiste ordnet nach Situation: **Im Spiel**,
+**Leiste**, **Teilen**, **System**. Jede Einstellung steht genau an einem Ort; ein Modul kann mehrere
+Seiten haben (Radar: Warnungen, Radar & Karte). Hell und dunkel folgen dem System oder lassen sich
+umschalten, die Seite passt sich auch an schmale Fenster an.
 
-| Modul | Inhalt | braucht |
+| Modul | Seiten und Inhalt | braucht |
 |---|---|---|
-| Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte | – |
-| AION 2 · DPS-Mitschnitt | Live-Ansicht, Quelle, Sprache, Seitenwechsel im Kampf | – |
-| AION 2 · Overlay | Overlay-Programm steuern, Widgets, Event-Timer | DPS-Mitschnitt |
-| AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | DPS-Mitschnitt |
-| Discord-Bot | Gruppen-DPS und Run-API eines Bots | DPS-Mitschnitt |
+| AION 2 · Overlay | Overlay: Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
+| AION 2 · Radar | Warnungen (Aus · Nur Wichtiges · Alles, Einzelheiten unter „Erweitert“), Radar & Karte | Termine |
+| AION 2 · Termine | Termine: feste Termine der Server und eigene Ereignisse, Feldbosse des Radars | – |
+| AION 2 · Kampfdaten | Live-Ansicht, Quelle, Meter-Einstellungen öffnen | – |
+| AION 2 · Plugins | Plugins: installiert, Katalog, Updates mit Zustimmung, ein/aus, Fenster öffnen | Overlay |
+| Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte (mit „Im Kampf zur Seite“) | – |
+| AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | Kampfdaten |
+| Discord-Bot | Gruppen-DPS und Run-API eines Bots | Kampfdaten |
 | NexHub | Dieses NexBoard mit einem Konto im NexHub koppeln | – |
 | Updates | Stand von Repo und A2Tools-Kern, Aktualisieren | – |
 
@@ -199,8 +203,9 @@ die Online-Funktionen des Meters: kein Konto, keine Uploads, keine Update-Abfrag
 
    Mitschneiden braucht nur `cap_net_raw`, nicht root. Ein Neubau verliert die Rechte, deshalb
    immer mit `--install` bauen.
-2. In der Web-UI das Modul „AION 2 · DPS-Mitschnitt“ einschalten, unter Einstellungen als Quelle
-   „Eigener Mitschnitt“ wählen (Standard) und die Sprache für Boss- und Skillnamen.
+2. In der Web-UI das Modul „AION 2 · Kampfdaten“ einschalten und unter „Quelle und Meter“
+   „Eigener Mitschnitt“ wählen (Standard). Die Sprache der Boss- und Skillnamen ist die allgemeine
+   unter System → Einstellungen; sie gilt auch für Meter, Ansagen und Warnungen.
 3. Eine Seite mit der Kachel „AION 2 DPS-Meter“ anlegen. Spielerzahl (1–8) und Zusatzwert stehen
    in den Kachel-Eigenschaften.
 4. Optional „Bei Kampfbeginn zeigen“: Sobald neuer Schaden kommt, springt die Leiste auf diese
@@ -214,8 +219,11 @@ daneben in `hits/` jeder einzelne Treffer mit eigenem Schaden und Merkmalen (fü
 (`capture/patches/`) jeden Treffer; `capture/build.sh` wendet ihn an, `update.sh` nimmt ihn vor
 einem A2Tools-Update zurück. Passt er nach einem Update nicht mehr, bricht der Build mit Hinweis ab.
 
-`deckbar-capture` spricht Zeilen-JSON über stdin/stdout (Format in `capture/src/main.rs`) und lässt
-sich zum Testen auch allein starten. `--save-packets DIR` zeichnet den Mitschnitt auf,
+`deckbar-capture` spricht Zeilen-JSON über stdin/stdout (Überblick in `capture/src/main.rs`, Nachrichten in
+`out.rs`, Befehle in `commands.rs`) und lässt sich zum Testen auch allein starten. Auf stdout schreibt nur
+ein eigener Thread: Hängt der Daemon, ersetzen neue Zustände (DPS, Status) die wartenden, Ereignisse gehen
+bei voller Warteschlange verloren, und der Mitschnitt läuft weiter. Die volle DpsData für die
+Meter-Seiten kommt nur bei Änderung als eigene Zeile `dps_data`, die der Daemon ungeparst weiterreicht. `--save-packets DIR` zeichnet den Mitschnitt auf,
 `--replay packets_….txt [--realtime]` spielt ihn ohne Spiel wieder ab:
 
 ```sh
@@ -235,17 +243,17 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Kopf- oder Fußzeile, die Position bleibt gespeichert.
 - **Boss-Leiste:** HP des Ziels, Kampfzeit und Kill-Prognose aus dem HP-Verlauf, außerhalb von
   Kämpfen ausgeblendet.
-- **Event-Timer:** Countdown bis zum nächsten Start (Shugo-Festival, Spacetime Rift, Resets …),
-  Ereignisse frei einstellbar in der Web-UI.
+- **Termine:** Countdown bis zum nächsten Termin (Riss, Shugo-Fest, Resets … und eigene Ereignisse).
+  Dieselbe Liste wie auf der Seite „Termine“, gerechnet im Daemon aus `nexproto.termine`.
 - **PvP** (Daten vom Modul „AION 2 · Radar“): Kills und Tode der Sitzung live, dazu Assists,
   Abyss-Rangpunkte und Rang aus der Saisonwertung des Servers (rechnet etwa stündlich neu, daher
-  „Stand“). Neu beginnen: Web-UI → Radar → „PvP neu beginnen“. Details in `radar/README.md`.
+  „Stand“). Neu beginnen: Web-UI → Radar & Karte → „PvP neu beginnen“. Details in `radar/README.md`.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
 
 **Profile** legen fest, welche Widgets sichtbar sind (Standard: PvE und PvP). Wechsel in der
-Bearbeiten-Leiste, in der Web-UI (Overlay → Widgets → Profile) oder per `--profil NAME`; das aktive
+Bearbeiten-Leiste, in der Web-UI (Im Spiel → Overlay) oder per `--profil NAME`; das aktive
 Profil merkt sich jedes Ein- und Ausblenden. `--widget ID` blendet ein einzelnes Widget ein oder aus
-(meter, boss, timers, radar, warnung, karte, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
+(meter, boss, timers, radar, warnung, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
 also sofort. Der Daemon trägt je Profil und Widget eine Aktion in den Starter „NexBoard Overlay
 ein/aus“ ein; dort in den Systemeinstellungen (Kurzbefehle) eine Taste zuweisen.
 
@@ -289,12 +297,15 @@ kleinen Ersatz für Tauris JavaScript-API davor (`web/a2shim.js`). Daten-Befehle
 Einstellungen der Meter-Oberfläche liegen in `~/.config/deckbar/a2-settings.json`. Nicht dabei sind
 die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters.
 
-**A2Tools-Plugins** laufen ohne das Meter-Programm: In den Meter-Einstellungen unter „Plugins“
-installieren (signierter Katalog von cdn.a2tools.app, Ed25519, Zustimmung zu den Berechtigungen). Der
+**A2Tools-Plugins** laufen ohne das Meter-Programm: in der Web-UI unter Im Spiel → Plugins installieren
+(signierter Katalog von cdn.a2tools.app, Ed25519, Zustimmung zu den Berechtigungen; die Texte dazu kommen aus
+dem Meter). Die Plugin-Seite in den Meter-Einstellungen geht weiterhin. Das eigenständige A2Tools-Programm hat
+einen eigenen Plugin-Ordner, den die NexBoard nicht sieht. Ist das Modul aus, laufen keine Plugins und
+bekommen keine Spieldaten; installiert bleibt alles. Der
 Plugin-Host ist `daemon/deckbar_daemon/plugins.py`, ein Nachbau des Hosts aus dem Submodul; die Seiten
 kommen unverändert von dort. Hauptfenster sind normale Fenster des Overlay-Programms (damit die Tastatur
-geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefert
-`capture/src/plugins.rs`. Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
+geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefern
+`capture/src/decoders.rs` (Decoder je Opcode) und `capture/src/feed.rs` (Charakter, Feldboss-Karte …). Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
 in `plugin-data/` daneben. Plugins laufen, solange das Overlay läuft, also mit dem Spiel. Anders als im
 Meter: kein Dock, keine FPS-Anzeige (zählt nur unter Windows), keine Entwickler-Ordner, die Option
 „ausblenden“ wirkt nur über das Overlay selbst, Widgets nur mit layer-shell. Plugin-API bis Version 2;
@@ -467,7 +478,11 @@ Zusätzliche Icons trägt man in `tools/icons.txt` ein (Namen aus
 ```sh
 cd daemon && uv run python -m pytest -q
 cd radar && ../daemon/.venv/bin/python -m pytest -q tests   # mit Goldtest, siehe radar/README.md
+cd capture && ./build.sh && cargo test --release && cargo clippy --release -- -D warnings && cargo fmt --check
 ```
+
+Der Goldtest der Spur „capture“ nimmt das Programm aus `capture/target/release/`; nach Änderungen am
+Mitschnitt also erst `./build.sh`, dann den Goldtest.
 
 `daemon/tests/test_simulator.py` vergleicht jede Seite aus `daemon/tests/simulator_layout.yaml` mit den
 Referenzbildern in `simulator/reference/` (braucht den gebauten Simulator, sonst übersprungen). Sieht ein

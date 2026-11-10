@@ -19,6 +19,7 @@ FAKE = textwrap.dedent('''\
     out({"type": "dps", "view": {"target": "Boss", "mode": "bossTargets", "timeMs": 4000, "hp": 50.0,
          "targetId": 9, "boss": True,
          "rows": [{"id": 1, "name": "Alpha", "cls": "cleric", "dps": 10, "dmg": 40, "pct": 100.0, "you": True}]}})
+    print('{"type":"dps_data","data":{"localPlayerId":1,"map":{}}}', flush=True)  # wie out.rs
     for line in sys.stdin:
         cmd = json.loads(line)
         out({"type": "reply", "id": cmd["id"], "ok": cmd["cmd"] != "kaputt", "result": cmd["cmd"], "error": "nö"})
@@ -66,6 +67,12 @@ async def test_lebenszyklus(tmp_path, monkeypatch):
         pass
 
     cap = Capture(on_view, nothing, on_fights)
+    data = []
+
+    async def on_data(event, payload):
+        data.append((event, payload))
+
+    cap.data_listeners.append(on_data)
     cap.game_running = lambda: game["on"]
     job = asyncio.ensure_future(cap.run(fake_binary(tmp_path)))
     try:
@@ -75,6 +82,8 @@ async def test_lebenszyklus(tmp_path, monkeypatch):
         v, first = views[0]
         assert first and compact(v)["rows"][0]["name"] == "Alpha" and compact(v)["hp"] == 50.0
         assert cap.info()["port"] == 7777 and cap.info()["cap_net_raw"] is True
+        await _until(lambda: any(e == "dps_data" for e, _ in data))
+        assert ("dps_data", '{"localPlayerId":1,"map":{}}') in data  # als Text, ungeparst
 
         assert await cap.request("history") == "history"
         with pytest.raises(RuntimeError, match="nö"):

@@ -80,7 +80,6 @@ function fmtLeft(s) {
 }
 
 export default {
-  tabs: [{ id: "hub", label: "Verbindung", icon: "link-variant" }],
   status: () => ({ paired: "", pairing: "", offline: "bad" })[S.hub?.status] ?? "off",
   card() {
     const h = S.hub;
@@ -91,5 +90,5 @@ export default {
       el("span", { class: "faint", text: h.account ? `${h.account.device} · ${h.account.owner}` : (h.settings.url || "Keine Hub-Adresse") }),
       h.settings.upload ? el("span", { class: "faint", text: h.outbox ? `${h.outbox} im Postausgang` : (h.last_upload?.ok ? `Zuletzt hochgeladen ${fmtWhen(h.last_upload.at)}` : "Hochladen an") }) : null);
   },
-  render(tab, ctx) { return hubTab(ctx); },
+  pages: [{ id: "hub", render: (tab, ctx) => hubTab(ctx) }],
 };

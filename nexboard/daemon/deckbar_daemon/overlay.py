@@ -5,7 +5,7 @@ Das Programm (overlay/deckbar-overlay, Qt) legt unter Wayland eine durchsichtige
 Meter-Oberfläche). Die Seite holt hier:
 
     GET  /api/overlay/layout     Layout (OverlayLayout), PUT speichert (nach Ziehen im Bearbeiten-Modus)
-    GET  /api/overlay/events     Server-Sent Events: layout, dps (State dps + dps_active), radar
+    GET  /api/overlay/events     Server-Sent Events: layout, dps (State dps + dps_active), radar, schedule
 
 Die Web-UI (Port 8765) nutzt dieselben Daten über /api/overlay und schickt Befehle an das
 Programm (Bearbeiten, Sperren, Ein-/Ausblenden) über dessen Socket im Laufzeitordner.
@@ -19,12 +19,10 @@ import json
 import logging
 import os
 import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Awaitable, Callable, Literal
 
 from aiohttp import web
-from nexproto.termine import TERMINE
 from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
 
 from .capture import aion2_running
@@ -71,27 +69,6 @@ class BossWidget(Widget):
     hide_idle: bool = True  # außerhalb von Kämpfen ausblenden
 
 
-class TimerEvent(_Strict):
-    name: str = Field(min_length=1, max_length=40)
-    # Wiederholung und Start in Minuten; Start gezählt ab Montag 00:00 (Zeitzone tz),
-    # bei Wiederholungen unter einer Woche also einfach ab Mitternacht bzw. zur vollen Stunde
-    every: int = Field(60, ge=1, le=10080)
-    at: int = Field(0, ge=0, le=10079)
-    open: int = Field(0, ge=0, le=1440)  # so lange ist es „offen“ (0 = Zeitpunkt)
-    tz: Literal["local", "utc"] = "local"
-    enabled: bool = True
-
-
-def termin_event(name: str, reference: str, every: int, open_min: int) -> TimerEvent:
-    """Termin aus nexproto.termine als Timer: Beginn in Minuten ab Montag 00:00 UTC, auf den Takt gelegt."""
-    start = datetime.fromisoformat(reference)
-    at = (start.weekday() * 1440 + start.hour * 60 + start.minute) % every
-    return TimerEvent(name=name, every=every, at=at, open=open_min, tz="utc")
-
-
-DEFAULT_EVENTS = [termin_event(*t) for t in TERMINE]
-
-
 class RadarWidget(Widget):
     # Größe in CSS-Pixeln, zieht der Griff unten rechts; scale vergrößert zusätzlich alles darin
     width: int = Field(440, ge=300, le=2000)
@@ -100,23 +77,43 @@ class RadarWidget(Widget):
 
 class TimersWidget(Widget):
     enabled: bool = False
-    events: list[TimerEvent] = Field(default_factory=lambda: [e.model_copy() for e in DEFAULT_EVENTS],
-                                     max_length=24)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ereignisse_sind_jetzt_termine(cls, data: Any) -> Any:
+        """Die Ereignisliste lebt seit dem Umbau im Modul Termine (migrate.py zieht sie um)."""
+        if isinstance(data, dict) and "events" in data:
+            data = {k: v for k, v in data.items() if k != "events"}
+        return data
+
+
+def _from(module: str) -> dict[str, str]:
+    """Zu welchem Modul ein Widget gehört: die Web-UI zeigt es nur, solange das Modul an ist."""
+    return {"module": module}
+
+
+def _from_field(wid: str) -> str:
+    extra = Widgets.model_fields[wid].json_schema_extra
+    assert isinstance(extra, dict)
+    return str(extra["module"])
 
 
 class Widgets(_Strict):
-    # title: Name in den Tastenkürzeln (KDE-Starter)
-    meter: Widget = Field(default_factory=Widget, title="DPS-Meter")
-    boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste")
-    timers: TimersWidget = Field(default_factory=TimersWidget, title="Event-Timer")
+    # title: Name in der Web-UI und in den Tastenkürzeln (KDE-Starter)
+    meter: Widget = Field(default_factory=Widget, title="DPS-Meter", json_schema_extra=_from("aion2.dps"))
+    boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste", json_schema_extra=_from("aion2.dps"))
+    timers: TimersWidget = Field(default_factory=TimersWidget, title="Termine",
+                                 json_schema_extra=_from("aion2.schedule"))
     # Modul AION 2 · Radar: Karte, Vertraute und Würfel in einem Widget; die Warnungen zeigen sich nur bei einer
-    radar: RadarWidget = Field(default_factory=RadarWidget, title="Radar")
-    warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen")
-    pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP")
+    radar: RadarWidget = Field(default_factory=RadarWidget, title="Radar", json_schema_extra=_from("aion2.radar"))
+    warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen", json_schema_extra=_from("aion2.radar"))
+    pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP",
+                        json_schema_extra=_from("aion2.radar"))
 
 
 WIDGET_IDS = tuple(Widgets.model_fields)
 WIDGET_TITEL = {wid: Widgets.model_fields[wid].title for wid in WIDGET_IDS}
+WIDGET_MODULE = {wid: _from_field(wid) for wid in WIDGET_IDS}
 # Profil = welche Widgets sichtbar sind; die Positionen gelten für alle Profile
 ProfilName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{1,24}$")]  # auch Aktions-ID im Starter
 DEFAULT_PROFILE = {"PvE": ["meter", "boss", "timers", "radar", "warnung"], "PvP": ["meter", "pvp"]}
@@ -193,6 +190,7 @@ class Overlay:
         self.enabled = False
         self.clients: set[asyncio.Queue] = set()
         self.dps: dict[str, Any] = {"dps": None, "dps_active": False}
+        self.schedule: list[dict[str, Any]] = []  # sichtbare Termine (Modul Termine), fürs Widget
         self.unit: dict[str, Any] = {"installed": None, "active": None}
         # Läuft AION 2? Setzt der Daemon (nutzt den Blick des Mitschnitts, sonst eigener Scan)
         self.game_check: Callable[[], Awaitable[bool]] | None = None
@@ -262,7 +260,7 @@ class Overlay:
             _atomic_write(ziel, text)
 
     def info(self) -> dict:
-        return {"layout": self.layout.model_dump(), "widget_titel": WIDGET_TITEL,
+        return {"layout": self.layout.model_dump(), "widget_titel": WIDGET_TITEL, "widget_module": WIDGET_MODULE,
                 "unit": self.unit, "socket": socket_path().exists(),
                 "clients": len(self.clients), "screens": self.screens, "game": self.game}
 
@@ -290,6 +288,10 @@ class Overlay:
             await self.publish("dps", part)
         elif part:
             self.dps.update(part)
+
+    async def on_schedule(self, entries: list[dict[str, Any]]) -> None:
+        self.schedule = entries
+        await self.publish("schedule", entries)
 
     async def publish(self, event: str, payload: Any) -> None:
         text = f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
@@ -446,6 +448,7 @@ class Overlay:
         try:
             await resp.write(f"event: layout\ndata: {json.dumps(self.layout.model_dump())}\n\n".encode())
             await resp.write(f"event: dps\ndata: {json.dumps(self.dps, ensure_ascii=False)}\n\n".encode())
+            await resp.write(f"event: schedule\ndata: {json.dumps(self.schedule, ensure_ascii=False)}\n\n".encode())
             while True:
                 try:
                     text = await asyncio.wait_for(q.get(), 15)

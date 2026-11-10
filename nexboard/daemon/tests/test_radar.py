@@ -88,7 +88,8 @@ async def test_speichern_mischt_und_behaelt_fremde_schluessel(konfig):
     assert json.loads(konfig.read_text()) == {"x": 5, "karte_x": 9, "reichweite": 300, "ton": False}
 
 
-@pytest.mark.parametrize("patch", [{"quatsch": 1}, {"x": 10}, {"reichweite": "weit"}, {"ton": 1}, {"reichweite": True}])
+@pytest.mark.parametrize("patch", [{"quatsch": 1}, {"x": 10}, {"reichweite": "weit"}, {"ton": 1}, {"reichweite": True},
+                                   {"name": "X"}, {"sprache": "en"}])  # Name und Sprache: nur allgemein
 async def test_speichern_lehnt_falsches_ab(konfig, patch):
     r, _ = radar()
     konfig.write_text('{"reichweite": 50}')
@@ -141,24 +142,34 @@ async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel():
     assert not r.laeuft and gesendet[-1] == {"aktiv": False}
 
 
-async def test_neustart_liest_den_namen_neu(konfig):
+async def test_neuer_charaktername_startet_das_radar_neu(konfig):
     r, _ = radar(spiel_laeuft=spiel(lambda: True), abfrage_s=0.05)
     aufgabe = asyncio.create_task(r.watch())
     await warten_bis(lambda: r.laeuft)
     alt = r.dienst
-    konfig.write_text(json.dumps({"name": "Gamunex"}))
-    await r.befehl("neustart")
+    r.sync_profile("Gamunex", "de")
     assert r.dienst is not alt and alt.aufrufe[-1] == "stoppen" and r.dienst.name == "Gamunex"
+    neu = r.dienst
+    r.sync_profile("Gamunex", "fr")  # Ansagen gibt es nur deutsch und englisch: englisch, kein Neustart
+    assert r.dienst is neu and json.loads(konfig.read_text()) == {"name": "Gamunex", "sprache": "en"}
     aufgabe.cancel()
     with pytest.raises(asyncio.CancelledError):
         await aufgabe
 
 
-def test_uebersicht_ohne_laufendes_radar():
+async def test_voreinstellung_der_warnungen(konfig):
     r, _ = radar()
-    u = r.uebersicht()
-    assert [t["name"] for t in u["termine"]][:2] == ["Riss", "Shugo-Fest"]
-    assert u["vertraute"] and all("fehlen" in v for v in u["vertraute"])
+    assert r.info()["preset"] == "wichtig"  # Standardwerte des Radars
+    await r.speichern(modul.WARNING_PRESETS["alles"])
+    assert r.info()["preset"] == "alles"
+    assert modul.WARNING_PRESETS.keys() == {"aus", "wichtig", "alles"}
+    await r.speichern({"warn_an": False})
+    assert r.info()["preset"] == "aus"
+
+
+def test_feldbosse_und_karte_ohne_laufendes_radar():
+    r, _ = radar()
+    assert isinstance(r.field_bosses(), list)
     assert r.karte() == {"name": ""} and r.kartendatei("bild") is None
 
 

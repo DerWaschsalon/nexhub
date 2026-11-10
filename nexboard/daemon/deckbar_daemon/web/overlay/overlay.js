@@ -520,34 +520,28 @@ function renderBoss() {
   $("boss-ttk").innerHTML = text;
 }
 
-/* ================================================================ Event-Timer */
-/** Nächster Start bzw. Restzeit eines Ereignisses. `at` zählt in Minuten ab Montag 00:00 (tz). */
-function nextEvent(ev, nowMs) {
-  const offset = ev.tz === "utc" ? 0 : -new Date(nowMs).getTimezoneOffset();
-  const minutes = nowMs / 60000 + offset + 3 * 1440; // 0 = Montag 00:00 (1.1.1970 war ein Donnerstag)
-  const since = (((minutes - ev.at) % ev.every) + ev.every) % ev.every;
-  if (since < ev.open) return { open: true, left: (ev.open - since) * 60 };
-  return { open: false, left: (ev.every - since) * 60 };
-}
+/* ================================================================ Termine */
+// Sichtbare Termine vom Modul Termine (schedule.py): Name, Beginn und „offen bis“ in Sekunden seit 1970.
+// Gerechnet wird im Daemon; hier wird nur heruntergezählt. Die Liste kommt alle 10 s neu.
+let schedule = [];
 
 function renderTimers() {
   if (!layout || W.timers.hidden) return;
-  const now = Date.now();
+  const now = Date.now() / 1000;
   const list = $("timer-list");
-  const evs = (cfg("timers").events || []).filter((e) => e.enabled !== false);
-  if (!evs.length) {
-    list.innerHTML = '<div class="empty">Keine Ereignisse – in der Web-UI eintragen.</div>';
+  if (!schedule.length) {
+    list.innerHTML = '<div class="empty">Keine Termine – in der Web-UI unter Im Spiel → Termine.</div>';
     return;
   }
-  const rows = evs.map((ev) => ({ ev, n: nextEvent(ev, now) }))
-    .sort((a, b) => (b.n.open - a.n.open) || a.n.left - b.n.left);
-  list.replaceChildren(...rows.map(({ ev, n }) => {
+  list.replaceChildren(...schedule.map((t) => {
+    const open = t.open_until !== null;
+    const left = Math.max(0, (open ? t.open_until : t.start) - now);
     const row = document.createElement("div");
-    row.className = n.open ? "open" : n.left < 600 ? "soon" : "";
+    row.className = open ? "open" : left < 600 ? "soon" : "";
     const a = document.createElement("span");
-    a.textContent = ev.name;
+    a.textContent = t.name;
     const b = document.createElement("span");
-    b.textContent = n.open ? `offen · ${fmt(n.left)}` : fmt(n.left);
+    b.textContent = open ? `offen · ${fmt(left)}` : fmt(left);
     row.append(a, b);
     return row;
   }));
@@ -565,6 +559,7 @@ function connect() {
   es.addEventListener("layout", (e) => applyLayout(JSON.parse(e.data)));
   es.addEventListener("dps", (e) => onDps(JSON.parse(e.data)));
   es.addEventListener("radar", (e) => onRadar(JSON.parse(e.data)));
+  es.addEventListener("schedule", (e) => { schedule = JSON.parse(e.data); renderTimers(); });
   es.onopen = () => { clearTimeout(offlineTimer); $("offline").hidden = true; };
   es.onerror = () => {
     clearTimeout(offlineTimer);

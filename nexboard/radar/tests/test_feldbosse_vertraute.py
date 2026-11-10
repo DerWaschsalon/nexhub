@@ -83,7 +83,7 @@ class FeldbosseVertrauteTest(unittest.TestCase):
         self.assertEqual(self.z.vertraute["1002"], [2, 8])
 
 
-class RissUndSeelenTest(unittest.TestCase):
+class RissTest(unittest.TestCase):
     def test_riss_zeitplan(self):
         from datetime import datetime, timezone
         from radar.uebersicht import riss
@@ -93,12 +93,3 @@ class RissUndSeelenTest(unittest.TestCase):
         self.assertEqual(riss(zeit(3, 5)), (zeit(3, 0), True))   # 10 min offen
         self.assertEqual(riss(zeit(3, 11)), (zeit(6, 0), False))
         self.assertEqual(riss(zeit(22, 30))[0], zeit(21, 0) + 3 * 3600)  # 00:00 UTC am naechsten Tag
-
-    def test_fehlende_seelen(self):
-        from radar.uebersicht import fehlende_seelen
-        self.assertEqual(fehlende_seelen(0, 0), (5, 105))
-        self.assertEqual(fehlende_seelen(2, 47), (28, 28))
-        self.assertEqual(fehlende_seelen(3, 0), (0, 0))
-
-if __name__ == "__main__":
-    unittest.main()

@@ -1,5 +1,5 @@
 /* Modul Updates: Stand von Repo und A2Tools-Kern, Prüfen, Installieren. */
-import { fill, el, icon, api, S, on, button, chip, callout, card, toast, fmtWhen } from "../core.js";
+import { fill, el, api, S, on, button, chip, callout, card, toast, fmtWhen } from "../core.js";
 
 function summary(u) {
   const parts = [];
@@ -45,7 +45,6 @@ function updatesTab(ctx) {
 }
 
 export default {
-  tabs: [{ id: "updates", label: "Updates", icon: "update" }],
   status: () => (S.updates?.available ? "warn" : ""),
   card() {
     const u = S.updates;
@@ -53,5 +52,5 @@ export default {
       el("div", { class: "row wrap" }, u?.available ? chip("Update verfügbar", "info") : chip("aktuell", "ok")),
       el("span", { class: "faint", text: u?.available ? summary(u) : u?.checked_at ? `Geprüft ${fmtWhen(u.checked_at)}` : "Noch nicht geprüft." }));
   },
-  render(tab, ctx) { return updatesTab(ctx); },
+  pages: [{ id: "updates", render: (tab, ctx) => updatesTab(ctx) }],
 };

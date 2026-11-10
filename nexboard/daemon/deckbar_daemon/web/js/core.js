@@ -232,6 +232,13 @@ export function settingsRow(title, text, control) {
   return el("div", { class: "settings-row" }, el("div", { class: "txt" }, el("b", { text: title }), text ? el("span", { text }) : null), control);
 }
 
+/** Zugeklappter Abschnitt (z. B. „Erweitert“); view merkt sich über Neuzeichnen hinweg, ob er offen ist. */
+export function collapsible(label, view, ...kids) {
+  const box = el("details", { class: "advanced", open: !!view.open }, el("summary", { text: label }), ...kids);
+  box.addEventListener("toggle", () => { view.open = box.open; });
+  return box;
+}
+
 /** Segmente: items [{id, label, icon}], aktiv, onClick(id) */
 export function seg(items, active, onClick) {
   return el("div", { class: "seg", role: "tablist" }, items.map((t) =>

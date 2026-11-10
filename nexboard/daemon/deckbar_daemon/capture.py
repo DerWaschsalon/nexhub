@@ -33,6 +33,8 @@ STOP_AFTER_S = 30   # Spiel weg: so lange weiterlaufen lassen (Absturz mit Neust
 STOP_WAIT_S = 10    # nach geschlossener Eingabe, dann SIGTERM
 MAX_LINE = 4 * 1024 * 1024  # volle DpsData mit allen Skills
 PING_STEP_MS = 5
+# Zeile mit der vollen DpsData, genau so geschrieben von deckbar-capture (out.rs): nur den Inhalt herausschneiden
+DPS_DATA_PREFIX = b'{"type":"dps_data","data":'
 
 Phase = Literal["no_binary", "no_game", "starting", "running", "no_caps", "crashed"]
 
@@ -239,6 +241,10 @@ class Capture:
                 continue
             if not raw:
                 return
+            if raw.startswith(DPS_DATA_PREFIX):
+                # bis zu 100 KB: als Text weiter an die Meter-Seiten, ohne zu parsen (Format: out.rs)
+                await self._notify("dps_data", raw[len(DPS_DATA_PREFIX):].rstrip()[:-1].decode())
+                continue
             try:
                 msg = json.loads(raw)
             except ValueError:
@@ -249,8 +255,6 @@ class Capture:
             if t == "dps" and isinstance(msg.get("view"), dict):
                 await self.on_view(msg["view"], first)
                 first = False
-                if "data" in msg:
-                    await self._notify("dps", msg["data"])
             elif t == "status":
                 ping = msg.get("ping")
                 if ping != self.status.get("ping"):
@@ -267,6 +271,9 @@ class Capture:
                     self.status = {**msg, "ping": old.get("ping")}  # Bezugswert bleibt der zuletzt gezeigte
             elif t == "hello":
                 self.hello = msg
+                if "dps_data" not in (msg.get("features") or []):
+                    log.warning("%s ist veraltet, Meter-Daten und Boss-Effekte fehlen: capture/build.sh --install",
+                                BINARY)
                 if self.full:
                     asyncio.ensure_future(self._send_view())
                 if msg.get("cap_net_raw"):

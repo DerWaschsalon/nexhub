@@ -19,18 +19,18 @@ from nexcore.registry import CHANGED
 from nexcore.settings import MASK, SettingsStore, is_mask
 
 from . import __version__
+from .a2ui import A2Ui
 from .boss_effekte import BossEffekte
 from .bot import SETTINGS_FILE as bot_settings_file
 from .bot import DiscordBot
 from .capture import aion2_running, history_root
-from .config import Settings, save_settings
-from .config import config_dir as default_config_dir
+from .config import Settings, is_default_config, save_settings
 from .core.http import api_errors, local_only, ok, read_object
 from .core.live import LiveHub
+from .core.topics import LANGUAGE
 from .dps import SETTINGS_FILE as dps_settings_file
 from .dps import DpsFeed
 from .hub import Hub
-from .migrate import migrate
 from .modules import CATEGORIES
 from .modules.base import WebModule
 from .modules.bot import BotModule
@@ -38,14 +38,17 @@ from .modules.deck import DeckModule
 from .modules.dps import DpsModule
 from .modules.hub import HubModule
 from .modules.overlay import OverlayModule
+from .modules.plugins import PluginsModule
 from .modules.radar import RadarModule
 from .modules.runs import RunsModule
+from .modules.schedule import ScheduleModule
 from .modules.updates import UpdatesModule
 from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
 from .radar import Radar
 from .runs import SETTINGS_FILE as runs_settings_file
 from .runs import DungeonRuns, a2tools_dir
+from .schedule import Schedule
 from .state import State
 from .updates import Updates
 
@@ -63,12 +66,11 @@ class NexBoard:
         self.config_dir = config_dir
         self.restart_requested = False
         # Nur der Daemon mit der echten Konfiguration steuert den Overlay-Dienst (nicht Testinstanzen)
-        self.real_config = config_dir.resolve() == default_config_dir().resolve()
+        self.real_config = is_default_config(config_dir)
         self.bus = EventBus()
         ctx = Context(self.bus, Paths("deckbar"))
         self.live = LiveHub(self.bus)
         self.state = State()
-        migrate(config_dir)
         self._build_components()
         self.bar = DeckModule(ctx, self.live, lambda: self.settings, self.state, config_dir, WEB_DIR,
                               mdns and settings.mdns)
@@ -78,13 +80,17 @@ class NexBoard:
             self.bar,
             DpsModule(ctx, self.live, self.dps, self.state),
             OverlayModule(ctx, self.live, self.overlay, self.state),
+            PluginsModule(ctx, self.live, self.a2.plugins),
             RunsModule(ctx, self.live, self.runs, self.state),
+            ScheduleModule(ctx, self.live, Schedule(config_dir)),
             self.radar_module,
             BotModule(ctx, self.live, self.bot, self.runs),
             HubModule(ctx, self.live, self.hub),
             UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json")),
         ]
-        self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules)
+        # Plugins liefen bis zum eigenen Modul einfach mit dem Overlay: bei alten modules.yaml neu
+        self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules,
+                                introduced=frozenset({"aion2.plugins"}))
         self.bus.on(CHANGED, self._modules_changed)
         self.state.subscribe(self._state_changed)
         for key, provider in (("state", lambda: self.state.values), ("status", self.status),
@@ -94,7 +100,7 @@ class NexBoard:
     def _build_components(self) -> None:
         """Die Komponenten und ihre Verdrahtung untereinander; sie werden mit ihrem Bereich zerlegt."""
         c = self.config_dir
-        self.dps = DpsFeed(self.state, c, self._on_combat)
+        self.dps = DpsFeed(self.state, c, self._on_combat, language=lambda: self.settings.language)
         self.runs = DungeonRuns(c)
         self.runs.history_dir = self._history_dir
         own = lambda: self.dps.settings.source == "capture"  # noqa: E731
@@ -105,7 +111,7 @@ class NexBoard:
         self.runs.run_listeners.append(self.bot.on_run)
         self.hub = Hub(c)
         self.hub.history_dir = self._history_dir
-        self.hub.language = lambda: self.dps.settings.lang
+        self.hub.language = lambda: self.settings.language
         self.hub.capture_build = self._capture_build
         self.dps.fight_listeners.append(self.hub.on_fight)
         self.runs.run_listeners.append(self.hub.on_run)
@@ -113,6 +119,19 @@ class NexBoard:
         self.overlay.game_check = self._game_running
         self.radar = Radar(lambda stand: self.overlay.publish("radar", stand), spiel_laeuft=self._game_running)
         self.hub.deaths = self.radar.tode_zwischen
+        self._sync_radar()
+        # Oberfläche des A2Tools-Meters mit dem Plugin-Host (eigener Port, siehe __main__); Testinstanzen
+        # bekommen eigene Plugin-Ordner, damit sie die installierten Plugins nicht anfassen
+        self.a2 = A2Ui(self.dps.capture, c / "a2-settings.json", None if self.real_config else c / "a2")
+        self.a2.plugins.overlay = self.overlay.plugin_command
+        # eine Sprache für alles: die der allgemeinen Einstellungen (System → Allgemein)
+        self.a2.on_language = self.set_language
+        self.bus.on(LANGUAGE, self.a2.apply_language)
+
+    def _sync_radar(self) -> None:
+        """Name und Sprache ans Radar. Seine Datei liegt fest in ~/.config, Testinstanzen fassen sie nicht an."""
+        if self.real_config:
+            self.radar.sync_profile(self.settings.character_name, self.settings.language)
 
     def _initial_modules(self) -> set[str]:
         """Erster Start mit Modulen: was bisher eingerichtet war, bleibt an (Umstieg ohne Überraschung)."""
@@ -262,15 +281,25 @@ class NexBoard:
             if key == "token" and (not value or is_mask(value)):
                 continue
             merged[key] = value
-        settings = Settings.model_validate(merged)
+        restart = await self._apply_settings(Settings.model_validate(merged))
+        return ok(restart=restart, **self.settings_info())
+
+    async def set_language(self, language: str) -> None:
+        """Sprachwahl im A2Tools-Meter: dieselbe Einstellung wie in der Web-UI (System → Allgemein)."""
+        await self._apply_settings(Settings.model_validate({**self.settings.model_dump(), "language": language}))
+
+    async def _apply_settings(self, settings: Settings) -> list[str]:
+        """Speichern und übernehmen, was sofort wirken kann; zurück kommt, was erst nach einem Neustart wirkt."""
         save_settings(self.config_dir, settings)
         current, saved = self.settings.model_dump(), settings.model_dump()
         restart = [k for k in RESTART_FIELDS if saved[k] != current[k]]
-        # was sofort wirken kann, gleich übernehmen
         self.settings = settings.model_copy(update={k: current[k] for k in RESTART_FIELDS})
         self.bar.media.player = self.settings.player
+        self._sync_radar()
+        if saved["language"] != current["language"]:
+            await self.bus.emit(LANGUAGE, self.settings.language)
         await self.live.send({"type": "settings", "settings": self.settings_info()})
-        return ok(restart=restart, **self.settings_info())
+        return restart
 
     async def api_get_token(self, request: web.Request) -> web.Response:
         """Geräte-Token im Klartext (für die Firmware-Konfiguration), nur auf ausdrückliche Anfrage."""

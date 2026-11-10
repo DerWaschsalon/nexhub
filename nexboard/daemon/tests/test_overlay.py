@@ -6,13 +6,15 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from deckbar_daemon.overlay import DEFAULT_EVENTS, Overlay, OverlayLayout, merge
+from deckbar_daemon.overlay import WIDGET_MODULE, Overlay, OverlayLayout, merge
 
 
 def test_layout_defaults_and_validation():
     L = OverlayLayout()
     assert L.start_mode == "click" and L.widgets.meter.enabled and not L.widgets.timers.enabled
-    assert [e.name for e in L.widgets.timers.events] == [e.name for e in DEFAULT_EVENTS]
+    old = OverlayLayout.model_validate({"widgets": {"timers": {"enabled": True, "events": [{"name": "Riss"}]}}})
+    assert old.widgets.timers.enabled  # die Ereignisse führt jetzt das Modul Termine
+    assert WIDGET_MODULE["timers"] == "aion2.schedule" and WIDGET_MODULE["pvp"] == "aion2.radar"
     with pytest.raises(ValueError):
         OverlayLayout.model_validate({"widgets": {"meter": {"scale": 9}}})
     with pytest.raises(ValueError):
@@ -196,8 +198,8 @@ async def test_close_clients_beendet_offene_streams(tmp_path):
     o.add_routes(app)
     async with TestClient(TestServer(app)) as c:
         r = await c.get("/api/overlay/events")
-        await r.content.readuntil(b"\n\n")
-        await r.content.readuntil(b"\n\n")
+        for _ in ("layout", "dps", "schedule"):  # Begrüßung
+            await r.content.readuntil(b"\n\n")
         assert len(o.clients) == 1
         o.close_clients()
         assert await asyncio.wait_for(r.content.read(), 2) == b""  # Server hat beendet

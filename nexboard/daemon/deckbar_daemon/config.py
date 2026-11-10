@@ -127,8 +127,20 @@ class Layout(_Strict, device.Layout):
 
 
 # ------------------------------------------------------------------ Einstellungen
+# Sprachen des A2Tools-Kerns (Boss- und Skillnamen, Meter); Ansagen und Warnungen gibt es nur auf Deutsch und Englisch
+LANGUAGES = {"de": "Deutsch", "en": "English", "fr": "Français", "es": "Español", "pt": "Português", "ru": "Русский",
+             "ja": "日本語", "ko": "한국어", "zh-Hans": "简体中文", "zh-Hant": "繁體中文"}
+Language = Literal["de", "en", "es", "fr", "ja", "ko", "pt", "ru", "zh-Hans", "zh-Hant"]
+
+
 class Settings(_Strict):
     name: str = Field("NexBoard", title="Name", description="Erscheint auf den Geräten und im Netzwerk (mDNS)")
+    character_name: str = Field("", max_length=30, title="Charaktername",
+                                description="Macht die eigene Erkennung im Radar sicher („Todesmal – DU!“)")
+    language: Language = Field("en", title="Sprache",
+                               description="Boss- und Skillnamen, Meter, Ansagen und Warnungen. Ansagen gibt es nur "
+                                           "auf Deutsch und Englisch, sonst kommen sie auf Englisch.",
+                               json_schema_extra={"labels": LANGUAGES})
     player: str | None = Field(None, title="Medien-Player",
                                description="Für Media-Kacheln, z. B. spotify; leer = aktivster Player (playerctl)")
     update_check: bool = Field(True, title="Nach Updates sehen",
@@ -152,6 +164,11 @@ class Settings(_Strict):
 def config_dir() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
     return Path(os.environ.get("DECKBAR_CONFIG_DIR", Path(base) / "deckbar"))
+
+
+def is_default_config(directory: Path) -> bool:
+    """Die echte Konfiguration des Nutzers? Testinstanzen (--config-dir) fassen nichts außerhalb an."""
+    return directory.resolve() == config_dir().resolve()
 
 
 def _atomic_write(path: Path, text: str, mode: int = 0o644) -> None:

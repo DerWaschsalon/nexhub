@@ -25,8 +25,9 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
   AION 2 (NCSoft). Sie fallen nicht unter die GPL dieses Repos.
 - **Boss-Warnungen (Kromedes Gier):** Todesmal, Regen des Hasses, Vorhersage nach der Flächenphase,
   Zeitfenster für den nächsten Regen. Widget „Boss-Warnungen“ im Overlay, sichtbar nur während einer Warnung.
-  Auf der Seite „Radar“ Dungeon wählen, dann jede Warnung einzeln an/aus und mit/ohne Ton.
-  Dort auch die Sprache der Warnungen (Deutsch/Englisch).
+  Auf der Seite „Warnungen“ eine Voreinstellung wählen (Aus · Nur Wichtiges · Alles); unter „Erweitert“
+  Dungeon wählen, dann jede Warnung einzeln an/aus und mit/ohne Ton. Die Sprache der Warnungen
+  (Deutsch/Englisch) ist die allgemeine unter System → Einstellungen.
   Der Dungeon wird beim Betreten erkannt (Zonenwechsel `0x4002`), sonst am ersten Boss. Es warnen nur Regeln dieses Dungeons.
 - **Gruppe auf dem Radar:** Mitspieler als blaue Punkte mit Namen (Position etwa alle 2 s, also grob).
 - **Name des Ziels:** Warnungen nennen den markierten Spieler („Todesmal auf Testspieler“).
@@ -85,24 +86,25 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
   nach manchen Zonenwechseln, der Server rechnet etwa stündlich neu. Gezeigt wird der Zuwachs seit
   Spielstart bzw. „PvP neu beginnen“. Opcodes und Formate nach dem Desktop-Programm von questlog.gg,
   an eigenen Mitschnitten geprüft; PvP-Kills selbst sind noch nicht live geprüft.
-- **Feldbosse und Vertraute** (NexBoard-Seite „Radar“, Reiter „Feldbosse und Vertraute“): Respawn-Timer aller gesehenen
+- **Feldbosse** (NexBoard-Seite „Termine“): Respawn-Timer aller gesehenen
   Feldbosse (`0x9101`), Ansage 5 Minuten vorher und beim Respawn (nur aktuelle Karte), lebende Feldbosse
   als lila Raute auf dem Radar. Namen lernt das Radar, sobald ein Boss neben dem Platz erscheint.
-  Termine (Riss, Shugo-Fest, Beritra-Luftangriff, Wächterin Kaira, Tages- und Wochen-Reset) in Ortszeit,
-  gerechnet in UTC nach jackships/aion2-data. Ansage 5 Minuten vor dem Riss.
-  Vertraute (`0x9000`/`0x900D`/`0x9014`): 207 Vertraute mit Art (Cogni/Fera/Natura/Varian), Stufe, Seelen,
-  fehlenden Seelen bis zur nächsten Stufe (5/25/75) und den Monstern, die die Seele droppen (Katalog aus
-  aion2pettracker, GPL-3.0). Filter nach Stand und Art. Stand in `~/.local/share/aion2-radar/{feldbosse,vertraute}.json`.
+  Die festen Termine (Riss, Shugo-Fest, Beritra-Luftangriff, Wächterin Kaira, Tages- und Wochen-Reset)
+  zeigt das Modul Termine, gerechnet in UTC nach jackships/aion2-data (`nexproto.termine`). Ansage 5
+  Minuten vor dem Riss.
+  Stand in `~/.local/share/aion2-radar/feldbosse.json`. Die Vertraute-Tabelle ist gestrichen, das zeigt der
+  Pet Soul Tracker (Reiter „Vertraute“ im Radar-Widget); die Opcodes liest das Radar bis Schritt 7 des Umbaus noch mit.
 - **Lernmodus:** Beim Betreten eines Dungeons startet eine Aufnahme nach `~/.local/share/aion2-radar/mitschnitte/<Dungeon>-<Zeit>.pcap`,
-  beim Verlassen stoppt sie (Statuszeile „● REC“), jeder Lauf eine Datei. Abschaltbar auf der Seite „Radar“
-  („Dungeons automatisch aufnehmen“), dort auch von Hand starten und stoppen. Auswerten mit
+  beim Verlassen stoppt sie (Statuszeile „● REC“), jeder Lauf eine Datei. Standardmäßig aus; einschalten unter
+  Warnungen → Erweitert („Lernmodus: Dungeons aufnehmen“), dort auch von Hand starten und stoppen. Auswerten mit
   `python3 -m werkzeuge.lernen mitschnitte/<datei>.pcap`: pro Boss jeder Skill mit Vorlauf bis zum Treffer,
   Toden und dem Cast, der regelmäßig davor kommt.
 
-Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seite „Radar“). Ist es an, startet der Daemon das Radar
+Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seiten „Warnungen“ und „Radar & Karte“). Ist es an, startet der Daemon das Radar
 (`RadarDienst`), sobald AION 2 läuft, und beendet es 30 s nach Spielende. Den Stand schickt er etwa fünfmal pro
-Sekunde als Overlay-Ereignis `radar`, gezeichnet in `daemon/deckbar_daemon/web/overlay/radar.js`. Auf der Seite
-stehen alle Einstellungen, auch der Charaktername. Standardwerte und Warnungsliste stehen in
+Sekunde als Overlay-Ereignis `radar`, gezeichnet in `daemon/deckbar_daemon/web/overlay/radar.js`. Auf den Seiten
+stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den allgemeinen Einstellungen
+(der Daemon schreibt sie in die Datei des Radars). Standardwerte und Warnungsliste stehen in
 `radar/standard.json` und `radar/meldungen.json` (liest auch die Seite).
 
 | Datei | Inhalt |
@@ -114,7 +116,7 @@ stehen alle Einstellungen, auch der Charaktername. Standardwerte und Warnungslis
 | `radar/dienst.py` | RadarDienst: verbindet alles, Ton, Ansagen, Aufnahme, Stand fürs Overlay |
 | `radar/warnung.py` | Boss-Regeln, Warnungen, Ansagen |
 | `radar/konfig.py` | gemeinsame Einstellungen, Ton bei neuem Cube |
-| `radar/uebersicht.py` | Feldbosse, Termine und Vertraute für die Seite, Feldboss-Ansagen |
+| `radar/uebersicht.py` | Feldbosse für die Seite „Termine“, Feldboss- und Riss-Ansagen |
 | `radar/daten.py` | Namen (A2Tools, Vertraute), gespeicherte Zustände |
 | `radar/punkte.py` | Spawnpunkte, Eichung, Karten |
 | `werkzeuge/cubekarte.py`, `karten/` | Kartenbild, Cube-Fundorte und Teleporter von aion2hub |

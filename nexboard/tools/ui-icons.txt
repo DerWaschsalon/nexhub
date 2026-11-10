@@ -14,3 +14,4 @@ volume-high
 stop
 record
 restart
+bell bell-off bell-alert calendar-clock

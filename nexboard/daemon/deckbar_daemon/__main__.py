@@ -13,10 +13,11 @@ from pathlib import Path
 from aiohttp import web
 from pydantic import ValidationError
 
-from .a2ui import A2Ui
 from .app import NexBoard, build_app
-from .config import config_dir, load_settings
+from .config import config_dir, is_default_config, load_settings
 from .core.http import local_only
+from .migrate import migrate
+from .radar import SETTINGS_FILE as RADAR_SETTINGS
 
 log = logging.getLogger("deckbar")
 SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Standard: 60 s)
@@ -24,6 +25,8 @@ SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Stan
 
 async def serve(args: argparse.Namespace) -> NexBoard:
     cdir = args.config_dir or config_dir()
+    # erst umziehen, dann laden: der Umzug schreibt auch in config.yaml (Sprache, Charaktername)
+    migrate(cdir, RADAR_SETTINGS if is_default_config(cdir) else None)
     settings = load_settings(cdir)
     deck = NexBoard(settings, cdir, mdns=not args.no_mdns)
     app = build_app(deck)
@@ -33,9 +36,8 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     await web.TCPSite(runner, settings.host, settings.port).start()
     url = f"http://localhost:{settings.port}/"
     # Overlay-Seite und Oberfläche des A2Tools-Meters, eigener Port wegen ihrer absoluten Pfade
-    a2 = A2Ui(deck.dps.capture, cdir / "a2-settings.json")
-    a2.plugins.overlay = deck.overlay.plugin_command
-    a2.plugins.start()
+    a2 = deck.a2
+    await a2.apply_language(settings.language)
 
     @web.middleware
     async def overlay_on(request: web.Request, handler):

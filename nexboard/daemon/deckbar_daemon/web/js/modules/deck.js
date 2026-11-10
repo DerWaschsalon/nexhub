@@ -781,11 +781,6 @@ function devicesTab(ctx) {
 }
 
 export default {
-  tabs: [
-    { id: "editor", label: "Editor", icon: "view-dashboard-outline" },
-    { id: "design", label: "Design", icon: "palette" },
-    { id: "devices", label: "Geräte", icon: "tablet" },
-  ],
   status: () => (S.devices.length ? "" : "off"),
   card() {
     const devs = S.devices.length;
@@ -794,9 +789,17 @@ export default {
       el("div", { class: "metric" }, el("b", { text: String(devs) }), el("span", { text: devs === 1 ? "Gerät verbunden" : "Geräte verbunden" })),
       el("div", { class: "row wrap", style: "gap:6px" }, chip(`${pages} Seite${pages === 1 ? "" : "n"}`), S.state.track?.title ? chip(`♪ ${S.state.track.title}`, "info") : null));
   },
-  render(tab, ctx) {
-    if (tab === "design") return designTab(ctx);
-    if (tab === "devices") return devicesTab(ctx);
-    return editorTab(ctx);
-  },
+  pages: [{
+    id: "deck",
+    tabs: [
+      { id: "editor", label: "Editor", icon: "view-dashboard-outline" },
+      { id: "design", label: "Design", icon: "palette" },
+      { id: "devices", label: "Geräte", icon: "tablet" },
+    ],
+    render(tab, ctx) {
+      if (tab === "design") return designTab(ctx);
+      if (tab === "devices") return devicesTab(ctx);
+      return editorTab(ctx);
+    },
+  }],
 };

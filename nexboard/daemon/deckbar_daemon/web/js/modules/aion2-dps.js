@@ -1,5 +1,7 @@
-/* Modul AION 2 · DPS-Mitschnitt: Live-Ansicht und Einstellungen (Quelle, Sprache, Seitenwechsel). */
-import { fill, el, icon, S, on, chip, callout, card, fmtAmount, fmtTime, classColor, modOn } from "../core.js";
+/* Modul AION 2 · Kampfdaten: Live-Ansicht, Quelle und Status, Zugang zu den Meter-Einstellungen.
+   Die Sprache der Namen steht unter System → Einstellungen (gilt für alles). */
+import { fill, el, icon, S, on, button, chip, callout, card, settingsRow, fmtAmount, fmtTime, classColor, modOn } from "../core.js";
+import { cmd as overlayCommand } from "./aion2-overlay.js";
 import { moduleSettings } from "../form.js";
 
 const DOT = { connected: "ok", capturing: "ok", bad_key: "bad", no_caps: "bad", no_capture: "bad", off: "" };
@@ -69,17 +71,23 @@ function liveTab(ctx) {
   return box;
 }
 
+/** Meter-Einstellungen hat das A2Tools-Meter selbst; das Overlay öffnet sein Fenster. Plugins: eigene Seite. */
+function meterCard() {
+  const hint = modOn("aion2.overlay") ? "Öffnet das Fenster des A2Tools-Meters über dem Spiel (Overlay muss laufen)"
+    : "Braucht das Modul Overlay";
+  return card("Meter", "Plugins verwaltest du unter Im Spiel → Plugins", null,
+    settingsRow("Meter-Einstellungen", hint,
+      button("Öffnen", () => overlayCommand("settings"), "sm", "open-in-new", { disabled: !modOn("aion2.overlay") })));
+}
+
 function settingsTab(ctx) {
   return el("div", { class: "stack" },
-    moduleSettings(ctx, "aion2.dps", "Kampfdaten", null),
+    moduleSettings(ctx, "aion2.dps", "Quelle", null),
+    meterCard(),
     callout("info", "shield-check", el("span", {}, "Der Mitschnitt ist rein passiv: Er liest nur Netzwerkpakete mit (libpcap, Recht cap_net_raw), verändert nichts am Spiel und lädt nichts hoch.")));
 }
 
 export default {
-  tabs: [
-    { id: "live", label: "Live", icon: "chart-bar" },
-    { id: "settings", label: "Einstellungen", icon: "tune-variant" },
-  ],
   status: () => (S.dps ? ({ connected: "", capturing: "", no_game: "off", off: "off" }[S.dps.status] ?? "warn") : null),
   card() {
     const v = S.state.dps;
@@ -87,7 +95,12 @@ export default {
       el("div", { class: "row wrap" }, statusChip(S.dps), S.state.dps_active ? chip("im Kampf", "ok") : null),
       v?.rows?.length ? meter(v, 3) : el("span", { class: "faint", text: v?.target ? v.target : "Startet mit AION 2." }));
   },
-  render(tab, ctx) {
-    return tab === "settings" ? settingsTab(ctx) : liveTab(ctx);
-  },
+  pages: [{
+    id: "aion2.dps",
+    tabs: [
+      { id: "live", label: "Live", icon: "chart-bar" },
+      { id: "settings", label: "Quelle und Meter", icon: "tune-variant" },
+    ],
+    render: (tab, ctx) => (tab === "settings" ? settingsTab(ctx) : liveTab(ctx)),
+  }],
 };

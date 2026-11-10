@@ -1,0 +1,3 @@
+# Zeilenbreite wie im übrigen Repo (CLAUDE.md: Zeilen ≤ 120)
+max_width = 120
+use_small_heuristics = "Max"
