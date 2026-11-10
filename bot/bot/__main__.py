@@ -26,7 +26,7 @@ COGS = [
     "bot.cogs.tickets",
     "bot.cogs.control",
     "bot.cogs.aion_dedup",
-    "bot.cogs.aion_rangliste",
+    "bot.cogs.aion_ranking",
     "bot.cogs.bump",
     "bot.cogs.termintafel",
     "bot.cogs.stats",

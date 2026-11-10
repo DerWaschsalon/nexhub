@@ -41,7 +41,7 @@ from aiohttp import web
 from discord import app_commands
 from discord.ext import commands
 
-from ..aion_format import fmt_dps, fmt_time
+from ..aion_format import fmt_dps, fmt_time, records_text
 from ..aion_records import RunRecords, RunResult
 
 log = logging.getLogger(__name__)
@@ -196,7 +196,7 @@ def build_run_embed(
     e.add_field(name="Bosse", value=f"{run['bosses_killed']}/{run['bosses_total']} besiegt")
     e.add_field(name="Kampfzeit", value=fmt_time(run["fight_ms"]))
     if records:
-        e.add_field(name=RECORDS_FIELD, value=records.lines(), inline=False)
+        e.add_field(name=RECORDS_FIELD, value=records_text(records), inline=False)
     links = [hub_link(hub_url)] if hub_url else []
     if guild_id and bosses and public_url():
         links.append(f"[Bestenliste]({public_url()}/leaderboard/{guild_id})")
