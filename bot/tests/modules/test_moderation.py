@@ -103,3 +103,17 @@ def test_log_writes_events_and_skips_quiet_deletes() -> None:
         assert 42 not in module.quiet
 
     with_modules(check)
+
+
+def test_ticket_panel_custom_ids_roundtrip() -> None:
+    from bot.modules.moderation.tickets import KINDS, PANEL_PREFIX
+    from bot.modules.moderation.tickets.views import TicketPanelView
+
+    view = TicketPanelView()
+    ids = {item.custom_id or "" for item in view.children if isinstance(item, discord.ui.Button)}
+    assert ids == {f"{PANEL_PREFIX}{k}" for k in KINDS}
+    # Jede custom_id muss sich eindeutig auf eine bekannte Ticket-Art zurückführen lassen
+    for cid in ids:
+        assert cid[len(PANEL_PREFIX):] in KINDS
+
+

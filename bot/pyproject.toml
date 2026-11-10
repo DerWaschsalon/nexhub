@@ -18,3 +18,8 @@ mypy_path = ["../packages/nexcore", "../proto"]
 # bot/ und bot/cogs/ haben keine __init__.py (Namespace-Pakete)
 explicit_package_bases = true
 
+
+# Übergang: aus tests/test_bot.py herausgelöst, Typangaben folgen im nächsten Commit
+[[tool.mypy.overrides]]
+module = ["tests.modules.test_aion"]
+ignore_errors = true
