@@ -3,12 +3,16 @@ import asyncio
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import discord
 from aiohttp.test_utils import TestClient, TestServer
+from nexcore import EventBus, Paths
 
 from bot.cogs.control import Control
+from bot.core import BotContext
 from bot.db import Database
+from bot.modules.aion2.runs import RunPosts
 
 KEY = "k" * 32
 AUTH = {"Authorization": f"Bearer {KEY}"}
@@ -77,6 +81,8 @@ def run(test):
                                   get_cog=lambda name: None, cogs={}, user=None, latency=float("nan"),
                                   is_ready=lambda: True, dispatched=[])
             bot.dispatch = lambda event, *args: bot.dispatched.append((event, *args))
+            runs = RunPosts(BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock()))
+            bot.modules = SimpleNamespace(module=lambda mid: runs, pages=lambda: [])
             guild.bot = bot  # für Tests, die gemeldete Ereignisse prüfen
             cog = Control(bot)
             cog.key = KEY

@@ -19,9 +19,6 @@ log = logging.getLogger("bot")
 COGS = [
     "bot.cogs.settings",
     "bot.cogs.control",
-    "bot.cogs.aion_dedup",
-    "bot.cogs.aion_ranking",
-    "bot.cogs.termintafel",
     "bot.cogs.server",
 ]
 

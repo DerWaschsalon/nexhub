@@ -13,3 +13,6 @@ class ScheduleSettings(BaseModel):
         hint="Riss, Shugo-Fest, Beritra, Kaira und Resets, aktualisiert sich jede Minute. Leer schaltet sie ab.")
     termine_role: int | None = setting("role", "Rolle, die 5 Minuten vorher gepingt wird", group=GROUP,
                                        hint="Leer: nur die Tafel, kein Ping.")
+    # Zustand, keine Einstellung: die eigene Nachricht der Tafel und ihr Kanal
+    termine_message: int | None = None
+    termine_message_channel: int | None = None
