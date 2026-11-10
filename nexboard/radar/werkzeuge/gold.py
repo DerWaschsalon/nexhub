@@ -1,12 +1,13 @@
 """Goldtest: spielt die Radar-Mitschnitte (pcap) ab und schreibt jedes Ergebnis als JSON-Zeile.
 
-Zwei Spuren: „radar“ (jedes Ereignis des RadarDienstes) und „capture“ (Ausgabe und Kampfdateien
-von deckbar-capture, also die DPS-Kette). Der Umbau muss für jeden Mitschnitt dasselbe liefern wie
+Drei Spuren: „radar“ (jedes Ereignis des RadarDienstes), „capture“ (Ausgabe und Kampfdateien
+von deckbar-capture, also die DPS-Kette) und „runs“ (die Dungeon-Runs, die der Daemon aus diesen
+Kampfdateien bildet, mit Discord-Text und den Bildpunkten ihres Bildes). Der Umbau muss für jeden Mitschnitt dasselbe liefern wie
 der alte Code. Die Referenzen liegen neben den Mitschnitten, nicht im Repo: Sie enthalten Namen
 anderer Spieler.
 
 Aufruf (aus nexboard/radar, mit der .venv des Daemons):
-  python -m werkzeuge.gold --schreiben radar|capture   Referenzen der Spur neu schreiben
+  python -m werkzeuge.gold --schreiben radar|capture|runs   Referenzen der Spur neu schreiben
   python -m werkzeuge.gold datei.pcap                  Radar-Ereignisse auf stdout; nur mit leerem
                                                        HOME sinnvoll, siehe radar_isoliert()
 """
@@ -15,6 +16,8 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import gzip
+import hashlib
+import io
 import json
 import os
 import subprocess
@@ -143,19 +146,52 @@ def a2tools_mitschnitt(pcap: Path, ziel: Path) -> None:
             strom(fluss).segment(seq, flags, daten)
 
 
+def capture_lauf(pcap: Path, ordner: Path) -> list[dict]:
+    """Den Mitschnitt durch deckbar-capture schicken; Kampfdateien landen in `ordner`. Zurück: jede Nachricht."""
+    text = ordner.parent / "packets.txt"
+    a2tools_mitschnitt(pcap, text)
+    lauf = subprocess.run([str(CAPTURE), "--replay", str(text), "--history-dir", str(ordner)],
+                          capture_output=True, text=True, check=True)
+    return [json.loads(z) for z in lauf.stdout.splitlines()]
+
+
 def capture_ausgabe(pcap: Path) -> list[str]:
-    """Den Mitschnitt durch deckbar-capture schicken: jede Zeile auf stdout außer dem Gruß (enthält
-    Pfade), danach jede geschriebene Datei (Kämpfe und Treffer, daraus baut der Daemon die Runs)."""
+    """Jede Zeile auf stdout außer dem Gruß (enthält Pfade), danach jede geschriebene Datei (Kämpfe und
+    Treffer, daraus baut der Daemon die Runs)."""
     with tempfile.TemporaryDirectory() as tmp:
         ordner = Path(tmp) / "aion2"
-        text = Path(tmp) / "packets.txt"
-        a2tools_mitschnitt(pcap, text)
-        lauf = subprocess.run([str(CAPTURE), "--replay", str(text), "--history-dir", str(ordner)],
-                              capture_output=True, text=True, check=True)
-        nachrichten = [json.loads(z) for z in lauf.stdout.splitlines()]
-        zeilen = [geordnet(n) for n in nachrichten if n["type"] != "hello"]
+        zeilen = [geordnet(n) for n in capture_lauf(pcap, ordner) if n["type"] != "hello"]
         for datei in sorted(ordner.rglob("*.json")):
             zeilen.append(geordnet({"datei": str(datei.relative_to(ordner)), "inhalt": json.loads(datei.read_text())}))
+    return zeilen
+
+
+def run_bilder(pcap: Path) -> list[str]:
+    """Die Runs, die der Daemon aus den Kampfdateien des Mitschnitts bildet: je Run Bosse, Discord-Text und
+    die Bildpunkte des Run-Bildes (verglichen wird das entpackte Bild, nicht die WebP-Datei). Mit
+    RUN_BILDER=<Ordner> landen die Bilder zum Ansehen dort."""
+    from deckbar_daemon import runs  # das Daemon-Paket, gleiche .venv
+    from PIL import Image
+    with tempfile.TemporaryDirectory() as tmp:
+        ordner = Path(tmp) / "aion2"
+        capture_lauf(pcap, ordner)
+        kaempfe = [runs.load_fight(p) for p in sorted((ordner / "history").glob("*.json"))]
+    tracker = runs.RunTracker(runs.RunSettings().idle_minutes * 60_000)
+    fertig = []
+    for kampf in sorted((k for k in kaempfe if k), key=lambda k: k.start_ms):
+        fertig += tracker.add(kampf)
+    fertig += tracker.check_idle(2**62)
+    zeilen = []
+    for nummer, run in enumerate(fertig):
+        bild = runs.render_run(run)
+        if os.environ.get("RUN_BILDER"):
+            ziel = Path(os.environ["RUN_BILDER"]) / f"{pcap.stem}-{nummer}.webp"
+            ziel.parent.mkdir(parents=True, exist_ok=True)
+            ziel.write_bytes(bild)
+        punkte = Image.open(io.BytesIO(bild)).convert("RGBA")
+        zeilen.append(geordnet({"text": runs.run_message(run), "komplett": run.complete, "groesse": punkte.size,
+                                "bosse": [[b.name, b.attempts, b.killed, b.total] for b in run.bosses()],
+                                "bildpunkte": hashlib.sha256(punkte.tobytes()).hexdigest()}))
     return zeilen
 
 
@@ -183,7 +219,7 @@ def radar_isoliert(pcap: Path) -> list[str]:
 
 
 # Spur -> Abspielen; jede Spur hat eigene Referenzen unter GOLD/<spur>/
-SPUREN = {"radar": radar_isoliert, "capture": capture_ausgabe}
+SPUREN = {"radar": radar_isoliert, "capture": capture_ausgabe, "runs": run_bilder}
 
 
 def referenz(spur: str, pcap: Path) -> Path:
@@ -206,7 +242,7 @@ def schreiben(spur: str) -> None:
     (GOLD / spur).mkdir(parents=True, exist_ok=True)
     for pcap, zeilen in zip(pcaps, alle(spur, pcaps)):
         with gzip.open(referenz(spur, pcap), "wt", encoding="utf-8") as f:
-            f.write("\n".join(zeilen) + "\n")
+            f.write("".join(z + "\n" for z in zeilen))  # ohne Zeilen eine leere Datei, nicht eine leere Zeile
         print(f"{spur} {pcap.name}: {len(zeilen)} Zeilen", flush=True)
 
 

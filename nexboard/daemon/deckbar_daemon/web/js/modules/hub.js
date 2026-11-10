@@ -3,6 +3,7 @@ import { fill, el, api, S, on, button, chip, callout, card, settingsRow, sw, sav
 import { moduleSettings } from "../form.js";
 
 const PRIVACY = "Hochgeladene Runs enthalten die Charakternamen, Klassen und Ausrüstungswerte deiner Mitspieler und jeden einzelnen Treffer. Sie sind im Hub für alle freigeschalteten Mitglieder sichtbar. Sprich das mit deiner Gruppe ab.";
+const DISCORD_PRIVACY = "Der Post zeigt Namen, Klassen und Schaden deiner Mitspieler im Discord-Kanal des Hubs. Sprich das mit deiner Gruppe ab.";
 
 const STATUS = {
   unpaired: ["nicht gekoppelt", ""],
@@ -60,9 +61,15 @@ function hubTab(ctx) {
       if (v && !confirm(`Runs hochladen?\n\n${PRIVACY}`)) { draw(); return; }
       save({ upload: v });
     };
-    return card("Runs hochladen", "Nach jedem Dungeon-Run automatisch in den Hub", st.upload && h.status === "paired" ? chip("an", "ok") : chip("aus"),
+    const discord = (v) => {
+      if (v && !confirm(`Runs in Discord posten?\n\n${DISCORD_PRIVACY}`)) { draw(); return; }
+      save({ discord: v });
+    };
+    return card("Runs teilen", "Nach jedem Dungeon-Run automatisch in den Hub und auf Wunsch nach Discord", st.upload && h.status === "paired" ? chip("an", "ok") : chip("aus"),
       !modOn("aion2.runs") ? callout("info", "information-outline", el("span", {}, "Braucht das Modul „AION 2 · Dungeon-Runs“ (es erkennt, wann ein Run vorbei ist)."), button("Einschalten", () => setModule("aion2.runs", true).catch((e) => toast(e.message, true)), "sm primary")) : null,
       settingsRow("Hochladen", h.status === "paired" ? "Fertige Runs mit allen Treffern an den Hub schicken" : "Erst koppeln", sw(st.upload, toggle, { disabled: h.status !== "paired" && !st.upload })),
+      settingsRow("In Discord posten", "Über den Bot des Hubs in dessen Discord-Kanal, mit Link zum Run im Hub",
+        sw(st.discord, discord, { disabled: !st.upload && !st.discord })),
       settingsRow("Postausgang", h.outbox ? `${h.outbox} Run${h.outbox === 1 ? "" : "s"} warten auf den Hub` : "leer", null),
       el("p", { class: "hint small", style: "margin-top:10px" },
         last ? el("span", { style: `color:${last.ok ? "var(--ok)" : "var(--bad)"}` }, `${fmtWhen(last.at)} · ${last.text} `) : el("span", { class: "faint", text: "Noch nichts hochgeladen." }),

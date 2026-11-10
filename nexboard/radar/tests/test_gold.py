@@ -17,6 +17,12 @@ class GoldTest(unittest.TestCase):
             self.skipTest("deckbar-capture ist nicht gebaut (cargo build --release in capture/)")
         self.spur_pruefen("capture")
 
+    def test_runs(self):
+        """Run-Bilder aus den Referenz-Runs gleich (Fertig-Kriterium von Umbauschritt 6)."""
+        if not CAPTURE.exists():
+            self.skipTest("deckbar-capture ist nicht gebaut (cargo build --release in capture/)")
+        self.spur_pruefen("runs")
+
     def spur_pruefen(self, spur: str) -> None:
         pcaps = [p for p in sorted(MITSCHNITTE.glob("*.pcap")) if referenz(spur, p).exists()]
         if not pcaps:
