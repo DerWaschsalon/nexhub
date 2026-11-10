@@ -609,9 +609,14 @@ def test_every_panel_page_fits_discord_limits():
     5 Knöpfe) und stabile custom_ids haben, in beiden Verifizierungs-Zuständen."""
     from pathlib import Path
 
-    from bot.cogs.settings import EXTRAS, SettingsPanel, VerifyView
+    from nexcore import EventBus, Paths
+
+    from bot.cogs.settings import EXTRAS, SettingsPanel
+    from bot.core import BotContext
     from bot.db import Database
     from bot.forms import SECTIONS
+    from bot.modules.server.verification import Verification
+    from bot.modules.server.verification.panel import Flow
     from bot.panel import FieldPage
 
     cog = type("FakeCog", (), {})()
@@ -631,9 +636,10 @@ def test_every_panel_page_fits_discord_limits():
             assert all(item.custom_id for item in page.children), (section.id, group)
             assert page.embed().title
 
+    verification = Verification(BotContext(bus=EventBus(), paths=Paths("test"), db=cog.db, client=MagicMock()))
     for active in (True, False):
         cog.db._settings[1] = {"verify_active": "1" if active else "0"}
-        view = VerifyView(panel)
+        view = Flow(verification, guild, True, back).menu()
         assert all(item.custom_id for item in view.children)
 
 
