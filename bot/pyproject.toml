@@ -35,6 +35,8 @@ files = [
     "bot/aion_records.py",
     "bot/cogs/aion_ranking.py",
     "bot/core",
+    "bot/forms.py",
+    "bot/panel.py",
     "bot/modules",
     "tests/core",
     "tests/modules",

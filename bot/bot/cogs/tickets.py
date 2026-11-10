@@ -1,6 +1,6 @@
 """Tickets: Panel mit Buttons (Frage, Meldung, Bewerbung) → privater Thread mit Team-Rolle.
 
-Team-Rolle wird mit `/setup tickets` festgelegt (oder im Klick-Panel), das Panel selbst mit
+Team-Rolle wird im Klick-Panel festgelegt (`/setup panel`), das Panel selbst mit
 `/ticket-panel` in den gewünschten Support-Kanal gepostet. Die Buttons im Panel und der
 „Schließen“-Button im Thread sind wie bei `/rollen-panel` über feste `custom_id`s + einen
 `on_interaction`-Listener verdrahtet, überleben also Neustarts ohne `bot.add_view`.
@@ -74,7 +74,7 @@ class Tickets(commands.Cog):
         roles = team_roles(self.db, guild)
         if not roles:
             return await interaction.response.send_message(
-                "Noch keine Team-Rolle für Tickets eingerichtet (`/setup tickets`).", ephemeral=True
+                "Noch keine Team-Rolle für Tickets eingerichtet (`/setup panel` → Tickets).", ephemeral=True
             )
         if not channel.permissions_for(guild.me).create_private_threads:
             return await interaction.response.send_message(
@@ -174,7 +174,7 @@ class Tickets(commands.Cog):
         text: str = "Klick auf einen Button, um ein Ticket zu eröffnen.",
     ):
         if not team_roles(self.db, interaction.guild):
-            raise UserError("Erst eine Team-Rolle einrichten: `/setup tickets rolle:`.")
+            raise UserError("Erst eine Team-Rolle einrichten: `/setup panel` → Tickets.")
         e = discord.Embed(title=titel, description=text.replace("\\n", "\n"), colour=discord.Colour.blurple())
         e.add_field(name="Optionen", value="\n".join(f"{emoji} {label}" for emoji, label, _ in KINDS.values()))
         await interaction.channel.send(embed=e, view=TicketPanelView())

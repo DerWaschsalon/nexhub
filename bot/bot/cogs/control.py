@@ -26,7 +26,6 @@ import os
 import re
 import time
 import urllib.parse
-from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 import discord
@@ -35,6 +34,7 @@ from discord.ext import commands
 
 from .. import hubpages
 from ..errors import UserError
+from ..forms import SECTIONS, Section, convert_field, parse_id, read_field, save_values
 from ..hubpages import ApiError, Ctx, Field, Form, Page
 
 log = logging.getLogger(__name__)
@@ -47,76 +47,6 @@ VOICE_TYPES = hubpages.VOICE_TYPES
 
 
 # ---- Formular-Bereiche ---------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class Section:
-    id: str
-    title: str
-    description: str = ""
-    fields: tuple[Field, ...] = ()
-    # Hinweise unter dem Formular, die nur in Discord gehen
-    note: str = ""
-    # Aktionen als Knopf (id → Beschriftung); Ausführung in Control.ACTIONS
-    actions: dict[str, str] = field(default_factory=dict)
-
-
-SECTIONS: dict[str, Section] = {s.id: s for s in [
-    Section("allgemein", "Allgemein", "Moderation, Begrüßung, Musik und Sprachkanäle.", (
-        Field("log_channel", "channel", "Log-Kanal", "Moderation",
-              "Gelöschte/bearbeitete Nachrichten, Beitritte, Bans, …"),
-        Field("antispam", "bool", "Spamschutz aktiv", "Moderation", default=True),
-        Field("allow_invites", "bool", "Einladungslinks erlauben", "Moderation"),
-        Field("welcome_channel", "channel", "Willkommenskanal", "Willkommen"),
-        Field("welcome_text", "textarea", "Begrüßungstext", "Willkommen",
-              "Platzhalter: {user} {name} {server} {anzahl}"),
-        Field("autorole", "role", "Autorolle", "Willkommen", "Wird sofort beim Beitritt vergeben, z. B. „Neuling“."),
-        Field("dj_role", "role", "DJ-Rolle", "Musik & Voice", "Leer: alle dürfen die Musik steuern."),
-        Field("tempvoice_hub", "voice", "Temp-Voice-Kanal", "Musik & Voice",
-              "Neu anlegen geht genauer per /setup temp-voice in Discord."),
-    )),
-    Section("automod", "Automod", "Jeder Verstoß zählt zusätzlich als Verwarnung durch den Bot.", (
-        Field("automod_banned_words", "textarea", "Verbotene Wörter", "Wortfilter & Links", "Durch Komma getrennt."),
-        Field("automod_link_filter", "bool", "Nur Links zu erlaubten Domains zulassen", "Wortfilter & Links"),
-        Field("automod_allowed_domains", "textarea", "Erlaubte Domains", "Wortfilter & Links", "Durch Komma getrennt."),
-        Field("automod_caps", "bool", "Nachrichten mit zu vielen Großbuchstaben entfernen", "Großbuchstaben & Emojis"),
-        Field("automod_emoji_limit", "int", "Emoji-Grenze pro Nachricht", "Großbuchstaben & Emojis",
-              "0 = aus", default=0, min=0, zero_is_off=True),
-    )),
-    Section("verwarnungen", "Verwarnungen", "Automatische Strafe ab einer Anzahl Verwarnungen.", (
-        Field("warn_threshold", "int", "Schwelle", hint="0 = aus", default=0, min=0, zero_is_off=True),
-        Field("warn_action", "choice", "Aktion", default="timeout", options=("timeout", "kick", "ban")),
-    ), note="Einzelne Verwarnungen laufen über /warn, /warnungen und /warnung-loeschen in Discord."),
-    Section("tickets", "Tickets", "Wer neue Tickets sieht und sie schließen darf.", (
-        Field("ticket_team_roles", "roles", "Team-Rollen"),
-    ), note="Das Panel postet /ticket-panel in Discord."),
-    Section("community", "Community", "Zähler, Starboard, Geburtstage und Bump-Erinnerung.", (
-        Field("member_count_channel", "voice", "Mitglieder-Zähler", "Statistik-Kanäle"),
-        Field("bots_count_channel", "voice", "Bots-Zähler", "Statistik-Kanäle"),
-        Field("starboard_channel", "channel", "Highlight-Kanal", "Starboard"),
-        Field("starboard_threshold", "int", "Schwelle (Sterne, ohne den des Autors)", "Starboard", default=3, min=1),
-        Field("birthday_channel", "channel", "Kanal für die Gratulation um 9 Uhr", "Geburtstage",
-              "Mitglieder tragen ihren Geburtstag per /geburtstag-setzen ein."),
-        Field("bump_channel", "channel", "Kanal, in dem ihr /bump nutzt", "Bump-Erinnerung (Disboard)"),
-        Field("bump_role", "role", "Rolle, die gepingt wird", "Bump-Erinnerung (Disboard)"),
-    )),
-    Section("level", "Levelsystem", "XP für Nachrichten und Sprachzeit.", (
-        Field("level_system_enabled", "bool", "Levelsystem an", "Grundeinstellungen"),
-        Field("level_announce_channel", "channel", "Kanal für Level-Up-Nachrichten", "Grundeinstellungen",
-              "Leer: im Kanal der Nachricht."),
-        Field("voice_xp_per_minute", "int", "XP pro Minute Sprachzeit", "Grundeinstellungen", "0 = aus",
-              default=0, min=0, zero_is_off=True),
-        Field("level_no_xp_channels", "channels", "Kanäle ohne XP", "Ausnahmen"),
-        Field("level_no_xp_roles", "roles", "Rollen ohne XP", "Ausnahmen"),
-    )),
-    Section("aion", "AION 2", "Runs aus dem NexBoard (ein Post je Lauf mit Rangliste und Link in den NexHub) "
-            "und die Termin-Tafel.", (
-        Field("aion_channel", "channel", "Ziel-Kanal", hint="Leer schaltet die Posts ab."),
-        Field("termine_channel", "channel", "Kanal für die Termin-Tafel", "Termin-Tafel",
-              hint="Riss, Shugo-Fest, Beritra, Kaira und Resets, aktualisiert sich jede Minute. Leer schaltet sie ab."),
-        Field("termine_role", "role", "Rolle, die 5 Minuten vorher gepingt wird", "Termin-Tafel",
-              hint="Leer: nur die Tafel, kein Ping."),
-    ), actions={"token": "Neuen Token erzeugen (der alte wird ungültig)"}),
-]}
 
 # Seiten, die nicht von einem Cog kommen: Formular-Bereiche oben und eigene Seiten im Hub
 # (routes/hub/admin/bot/<id>). Alles andere liefern die Cogs per hub_pages() (siehe hubpages.py).
@@ -135,71 +65,6 @@ CORE_PAGES: tuple[Page, ...] = (
     Page("automod", "Automod", "Moderation", (Form("automod"),), SECTIONS["automod"].description, order=40),
     Page("aion", "AION 2", "Spiele", (Form("aion"),), SECTIONS["aion"].description, order=10),
 )
-
-
-def read_field(db, guild_id: int, f: Field) -> Any:
-    if f.kind in ("channel", "voice", "role", "text", "textarea", "choice"):
-        return db.get(guild_id, f.key, f.default if f.kind == "choice" else None) or (
-            "" if f.kind in ("text", "textarea") else None)
-    if f.kind in ("channels", "roles"):
-        return [str(i) for i in db.get_ids(guild_id, f.key)]
-    if f.kind == "bool":
-        return db.get_bool(guild_id, f.key, bool(f.default))
-    if f.kind == "int":
-        value = db.get_int(guild_id, f.key)
-        return f.default if value is None else value
-    raise ValueError(f.kind)
-
-
-def _id(value: Any, label: str) -> int | None:
-    if value in (None, ""):
-        return None
-    if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
-        return int(value)
-    raise ApiError(400, f"{label}: ungültige ID")
-
-
-def convert_field(guild, f: Field, value: Any) -> str | int | bool | None:
-    """Wert aus dem Hub prüfen und in die Form bringen, die `db.set` speichert (None löscht)."""
-    if f.kind in ("channel", "voice"):
-        cid = _id(value, f.label)
-        if cid is not None:
-            ch = guild.get_channel(cid)
-            if ch is None or ch.type not in (VOICE_TYPES if f.kind == "voice" else TEXT_TYPES):
-                raise ApiError(400, f"{f.label}: Kanal gibt es nicht")
-        return cid
-    if f.kind == "role":
-        rid = _id(value, f.label)
-        if rid is not None and guild.get_role(rid) is None:
-            raise ApiError(400, f"{f.label}: Rolle gibt es nicht")
-        return rid
-    if f.kind in ("channels", "roles"):
-        if not isinstance(value, list):
-            raise ApiError(400, f"{f.label}: Liste erwartet")
-        ids = [_id(v, f.label) for v in value]
-        lookup = guild.get_channel if f.kind == "channels" else guild.get_role
-        if any(i is None or lookup(i) is None for i in ids):
-            raise ApiError(400, f"{f.label}: unbekannter Eintrag")
-        return ",".join(str(i) for i in dict.fromkeys(ids)) or None
-    if f.kind == "bool":
-        if not isinstance(value, bool):
-            raise ApiError(400, f"{f.label}: ja/nein erwartet")
-        return value
-    if f.kind == "int":
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise ApiError(400, f"{f.label}: Zahl erwartet")
-        if f.min is not None and value < f.min:
-            raise ApiError(400, f"{f.label}: mindestens {f.min}")
-        return None if f.zero_is_off and value == 0 else value
-    if f.kind in ("text", "textarea"):
-        if not isinstance(value, str):
-            raise ApiError(400, f"{f.label}: Text erwartet")
-        return value.strip()[:4000] or None
-    if f.kind == "choice":
-        if value not in dict(f.choices()):
-            raise ApiError(400, f"{f.label}: nur {', '.join(dict(f.choices()))}")
-        return value
-    raise ValueError(f.kind)
 
 
 # ---- Server-Daten für Auswahllisten ----------------------------------------------------------
@@ -453,18 +318,7 @@ class Control(commands.Cog):
         values = (await self.body(request)).get("values")
         if not isinstance(values, dict):
             raise ApiError(400, "values fehlt")
-        by_key = {f.key: f for f in s.fields}
-        unknown = set(values) - set(by_key)
-        if unknown:
-            raise ApiError(400, f"Unbekannte Felder: {', '.join(sorted(unknown))}")
-        # Erst alles prüfen, dann speichern: ein ungültiges Feld lässt den Bereich unverändert
-        converted = {k: convert_field(guild, by_key[k], v) for k, v in values.items()}
-        for key, value in converted.items():
-            await self.db.set(guild.id, key, value)
-        if s.id == "verwarnungen" and self.db.get_int(guild.id, "warn_threshold") is None:
-            await self.db.set(guild.id, "warn_action", None)
-        if s.id == "community" and (stats := self.bot.get_cog("Stats")):
-            await stats.update_guild(guild)
+        await save_values(self.bot, self.db, guild, s, values)
         return self.section_out(guild, s)
 
     async def section_action(self, request: web.Request) -> dict:
@@ -534,7 +388,7 @@ class Control(commands.Cog):
     async def reward_set(self, request: web.Request) -> list[dict]:
         guild = self.guild()
         level = self._level(request)
-        role_id = _id((await self.body(request)).get("role_id"), "Rolle")
+        role_id = parse_id((await self.body(request)).get("role_id"), "Rolle")
         role = guild.get_role(role_id or 0)
         if role is None:
             raise ApiError(400, "Rolle gibt es nicht")
@@ -668,8 +522,8 @@ class Control(commands.Cog):
         """Eine Zelle umschalten: diese Rolle darf den Kanal sehen (`allow`) oder nicht."""
         guild = self.guild()
         data = await self.body(request)
-        channel = guild.get_channel(_id(data.get("channel_id"), "Kanal") or 0)
-        role = guild.get_role(_id(data.get("role_id"), "Rolle") or 0)
+        channel = guild.get_channel(parse_id(data.get("channel_id"), "Kanal") or 0)
+        role = guild.get_role(parse_id(data.get("role_id"), "Rolle") or 0)
         if channel is None or role is None or role.is_default() or role.managed:
             raise ApiError(400, "Kanal oder Rolle gibt es nicht")
         if not isinstance(data.get("allow"), bool):

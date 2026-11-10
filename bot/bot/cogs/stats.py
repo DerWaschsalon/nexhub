@@ -55,6 +55,12 @@ class Stats(commands.Cog):
                 continue
             await self._update_one(guild, channel_key, last_key, _name_fn)
 
+    @commands.Cog.listener()
+    async def on_settings_changed(self, guild: discord.Guild, section_id: str) -> None:
+        """Neu eingerichtete Zähler (Hub, Panel, /setup ändern) gleich anzeigen, nicht erst im Takt."""
+        if section_id == "community":
+            await self.update_guild(guild)
+
     async def update_guild(self, guild: discord.Guild) -> None:
         """Aktualisiert alle für diesen Server eingerichteten Zähler sofort (z. B. direkt nach
         der Einrichtung im Panel), unabhängig von der 10-Minuten-Drosselung."""

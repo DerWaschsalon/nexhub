@@ -1,7 +1,7 @@
 """Moderation: Log-Kanal und Spamschutz.
 
 Logs: gelöschte und bearbeitete Nachrichten, Beitritte, Austritte, Banns, Rollenänderungen.
-Spamschutz (abschaltbar mit /setup spamschutz) greift nicht bei Bots und bei Leuten mit
+Spamschutz (abschaltbar im Klick-Panel, `/setup panel`) greift nicht bei Bots und bei Leuten mit
 „Nachrichten verwalten“:
   - mehr als SPAM_COUNT Nachrichten in SPAM_WINDOW Sekunden → Nachrichten weg, 5 Min. Timeout
   - mehr als MENTION_LIMIT Erwähnungen in einer Nachricht   → Nachricht weg, 10 Min. Timeout
@@ -59,6 +59,12 @@ class Moderation(commands.Cog):
         self.db = bot.db
         self._recent: dict[tuple[int, int], deque] = defaultdict(lambda: deque(maxlen=20))
         self._own_deletes: set[int] = set()  # vom Spamschutz gelöscht, nicht einzeln loggen
+
+    @commands.Cog.listener()
+    async def on_settings_changed(self, guild: discord.Guild, section_id: str) -> None:
+        """Ohne Schwelle gibt es keine Strafe: die Aktion fällt dann auf ihren Standard zurück."""
+        if section_id == "verwarnungen" and self.db.get_int(guild.id, "warn_threshold") is None:
+            await self.db.set(guild.id, "warn_action", None)
 
     async def log(self, guild: discord.Guild, embed: discord.Embed) -> None:
         channel_id = self.db.get_int(guild.id, "log_channel")

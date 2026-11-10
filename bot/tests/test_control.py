@@ -76,7 +76,9 @@ def run(test):
             guild = fake_guild()
             bot = SimpleNamespace(db=db, guilds=[guild], get_guild=lambda i: guild if i == GUILD else None,
                                   get_cog=lambda name: None, cogs={}, user=None, latency=float("nan"),
-                                  is_ready=lambda: True)
+                                  is_ready=lambda: True, dispatched=[])
+            bot.dispatch = lambda event, *args: bot.dispatched.append((event, *args))
+            guild.bot = bot  # für Tests, die gemeldete Ereignisse prüfen
             cog = Control(bot)
             cog.key = KEY
             async with TestClient(TestServer(cog.make_app())) as client:
@@ -144,6 +146,13 @@ def test_section_int_zero_and_warn_action():
                    {"values": {"warn_threshold": 3, "warn_action": "kick"}})
         assert (db.get(GUILD, "warn_threshold"), db.get(GUILD, "warn_action")) == ("3", "kick")
         await call(client, "PUT", "/control/sections/verwarnungen", {"values": {"warn_threshold": 0}})
+        assert guild.bot.dispatched[-1] == ("settings_changed", guild, "verwarnungen")
+        # Ohne Schwelle fällt die Aktion zurück (Moderation hört auf settings_changed)
+        from bot.cogs.moderation import Moderation
+
+        moderation = Moderation.__new__(Moderation)
+        moderation.db = db
+        await moderation.on_settings_changed(guild, "verwarnungen")
         assert (db.get(GUILD, "warn_threshold"), db.get(GUILD, "warn_action")) == (None, None)
         await call(client, "PUT", "/control/sections/verwarnungen", {"values": {"warn_action": "bannen"}}, status=400)
         await call(client, "PUT", "/control/sections/community", {"values": {"starboard_threshold": 0}}, status=400)

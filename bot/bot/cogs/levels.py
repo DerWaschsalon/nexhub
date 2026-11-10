@@ -1,7 +1,7 @@
 """Levelsystem: 15-25 XP pro Nachricht (60 s Abklingzeit pro Mitglied), Formel 5·l²+50·l+100
 XP für den nächsten Levelaufstieg, Rangkarte (siehe `rankcard.py`), Rollen-Belohnungen,
-Kanäle/Rollen ohne XP. Komplett abgeschaltet (`level_system_enabled`), bis ein Server es per
-`/setup level` oder im Klick-Panel einschaltet — sonst würde für jeden Server plötzlich ein neues
+Kanäle/Rollen ohne XP. Komplett abgeschaltet (`level_system_enabled`), bis ein Server es
+im Klick-Panel (`/setup panel`) einschaltet — sonst würde für jeden Server plötzlich ein neues
 Verhalten anfangen, ohne dass das irgendwer angefragt hat.
 """
 
