@@ -536,6 +536,8 @@ class Control(commands.Cog):
 
     def all_pages(self) -> list[Page]:
         pages = list(CORE_PAGES)
+        if hasattr(self.bot, "modules"):  # neue Module (bot/modules) neben den alten Cogs
+            pages.extend(self.bot.modules.pages())
         for cog in self.bot.cogs.values():
             if hasattr(cog, "hub_pages"):
                 pages.extend(cog.hub_pages())

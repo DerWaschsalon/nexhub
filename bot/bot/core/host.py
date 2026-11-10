@@ -15,6 +15,7 @@ from discord.ext import commands
 from nexcore import EventBus, Paths, Registry
 
 from ..db import Database
+from ..hubpages import Page
 from .module import BotContext, BotModule, Listener
 
 
@@ -43,7 +44,14 @@ class ModuleHost:
         for m in self.modules:
             for event, handler in m.listeners().items():
                 self.client.add_listener(only_while_active(m, handler), event)
+            cog = m.cog()
+            if cog is not None:
+                await self.client.add_cog(cog)
         await self.registry.start()
+
+    def pages(self) -> list[Page]:
+        """Hub-Seiten aller Module, für die Steuer-API (cogs/control.py)."""
+        return [page for m in self.modules for page in m.pages()]
 
     async def stop(self) -> None:
         await self.registry.shutdown()

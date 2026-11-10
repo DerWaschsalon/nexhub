@@ -54,8 +54,7 @@ def test_all_commands_register():
             # "exception was never retrieved".
             for cog_name, loop_name in [
                 ("Reminders", "check_due"), ("Notifications", "poll_feeds"),
-                ("Stats", "refresh"), ("Birthdays", "check"),
-                ("Announcements", "check_due"), ("VoiceStats", "tick"), ("Giveaways", "check_due"),
+                ("Birthdays", "check"), ("VoiceStats", "tick"), ("Giveaways", "check_due"),
             ]:
                 loop = getattr(bot.get_cog(cog_name), loop_name)
                 task = loop.get_task()
@@ -619,15 +618,6 @@ def test_panel_regex():
     assert got == [("🎮", "1"), (None, "2"), ("<:aion:99>", "3")]
 
 
-def test_stats_channel_names():
-    from bot.cogs.stats import bots_channel_name, member_channel_name
-
-    bots = [type("M", (), {"bot": True})(), type("M", (), {"bot": True})(), type("M", (), {"bot": False})()]
-    guild = type("G", (), {"member_count": 123, "members": bots})()
-    assert member_channel_name(guild) == "👥 Mitglieder: 123"
-    assert bots_channel_name(guild) == "🤖 Bots: 2"
-
-
 def test_every_panel_page_fits_discord_limits():
     """Jede erzeugte Seite muss sich bauen lassen (Discord: 5 Zeilen, je Zeile eine Auswahl oder
     5 Knöpfe) und stabile custom_ids haben, in beiden Verifizierungs-Zuständen."""
@@ -838,78 +828,6 @@ def test_birthday_day_in_month_validation():
     assert DAYS_IN_MONTH[2] == 29  # Februar: 29 erlauben (Schaltjahr), Validierung nicht zu streng
     assert DAYS_IN_MONTH[4] == 30
     assert 31 <= DAYS_IN_MONTH[1]
-
-
-def test_embed_colour_parsing():
-    import discord
-
-    from bot.cogs.embeds import parse_colour
-    from bot.errors import UserError
-
-    assert parse_colour(None) == discord.Colour.blurple()
-    assert parse_colour("#5865F2") == discord.Colour(0x5865F2)
-    assert parse_colour("5865F2") == discord.Colour(0x5865F2)
-
-    with pytest.raises(UserError):
-        parse_colour("nicht-hex")
-
-
-def test_custom_command_rendering_and_name_validation():
-    from bot.cogs.customcommands import NAME_RE, render
-
-    member = type("M", (), {"mention": "<@1>"})()
-    guild = type("G", (), {"name": "Der Waschsalon"})()
-    assert render("Hallo {user}, willkommen auf {server}!", member, guild) == \
-        "Hallo <@1>, willkommen auf Der Waschsalon!"
-
-    assert NAME_RE.match("regeln") and NAME_RE.match("info-2")
-    assert not NAME_RE.match("Regeln")  # Großbuchstaben nicht erlaubt
-    assert not NAME_RE.match("mit leerzeichen")
-
-
-def test_announcement_due_rows_get_rescheduled():
-    import tempfile
-    import time
-    from pathlib import Path
-
-    from bot.cogs.announcements import Announcements
-    from bot.db import Database
-
-    async def go():
-        with tempfile.TemporaryDirectory() as d:
-            db = Database(Path(d) / "t.sqlite3")
-            await db.connect()
-            now = time.time()
-            due_id = await db.execute(
-                "INSERT INTO scheduled (guild_id, channel_id, text, interval_minutes, next_run) "
-                "VALUES (1, 2, 'Hallo!', 30, ?)", (now - 10,),
-            )
-            not_due_id = await db.execute(
-                "INSERT INTO scheduled (guild_id, channel_id, text, interval_minutes, next_run) "
-                "VALUES (1, 2, 'Später', 30, ?)", (now + 10_000,),
-            )
-
-            sent = []
-
-            class FakeChannel:
-                async def send(self, text):
-                    sent.append(text)
-
-            cog = Announcements.__new__(Announcements)
-            cog.bot = type("B", (), {"get_channel": lambda self, i: FakeChannel()})()
-            cog.db = db
-
-            await cog.check_due.coro(cog)  # die echte Loop-Funktion, nicht als Loop (kein wait_until_ready nötig)
-
-            assert sent == ["Hallo!"]  # nur die fällige wurde gepostet
-            due_row = await db.fetchone("SELECT next_run FROM scheduled WHERE id=?", (due_id,))
-            not_due_row = await db.fetchone("SELECT next_run FROM scheduled WHERE id=?", (not_due_id,))
-            assert due_row["next_run"] > now  # neu geplant, 30 Min. weiter in der Zukunft
-            assert not_due_row["next_run"] == now + 10_000  # unverändert, war nicht fällig
-
-            await db.close()
-
-    run(go())
 
 
 def test_voicestats_qualifies_and_format():

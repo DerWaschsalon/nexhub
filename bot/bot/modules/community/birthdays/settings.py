@@ -8,3 +8,5 @@ from bot.core.schema import setting
 class BirthdaySettings(BaseModel):
     birthday_channel: int | None = setting("channel", "Kanal für die Gratulation um 9 Uhr", group="Geburtstage",
                                            hint="Mitglieder tragen ihren Geburtstag per /geburtstag-setzen ein.")
+    # Zustand, keine Einstellung: an welchem Tag (JJJJ-MM-TT) zuletzt gratuliert wurde
+    birthday_last_run: str | None = None
