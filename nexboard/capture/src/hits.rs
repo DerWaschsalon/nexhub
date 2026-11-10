@@ -32,6 +32,9 @@ const MAX_HITS: usize = 300_000;
 const KEEP_MS: i64 = 2 * 60 * 60 * 1000;
 /// Treffer, die so kurz nach dem gespeicherten Kampfende landen, gehören noch dazu
 const END_GRACE_MS: i64 = 1000;
+/// Treffer kommen fast nach Zeit geordnet an; nur zurückgehaltene DoT-Ticks des Kerns kommen später als
+/// ihr Zeitpunkt. Die Suche nach dem Kampfbeginn fängt deshalb so viel früher an.
+const REORDER_SLACK_MS: i64 = 10 * 60 * 1000;
 
 /// Merkmale eines Treffers als Bits; die Namen stehen in jeder Datei mit.
 const FLAGS: [(&str, u16); 11] = [
@@ -126,22 +129,42 @@ impl HitLog {
         }
     }
 
+    /// Treffer auf `target` zwischen `start` und `end`. Sucht ab kurz vor dem Kampfbeginn statt durch
+    /// den ganzen Puffer und hält die Sperre nur fürs Kopieren (der Haken des Kerns wartet darauf).
+    fn fight_hits(&self, target: i32, start: i64, end: i64) -> Vec<Hit> {
+        let hits = self.hits.lock();
+        let first = hits.partition_point(|h| h.t < start - REORDER_SLACK_MS);
+        hits.range(first..).filter(|h| h.target == target && h.t >= start && h.t <= end).copied().collect()
+    }
+
     /// Treffer eines gespeicherten Kampfes nach `hits/<id>.json` schreiben.
     /// `summons` ordnet Beschwörungen ihrer Figur zu (`DataStorage::get_summon_data`).
-    pub fn save_fight(&self, record: &FightRecord, summons: &HashMap<i32, i32>, skills: &SkillLookup)
-        -> std::io::Result<usize> {
+    pub fn save_fight(
+        &self,
+        record: &FightRecord,
+        summons: &HashMap<i32, i32>,
+        skills: &SkillLookup,
+    ) -> std::io::Result<usize> {
         let start = record.start_time_ms;
         let end = start + record.duration_ms + END_GRACE_MS;
+        // Je Fähigkeit nur einmal nach dem Namen fragen, nicht je Treffer
+        let mut codes: HashMap<i32, i32> = HashMap::new();
         let rows: Vec<[i64; 7]> = self
-            .hits
-            .lock()
+            .fight_hits(record.target_id, start, end)
             .iter()
-            .filter(|h| h.target == record.target_id && h.t >= start && h.t <= end)
             .map(|h| {
                 let owner = summon_resolver::resolve(h.actor, summons);
                 let owner = if owner == h.actor { 0 } else { owner };
-                let skill = meter_skill_code(h.skill, skills);
-                [h.t - start, h.actor.into(), owner.into(), skill.into(), h.damage.into(), h.multi.into(), h.flags.into()]
+                let skill = *codes.entry(h.skill).or_insert_with(|| meter_skill_code(h.skill, skills));
+                [
+                    h.t - start,
+                    h.actor.into(),
+                    owner.into(),
+                    skill.into(),
+                    h.damage.into(),
+                    h.multi.into(),
+                    h.flags.into(),
+                ]
             })
             .collect();
         let doc = json!({
@@ -207,6 +230,20 @@ mod tests {
         log.record(&packet(KEEP_MS + 1, 3));
         let left: Vec<i32> = log.hits.lock().iter().map(|h| h.damage).collect();
         assert_eq!(left, vec![2, 3]);
+    }
+
+    #[test]
+    fn kampf_wird_auch_hinter_vielen_alten_treffern_gefunden() {
+        let log = HitLog::new(Path::new("/nicht/benutzt"));
+        for t in 0..1_000 {
+            log.record(&packet(t * 10, 1)); // alter Kampf, lange vor diesem
+        }
+        let start = REORDER_SLACK_MS + 40_000;
+        log.record(&packet(start + 10_000, 9)); // gehört dazu
+        log.record(&packet(start + 9_000, 8)); // zurückgehaltener DoT-Tick, später angekommen: auch
+        log.record(&packet(start + 60_000, 7)); // nach dem Kampf
+        let damage: Vec<i32> = log.fight_hits(37797, start, start + 20_000).iter().map(|h| h.damage).collect();
+        assert_eq!(damage, vec![9, 8]);
     }
 
     #[test]

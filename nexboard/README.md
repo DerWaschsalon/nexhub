@@ -218,8 +218,11 @@ daneben in `hits/` jeder einzelne Treffer mit eigenem Schaden und Merkmalen (fü
 (`capture/patches/`) jeden Treffer; `capture/build.sh` wendet ihn an, `update.sh` nimmt ihn vor
 einem A2Tools-Update zurück. Passt er nach einem Update nicht mehr, bricht der Build mit Hinweis ab.
 
-`deckbar-capture` spricht Zeilen-JSON über stdin/stdout (Format in `capture/src/main.rs`) und lässt
-sich zum Testen auch allein starten. `--save-packets DIR` zeichnet den Mitschnitt auf,
+`deckbar-capture` spricht Zeilen-JSON über stdin/stdout (Überblick in `capture/src/main.rs`, Nachrichten in
+`out.rs`, Befehle in `commands.rs`) und lässt sich zum Testen auch allein starten. Auf stdout schreibt nur
+ein eigener Thread: Hängt der Daemon, ersetzen neue Zustände (DPS, Status) die wartenden, Ereignisse gehen
+bei voller Warteschlange verloren, und der Mitschnitt läuft weiter. Die volle DpsData für die
+Meter-Seiten kommt nur bei Änderung als eigene Zeile `dps_data`, die der Daemon ungeparst weiterreicht. `--save-packets DIR` zeichnet den Mitschnitt auf,
 `--replay packets_….txt [--realtime]` spielt ihn ohne Spiel wieder ab:
 
 ```sh
@@ -297,8 +300,8 @@ die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters
 installieren (signierter Katalog von cdn.a2tools.app, Ed25519, Zustimmung zu den Berechtigungen). Der
 Plugin-Host ist `daemon/deckbar_daemon/plugins.py`, ein Nachbau des Hosts aus dem Submodul; die Seiten
 kommen unverändert von dort. Hauptfenster sind normale Fenster des Overlay-Programms (damit die Tastatur
-geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefert
-`capture/src/plugins.rs`. Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
+geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefern
+`capture/src/decoders.rs` (Decoder je Opcode) und `capture/src/feed.rs` (Charakter, Feldboss-Karte …). Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
 in `plugin-data/` daneben. Plugins laufen, solange das Overlay läuft, also mit dem Spiel. Anders als im
 Meter: kein Dock, keine FPS-Anzeige (zählt nur unter Windows), keine Entwickler-Ordner, die Option
 „ausblenden“ wirkt nur über das Overlay selbst, Widgets nur mit layer-shell. Plugin-API bis Version 2;
@@ -471,7 +474,11 @@ Zusätzliche Icons trägt man in `tools/icons.txt` ein (Namen aus
 ```sh
 cd daemon && uv run python -m pytest -q
 cd radar && ../daemon/.venv/bin/python -m pytest -q tests   # mit Goldtest, siehe radar/README.md
+cd capture && ./build.sh && cargo test --release && cargo clippy --release -- -D warnings && cargo fmt --check
 ```
+
+Der Goldtest der Spur „capture“ nimmt das Programm aus `capture/target/release/`; nach Änderungen am
+Mitschnitt also erst `./build.sh`, dann den Goldtest.
 
 `daemon/tests/test_simulator.py` vergleicht jede Seite aus `daemon/tests/simulator_layout.yaml` mit den
 Referenzbildern in `simulator/reference/` (braucht den gebauten Simulator, sonst übersprungen). Sieht ein

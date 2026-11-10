@@ -132,11 +132,11 @@ pub fn build(dps: &DpsData, opts: &Options) -> View {
             shown.push(c);
         }
     }
-    if opts.pin_you {
-        if let Some(pos) = shown.iter().position(|c| is_you(c)) {
-            let you = shown.remove(pos);
-            shown.insert(0, you);
-        }
+    if opts.pin_you
+        && let Some(pos) = shown.iter().position(|c| is_you(c))
+    {
+        let you = shown.remove(pos);
+        shown.insert(0, you);
     }
 
     let total: i64 = shown.iter().map(|c| c.dmg.max(0)).sum();

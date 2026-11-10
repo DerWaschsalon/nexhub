@@ -179,15 +179,20 @@ class A2Ui:
 
     # ------------------------------------------------------------ Ereignisse
     async def _on_capture(self, event: str, payload: Any) -> None:
-        if event == "dps":
-            await self.emit("dps-update", payload)
+        if event == "dps_data":
+            await self.emit_raw("dps-update", payload)
         elif event == "ping" and payload is not None:
             await self.emit("ping-update", payload)
 
     async def emit(self, event: str, payload: Any) -> None:
+        if self.clients:
+            await self.emit_raw(event, json.dumps(payload, ensure_ascii=False))
+
+    async def emit_raw(self, event: str, payload_json: str) -> None:
+        """payload schon als JSON-Text: die volle DpsData (bis 100 KB) wird nicht geparst und neu geschrieben."""
         if not self.clients:
             return
-        text = f"data: {json.dumps({'event': event, 'payload': payload}, ensure_ascii=False)}\n\n"
+        text = f'data: {{"event": {json.dumps(event)}, "payload": {payload_json}}}\n\n'
         for q in list(self.clients):
             if q.full():
                 try:
