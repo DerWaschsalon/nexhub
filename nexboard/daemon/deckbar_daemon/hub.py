@@ -157,10 +157,10 @@ class Hub:
         self.settings = settings
 
     def update(self, data: dict) -> HubSettings:
-        """Adresse und Gerätename aus der Web-UI. Eine neue Adresse heißt ein anderer Hub:
-        das alte Token gilt dort nicht, also neu koppeln."""
+        """Adresse, Gerätename und die Schalter Hochladen/In Discord posten aus der Web-UI. Eine neue
+        Adresse heißt ein anderer Hub: das alte Token gilt dort nicht, also neu koppeln."""
         merged = self.settings.model_dump()
-        merged.update({k: v for k, v in data.items() if k in ("url", "name", "upload")})
+        merged.update({k: v for k, v in data.items() if k in ("url", "name", "upload", "discord")})
         settings = HubSettings.model_validate(merged)
         if settings.upload and not self.settings.upload:
             self._wake.set()  # liegt schon etwas im Postausgang: gleich versuchen
@@ -172,7 +172,8 @@ class Hub:
 
     def info(self) -> dict:
         s = self.settings
-        return {"settings": {"url": s.url, "name": s.name, "upload": s.upload}, "status": self.status,
+        return {"settings": {"url": s.url, "name": s.name, "upload": s.upload, "discord": s.discord},
+                "status": self.status,
                 "detail": self.detail, "pairing": self.pairing, "account": self.account,
                 "outbox": len(self._queued()), "last_upload": self.last_upload, "you": self.you}
 
