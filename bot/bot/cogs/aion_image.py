@@ -1,5 +1,5 @@
 """Balkendiagramme (PNG) für AION-2-Lauf-Posts — wie die DPS-Rangliste, nur als Bild statt Text,
-analog zur Rangkarte in rankcard.py (selbe DejaVu-Schrift, selbes Pillow-Fallback-Muster). Je ein
+analog zur Rangkarte in modules/community/levels/rankcard.py (selbe DejaVu-Schrift, selbes Pillow-Fallback-Muster). Je ein
 Bild für die Gesamt-Rangliste und eines pro Boss.
 """
 

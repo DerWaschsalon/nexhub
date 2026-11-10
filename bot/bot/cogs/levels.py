@@ -1,5 +1,5 @@
 """Levelsystem: 15-25 XP pro Nachricht (60 s Abklingzeit pro Mitglied), Formel 5·l²+50·l+100
-XP für den nächsten Levelaufstieg, Rangkarte (siehe `rankcard.py`), Rollen-Belohnungen,
+XP für den nächsten Levelaufstieg, Rangkarte (siehe `modules/community/levels/rankcard.py`), Rollen-Belohnungen,
 Kanäle/Rollen ohne XP. Komplett abgeschaltet (`level_system_enabled`), bis ein Server es
 im Klick-Panel (`/setup panel`) einschaltet — sonst würde für jeden Server plötzlich ein neues
 Verhalten anfangen, ohne dass das irgendwer angefragt hat.
@@ -16,7 +16,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..errors import UserError
-from .rankcard import render_rank_card
+from ..modules.community.levels.rankcard import render_rank_card
 
 log = logging.getLogger(__name__)
 

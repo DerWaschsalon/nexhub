@@ -1052,7 +1052,7 @@ def test_rank_card_renders_valid_png():
 
     from PIL import Image
 
-    from bot.cogs.rankcard import HEIGHT, WIDTH, render_rank_card
+    from bot.modules.community.levels.rankcard import HEIGHT, WIDTH, render_rank_card
 
     # Minimaler Fake-Avatar: ein echtes kleines PNG, damit Image.open() nicht scheitert
     fake_avatar = io.BytesIO()

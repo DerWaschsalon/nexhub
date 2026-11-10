@@ -23,7 +23,7 @@ AVATAR_SIZE = 180
 MARGIN = 40
 
 
-def _font(path: str, size: int):
+def _font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
         return ImageFont.truetype(path, size)
     except OSError:

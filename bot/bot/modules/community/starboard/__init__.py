@@ -33,7 +33,11 @@ async def star_count(message: discord.Message) -> int:
     """Sterne ohne den des Autors."""
     for reaction in message.reactions:
         if str(reaction.emoji) == STAR:
-            return sum(1 async for user in reaction.users() if user.id != message.author.id)
+            count = 0  # sum() nimmt keinen asynchronen Generator
+            async for user in reaction.users():
+                if user.id != message.author.id:
+                    count += 1
+            return count
     return 0
 
 
