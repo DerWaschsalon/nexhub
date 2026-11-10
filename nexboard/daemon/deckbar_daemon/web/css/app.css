@@ -246,6 +246,11 @@ select option { background: var(--glass-solid); color: var(--text); }
 .settings-row:first-of-type { border-top: 0; padding-top: 4px; }
 .settings-row .txt b { display: block; font-weight: 650; }
 .settings-row .txt span { color: var(--text-3); font-size: 12.5px; }
+/* Zeile mit aufklappbarem Teil darunter (Widgets im Overlay): eine Einheit, die Linie trennt erst danach */
+.row-group { border-top: 1px solid var(--line-soft); padding-bottom: 6px; }
+.row-group:first-of-type { border-top: 0; }
+.row-group > .settings-row { border-top: 0; padding-bottom: 4px; }
+.row-group > details.advanced { margin-top: 0; border-top: 0; padding-top: 0; }
 
 .callout { display: flex; gap: 12px; padding: 13px 16px; border-radius: var(--radius-m); font-size: 13px; line-height: 1.45; background: var(--glass); border: 1px solid var(--line-soft); }
 .callout > .ic { font-size: 19px; line-height: 1.1; }

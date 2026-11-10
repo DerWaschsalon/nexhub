@@ -1,12 +1,27 @@
-/* Modul AION 2 · Overlay: Programm (Dienst, Modus), Widgets, Event-Timer. */
-import { fill, el, icon, api, S, on, field, input, select, button, chip, callout, card, settingsRow, sw, saver, toast, clampInt } from "../core.js";
+/* Modul AION 2 · Overlay: Profile (Hauptbedienung), Widgets aller eingeschalteten Module, Steuerung, Darstellung.
+   Jedes Widget wird nur hier ein- und ausgeschaltet; die Module stellen es auf ihrer eigenen Seite ein. */
+import { fill, el, api, S, on, field, input, select, button, chip, callout, card, settingsRow, sw, saver, toast, modOn, collapsible } from "../core.js";
 
 const FX = { "": "aus", glanz: "Glanz", brennen: "Brennen", gold: "Gold", frost: "Frost", holo: "Holo", leere: "Leere" };
+// Ein Begriff je Sache: „Durchklicken an“ = Overlay nimmt keine Klicks an, „aus“ = Meter bedienbar
+const START_MODE = { click: "Durchklicken aus (Meter bedienbar)", lock: "Durchklicken an (alles klickt durch)" };
+const DONE = { edit: "Bearbeiten-Modus umgeschaltet", toggle: "Overlay umgeschaltet", lock: "Durchklicken an", click: "Durchklicken aus", settings: "Meter-Einstellungen geöffnet" };
+const WIDGET_HELP = {
+  meter: "Oberfläche des A2Tools-Meters",
+  boss: "HP des Ziels mit Kill-Prognose",
+  timers: "Countdown bis zum nächsten Termin; welche, steht unter Termine",
+  radar: "Karte, Cubes, Vertraute und Würfel; zeigt sich, solange ein Cube in Sicht ist",
+  warnung: "Boss-Warnungen, nur während einer Warnung; was gewarnt wird, steht unter Warnungen",
+  pvp: "Kills, Tode und Rangpunkte seit Spielstart",
+};
+const SHORTCUT_HINT = "Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „NexBoard Overlay ein/aus“. "
+  + "Dort steht je Profil und je Widget eine eigene Aktion, der du eine Taste gibst.";
 
-async function cmd(c) {
+/** Befehl an das laufende Overlay-Programm (auch von Übersicht und Kampfdaten). */
+export async function cmd(c) {
   try {
     await api("POST", "/api/overlay/command", { cmd: c });
-    toast({ edit: "Bearbeiten-Modus umgeschaltet", toggle: "Overlay umgeschaltet", lock: "Gesperrt (klickdurchlässig)", click: "Entsperrt", reload: "Neu geladen" }[c] || "Erledigt");
+    toast(DONE[c] || "Erledigt");
   } catch (e) { toast(e.message, true); }
 }
 
@@ -23,85 +38,9 @@ function unitChip(o) {
   return chip("…");
 }
 
-function controlTab(ctx) {
-  const box = el("div", { class: "stack" });
-  const save = saver("PUT", "/api/overlay", (res) => { S.overlay = res; }, 300, "Overlay gespeichert");
-  const draw = () => {
-    const o = S.overlay;
-    if (!o) return;
-    const L = o.layout;
-    const screens = { "": "Hauptmonitor (laut KDE)", ...Object.fromEntries((o.screens || []).map((s) => [s.name, `${s.name} · ${s.width}×${s.height}${s.primary ? " · Hauptmonitor" : ""}`])) };
-    if (L.screen && !(L.screen in screens)) screens[L.screen] = L.screen;
-    fill(box,
-      o.unit?.installed === false ? callout("warn", "alert", el("span", {}, "Das Overlay-Programm ist noch nicht eingerichtet. Einmal im Repo ausführen: ", el("code", { text: "overlay/install.sh" }), " (braucht pyside6, qt6-webengine, layer-shell-qt).")) : null,
-      el("div", { class: "cols" },
-        card("Overlay", "Startet mit AION 2 und läuft dann als eigenes Programm im Tray", unitChip(o),
-          el("div", { class: "row wrap" },
-            button("Bearbeiten", () => cmd("edit"), "primary", "cursor-move"),
-            button("Zeigen/Verbergen", () => cmd("toggle"), "", "eye"),
-            button("Sperren", () => cmd("lock"), "", "lock"),
-            button("Entsperren", () => cmd("click"), "", "lock-open"),
-            button("Neu starten", async () => {
-              try { S.overlay = await api("POST", "/api/overlay/restart"); toast("Overlay startet neu"); draw(); } catch (e) { toast(e.message, true); }
-            }, "ghost", "restart")),
-          el("p", { class: "hint small", style: "margin-top:14px" },
-            "Im Bearbeiten-Modus Widgets ziehen, Mausrad = Größe, Esc = fertig. Das Meter selbst lässt sich jederzeit an Kopf- oder Fußzeile verschieben. ",
-            "Für Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → Neu → Anwendung → „NexBoard Overlay ein/aus“ bzw. „… bearbeiten“.")),
-        card("Darstellung", null, null,
-          el("div", { class: "grid" },
-            field("Monitor", select(screens, L.screen, (v) => { L.screen = v; save({ screen: v }); }), "Wirkt nach „Neu starten“."),
-            field("Beim Start", select({ click: "Meter bedienbar", lock: "Gesperrt (alles klickt durch)" }, L.start_mode, (v) => { L.start_mode = v; save({ start_mode: v }); })),
-            field("Namenseffekt", select(FX, L.fx, (v) => { L.fx = v; save({ fx: v }); }), "Auf deinem Namen in der eigenen Meter-Zeile.")),
-          settingsRow("Nur bei aktivem Spiel zeigen", "Blendet das Overlay aus, sobald ein anderes Fenster als AION 2 den Fokus hat (KDE)", sw(L.hide_unfocused, (v) => { L.hide_unfocused = v; save({ hide_unfocused: v }); })),
-          settingsRow("GPU-Beschleunigung", "Aus nur bei Darstellungsfehlern; wirkt nach Neustart", sw(L.gpu, (v) => { L.gpu = v; save({ gpu: v }); })))),
-      callout("info", "information-outline", el("span", {}, "Unter KDE Plasma (Wayland) liegt das Overlay als eigene Ebene über dem Vollbildspiel und nimmt nur dort Klicks an, wo das Meter ist. Ohne layer-shell (GNOME, X11) läuft automatisch das einfache Meter-Fenster.")));
-  };
-  ctx.onUnmount(on("overlay", draw));
-  refresh().then(draw);
-  draw();
-  return box;
-}
-
-function widgetsTab(ctx) {
-  const box = el("div", { class: "stack" });
-  const save = saver("PUT", "/api/overlay", (res) => { S.overlay = res; }, 400, "Widgets gespeichert");
-  const draw = () => {
-    const o = S.overlay;
-    if (!o) return;
-    const w = o.layout.widgets;
-    const set = (id, patch) => { Object.assign(w[id], patch); save({ widgets: { [id]: patch } }); };
-    const common = (id) => [
-      settingsRow("Deckkraft", `${Math.round(w[id].opacity * 100)} %`, el("input", { type: "range", min: 20, max: 100, value: Math.round(w[id].opacity * 100), style: "max-width:200px", oninput: (e) => { set(id, { opacity: Number(e.target.value) / 100 }); e.target.closest(".settings-row").querySelector(".txt span").textContent = `${e.target.value} %`; } })),
-      settingsRow("Position zurücksetzen", "An den Standardplatz, Größe 100 %", button("Zurücksetzen", () => { set(id, { x: null, y: null, scale: 1 }); toast("Zurückgesetzt"); }, "sm", "refresh")),
-    ];
-    fill(box,
-      el("div", { class: "cols" },
-        card("DPS-Meter", "Oberfläche des A2Tools-Meters", sw(w.meter.enabled, (v) => set("meter", { enabled: v })), ...common("meter")),
-        card("Boss-Leiste", "HP des Ziels mit Kill-Prognose", sw(w.boss.enabled, (v) => set("boss", { enabled: v })),
-          settingsRow("Kill-Prognose", "Restzeit aus dem HP-Verlauf der letzten 40 s", sw(w.boss.show_ttk, (v) => set("boss", { show_ttk: v }))),
-          settingsRow("Außerhalb von Kämpfen ausblenden", null, sw(w.boss.hide_idle, (v) => set("boss", { hide_idle: v }))),
-          ...common("boss"))),
-      el("div", { class: "cols" },
-        card("Radar", "Modul AION 2 · Radar: Karte, Cubes, Vertraute und Würfel in einem Widget", sw(w.radar.enabled, (v) => set("radar", { enabled: v })), ...common("radar")),
-        card("Boss-Warnungen", "Modul AION 2 · Radar: nur während einer Warnung", sw(w.warnung.enabled, (v) => set("warnung", { enabled: v })), ...common("warnung")),
-        card("PvP", "Modul AION 2 · Radar: Kills, Tode und Rangpunkte seit Spielstart", sw(w.pvp.enabled, (v) => set("pvp", { enabled: v })), ...common("pvp"))),
-      profilesCard(o, draw),
-      eventsCard(w, set));
-  };
-  // nicht neu aufbauen, solange ein Regler oder Feld in Benutzung ist (sonst bricht das Ziehen ab)
-  const busy = () => box.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
-  ctx.onUnmount(on("overlay", () => { if (!busy()) draw(); }));
-  if (!S.overlay) refresh().then(draw);
-  draw();
-  return box;
-}
-
-/** Profile: welche Widgets sichtbar sind. Wechsel und Löschen speichern sofort (die Schalter oben ändern sich mit). */
-function profilesCard(o, redraw) {
+/** Profile: welche Widgets sichtbar sind. Wechsel und Löschen speichern sofort, die Schalter darunter ändern sich mit. */
+function profilesCard(o, put) {
   const L = o.layout;
-  const put = async (patch, text) => {
-    try { S.overlay = await api("PUT", "/api/overlay", patch); toast(text); redraw(); } catch (e) { toast(e.message, true); }
-  };
   const remove = (name) => {
     const rest = { ...L.profile };
     delete rest[name];
@@ -114,54 +53,110 @@ function profilesCard(o, redraw) {
       button(null, () => remove(name), "sm icon ghost", "delete", { title: "Löschen" }))));
   let neu = "";
   const visible = Object.keys(L.widgets).filter((id) => L.widgets[id].enabled);
-  return card("Profile", "Welche Widgets sichtbar sind. Das aktive Profil merkt sich jedes Ein- und Ausschalten.", null,
+  return card("Profile", "Das aktive Profil merkt sich jedes Ein- und Ausschalten eines Widgets", null,
     ...rows,
     el("div", { class: "row wrap", style: "margin-top:14px" },
       input("", (v) => { neu = v.trim(); }, { placeholder: "Name ohne Leerzeichen, z. B. Raid", maxlength: 24 }),
-      button("Aus der aktuellen Ansicht anlegen", () => put({ profile: { ...L.profile, [neu]: visible }, profil: neu }, `Profil ${neu} angelegt`), "sm", "plus")),
-    el("p", { class: "hint small", style: "margin-top:14px" },
-      "Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „NexBoard Overlay ein/aus“. Dort steht je Profil und je Widget eine eigene Aktion, der du eine Taste gibst. Im Terminal: ",
-      el("code", { text: "deckbar-overlay --profil PvP" }), " bzw. ", el("code", { text: "--widget pvp" }), "."));
+      button("Aus der aktuellen Ansicht anlegen", () => put({ profile: { ...L.profile, [neu]: visible }, profil: neu }, `Profil ${neu} angelegt`), "sm", "plus")));
 }
 
-function eventsCard(w, set) {
-  const evs = w.timers.events;
-  const push = () => set("timers", { events: evs });
-  const hhmm = (min) => `${String(Math.floor((min % 1440) / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
-  const days = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-  const rows = evs.map((ev, i) => el("tr", {},
-    el("td", {}, sw(ev.enabled !== false, (v) => { ev.enabled = v; push(); })),
-    el("td", {}, input(ev.name, (v) => { ev.name = v.trim() || ev.name; push(); }, { maxlength: 40, lazy: true })),
-    el("td", {}, select({ 60: "stündlich", 120: "alle 2 h", 180: "alle 3 h", 240: "alle 4 h", 360: "alle 6 h", 720: "alle 12 h", 1440: "täglich", 10080: "wöchentlich" }, String(ev.every), (v) => { ev.every = Number(v); ev.at %= ev.every; push(); }, {})),
-    el("td", {}, ev.every === 10080 ? select(Object.fromEntries(days.map((d, k) => [k, d])), String(Math.floor(ev.at / 1440)), (v) => { ev.at = Number(v) * 1440 + (ev.at % 1440); push(); }) : null,
-      input(hhmm(ev.at), (v) => { const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim()); if (!m) return toast("Zeit als HH:MM", true); ev.at = (ev.every === 10080 ? Math.floor(ev.at / 1440) * 1440 : 0) + (Number(m[1]) * 60 + Number(m[2])) % Math.min(ev.every, 1440); push(); }, { lazy: true, style: "width:80px", title: "erster Start ab Mitternacht" })),
-    el("td", {}, input(ev.open, (v) => { ev.open = clampInt(v, 0, 1440, 0); push(); }, { type: "number", min: 0, max: 1440, style: "width:80px" })),
-    el("td", {}, select({ local: "Ortszeit", utc: "UTC" }, ev.tz, (v) => { ev.tz = v; push(); })),
-    el("td", {}, button(null, () => { evs.splice(i, 1); push(); }, "sm icon ghost", "delete", { title: "Entfernen" }))));
-  return card("Event-Timer", "Countdown bis zum nächsten Start, grün solange offen", sw(w.timers.enabled, (v) => set("timers", { enabled: v })),
-    el("div", { style: "overflow-x:auto" }, el("table", { class: "list ev-table" },
-      el("thead", {}, el("tr", {}, ["", "Name", "Wiederholung", "Start", "offen (min)", "Zeitzone", ""].map((h) => el("th", { text: h })))),
-      el("tbody", {}, rows))),
-    el("div", { class: "row wrap", style: "margin-top:14px" },
-      button("Ereignis hinzufügen", () => { evs.push({ name: "Neues Ereignis", every: 60, at: 0, open: 0, tz: "local", enabled: true }); push(); }, "sm", "plus"),
-      el("span", { class: "hint small", text: "Uhrzeiten der Voreinstellungen bitte im Spiel prüfen (Global, Zeitumstellung)." })));
+/** Ein Widget: Schalter in der Zeile, Deckkraft, Position und Eigenes unter „Anpassen“. */
+function widgetRow(o, id, set, view) {
+  const w = o.layout.widgets[id];
+  const extra = id === "boss" ? [
+    settingsRow("Kill-Prognose", "Restzeit aus dem HP-Verlauf der letzten 40 s", sw(w.show_ttk, (v) => set(id, { show_ttk: v }))),
+    settingsRow("Außerhalb von Kämpfen ausblenden", null, sw(w.hide_idle, (v) => set(id, { hide_idle: v }))),
+  ] : [];
+  const opacity = el("input", { type: "range", min: 20, max: 100, value: Math.round(w.opacity * 100), style: "max-width:200px" });
+  const opacityRow = settingsRow("Deckkraft", `${opacity.value} %`, opacity);
+  opacity.addEventListener("input", () => {
+    set(id, { opacity: Number(opacity.value) / 100 });
+    opacityRow.querySelector(".txt span").textContent = `${opacity.value} %`;
+  });
+  const reset = () => { set(id, { x: null, y: null, scale: 1 }); toast("Zurückgesetzt"); };
+  return el("div", { class: "row-group" }, settingsRow(o.widget_titel[id], WIDGET_HELP[id], sw(w.enabled, (v) => set(id, { enabled: v }))),
+    collapsible("Anpassen", view,
+      opacityRow,
+      settingsRow("Position zurücksetzen", "An den Standardplatz, Größe 100 %", button("Zurücksetzen", reset, "sm", "refresh")),
+      ...extra));
+}
+
+function widgetsCard(o, set, views) {
+  const ids = Object.keys(o.layout.widgets).filter((id) => modOn(o.widget_module[id]));
+  return card("Widgets", "Nur von eingeschalteten Modulen", null, ids.map((id) => {
+    views[id] ??= {};
+    return widgetRow(o, id, set, views[id]);
+  }));
+}
+
+function controlCard(o, redraw) {
+  const restart = async () => {
+    try { S.overlay = await api("POST", "/api/overlay/restart"); toast("Overlay startet neu"); redraw(); } catch (e) { toast(e.message, true); }
+  };
+  return card("Steuerung", "Startet mit AION 2 und läuft dann als eigenes Programm im Tray", unitChip(o),
+    el("div", { class: "row wrap" },
+      button("Bearbeiten", () => cmd("edit"), "primary", "cursor-move"),
+      button("Zeigen/Verbergen", () => cmd("toggle"), "", "eye"),
+      button("Durchklicken an", () => cmd("lock"), "", "lock"),
+      button("Durchklicken aus", () => cmd("click"), "", "lock-open"),
+      button("Overlay neu starten", restart, "ghost", "restart")),
+    el("p", { class: "hint small", style: "margin-top:14px" },
+      "Im Bearbeiten-Modus Widgets ziehen, Mausrad = Größe, Esc = fertig. Das Meter lässt sich jederzeit an Kopf- oder Fußzeile verschieben."),
+    el("p", { class: "hint small", text: SHORTCUT_HINT }));
+}
+
+function lookCard(o, save, view) {
+  const L = o.layout;
+  const screens = { "": "Hauptmonitor (laut KDE)", ...Object.fromEntries((o.screens || []).map((s) => [s.name, `${s.name} · ${s.width}×${s.height}${s.primary ? " · Hauptmonitor" : ""}`])) };
+  if (L.screen && !(L.screen in screens)) screens[L.screen] = L.screen;
+  const set = (key, value) => { L[key] = value; save({ [key]: value }); };
+  const advanced = collapsible("Erweitert", view,
+    settingsRow("GPU-Beschleunigung", "Aus nur bei Darstellungsfehlern; wirkt nach „Overlay neu starten“", sw(L.gpu, (v) => set("gpu", v))));
+  return card("Darstellung", null, null,
+    el("div", { class: "grid" },
+      field("Monitor", select(screens, L.screen, (v) => set("screen", v)), "Wirkt nach „Overlay neu starten“."),
+      field("Beim Start", select(START_MODE, L.start_mode, (v) => set("start_mode", v))),
+      field("Namenseffekt", select(FX, L.fx, (v) => set("fx", v)), "Auf deinem Namen in der eigenen Meter-Zeile.")),
+    settingsRow("Nur bei aktivem Spiel zeigen", "Blendet das Overlay aus, sobald ein anderes Fenster als AION 2 den Fokus hat (KDE)", sw(L.hide_unfocused, (v) => set("hide_unfocused", v))),
+    advanced);
+}
+
+function overlayPage(ctx) {
+  const box = el("div", { class: "stack" });
+  const save = saver("PUT", "/api/overlay", (res) => { S.overlay = res; }, 400, "Overlay gespeichert");
+  const views = {}; // aufgeklappte Abschnitte bleiben beim Neuzeichnen offen
+  const view = {};
+  const draw = () => {
+    const o = S.overlay;
+    if (!o) return;
+    const setWidget = (id, patch) => { Object.assign(o.layout.widgets[id], patch); save({ widgets: { [id]: patch } }); };
+    const put = async (patch, text) => {
+      try { S.overlay = await api("PUT", "/api/overlay", patch); toast(text); draw(); } catch (e) { toast(e.message, true); }
+    };
+    fill(box,
+      o.unit?.installed === false ? callout("warn", "alert", el("span", {}, "Das Overlay-Programm ist noch nicht eingerichtet. Einmal im Repo ausführen: ", el("code", { text: "overlay/install.sh" }), " (braucht pyside6, qt6-webengine, layer-shell-qt).")) : null,
+      el("div", { class: "cols" }, profilesCard(o, put), widgetsCard(o, setWidget, views)),
+      el("div", { class: "cols" }, controlCard(o, draw), lookCard(o, save, view)),
+      callout("info", "information-outline", "Unter KDE Plasma (Wayland) liegt das Overlay als eigene Ebene über dem Vollbildspiel und nimmt nur dort Klicks an, wo das Meter ist. Ohne layer-shell (GNOME, X11) läuft automatisch das einfache Meter-Fenster."));
+  };
+  // nicht neu aufbauen, solange ein Regler oder Feld in Benutzung ist (sonst bricht das Ziehen ab)
+  const busy = () => box.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  ctx.onUnmount(on("overlay", () => { if (!busy()) draw(); }));
+  ctx.onUnmount(on("modules", draw));
+  refresh().then(draw);
+  draw();
+  return box;
 }
 
 export default {
-  tabs: [
-    { id: "control", label: "Steuerung", icon: "monitor" },
-    { id: "widgets", label: "Widgets", icon: "layers" },
-  ],
   status: () => (S.overlay?.unit?.active ? "" : "off"),
   card() {
     const o = S.overlay;
     const w = o?.layout?.widgets;
     const active = w ? Object.entries(w).filter(([, v]) => v.enabled).length : 0;
     return el("div", { class: "stack", style: "gap:10px" },
-      el("div", { class: "row wrap" }, unitChip(o), o?.layout?.fx ? chip(`Effekt: ${FX[o.layout.fx]}`, "info") : null),
+      el("div", { class: "row wrap" }, unitChip(o), o?.layout?.profil ? chip(`Profil ${o.layout.profil}`, "info") : null),
       el("div", { class: "metric" }, el("b", { text: String(active) }), el("span", { text: active === 1 ? "Widget aktiv" : "Widgets aktiv" })));
   },
-  render(tab, ctx) {
-    return tab === "widgets" ? widgetsTab(ctx) : controlTab(ctx);
-  },
+  pages: [{ id: "aion2.overlay", render: (tab, ctx) => overlayPage(ctx) }],
 };

@@ -9,15 +9,15 @@ from nexcore.settings import SettingsStore
 
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
+from ..core.topics import DPS_RESET
 from ..dps import STATUS_TEXT, DpsFeed
 from ..state import State
 from .base import WebModule
-from .deck import DPS_RESET
 
 
 class DpsModule(WebModule):
     info = ModuleInfo(
-        "aion2.dps", "AION 2 · DPS-Mitschnitt", "ingame", "sword-cross",
+        "aion2.dps", "AION 2 · Kampfdaten", "ingame", "sword-cross",
         "Liest den Kampf passiv mit (deckbar-capture, Kern des A2Tools DPS Meter) und liefert DPS "
         "für Leiste, Overlay und Discord.",
         tags=("AION 2", "Live"),

@@ -18,9 +18,9 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
   Eigene Werte kommen per `POST /api/state` dazu.
 - **Mehrere Seiten** mit Wischgesten, Hintergrund wählbar (Standard, Desktop-Hintergrund, eigenes Bild)
 - **AION 2:** DPS-Meter der Gruppe als eigene Seite, ein Overlay über dem Spiel (Meter, Boss-Leiste,
-  Event-Timer, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
-- **AION-2-Radar:** Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse und Vertraute
-  in der Web-UI (`radar/`), läuft im Daemon mit dem Spiel, alle Einstellungen in der Web-UI
+  Termine, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
+- **AION-2-Radar:** Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse unter
+  Termine in der Web-UI (`radar/`), läuft im Daemon mit dem Spiel, alle Einstellungen in der Web-UI
 - **Discord-Bot:** Gruppen-DPS und Run-Ergebnisse an einen Bot, der Meldungen mehrerer Spieler zusammenführt
 - **Verbindung** per WLAN, bei Bedarf per USB-Kabel als Rückfall
 - **Ruhemodus:** Ist 30 s lang kein PC verbunden (weder WLAN noch USB), blendet das Display aus und
@@ -108,17 +108,20 @@ Port im Heimnetz offen sein. Die Web-UI und `/api/*` antworten trotzdem nur auf 
 ## Web-UI und Module
 
 <http://localhost:8765> (nur von diesem PC aus erreichbar). Die Startseite ist ein Dashboard mit
-einer Karte je eingeschaltetem Modul; jedes Modul hat eine eigene Seite mit Tabs, thematisch
-gruppiert in der Seitenleiste (Geräte, Spiele, Community, System). Hell und dunkel folgen dem
-System oder lassen sich umschalten, die Seite passt sich auch an schmale Fenster an.
+einer Karte je eingeschaltetem Modul. Die Seitenleiste ordnet nach Situation: **Im Spiel**,
+**Leiste**, **Teilen**, **System**. Jede Einstellung steht genau an einem Ort; ein Modul kann mehrere
+Seiten haben (Radar: Warnungen, Radar & Karte). Hell und dunkel folgen dem System oder lassen sich
+umschalten, die Seite passt sich auch an schmale Fenster an.
 
-| Modul | Inhalt | braucht |
+| Modul | Seiten und Inhalt | braucht |
 |---|---|---|
-| Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte | – |
-| AION 2 · DPS-Mitschnitt | Live-Ansicht, Quelle, Sprache, Seitenwechsel im Kampf | – |
-| AION 2 · Overlay | Overlay-Programm steuern, Widgets, Event-Timer | DPS-Mitschnitt |
-| AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | DPS-Mitschnitt |
-| Discord-Bot | Gruppen-DPS und Run-API eines Bots | DPS-Mitschnitt |
+| AION 2 · Overlay | Overlay: Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
+| AION 2 · Radar | Warnungen (Aus · Nur Wichtiges · Alles, Einzelheiten unter „Erweitert“), Radar & Karte | Termine |
+| AION 2 · Termine | Termine: feste Termine der Server und eigene Ereignisse, Feldbosse des Radars | – |
+| AION 2 · Kampfdaten | Live-Ansicht, Quelle, Meter-Einstellungen und Plugins öffnen | – |
+| Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte (mit „Im Kampf zur Seite“) | – |
+| AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | Kampfdaten |
+| Discord-Bot | Gruppen-DPS und Run-API eines Bots | Kampfdaten |
 | NexHub | Dieses NexBoard mit einem Konto im NexHub koppeln | – |
 | Updates | Stand von Repo und A2Tools-Kern, Aktualisieren | – |
 
@@ -199,8 +202,9 @@ die Online-Funktionen des Meters: kein Konto, keine Uploads, keine Update-Abfrag
 
    Mitschneiden braucht nur `cap_net_raw`, nicht root. Ein Neubau verliert die Rechte, deshalb
    immer mit `--install` bauen.
-2. In der Web-UI das Modul „AION 2 · DPS-Mitschnitt“ einschalten, unter Einstellungen als Quelle
-   „Eigener Mitschnitt“ wählen (Standard) und die Sprache für Boss- und Skillnamen.
+2. In der Web-UI das Modul „AION 2 · Kampfdaten“ einschalten und unter „Quelle und Meter“
+   „Eigener Mitschnitt“ wählen (Standard). Die Sprache der Boss- und Skillnamen ist die allgemeine
+   unter System → Einstellungen; sie gilt auch für Meter, Ansagen und Warnungen.
 3. Eine Seite mit der Kachel „AION 2 DPS-Meter“ anlegen. Spielerzahl (1–8) und Zusatzwert stehen
    in den Kachel-Eigenschaften.
 4. Optional „Bei Kampfbeginn zeigen“: Sobald neuer Schaden kommt, springt die Leiste auf diese
@@ -235,17 +239,17 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Kopf- oder Fußzeile, die Position bleibt gespeichert.
 - **Boss-Leiste:** HP des Ziels, Kampfzeit und Kill-Prognose aus dem HP-Verlauf, außerhalb von
   Kämpfen ausgeblendet.
-- **Event-Timer:** Countdown bis zum nächsten Start (Shugo-Festival, Spacetime Rift, Resets …),
-  Ereignisse frei einstellbar in der Web-UI.
+- **Termine:** Countdown bis zum nächsten Termin (Riss, Shugo-Fest, Resets … und eigene Ereignisse).
+  Dieselbe Liste wie auf der Seite „Termine“, gerechnet im Daemon aus `nexproto.termine`.
 - **PvP** (Daten vom Modul „AION 2 · Radar“): Kills und Tode der Sitzung live, dazu Assists,
   Abyss-Rangpunkte und Rang aus der Saisonwertung des Servers (rechnet etwa stündlich neu, daher
-  „Stand“). Neu beginnen: Web-UI → Radar → „PvP neu beginnen“. Details in `radar/README.md`.
+  „Stand“). Neu beginnen: Web-UI → Radar & Karte → „PvP neu beginnen“. Details in `radar/README.md`.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
 
 **Profile** legen fest, welche Widgets sichtbar sind (Standard: PvE und PvP). Wechsel in der
-Bearbeiten-Leiste, in der Web-UI (Overlay → Widgets → Profile) oder per `--profil NAME`; das aktive
+Bearbeiten-Leiste, in der Web-UI (Im Spiel → Overlay) oder per `--profil NAME`; das aktive
 Profil merkt sich jedes Ein- und Ausblenden. `--widget ID` blendet ein einzelnes Widget ein oder aus
-(meter, boss, timers, radar, warnung, karte, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
+(meter, boss, timers, radar, warnung, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
 also sofort. Der Daemon trägt je Profil und Widget eine Aktion in den Starter „NexBoard Overlay
 ein/aus“ ein; dort in den Systemeinstellungen (Kurzbefehle) eine Taste zuweisen.
 

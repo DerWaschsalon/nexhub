@@ -38,7 +38,6 @@ function botTab(ctx) {
 }
 
 export default {
-  tabs: [{ id: "bot", label: "Anbindung", icon: "robot" }],
   status: () => {
     const r = S.bot?.result || {};
     if ([r.dps, r.runs].some((x) => x && x.ok === false)) return "bad";
@@ -53,5 +52,5 @@ export default {
       el("div", { class: "row wrap" }, chip("Gruppen-DPS", st.dps_enabled && st.dps_url ? "ok" : ""), chip("Runs", st.runs_enabled && st.runs_url ? "ok" : "")),
       last ? resultLine(last) : el("span", { class: "faint", text: "Noch nichts gesendet." }));
   },
-  render(tab, ctx) { return botTab(ctx); },
+  pages: [{ id: "discord.bot", render: (tab, ctx) => botTab(ctx) }],
 };

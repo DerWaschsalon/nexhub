@@ -21,7 +21,11 @@ TERMINE = [
 
 def termin(jetzt: float, bezug: str, alle: int, offen: int) -> tuple[float, bool]:
     """(Beginn des naechsten oder laufenden Termins in Sekunden seit 1970, gerade offen?)."""
-    start = datetime.fromisoformat(bezug).replace(tzinfo=timezone.utc).timestamp()
+    return termin_ab(jetzt, datetime.fromisoformat(bezug).replace(tzinfo=timezone.utc).timestamp(), alle, offen)
+
+
+def termin_ab(jetzt: float, start: float, alle: int, offen: int) -> tuple[float, bool]:
+    """Wie termin(), mit dem Bezug als Sekunden seit 1970 (eigene Ereignisse der NexBoard)."""
     beginn = start + -(-(jetzt - start) // (alle * 60)) * alle * 60  # naechster Beginn ab jetzt
     if jetzt < beginn - alle * 60 + offen * 60:
         return beginn - alle * 60, True

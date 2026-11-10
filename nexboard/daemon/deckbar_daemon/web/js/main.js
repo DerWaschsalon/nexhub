@@ -1,5 +1,6 @@
 /* Web-UI: Gerüst (Seitenleiste, Kopfzeile), Router, Dashboard, Modulverwaltung, Einstellungen.
-   Jedes Modul hat eine eigene Datei in js/modules/ (Tabs, Dashboard-Karte, Seiten). */
+   Jedes Modul hat eine eigene Datei in js/modules/ mit seinen Seiten (pages), Dashboard-Karte und Status.
+   Ein Modul kann mehrere Seiten haben (Radar: Warnungen, Radar & Karte); die Seitenleiste zeigt Seiten. */
 import {
   fill, $, el, icon, glyph, api, S, on, emit, connectLive, loadIcons, mod, modOn, setModule, modIcon, toast,
   setSaveState, sw, field, select, button, chip, callout, card, settingsRow, seg, throttle, dpsDiff,
@@ -7,15 +8,24 @@ import {
 import { schemaForm } from "./form.js";
 import deck from "./modules/deck.js";
 import dps from "./modules/aion2-dps.js";
-import overlay from "./modules/aion2-overlay.js";
+import overlay, { cmd as overlayCommand } from "./modules/aion2-overlay.js";
 import runs from "./modules/aion2-runs.js";
 import radar from "./modules/aion2-radar.js";
+import schedule from "./modules/aion2-schedule.js";
 import bot from "./modules/discord-bot.js";
 import hub from "./modules/hub.js";
 import updates from "./modules/updates.js";
 
 export const BRAND = "NexBoard";
-const UI = { deck, "aion2.dps": dps, "aion2.overlay": overlay, "aion2.runs": runs, "aion2.radar": radar, "discord.bot": bot, hub, updates };
+// Reihenfolge = Reihenfolge in der Seitenleiste je Bereich (Im Spiel: Overlay, Warnungen, Radar & Karte, Termine, Kampfdaten)
+const UI = {
+  "aion2.overlay": overlay, "aion2.radar": radar, "aion2.schedule": schedule, "aion2.dps": dps,
+  deck, "aion2.runs": runs, "discord.bot": bot, hub, updates,
+};
+// Seiten-ID → { page, mid }; die erste Seite eines Moduls trägt meist seine ID
+const PAGES = new Map(Object.entries(UI).flatMap(([mid, ui]) => ui.pages.map((page) => [page.id, { page, mid }])));
+const firstPage = (mid) => UI[mid]?.pages[0].id ?? mid;
+const shortName = (m) => m.name.replace(/^AION 2 · /, "");
 const SYSTEM = [
   { id: "modules", name: "Module", icon: "puzzle" },
   { id: "settings", name: "Einstellungen", icon: "cog" },
@@ -55,14 +65,15 @@ function render() {
     title = "Einstellungen";
     crumb = "System";
     content = settingsPage(ctx);
-  } else if (UI[route.page] && mod(route.page)) {
-    const m = mod(route.page);
-    const ui = UI[route.page];
-    title = m.name;
+  } else if (PAGES.has(route.page) && mod(PAGES.get(route.page).mid)) {
+    const { page, mid } = PAGES.get(route.page);
+    const m = mod(mid);
+    title = page.name || shortName(m);
     crumb = S.modules.categories[m.category] || "Module";
-    const tab = ui.tabs.some((t) => t.id === route.tab) ? route.tab : ui.tabs[0].id;
-    if (ui.tabs.length > 1) tabs = seg(ui.tabs, tab, (id) => go(m.id, id));
-    content = m.enabled ? ui.render(tab, { ...ctx, m }) : disabledPage(m);
+    const pageTabs = page.tabs || [];
+    const tab = pageTabs.some((t) => t.id === route.tab) ? route.tab : pageTabs[0]?.id;
+    if (pageTabs.length > 1) tabs = seg(pageTabs, tab, (id) => go(page.id, id));
+    content = m.enabled ? page.render(tab, { ...ctx, m }) : disabledPage(m);
   } else {
     title = "Nicht gefunden";
     crumb = BRAND;
@@ -99,16 +110,16 @@ function renderNav() {
   const nav = $("nav");
   if (!S.modules) return;
   const link = (id, name, ic, extra) => el("a", { href: `#/${id === "dashboard" ? "" : id}`, class: route.page === id ? "on" : "" }, icon(ic), el("span", { class: "t", text: name }), extra);
+  const pageLinks = (cat) => Object.entries(UI).map(([mid]) => mod(mid))
+    .filter((m) => m?.enabled && m.category === cat)
+    .flatMap((m) => UI[m.id].pages.map((p) => link(p.id, p.name || shortName(m), p.icon || m.icon, badgeFor(m))));
   const items = [link("dashboard", "Übersicht", "view-dashboard")];
   for (const [cat, label] of Object.entries(S.modules.categories)) {
     if (cat === "system") continue;
-    const mods = S.modules.modules.filter((m) => m.category === cat && m.enabled);
-    if (!mods.length) continue;
-    items.push(el("h6", { text: label }));
-    for (const m of mods) items.push(link(m.id, m.name.replace(/^AION 2 · /, ""), m.icon, badgeFor(m)));
+    const links = pageLinks(cat);
+    if (links.length) items.push(el("h6", { text: label }), ...links);
   }
-  items.push(el("h6", { text: "System" }));
-  for (const m of S.modules.modules.filter((x) => x.category === "system" && x.enabled)) items.push(link(m.id, m.name, m.icon, badgeFor(m)));
+  items.push(el("h6", { text: "System" }), ...pageLinks("system"));
   for (const s of SYSTEM) items.push(link(s.id, s.name, s.icon));
   fill(nav, ...items);
 }
@@ -131,7 +142,8 @@ function dashboard(ctx) {
       el("div", {}, el("h2", { text: greeting() }), el("p", { text: `${enabled.length} von ${S.modules.modules.length} Modulen aktiv · ${S.settings?.settings?.name || BRAND}` })),
       el("div", { class: "row wrap" },
         modOn("deck") ? chip(devs ? `${devs} Gerät${devs === 1 ? "" : "e"} verbunden` : "Kein Gerät verbunden", devs ? "ok" : "") : null,
-        S.updates?.available ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null)));
+        S.updates?.available ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null,
+        modOn("aion2.overlay") ? button("Overlay bearbeiten", () => overlayCommand("edit"), "sm", "cursor-move") : null)));
     for (const [cat, label] of Object.entries(S.modules.categories)) {
       const mods = enabled.filter((m) => m.category === cat);
       if (!mods.length) continue;
@@ -140,7 +152,7 @@ function dashboard(ctx) {
     }
     if (off.length) {
       parts.push(el("div", { class: "section-title", text: "Weitere Module" }));
-      parts.push(el("div", { class: "cards" }, off.map((m) => el("div", { class: "tile glass", onclick: (e) => { if (!e.target.closest(".switch")) go(m.id); } },
+      parts.push(el("div", { class: "cards" }, off.map((m) => el("div", { class: "tile glass", onclick: (e) => { if (!e.target.closest(".switch")) go(firstPage(m.id)); } },
         el("div", { class: "tile-head" }, modIcon(m, "off"), el("div", { class: "t" }, el("b", { text: m.name }), el("small", { text: S.modules.categories[m.category] })),
           sw(false, (v) => setModule(m.id, v).catch((e) => toast(e.message, true)), { title: "Einschalten" })),
         el("div", { class: "body" }, el("span", { text: m.summary }))))));
@@ -160,7 +172,7 @@ function dashboard(ctx) {
 
 function tile(m) {
   const ui = UI[m.id];
-  return el("a", { class: "tile glass", href: `#/${m.id}` },
+  return el("a", { class: "tile glass", href: `#/${firstPage(m.id)}` },
     el("div", { class: "tile-head" }, modIcon(m), el("div", { class: "t" }, el("b", { text: m.name }), el("small", { text: m.tags.join(" · ") })), icon("chevron-right", "faint")),
     el("div", { class: "body" }, ui?.card ? ui.card(m) : null));
 }
@@ -180,7 +192,7 @@ function modulesPage(ctx) {
           el("p", { text: m.summary }),
           el("div", { class: "tags" }, m.tags.map((t) => el("span", { class: "tag", text: t })),
             m.requires.length ? el("span", { class: "tag", text: `braucht ${m.requires.map((r) => mod(r)?.name || r).join(", ")}` }) : null)),
-        m.enabled ? button(null, () => go(m.id), "ghost icon", "chevron-right", { title: "Öffnen" }) : null,
+        m.enabled ? button(null, () => go(firstPage(m.id)), "ghost icon", "chevron-right", { title: "Öffnen" }) : null,
         sw(m.enabled, async (v, inp) => {
           if (!v && m.dependents.some(modOn)) {
             const deps = m.dependents.filter(modOn).map((d) => mod(d).name).join(", ");
@@ -299,7 +311,7 @@ async function init() {
   $("theme-btn").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
   addEventListener("hashchange", render);
   on("hello", () => { render(); renderConn(); renderBanners(); });
-  on("modules", () => { renderNav(); if (route.page !== "dashboard" && route.page !== "modules" && UI[route.page]) render(); });
+  on("modules", () => { renderNav(); if (PAGES.has(route.page)) render(); });
   on("online", () => { renderConn(); renderBanners(); });
   on("layout_error", renderBanners);
   on("layout", renderBanners);

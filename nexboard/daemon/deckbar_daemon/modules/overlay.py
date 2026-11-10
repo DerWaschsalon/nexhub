@@ -9,6 +9,7 @@ from nexcore.errors import ApiError
 
 from ..core.http import ok, read_object
 from ..core.live import OPENED, LiveHub
+from ..core.topics import SCHEDULE
 from ..overlay import UNIT, Overlay
 from ..state import State
 from .base import WebModule
@@ -17,8 +18,8 @@ from .base import WebModule
 class OverlayModule(WebModule):
     info = ModuleInfo(
         "aion2.overlay", "AION 2 · Overlay", "ingame", "layers-triple",
-        "Meter und Widgets über dem Spiel: frei verschiebbar, klickdurchlässig, mit Boss-Leiste, "
-        "Event-Timern und Namenseffekt.",
+        "Meter und Widgets über dem Spiel: frei verschiebbar, klickdurchlässig, mit Profilen, Boss-Leiste, "
+        "Terminen und Namenseffekt.",
         requires=("aion2.dps",), tags=("AION 2", "Desktop"),
     )
     ui_key = "overlay"
@@ -29,6 +30,7 @@ class OverlayModule(WebModule):
         overlay.listeners.append(self.changed)
         overlay.ui_watching = lambda: live.watching
         state.subscribe(overlay.on_state)
+        ctx.bus.on(SCHEDULE, overlay.on_schedule)  # auch vor dem Einschalten: das Widget hat dann gleich die Liste
 
     def ui_info(self) -> dict[str, Any]:
         return self.overlay.info()

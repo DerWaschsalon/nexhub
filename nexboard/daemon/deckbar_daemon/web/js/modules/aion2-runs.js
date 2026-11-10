@@ -70,7 +70,6 @@ function namesGrid(r, patch) {
 }
 
 export default {
-  tabs: [{ id: "runs", label: "Runs", icon: "trophy" }],
   status: () => (S.runs?.settings?.enabled && S.runs.settings.webhook ? "" : "off"),
   card() {
     const r = S.runs;
@@ -78,5 +77,5 @@ export default {
       el("div", { class: "row wrap" }, stateChip(r)),
       r?.last_run ? el("span", {}, el("b", { text: r.last_run.name }), el("span", { class: "faint", text: ` · ${fmtWhen(r.last_run.end)}` })) : el("span", { class: "faint", text: "Noch kein Run seit dem Start." }));
   },
-  render(tab, ctx) { return runsTab(ctx); },
+  pages: [{ id: "aion2.runs", render: (tab, ctx) => runsTab(ctx) }],
 };

@@ -18,14 +18,14 @@ import mimetypes
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 from urllib.parse import unquote
 
 from aiohttp import web
 
 from .capture import DEFAULT_INTERVAL_MS, Capture, history_root
 from .config import _atomic_write
-from .plugins import PluginError, PluginHost, content_policy, valid_id, with_fonts
+from .plugins import LANGUAGE_KEY, PluginError, PluginHost, content_policy, valid_id, with_fonts
 
 log = logging.getLogger(__name__)
 
@@ -123,6 +123,21 @@ class A2Ui:
         base = plugin_dir or Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "deckbar"
         self.plugins = PluginHost(capture, lambda: self.settings, self._set_setting, self.emit,
                                   base / "plugins", base / "plugin-data")
+        # Sprachwahl im Meter speichert die allgemeine Einstellung (setzt __main__); die meldet sich
+        # dann über apply_language zurück
+        self.on_language: Callable[[str], Awaitable[None]] | None = None
+
+    async def apply_language(self, language: str) -> None:
+        """Sprache der allgemeinen Einstellungen an Mitschnitt, Meter und Plugins geben."""
+        if self.capture.running:
+            try:
+                await self._req("language", lang=language)
+            except (RuntimeError, TimeoutError) as e:
+                log.warning("Sprache nicht an den Mitschnitt übergeben: %s", e)
+        if self.settings.get(LANGUAGE_KEY) != language:
+            self._set_setting(LANGUAGE_KEY, language)
+            await self.emit("setting-changed", {"key": LANGUAGE_KEY, "value": language})
+        await self.plugins.tell_all("language", language)
 
     def _set_setting(self, key: str, value: str) -> None:
         self.settings[key] = value
@@ -311,9 +326,10 @@ class A2Ui:
                 self._apply_update_rate()
                 return None
             case "set_language":
-                if live:
-                    await self._req("language", lang=str(a("language")))
-                await self.plugins.tell_all("language", str(a("language")))
+                if self.on_language:
+                    await self.on_language(str(a("language")))
+                else:
+                    await self.apply_language(str(a("language")))
                 return None
             case "is_admin":
                 return True

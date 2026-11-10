@@ -69,8 +69,6 @@ STATUS_TEXT = {
 
 SOURCES = {"capture": "Eigener Mitschnitt (deckbar-capture)", "auto": "A2Tools-Meter, Stream-Overlay (automatisch)",
            "manual": "A2Tools-Meter, Port und Schlüssel von Hand"}
-LANGUAGES = {"de": "Deutsch", "en": "English", "fr": "Français", "es": "Español", "pt": "Português", "ru": "Русский",
-             "ja": "日本語", "ko": "한국어", "zh-Hans": "简体中文", "zh-Hant": "繁體中文"}
 ONLY_CAPTURE = {"show_if": {"source": ["capture"]}}
 ONLY_MANUAL = {"show_if": {"source": ["manual"]}}
 
@@ -82,8 +80,6 @@ class DpsSettings(_Strict):
     capture_bin: str = Field("", max_length=300, title="Programmpfad",
                              description="Leer = ~/.local/bin bzw. Build im Repo",
                              json_schema_extra=ONLY_CAPTURE | ADVANCED)
-    lang: Literal["de", "en", "es", "fr", "ja", "ko", "pt", "ru", "zh-Hans", "zh-Hant"] = Field(
-        "en", title="Sprache für Boss- und Skillnamen", json_schema_extra={"labels": LANGUAGES} | ONLY_CAPTURE)
     port: int = Field(DEFAULT_PORT, ge=1024, le=65535, title="Port", description="Port des Stream-Overlays im Meter",
                       json_schema_extra=ONLY_MANUAL)
     key: str = Field("", max_length=128, title="Schlüssel", description="key=… aus der Overlay-URL des Meters",
@@ -190,8 +186,10 @@ FightListener = Callable[[dict], Awaitable[None]]
 
 
 class DpsFeed:
-    def __init__(self, state: State, config_dir: Path, on_combat: CombatListener | None = None) -> None:
+    def __init__(self, state: State, config_dir: Path, on_combat: CombatListener | None = None,
+                 language: Callable[[], str] = lambda: "en") -> None:
         self.state = state
+        self.language = language  # Sprache der allgemeinen Einstellungen, gilt ab dem nächsten Start des Mitschnitts
         self.on_combat = on_combat
         self.store = SettingsStore(config_dir / SETTINGS_FILE, DpsSettings, header=SETTINGS_HEADER)
         self.settings = self.store.value
@@ -357,7 +355,7 @@ class DpsFeed:
                         continue
                     if self.settings.source == "capture":
                         self.port = None
-                        job = asyncio.ensure_future(self.capture.run(self.settings.capture_bin, self.settings.lang))
+                        job = asyncio.ensure_future(self.capture.run(self.settings.capture_bin, self.language()))
                         wake = asyncio.ensure_future(self._wake.wait())
                         current[:] = [job, wake]
                         await asyncio.wait({job, wake}, return_when=asyncio.FIRST_COMPLETED)
