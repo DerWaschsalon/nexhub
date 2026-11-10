@@ -10,39 +10,41 @@ Ein Bot für alles, was ihr bisher mit mehreren Bots macht. Alle Befehle sind Sl
 | **Musik** | `/play`, `/skip`, `/stop`, `/pause`, `/weiter`, `/warteschlange`, `/jetzt`, `/lautstaerke`, `/wiederholen`, `/mischen`, `/entfernen` | YouTube-Links und -Suche, SoundCloud, Spotify-Links (Titel, Alben, Playlists, gesucht auf YouTube). Eine „Läuft gerade“-Nachricht mit Buttons, die alte wird gelöscht. Allein im Kanal geht der Bot nach 1 Min., bei leerer Warteschlange nach 5 Min. |
 | **Radio** | `/radio sender:` oder `/radio url:` | Zehntausende Sender aus radio-browser.info, Vorschläge beim Tippen. Oder direkt eine Stream-Adresse. |
 | **Rollen** | `/rollen-panel` | Nachricht mit Buttons, über die man sich Rollen selbst nimmt oder abgibt. Funktioniert auch nach Neustarts. |
-| **Willkommen** | `/setup willkommen`, `/setup autorolle` | Begrüßung mit Platzhaltern `{user}`, `{name}`, `{server}`, `{anzahl}`, Rolle für Neue |
+| **Willkommen** | Klick-Panel oder `/setup aendern` | Begrüßung mit Platzhaltern `{user}`, `{name}`, `{server}`, `{anzahl}`, Rolle für Neue |
 | **Verifizierung** | `/setup verifizierung`, `/setup regeln-text` | Panel mit Regeln + „Regeln akzeptiert“-Button. Aktiv: @everyone sieht den Server erst nach Bestätigen, nur der Regel-Kanal bleibt sichtbar. Autorolle (z. B. „Neuling“) kommt trotzdem sofort beim Beitritt. `/setup regeln-text` ändert den Text im Panel nachträglich. Mit Vorschau/Bestätigung, `aus:True` schaltet wieder ab. |
-| **Moderation** | `/setup log-kanal`, `/setup spamschutz`, `/timeout` | Log für gelöschte/bearbeitete Nachrichten, Beitritte (mit Warnung bei neuen Konten), Austritte, Banns, Rollen. Spamschutz: Flut, Massen-Erwähnungen, Einladungslinks. |
-| **Verwarnungen** | `/warn`, `/warnungen`, `/warnung-loeschen`, `/kick`, `/ban`, `/unban`, `/setup verwarnungen` | Verwarnungen mit Historie (DM an Betroffene), automatische Strafe ab einstellbarer Schwelle (Timeout/Kick/Ban). |
+| **Moderation** | `/timeout`, Log-Kanal und Spamschutz im Klick-Panel | Log für gelöschte/bearbeitete Nachrichten, Beitritte (mit Warnung bei neuen Konten), Austritte, Banns, Rollen. Spamschutz: Flut, Massen-Erwähnungen, Einladungslinks. |
+| **Verwarnungen** | `/warn`, `/warnungen`, `/warnung-loeschen`, `/kick`, `/ban`, `/unban`, Schwelle im Klick-Panel | Verwarnungen mit Historie (DM an Betroffene), automatische Strafe ab einstellbarer Schwelle (Timeout/Kick/Ban). |
 | **Temp-Voice** | `/setup temp-voice`, `/vc name/limit/sperren/freigeben/einladen/uebernehmen` | Wer „➕ Kanal erstellen“ betritt, bekommt einen eigenen Sprachkanal, der leer wieder verschwindet. |
 | **Aufräumen** | `/aufraeumen nachrichten`, `/aufraeumen bots`, `/aufraeumen bericht` | Alte Nachrichten löschen (Filter nach Alter, Person, nur Bots), alte Bots entfernen, Bericht über tote Kanäle und leere Rollen. Immer erst mit Vorschau und Bestätigung. |
 | **Erinnerungen** | `/erinnere wann: text: privat:` | Zeit relativ (`2h`, `30m`, `1d2h`) oder absolut (`18:30`, `24.12. 18:00`). `/erinnerungen` zeigt eigene offene Erinnerungen, `/erinnerung-loeschen` entfernt eine. |
-| **Tickets** | `/setup tickets rolle:` (fügt hinzu/entfernt, mehrere möglich; im Klick-Panel per Mehrfachauswahl), `/ticket-panel` | Panel mit Buttons (❓ Frage, ⚠️ Meldung, 📋 Bewerbung) → Modal → privater Thread mit allen Team-Rollen. „Schließen“ im Thread beendet ihn, sperrt ihn und schickt den Verlauf als `.txt` in den Log-Kanal. |
+| **Tickets** | Team-Rollen im Klick-Panel (Mehrfachauswahl), `/ticket-panel` | Panel mit Buttons (❓ Frage, ⚠️ Meldung, 📋 Bewerbung) → Modal → privater Thread mit allen Team-Rollen. „Schließen“ im Thread beendet ihn, sperrt ihn und schickt den Verlauf als `.txt` in den Log-Kanal. |
 | **Benachrichtigungen** | Button „🔔 Benachrichtigungen" im Klick-Panel | GitHub-Repos beobachten (Releases, Issues, Pull Requests, Commits) per Klick-Assistent, komplett über Buttons/Select-Menüs/Modals, kein Befehl nötig. Modular für weitere Dienste (YouTube, Twitch, RSS, …) — siehe `bot/notify/`. |
 | **AION-2** | `/aion kanal:`, `/aion token:True`, `/dungeon-rangliste dungeon:` | Runs aus dem NexBoard: ein Post je Dungeon-Lauf mit Rangliste (auch wenn mehrere Mitspieler melden), Link in den NexHub und Bestenliste je Boss. Siehe „AION-2: Runs aus dem NexBoard“ unten. |
 | **AION-2-Termine** | Hub → Bot → AION 2 → Termin-Tafel | Eine Nachricht im Kanal, die sich jede Minute aktualisiert: Riss, Shugo-Fest, Beritra-Luftangriff, Wächterin Kaira, Tages- und Wochen-Reset. Zeiten als Discord-Zeitstempel, also in der Zeitzone jedes Lesers. 5 Minuten vorher Ping an die eingestellte Rolle (nicht vor Resets), der Ping löscht sich nach Beginn. Termine aus `proto/nexproto/termine.py` wie im Radar, das Image bekommt die Datei über den zweiten Build-Kontext `proto`. |
-| **DJ-Rolle** | `/setup dj-rolle` | Optional: Dann dürfen nur DJ, Admins und wer den Song gewünscht hat, überspringen und stoppen. |
-| **Bump-Erinnerung** | `/setup bump kanal: rolle:`, auch im Klick-Panel | Erkennt die Bump-Bestätigung von [DISBOARD](https://disboard.org) im festgelegten Kanal und erinnert nach Ablauf des 2-Stunden-Cooldowns per Ping (optionale Rolle) daran, `/bump` erneut zu tippen. Rein passiv, der Bot bumpt nicht selbst. |
-| **Mitglieder-Zähler** | `/setup mitglieder-zaehler kanal:`, auch im Klick-Panel | Name eines Sprachkanals zeigt laufend die aktuelle Mitgliederzahl (z. B. „👥 Mitglieder: 123“), aktualisiert bei Beitritt/Austritt und mindestens alle 10 Minuten (Discords Limit für Kanal-Umbenennungen). |
-| **Starboard** | `/setup starboard kanal: schwelle:`, auch im Klick-Panel | Nachrichten ab X ⭐-Reaktionen (ohne die des Autors selbst, Standard 3) landen als Embed in einem Highlight-Kanal, Sterne-Zähler aktualisiert sich live, Post verschwindet wieder, wenn die Reaktionen unter die Schwelle fallen. |
-| **Bots-Zähler** | `/setup bots-zaehler kanal:`, auch im Klick-Panel | Zweiter, unabhängig einstellbarer Sprachkanal zeigt die Bot-Anzahl (z. B. „🤖 Bots: 12“). |
-| **Voice-Statistik** | `/sprachzeit`, XP per `/setup sprachzeit-xp` oder im Klick-Panel | Zeit im Sprachkanal läuft mit (nicht allein, nicht im AFK-Kanal, nicht selbst taub/stumm), optional zusätzlich XP pro Minute für ein künftiges Levelsystem. |
+| **DJ-Rolle** | Klick-Panel oder `/setup aendern` | Optional: Dann dürfen nur DJ, Admins und wer den Song gewünscht hat, überspringen und stoppen. |
+| **Bump-Erinnerung** | Klick-Panel oder `/setup aendern` | Erkennt die Bump-Bestätigung von [DISBOARD](https://disboard.org) im festgelegten Kanal und erinnert nach Ablauf des 2-Stunden-Cooldowns per Ping (optionale Rolle) daran, `/bump` erneut zu tippen. Rein passiv, der Bot bumpt nicht selbst. |
+| **Mitglieder-Zähler** | Klick-Panel oder `/setup aendern` | Name eines Sprachkanals zeigt laufend die aktuelle Mitgliederzahl (z. B. „👥 Mitglieder: 123“), aktualisiert bei Beitritt/Austritt und mindestens alle 10 Minuten (Discords Limit für Kanal-Umbenennungen). |
+| **Starboard** | Klick-Panel oder `/setup aendern` | Nachrichten ab X ⭐-Reaktionen (ohne die des Autors selbst, Standard 3) landen als Embed in einem Highlight-Kanal, Sterne-Zähler aktualisiert sich live, Post verschwindet wieder, wenn die Reaktionen unter die Schwelle fallen. |
+| **Bots-Zähler** | Klick-Panel oder `/setup aendern` | Zweiter, unabhängig einstellbarer Sprachkanal zeigt die Bot-Anzahl (z. B. „🤖 Bots: 12“). |
+| **Voice-Statistik** | `/sprachzeit`, XP pro Minute im Klick-Panel (Levelsystem) | Zeit im Sprachkanal läuft mit (nicht allein, nicht im AFK-Kanal, nicht selbst taub/stumm), optional zusätzlich XP pro Minute für ein künftiges Levelsystem. |
 | **Umfragen** | `/umfrage frage: antworten: dauer_stunden: mehrfachauswahl:` | Native Discord-Umfrage, 2–10 Antworten durch `\|` getrennt. |
-| **Geburtstage** | `/geburtstag-setzen tag: monat:`, `/geburtstag-loeschen`, `/geburtstag`, Kanal per `/setup geburtstage` oder im Klick-Panel | Tägliche Gratulation um 9 Uhr (Europe/Berlin) im eingerichteten Kanal. |
+| **Geburtstage** | `/geburtstag-setzen tag: monat:`, `/geburtstag-loeschen`, `/geburtstag`, Kanal im Klick-Panel | Tägliche Gratulation um 9 Uhr (Europe/Berlin) im eingerichteten Kanal. |
 | **Embed-Ersteller** | `/embed-erstellen kanal:` | Formular (Titel, Beschreibung, Hex-Farbe, Bild-URL), postet das fertige Embed. |
 | **Eigene Befehle** | `/befehl-erstellen name: antwort:`, `/befehl-loeschen`, `/befehle` | `!name` im Chat antwortet mit dem hinterlegten Text, Platzhalter `{user}`/`{server}`. |
 | **Zeitgesteuerte Ankündigungen** | `/ankuendigung-erstellen kanal: text: intervall_minuten:`, `/ankuendigungen`, `/ankuendigung-loeschen` | Text wird automatisch alle X Minuten in einen Kanal gepostet. |
 | **Benachrichtigungen: YouTube** | Dienst „YouTube" im Klick-Assistenten (🔔) | Neue Videos per öffentlichem RSS-Feed, ohne API-Schlüssel — braucht die Kanal-ID (beginnt mit „UC…"). |
 | **Giveaways** | `/giveaway-erstellen kanal: preis: dauer: gewinner:`, `/giveaway-reroll` | Embed mit „🎉 Teilnehmen"-Button (An-/Abmelden), automatische Auslosung nach Ablauf, Reroll für neue Gewinner. `dauer` im selben Format wie bei `/erinnere` (z. B. `2h`, `1d2h`). |
-| **Levelsystem** | `/rang`, `/rangliste`, `/level-xp-geben`, `/level-belohnung`, `/level-kanal-ohne-xp`, `/level-rolle-ohne-xp`, an/aus per `/setup level` oder im Klick-Panel | 15–25 XP pro Nachricht (60 s Abklingzeit), Rangkarte als Bild, Level-Up-Nachricht, kumulative Rollen-Belohnungen. Standardmäßig **aus**, bis ein Server es einschaltet. |
+| **Levelsystem** | `/rang`, `/rangliste`, `/level-xp-geben`, `/level-belohnung`, `/level-kanal-ohne-xp`, `/level-rolle-ohne-xp`, an/aus im Klick-Panel oder im Klick-Panel | 15–25 XP pro Nachricht (60 s Abklingzeit), Rangkarte als Bild, Level-Up-Nachricht, kumulative Rollen-Belohnungen. Standardmäßig **aus**, bis ein Server es einschaltet. |
 | **Server-Status** | `/server`, `/server-neustart container:`, `/server-update` — nur für `OWNER_ID` | CPU/RAM/Uptime/Festplatte, laufende Container. `/server-update` zieht das neueste Image von GHCR und ersetzt den Bot-Container live damit (kurze Downtime). Braucht den Docker-Socket gemountet (in `docker-compose.yml` auskommentiert, siehe „Server-Status einrichten" unten) — **Root-Zugriff auf den Host**, deshalb bewusst nur eine einzelne Person statt einer Rolle. |
-| **Automod erweitert** | `/setup automod`, auch im Klick-Panel | Wortfilter, Großbuchstaben-Filter, Emoji-Spam-Grenze, Link-Filter mit erlaubten Domains — jeder Verstoß zählt zusätzlich als automatische Verwarnung (zählt mit Richtung der automatischen Strafschwelle). |
+| **Automod erweitert** | Klick-Panel oder `/setup aendern` | Wortfilter, Großbuchstaben-Filter, Emoji-Spam-Grenze, Link-Filter mit erlaubten Domains — jeder Verstoß zählt zusätzlich als automatische Verwarnung (zählt mit Richtung der automatischen Strafschwelle). |
 
 `/setup anzeigen` zeigt alle Einstellungen, `/setup panel` öffnet sie zum Anklicken (Kanal-/Rollen-
-Auswahl per Dropdown, Text per Formular, Ein/Aus per Knopf — kein Befehl tippen nötig). Das
-Klick-Panel deckt inzwischen **alle** `/setup`-Einstellungen ab, inklusive Verwarnungs-Schwelle
-und der kompletten Verifizierungs-Ersteinrichtung (mit Vorschau/Bestätigung
-wie beim Befehl).
+Auswahl per Dropdown, leer abwählen schaltet aus; Zahlen und Texte per Formular, Ein/Aus per Knopf).
+`/setup aendern einstellung: wert:` ändert eine einzelne Einstellung (Vorschläge beim Tippen; Wert als
+#Kanal, @Rolle, Zahl, Text oder an/aus, leer schaltet aus). Alle drei entstehen aus denselben Schemas wie
+die Formulare im NexHub (`bot/modules/*/*/settings.py`, `bot/forms.py`), es gibt also nichts, was nur an
+einer Stelle einstellbar ist. Eigene Befehle behalten nur Abläufe mit Rückfrage oder Anlegen:
+`/setup verifizierung`, `/setup regeln-text`, `/setup temp-voice`.
 `/setup management-kanal kategorie:` legt einen festen Kanal mit genau diesem Klick-Panel an (z. B.
 unter einer internen Admin-Kategorie) — bleibt dauerhaft da und funktioniert auch nach einem
 Neustart des Bots weiter. Die `/setup`- und `/aufraeumen`-Befehle sehen nur Leute mit
@@ -99,12 +101,10 @@ yt-dlp, weil YouTube regelmäßig etwas ändert. Spielt YouTube nicht mehr: Cont
 ## 3. Einrichten (in Discord)
 
 ```
-/setup log-kanal kanal:#mod-log
-/setup willkommen kanal:#willkommen text:Hey {user}, willkommen auf {server}! Schau in #regeln vorbei.
-/setup autorolle rolle:@Mitglied
+/setup panel                            (Log-Kanal, Begrüßung, Autorolle, Ticket-Team usw. per Klick)
+/setup aendern einstellung:Log-Kanal wert:#mod-log
 /setup temp-voice                       (legt Kategorie + „➕ Kanal erstellen“ an)
 /rollen-panel rollen:🎮 @Gamer 🎵 @Musik 📢 @News titel:Wähl deine Rollen
-/setup tickets rolle:@Team
 /ticket-panel titel:Support text:Klick auf einen Button, um ein Ticket zu eröffnen.
 ```
 

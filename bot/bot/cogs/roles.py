@@ -15,7 +15,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from ..errors import UserError
-from .settings import DEFAULT_WELCOME
+from ..modules.server.welcome.settings import DEFAULT_WELCOME
 
 log = logging.getLogger(__name__)
 PANEL_PREFIX = "rp:"

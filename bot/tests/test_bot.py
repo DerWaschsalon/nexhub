@@ -72,17 +72,16 @@ def test_all_commands_register():
     names, pages = run(go())
     check_hub_pages(pages)
     for expected in ["play", "radio", "skip", "stop", "warteschlange", "lautstaerke", "wiederholen",
-                     "setup log-kanal", "setup temp-voice", "setup panel", "setup management-kanal",
-                     "setup verifizierung", "setup regeln-text", "setup verwarnungen", "rollen-panel", "timeout",
+                     "setup aendern", "setup anzeigen", "setup temp-voice", "setup panel", "setup management-kanal",
+                     "setup verifizierung", "setup regeln-text", "rollen-panel", "timeout",
                      "warn", "warnungen", "warnung-loeschen", "kick", "ban", "unban",
                      "erinnere", "erinnerungen", "erinnerung-loeschen", "aion", "dungeon-rangliste",
-                     "setup tickets", "ticket-panel", "setup bump", "setup mitglieder-zaehler", "setup starboard",
-                     "setup bots-zaehler", "umfrage", "geburtstag-setzen", "geburtstag-loeschen", "geburtstag",
-                     "setup geburtstage", "embed-erstellen", "befehl-erstellen", "befehl-loeschen", "befehle",
+                     "ticket-panel", "umfrage", "geburtstag-setzen", "geburtstag-loeschen", "geburtstag",
+                     "embed-erstellen", "befehl-erstellen", "befehl-loeschen", "befehle",
                      "ankuendigung-erstellen", "ankuendigungen", "ankuendigung-loeschen",
-                     "sprachzeit", "setup sprachzeit-xp", "giveaway-erstellen", "giveaway-reroll",
-                     "setup automod", "rang", "rangliste", "level-xp-geben", "level-belohnung",
-                     "level-kanal-ohne-xp", "level-rolle-ohne-xp", "setup level",
+                     "sprachzeit", "giveaway-erstellen", "giveaway-reroll",
+                     "rang", "rangliste", "level-xp-geben", "level-belohnung",
+                     "level-kanal-ohne-xp", "level-rolle-ohne-xp",
                      "server", "server-neustart", "server-update",
                      "vc name", "vc sperren", "aufraeumen nachrichten", "aufraeumen bots", "aufraeumen bericht"]:
         assert expected in names, expected
@@ -155,14 +154,17 @@ def test_source_detection():
 
 def test_settings_panel_persistent_has_stable_custom_ids():
     from bot.cogs.settings import SettingsPanel
+    from bot.forms import SECTIONS
 
+    pages = sum(len(section.groups()) for section in SECTIONS.values())
     cog = type("FakeCog", (), {})()
     view = SettingsPanel(cog, guild=object(), persistent=True)
-    assert len(view.children) == 18  # kein Schließen-Button im persistenten Modus
+    assert len(view.children) == pages + 2  # Seiten, Verifizierung, Benachrichtigungen; kein Schließen
     assert all(item.custom_id for item in view.children)
+    assert len({item.custom_id for item in view.children}) == len(view.children)
 
     ephemeral = SettingsPanel(cog, guild=object(), persistent=False)
-    assert len(ephemeral.children) == 19  # inkl. Schließen
+    assert len(ephemeral.children) == pages + 3  # inkl. Schließen
 
 
 def test_reminder_parsing():
@@ -626,40 +628,60 @@ def test_stats_channel_names():
     assert bots_channel_name(guild) == "🤖 Bots: 2"
 
 
-def test_new_panel_subviews_build_without_overflow():
-    """Discord erlaubt höchstens 5 Komponenten pro Zeile — jede neue Unteransicht des Klick-Panels
-    muss ohne ValueError konstruierbar sein, in beiden Verifizierungs-Zuständen."""
+def test_every_panel_page_fits_discord_limits():
+    """Jede erzeugte Seite muss sich bauen lassen (Discord: 5 Zeilen, je Zeile eine Auswahl oder
+    5 Knöpfe) und stabile custom_ids haben, in beiden Verifizierungs-Zuständen."""
     from pathlib import Path
 
-    from bot.cogs.settings import (
-        AutomodView,
-        BirthdayView,
-        BumpView,
-        LevelView,
-        MemberCountView,
-        SettingsPanel,
-        StarboardView,
-        VerifyView,
-        WarnView,
-    )
+    from bot.cogs.settings import EXTRAS, SettingsPanel, VerifyView
     from bot.db import Database
+    from bot.forms import SECTIONS
+    from bot.panel import FieldPage
 
     cog = type("FakeCog", (), {})()
-    cog.db = Database(Path("/tmp/_unused_panel_subview_test.sqlite3"))
+    cog.db = Database(Path("/tmp/_unused_panel_page_test.sqlite3"))
+    cog.bot = object()
     guild = type("G", (), {"id": 1})()
-    panel = SettingsPanel.__new__(SettingsPanel)
-    panel.cog, panel.guild, panel.persistent = cog, guild, True
+    panel = SettingsPanel(cog, guild, persistent=True)
 
-    for view_cls in [
-        WarnView, BumpView, MemberCountView, StarboardView, BirthdayView, AutomodView, LevelView,
-    ]:
-        view = view_cls(panel)
-        assert all(item.custom_id for item in view.children)
+    async def back(_interaction):
+        return None
+
+    for section in SECTIONS.values():
+        for index, (group, _fields) in enumerate(section.groups()):
+            extra = EXTRAS.get((section.id, group))
+            page = FieldPage(cog.bot, cog.db, guild, section, index, back,
+                             extras=(extra(panel),) if extra else (), persistent=True)
+            assert all(item.custom_id for item in page.children), (section.id, group)
+            assert page.embed().title
 
     for active in (True, False):
         cog.db._settings[1] = {"verify_active": "1" if active else "0"}
         view = VerifyView(panel)
         assert all(item.custom_id for item in view.children)
+
+
+def test_setup_change_parses_input():
+    import pytest
+
+    from bot.cogs.settings import parse_input
+    from bot.errors import UserError
+    from bot.forms import find_field
+
+    def field(key):
+        return find_field(key)[1]
+
+    assert parse_input(field("log_channel"), "<#123456789012345678>") == "123456789012345678"
+    assert parse_input(field("log_channel"), "") is None
+    assert parse_input(field("level_no_xp_roles"), "<@&123456789012345678> 223456789012345678") == [
+        "123456789012345678", "223456789012345678"]
+    assert parse_input(field("antispam"), "Aus") is False
+    assert parse_input(field("warn_threshold"), "") == 0
+    assert parse_input(field("starboard_threshold"), "5") == 5
+    with pytest.raises(UserError):
+        parse_input(field("antispam"), "vielleicht")
+    with pytest.raises(UserError):
+        parse_input(field("log_channel"), "#allgemein")
 
 
 def test_starboard_embed():
