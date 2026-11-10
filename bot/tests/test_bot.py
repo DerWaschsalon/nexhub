@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import discord
@@ -12,11 +14,17 @@ import pytest
 
 from bot.__main__ import Bot
 from bot.db import Database
+from bot.hubpages import Page
 
 
-def check_hub_pages(pages):
+def custom_ids(view: discord.ui.View) -> list[str | None]:
+    """custom_id aller Knöpfe und Auswahlen; feste IDs braucht ein Panel, das Neustarts überlebt."""
+    return [getattr(item, "custom_id", None) for item in view.children]
+
+
+def check_hub_pages(pages: list[Page]) -> None:
     """Menü des Hubs: jede Seite einmal, Formulare zeigen auf echte Bereiche, Aktionen sind auffindbar."""
-    from bot.cogs.control import SECTIONS
+    from bot.forms import SECTIONS
     from bot.hubpages import GROUPS, Actions, Form, Status, Table
 
     ids = [p.id for p in pages]
@@ -40,13 +48,21 @@ def check_hub_pages(pages):
                 assert len({f.key for f in a.fields}) == len(a.fields), (p.id, a.id)
 
 
-def test_all_commands_register():
-    async def go():
+def test_all_commands_register() -> None:
+    async def go() -> Any:
         with tempfile.TemporaryDirectory() as d:
             bot = Bot(Database(Path(d) / "t.sqlite3"), sync=False)
             await bot.setup_hook()
+            # erst nach dem Laden importieren: load_extension lädt die Cog-Datei neu (eigene Klasse)
+            from bot.cogs.control import Control
+            from bot.cogs.settings import Setup
+
+            # So findet on_ready den Setup-Cog für die festen Management-Panels
+            assert isinstance(bot.get_cog("Setup"), Setup)
             names = sorted(c.qualified_name for c in bot.tree.walk_commands())
-            pages = bot.get_cog("Control").all_pages()
+            control = bot.get_cog("Control")
+            assert isinstance(control, Control)
+            pages = control.all_pages()
             await bot.modules.stop()
             await bot.db.close()
             return names, pages
@@ -72,8 +88,8 @@ def test_all_commands_register():
             assert part == part.lower() and len(part) <= 32
 
 
-def test_db_roundtrip():
-    async def go():
+def test_db_roundtrip() -> None:
+    async def go() -> Any:
         with tempfile.TemporaryDirectory() as d:
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
@@ -83,71 +99,78 @@ def test_db_roundtrip():
             await db.close()
             db2 = Database(Path(d) / "t.sqlite3")
             await db2.connect()
-            r = (db2.get_int(1, "log_channel"), db2.get_bool(1, "antispam", True),
-                 await db2.temp_channel_owner(5))
+            before = (db2.get_int(1, "log_channel"), db2.get_bool(1, "antispam", True),
+                      await db2.temp_channel_owner(5))
             await db2.set(1, "log_channel", None)
-            r += (db2.get(1, "log_channel"),)
+            after = db2.get(1, "log_channel")
             await db2.close()
-            return r
+            return (*before, after)
     assert asyncio.run(go()) == (42, False, 9, None)
 
 
-def test_settings_panel_persistent_has_stable_custom_ids():
+def test_settings_panel_persistent_has_stable_custom_ids() -> None:
     from bot.cogs.settings import SettingsPanel
     from bot.forms import SECTIONS
 
     pages = sum(len(section.groups()) for section in SECTIONS.values())
-    cog = type("FakeCog", (), {})()
-    view = SettingsPanel(cog, guild=object(), persistent=True)
+    cog: Any = type("FakeCog", (), {})()
+    guild: Any = object()
+    view = SettingsPanel(cog, guild=guild, persistent=True)
     assert len(view.children) == pages + 2  # Seiten, Verifizierung, Benachrichtigungen; kein Schließen
-    assert all(item.custom_id for item in view.children)
-    assert len({item.custom_id for item in view.children}) == len(view.children)
+    ids = custom_ids(view)
+    assert all(ids) and len(set(ids)) == len(ids)
 
-    ephemeral = SettingsPanel(cog, guild=object(), persistent=False)
+    ephemeral = SettingsPanel(cog, guild=guild, persistent=False)
     assert len(ephemeral.children) == pages + 3  # inkl. Schließen
 
 
-def test_role_can_view():
+def test_role_can_view() -> None:
 
     from bot.cogs.control import role_can_view
 
     class FakeChannel:
-        def __init__(self, overwrites):
+        def __init__(self, overwrites: dict[Any, discord.PermissionOverwrite]) -> None:
             self._ow = overwrites
 
-        def overwrites_for(self, target):
+        def overwrites_for(self, target: Any) -> discord.PermissionOverwrite:
             return self._ow.get(target, discord.PermissionOverwrite())
 
     class FakeRole:
-        def __init__(self, perms):
+        def __init__(self, perms: discord.Permissions) -> None:
             self.permissions = perms
 
-    everyone = FakeRole(discord.Permissions(view_channel=True))
-    role = FakeRole(discord.Permissions.none())
+    def fake_role(perms: discord.Permissions) -> Any:
+        return FakeRole(perms)
+
+    def channel(overwrites: dict[Any, discord.PermissionOverwrite]) -> Any:
+        return FakeChannel(overwrites)
+
+    everyone = fake_role(discord.Permissions(view_channel=True))
+    role = fake_role(discord.Permissions.none())
 
     # Kein Overwrite: @everyone darf sehen (Basisrecht), also auch diese Rolle
-    assert role_can_view(FakeChannel({}), role, everyone) is True
+    assert role_can_view(channel({}), role, everyone) is True
 
     # @everyone per Overwrite ausgeschlossen, Rolle ohne eigenes Overwrite -> nicht sichtbar
-    ch = FakeChannel({everyone: discord.PermissionOverwrite(view_channel=False)})
+    ch = channel({everyone: discord.PermissionOverwrite(view_channel=False)})
     assert role_can_view(ch, role, everyone) is False
 
     # @everyone ausgeschlossen, Rolle aber explizit erlaubt -> rollen-spezifisch gewinnt
-    ch = FakeChannel({
+    ch = channel({
         everyone: discord.PermissionOverwrite(view_channel=False),
         role: discord.PermissionOverwrite(view_channel=True),
     })
     assert role_can_view(ch, role, everyone) is True
 
 
-def test_panel_regex():
+def test_panel_regex() -> None:
     import re
     pat = re.compile(r"(?:(<a?:\w+:\d+>|[^\x00-\x7F\s]+)\s*)?<@&(\d+)>")
     got = [(m.group(1), m.group(2)) for m in pat.finditer("🎮 <@&1> und <@&2> <:aion:99> <@&3>")]
     assert got == [("🎮", "1"), (None, "2"), ("<:aion:99>", "3")]
 
 
-def test_every_panel_page_fits_discord_limits():
+def test_every_panel_page_fits_discord_limits() -> None:
     """Jede erzeugte Seite muss sich bauen lassen (Discord: 5 Zeilen, je Zeile eine Auswahl oder
     5 Knöpfe) und stabile custom_ids haben, in beiden Verifizierungs-Zuständen."""
     from pathlib import Path
@@ -162,13 +185,13 @@ def test_every_panel_page_fits_discord_limits():
     from bot.modules.server.verification.panel import Flow
     from bot.panel import FieldPage
 
-    cog = type("FakeCog", (), {})()
+    cog: Any = type("FakeCog", (), {})()
     cog.db = Database(Path("/tmp/_unused_panel_page_test.sqlite3"))
     cog.bot = object()
-    guild = type("G", (), {"id": 1})()
+    guild: Any = SimpleNamespace(id=1)
     panel = SettingsPanel(cog, guild, persistent=True)
 
-    async def back(_interaction):
+    async def back(_interaction: discord.Interaction) -> None:
         return None
 
     for section in SECTIONS.values():
@@ -176,25 +199,26 @@ def test_every_panel_page_fits_discord_limits():
             extra = EXTRAS.get((section.id, group))
             page = FieldPage(cog.bot, cog.db, guild, section, index, back,
                              extras=(extra(panel),) if extra else (), persistent=True)
-            assert all(item.custom_id for item in page.children), (section.id, group)
+            assert all(custom_ids(page)), (section.id, group)
             assert page.embed().title
 
     verification = Verification(BotContext(bus=EventBus(), paths=Paths("test"), db=cog.db, client=MagicMock()))
     for active in (True, False):
         cog.db._settings[1] = {"verify_active": "1" if active else "0"}
         view = Flow(verification, guild, True, back).menu()
-        assert all(item.custom_id for item in view.children)
+        assert all(custom_ids(view))
 
 
-def test_setup_change_parses_input():
-    import pytest
-
+def test_setup_change_parses_input() -> None:
     from bot.cogs.settings import parse_input
     from bot.errors import UserError
     from bot.forms import find_field
+    from bot.hubpages import Field
 
-    def field(key):
-        return find_field(key)[1]
+    def field(key: str) -> Field:
+        found = find_field(key)
+        assert found is not None, key
+        return found[1]
 
     assert parse_input(field("log_channel"), "<#123456789012345678>") == "123456789012345678"
     assert parse_input(field("log_channel"), "") is None
@@ -209,29 +233,19 @@ def test_setup_change_parses_input():
         parse_input(field("log_channel"), "#allgemein")
 
 
-def test_hub_action_values():
+def test_hub_action_values() -> None:
     """Werte aus dem Hub: Pflichtfelder, Grenzen, Auswahl und ausgeblendete Felder (show_if)."""
 
     from bot.hubpages import ApiError, Field, action_values
 
-    class Ch:
-        def __init__(self, cid, kind):
-            self.id, self.type, self.name = cid, kind, f"k{cid}"
+    def ch(cid: int, kind: discord.ChannelType) -> Any:
+        return SimpleNamespace(id=cid, type=kind, name=f"k{cid}")
 
-    class Guild:
-        channels = {1: Ch(1, discord.ChannelType.text), 2: Ch(2, discord.ChannelType.voice)}
-        members = {5: "Mitglied 5"}
-
-        def get_channel(self, i):
-            return self.channels.get(i)
-
-        def get_member(self, i):
-            return self.members.get(i)
-
-        def get_role(self, i):
-            return None
-
-    g = Guild()
+    channels = {1: ch(1, discord.ChannelType.text), 2: ch(2, discord.ChannelType.voice)}
+    members = {5: "Mitglied 5"}
+    # nachgebauter Server: nur was action_values liest
+    g: Any = SimpleNamespace(channels=channels, get_channel=channels.get, get_member=members.get,
+                             get_role=lambda i: None)
     fields = (
         Field("kind", "choice", "Dienst", default="a", options=(("a", "A"), ("b", "B"))),
         Field("src_a", "text", "Quelle A", required=True, show_if=("kind", ("a",))),
