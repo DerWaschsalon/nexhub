@@ -1,8 +1,5 @@
-"""AION-2: `/dungeon-rangliste` zeigt Bestzeiten und die DPS-Rangliste eines Dungeons.
-
-Die Daten sammelt `aion_dedup.py` aus den Runs des NexBoards (gespeichert über aion_records.py).
-`/rangliste` ist schon die Rangliste des Levelsystems, daher der längere Name.
-"""
+"""Slash-Befehle der Runs: /aion (Kanal, Wartezeit, Token) und /dungeon-rangliste (Bestzeiten und
+DPS-Rangliste eines Dungeons). `/rangliste` gehört schon dem Levelsystem, daher der längere Name."""
 
 from __future__ import annotations
 
@@ -11,14 +8,15 @@ from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
-from discord.ext import commands
 
-from ..aion_format import fmt_dps, fmt_time
-from ..aion_records import DungeonKey, FastRun, PlayerBest, RunRecords
-from ..errors import UserError
+from bot.core import ModuleCog
+from bot.errors import UserError
 
-if TYPE_CHECKING:  # nur für die Typprüfung, der Bot lädt diese Datei selbst
-    from ..__main__ import Bot
+from .format import fmt_dps, fmt_time
+from .records import DungeonKey, FastRun, PlayerBest
+
+if TYPE_CHECKING:
+    from .posts import RunPosts
 
 # Ein Vorschlag beim Tippen trägt Dungeon und Schwierigkeit in einem Wert, durch Tab getrennt
 # (kommt in keinem Dungeon-Namen vor).
@@ -56,9 +54,43 @@ def ranking_embed(title: str, runs: list[FastRun], players: list[PlayerBest]) ->
     return embed
 
 
-class AionRanking(commands.Cog):
-    def __init__(self, records: RunRecords) -> None:
-        self.records = records
+class RunsCog(ModuleCog):
+    module: "RunPosts"
+
+    @app_commands.command(name="aion", description="AION-2-Posts aus dem NexBoard einrichten")
+    @app_commands.describe(
+        kanal="Kanal für die zusammengeführten AION-Posts",
+        wartezeit="Sekunden, die auf weitere Meldungen vom selben Lauf gewartet wird (Standard 15)",
+        token="Neuen API-Token erzeugen (alten ungültig machen)",
+        aus="AION-Posts abschalten",
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def aion_settings(self, interaction: discord.Interaction, kanal: discord.TextChannel | None = None,
+                            wartezeit: app_commands.Range[int, 5, 300] | None = None, token: bool = False,
+                            aus: bool = False) -> None:
+        guild = interaction.guild
+        assert guild is not None  # guild_only
+        db = self.module.db
+        if aus:
+            await db.set(guild.id, "aion_channel", None)
+            await interaction.response.send_message("AION-Posts sind aus.", ephemeral=True)
+            return
+        if kanal:
+            await db.set(guild.id, "aion_channel", kanal.id)
+        if wartezeit:
+            await db.set(guild.id, "aion_dedup_delay", wartezeit)
+        channel = guild.get_channel(db.get_int(guild.id, "aion_channel") or 0)
+        if channel is None:
+            await interaction.response.send_message("Noch kein Kanal festgelegt. `/aion kanal:#dein-aion-kanal`.",
+                                                    ephemeral=True)
+            return
+        api_token = await self.module.token(guild.id, renew=token)
+        await interaction.response.send_message(
+            f"Kanal: {channel.mention}, Wartezeit {self.module.delay(guild.id)}s.\n\n"
+            f"Im NexBoard unter Discord-Bot eintragen:\n`{self.module.api_url()}`\nToken: `{api_token}`\n"
+            "Geheim halten, nur an NexBoards geben, die mitmachen sollen. Mit `token:True` einen neuen "
+            "erzeugen (macht den alten ungültig).", ephemeral=True)
 
     @app_commands.command(name="dungeon-rangliste", description="Bestzeiten und DPS-Rangliste eines Dungeons")
     @app_commands.describe(dungeon="Dungeon und Schwierigkeit, Vorschläge beim Tippen")
@@ -66,10 +98,10 @@ class AionRanking(commands.Cog):
     async def ranking(self, interaction: discord.Interaction, dungeon: str) -> None:
         assert interaction.guild_id is not None  # guild_only
         key = await self._resolve(interaction.guild_id, dungeon)
-        runs = await self.records.fastest(key)
+        runs = await self.module.records.fastest(key)
         if not runs:
             raise UserError(f"Für „{dungeon_label(key)}“ gibt es noch keinen vollständigen Run.")
-        players = await self.records.best_players(key)
+        players = await self.module.records.best_players(key)
         await interaction.response.send_message(embed=ranking_embed(dungeon_label(key), runs, players))
 
     @ranking.autocomplete("dungeon")
@@ -78,7 +110,7 @@ class AionRanking(commands.Cog):
     ) -> list[app_commands.Choice[str]]:
         if interaction.guild_id is None:
             return []
-        keys = await self.records.dungeons(interaction.guild_id, current)
+        keys = await self.module.records.dungeons(interaction.guild_id, current)
         return [
             app_commands.Choice(name=dungeon_label(k)[:MAX_CHOICE_NAME], value=f"{k.dungeon}{SEPARATOR}{k.difficulty}")
             for k in keys
@@ -89,11 +121,7 @@ class AionRanking(commands.Cog):
         if SEPARATOR in value:
             dungeon, difficulty = value.split(SEPARATOR, 1)
             return DungeonKey(guild_id, dungeon, difficulty)
-        keys = await self.records.dungeons(guild_id, value.strip())
+        keys = await self.module.records.dungeons(guild_id, value.strip())
         if not keys:
             raise UserError(f"Kein Dungeon „{value}“ mit gewerteten Runs.")
         return keys[0]
-
-
-async def setup(bot: Bot) -> None:
-    await bot.add_cog(AionRanking(RunRecords(bot.db)))

@@ -6,6 +6,7 @@ Bild für die Gesamt-Rangliste und eines pro Boss.
 from __future__ import annotations
 
 import io
+from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -31,15 +32,15 @@ FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 RANK_COLOURS = [GOLD, SILVER, BRONZE]
 
 
-def _font(path: str, size: int):
+def _font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
         return ImageFont.truetype(path, size)
     except OSError:
         return ImageFont.load_default()
 
 
-def _draw_rows(draw: ImageDraw.ImageDraw, rows: list[dict], top: int) -> None:
-    from ..aion_format import fmt_dps, fmt_num
+def _draw_rows(draw: ImageDraw.ImageDraw, rows: list[dict[str, Any]], top: int) -> None:
+    from .format import fmt_dps, fmt_num
 
     max_damage = rows[0]["damage"] if rows else 0
     name_x = MARGIN
@@ -68,7 +69,7 @@ def _draw_rows(draw: ImageDraw.ImageDraw, rows: list[dict], top: int) -> None:
 
 
 def render_run_image(
-    dungeon: str, difficulty: str | None, players: list[dict], bosses_killed: int,
+    dungeon: str, difficulty: str | None, players: list[dict[str, Any]], bosses_killed: int,
     bosses_total: int, fight_ms: int,
 ) -> io.BytesIO:
     rows = players[:MAX_ROWS]
@@ -90,7 +91,7 @@ def render_run_image(
     return buf
 
 
-def render_boss_image(boss_name: str, players: list[dict]) -> io.BytesIO:
+def render_boss_image(boss_name: str, players: list[dict[str, Any]]) -> io.BytesIO:
     rows = players[:MAX_ROWS]
     height = BOSS_HEADER_HEIGHT + max(1, len(rows)) * ROW_HEIGHT + MARGIN
     img = Image.new("RGB", (WIDTH, height), BG_COLOUR)

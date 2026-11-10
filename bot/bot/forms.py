@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from .core.schema import form_fields
 from .db import Database
 from .hubpages import TEXT_TYPES, VOICE_TYPES, ApiError, Field
-from .modules.aion2.run_posts.settings import RunPostSettings
+from .modules.aion2.runs.settings import RunPostSettings
 from .modules.aion2.schedule.settings import ScheduleSettings
 from .modules.community.birthdays.settings import BirthdaySettings
 from .modules.community.bump.settings import BumpSettings

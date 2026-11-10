@@ -49,7 +49,6 @@ def test_all_commands_register():
             names = sorted(c.qualified_name for c in bot.tree.walk_commands())
             pages = bot.get_cog("Control").all_pages()
             await bot.modules.stop()
-            await bot.get_cog("AionDedup").cog_unload()
             await bot.db.close()
             return names, pages
     names, pages = run(go())
@@ -309,8 +308,8 @@ def test_aion_api_auth_rejects_bad_requests():
 
     from aiohttp.test_utils import make_mocked_request
 
-    from bot.cogs.aion_dedup import AionDedup
     from bot.db import Database
+    from bot.modules.aion2.runs.posts import RunPosts
 
     async def go():
         with tempfile.TemporaryDirectory() as d:
@@ -318,8 +317,8 @@ def test_aion_api_auth_rejects_bad_requests():
             await db.connect()
             await db.set(1, "aion_api_token", "secret123")
             await db.set(1, "aion_channel", 999)
-            cog = AionDedup.__new__(AionDedup)
-            cog.bot = type("B", (), {"get_cog": lambda self, name: None})()
+            cog = RunPosts.__new__(RunPosts)
+            cog.client = type("B", (), {"get_cog": lambda self, name: None})()
             cog.db = db
             cog.api_pending = {}
 
@@ -339,8 +338,8 @@ def test_aion_api_auth_rejects_bad_requests():
 
 
 def test_aion_api_merge_and_embed():
-    from bot.aion_format import fmt_dps, fmt_num
-    from bot.cogs.aion_dedup import build_run_embed, merge_players, same_api_run, validate_fight_payload
+    from bot.modules.aion2.runs.format import fmt_dps, fmt_num
+    from bot.modules.aion2.runs.posts import build_run_embed, merge_players, same_api_run, validate_fight_payload
 
     assert fmt_num(13_290_000) == "13.29M"
     assert fmt_num(8_080) == "8.1k"
@@ -379,7 +378,7 @@ def test_aion_api_merge_and_embed():
 
 
 def test_aion_leaderboard_rows():
-    from bot.cogs.aion_dedup import leaderboard_rows
+    from bot.modules.aion2.runs.posts import leaderboard_rows
 
     bosses = [
         {"name": "Boss 1", "players": [{"name": "ReZero", "damage": 100, "dps": 10}]},
@@ -398,14 +397,14 @@ def test_aion_update_leaderboard_keeps_only_best():
     import tempfile
     from pathlib import Path
 
-    from bot.cogs.aion_dedup import AionDedup
     from bot.db import Database
+    from bot.modules.aion2.runs.posts import RunPosts
 
     async def go():
         with tempfile.TemporaryDirectory() as d:
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
-            cog = AionDedup.__new__(AionDedup)
+            cog = RunPosts.__new__(RunPosts)
             cog.db = db
 
             bosses = [{"name": "Boss 1", "players": [{"name": "ReZero", "damage": 100, "dps": 10}]}]
@@ -431,10 +430,10 @@ def test_aion_update_leaderboard_keeps_only_best():
 
 
 def test_aion_records_best_time_and_dps_record():
-    from bot.aion_format import records_text
-    from bot.aion_records import DungeonKey, RunRecords
-    from bot.cogs.aion_dedup import RECORDS_FIELD, build_run_embed
-    from bot.cogs.aion_ranking import ranking_embed
+    from bot.modules.aion2.runs.commands import ranking_embed
+    from bot.modules.aion2.runs.format import records_text
+    from bot.modules.aion2.runs.posts import RECORDS_FIELD, build_run_embed
+    from bot.modules.aion2.runs.records import DungeonKey, RunRecords
 
     def make_run(fight_ms: int, killed: int = 3, difficulty: str | None = "Normal") -> dict:
         return {"dungeon": "Feuertempel", "difficulty": difficulty, "bosses_total": 3,
@@ -492,8 +491,8 @@ def test_aion_leaderboard_page():
     import tempfile
     from pathlib import Path
 
-    from bot.cogs.aion_dedup import AionDedup
     from bot.db import Database
+    from bot.modules.aion2.runs.posts import RunPosts
 
     class FakeGuild:
         id = 1
@@ -504,9 +503,9 @@ def test_aion_leaderboard_page():
             db = Database(Path(d) / "t.sqlite3")
             await db.connect()
 
-            cog = AionDedup.__new__(AionDedup)
+            cog = RunPosts.__new__(RunPosts)
             cog.db = db
-            cog.bot = type("B", (), {"get_guild": lambda self, gid: FakeGuild() if gid == 1 else None})()
+            cog.client = type("B", (), {"get_guild": lambda self, gid: FakeGuild() if gid == 1 else None})()
             bosses = [{"name": "Kromede's Desire", "players": [{"name": "Xqzmepls", "damage": 500, "dps": 50}]}]
             await cog._update_leaderboard(1, bosses, [{"name": "Xqzmepls", "cls": "ranger"}])
 
@@ -526,7 +525,7 @@ def test_aion_leaderboard_page():
 
 
 def test_aion_api_boss_dps():
-    from bot.cogs.aion_dedup import build_run_embed, merge_bosses, validate_fight_payload
+    from bot.modules.aion2.runs.posts import build_run_embed, merge_bosses, validate_fight_payload
 
     base = {"dungeon": "Ferocious Horn Den", "bosses_total": 2, "bosses_killed": 2,
             "start_ms": 1_760_445_123_000, "fight_ms": 350_000,
@@ -554,7 +553,7 @@ def test_aion_api_boss_dps():
 
     from PIL import Image
 
-    from bot.cogs.aion_image import WIDTH, render_boss_image
+    from bot.modules.aion2.runs.image import WIDTH, render_boss_image
 
     boss_buf = render_boss_image(bosses[0]["name"], bosses[0]["players"])
     boss_image = Image.open(boss_buf)
@@ -786,7 +785,7 @@ def test_giveaway_pick_winners_respects_count_and_uses_entries():
 def test_aion_run_image_renders_valid_png():
     from PIL import Image
 
-    from bot.cogs.aion_image import WIDTH, render_run_image
+    from bot.modules.aion2.runs.image import WIDTH, render_run_image
 
     players = [
         {"name": "ReZero", "damage": 13_290_000, "dps": 38_000},
@@ -803,7 +802,7 @@ def test_aion_run_image_renders_valid_png():
     assert Image.open(empty_buf).size[0] == WIDTH
 
     # mehr als MAX_ROWS Spieler -> Bild bleibt begrenzt hoch (keine endlose Liste pro Spieler)
-    from bot.cogs.aion_image import MAX_ROWS
+    from bot.modules.aion2.runs.image import MAX_ROWS
 
     many_players = [{"name": f"P{i}", "damage": 1000 - i, "dps": 10} for i in range(30)]
     many_buf = render_run_image("Fire Temple", None, many_players, bosses_killed=1, bosses_total=1, fight_ms=60_000)
@@ -893,7 +892,7 @@ def test_aion_api_run_image():
     """Run-Bild vom NexBoard: nur echtes WebP, von mehreren Meldungen das mit den meisten Spielern."""
     import base64
 
-    from bot.cogs.aion_dedup import MAX_IMAGE_BYTES, decode_image, pick_image, validate_fight_payload
+    from bot.modules.aion2.runs.posts import MAX_IMAGE_BYTES, decode_image, pick_image, validate_fight_payload
 
     webp = b"RIFF\x10\0\0\0WEBPVP8L" + b"x" * 20
     enc = base64.b64encode(webp).decode()
@@ -920,7 +919,7 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
     """Mit Bild: ein Embed mit dem WebP, keine eigenen Boss-Bilder; ohne Bild wie früher."""
     import base64
 
-    import bot.cogs.aion_dedup as dedup
+    import bot.modules.aion2.runs.posts as dedup
 
     webp = b"RIFF\x10\0\0\0WEBPVP8L" + b"x" * 20
     sent = []
@@ -941,8 +940,8 @@ def test_aion_api_posts_nexboard_image(monkeypatch):
         return None
 
     monkeypatch.setattr(dedup.asyncio, "sleep", no_sleep)
-    cog = dedup.AionDedup.__new__(dedup.AionDedup)
-    cog.bot, cog.api_pending, cog.api_posted = FakeBot(), {}, []
+    cog = dedup.RunPosts.__new__(dedup.RunPosts)
+    cog.client, cog.api_pending, cog.api_posted = FakeBot(), {}, []
     cog._update_leaderboard = no_lb
     cog.records = type("NoRecords", (), {"save": lambda self, *a: no_lb()})()
     run_ = {"dungeon": "Fire Temple", "difficulty": None, "bosses_total": 2, "bosses_killed": 2, "start_ms": 1,
@@ -967,7 +966,7 @@ def test_aion_hub_link(monkeypatch):
 
     monkeypatch.setenv("AION_PUBLIC_URL", "https://hub.example.com")
 
-    from bot.cogs.aion_dedup import AionDedup, ApiCluster, build_run_embed, same_run_start, with_hub_link
+    from bot.modules.aion2.runs.posts import ApiCluster, RunPosts, build_run_embed, same_run_start, with_hub_link
 
     base = {"dungeon": "Fire Temple", "bosses_total": 4, "bosses_killed": 4,
             "start_ms": 1_792_616_000_000, "fight_ms": 300_000,
@@ -989,7 +988,7 @@ def test_aion_hub_link(monkeypatch):
     bare = with_hub_link(build_run_embed(base, reporters=1), url)
     assert bare.fields[-1].value == f"[Im NexHub ansehen]({url})"
 
-    cog = AionDedup.__new__(AionDedup)  # ohne Bot/DB/Loop: attach_hub_link braucht nur die Listen
+    cog = RunPosts.__new__(RunPosts)  # ohne Bot/DB/Loop: attach_hub_link braucht nur die Listen
     cog.api_pending, cog.api_posted = {}, []
 
     cluster = ApiCluster(base, guild_id=1)
@@ -1107,7 +1106,8 @@ def test_hub_giveaway_page():
 def test_termin_tafel_und_pings():
     from datetime import datetime, timezone
 
-    from bot.cogs.termintafel import faellige_pings, tafel
+    from bot.modules.aion2.schedule import board as tafel
+    from bot.modules.aion2.schedule import due_pings as faellige_pings
 
     um = lambda s: datetime.fromisoformat(s).replace(tzinfo=timezone.utc).timestamp()  # noqa: E731
     jetzt = um("2026-10-07 02:57")

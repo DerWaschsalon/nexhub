@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .db import Database
+from bot.db import Database
 
 TOP_TIMES = 5
 TOP_PLAYERS = 10

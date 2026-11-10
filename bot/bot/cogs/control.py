@@ -280,10 +280,16 @@ class Control(commands.Cog):
 
     # ---- Formular-Bereiche ---------------------------------------------------------------------
 
+    def runs(self) -> Any:
+        """Das Modul aion2.runs, wenn der Bot Module hat (in Tests der Steuer-API fehlen sie)."""
+        if not hasattr(self.bot, "modules"):
+            return None
+        return self.bot.modules.module("aion2.runs")
+
     def section_info(self, guild, s: Section) -> list[dict]:
         """Nur-Lese-Angaben unter einem Formular, z. B. Adresse und Token für das NexBoard."""
         if s.id == "aion":
-            aion = self.bot.get_cog("AionDedup")
+            aion = self.runs()
             return [
                 {"label": "Endpunkt", "value": aion.api_url() if aion else None, "code": True},
                 {"label": "Token", "value": self.db.get(guild.id, "aion_api_token"), "code": True, "secret": True},
@@ -325,9 +331,9 @@ class Control(commands.Cog):
         if action not in s.actions:
             raise ApiError(404, "Aktion gibt es nicht")
         if (s.id, action) == ("aion", "token"):
-            import secrets
-
-            await self.db.set(guild.id, "aion_api_token", secrets.token_urlsafe(24))
+            aion = self.runs()
+            if aion is not None:
+                await aion.token(guild.id, renew=True)
         return self.section_out(guild, s)
 
     # ---- Verifizierung -------------------------------------------------------------------------
@@ -543,7 +549,7 @@ class Control(commands.Cog):
     # ---- Runs aus dem Hub ---------------------------------------------------------------------
 
     async def run_link(self, request: web.Request) -> dict:
-        """Der Hub hat einen Run gespeichert: Link an den passenden AION-Post (aion_dedup.attach_hub_link)."""
+        """Der Hub hat einen Run gespeichert: Link an den passenden AION-Post (aion2.runs, attach_hub_link)."""
         data = await self.body(request)
         dungeon, start_ms, url = data.get("dungeon"), data.get("start_ms"), data.get("url")
         if not isinstance(dungeon, str) or not dungeon.strip():
@@ -552,7 +558,7 @@ class Control(commands.Cog):
             raise ApiError(400, "start_ms fehlt")
         if not isinstance(url, str) or not url.startswith(("https://", "http://")) or len(url) > 500:
             raise ApiError(400, "url fehlt oder ungültig")
-        aion = self.bot.get_cog("AionDedup")
+        aion = self.runs()
         if aion is None:
             raise ApiError(503, "AION-Modul ist nicht geladen")
         return {"result": await aion.attach_hub_link(dungeon.strip(), start_ms, url)}

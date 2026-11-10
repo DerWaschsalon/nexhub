@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import re
-import secrets
 from collections.abc import Callable
 from typing import Any
 
@@ -144,14 +143,10 @@ class AionTokenButton(discord.ui.Button[FieldPage]):
         self.panel = panel
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        db = self.panel.cog.db
-        token = db.get(interaction.guild_id, "aion_api_token")
-        if not token:
-            token = secrets.token_urlsafe(24)
-            await db.set(interaction.guild_id, "aion_api_token", token)
-        aion_cog = self.panel.cog.bot.get_cog("AionDedup")
+        runs = self.panel.cog.bot.modules.module("aion2.runs")
+        token = await runs.token(self.panel.guild.id)
         await interaction.response.send_message(
-            f"Im NexBoard unter Discord-Bot eintragen:\n`{aion_cog.api_url()}`\nToken: `{token}`\n\n"
+            f"Im NexBoard unter Discord-Bot eintragen:\n`{runs.api_url()}`\nToken: `{token}`\n\n"
             "Geheim halten. Für einen neuen Token (macht den alten ungültig): `/aion token:True`.",
             ephemeral=True,
         )

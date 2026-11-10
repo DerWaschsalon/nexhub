@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .aion_records import DpsRecord, RunResult
+from .records import DpsRecord, RunResult
 
 
 def fmt_num(n: float) -> str:

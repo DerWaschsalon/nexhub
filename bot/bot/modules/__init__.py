@@ -2,6 +2,8 @@
 
 MODULES ist die Liste, die der Host lädt; ein neues Modul kommt hier dazu, der Kern bleibt gleich.
 """
+from .aion2.runs import RunPosts
+from .aion2.schedule import Schedule
 from .community.birthdays import Birthdays
 from .community.bump import Bump
 from .community.giveaways import Giveaways
@@ -27,6 +29,6 @@ from .server.welcome import Welcome
 
 MODULES = (MusicPlayer, NotificationFeeds, ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
            Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
-           Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump)
+           Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump, RunPosts, Schedule)
 
 __all__ = ["MODULES"]

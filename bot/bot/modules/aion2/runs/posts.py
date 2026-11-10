@@ -35,14 +35,18 @@ import logging
 import os
 import secrets
 import time
+from typing import ClassVar
 
 import discord
 from aiohttp import web
-from discord import app_commands
 from discord.ext import commands
+from nexcore import ModuleInfo
 
-from ..aion_format import fmt_dps, fmt_time, records_text
-from ..aion_records import RunRecords, RunResult
+from bot.core import BotContext, BotModule
+
+from .format import fmt_dps, fmt_time, records_text
+from .records import RunRecords, RunResult
+from .settings import RunPostSettings
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +58,7 @@ ANALYSIS_FIELD = "📊 Analyse"
 RECORDS_FIELD = "🏆 Rekorde"
 HUB_LINK_TEXT = "Im NexHub ansehen"
 MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Run-Bild vom NexBoard, gemessen 200–400 KB
+TOKEN_BYTES = 24
 POSTED_KEEP_S = 6 * 3600  # so lange kann der Hub einen Link zu einem schon geposteten Lauf nachreichen
 
 
@@ -268,16 +273,26 @@ class ApiCluster:
         self.hub_url: str | None = None  # vom NexHub gemeldet (attach_hub_link), sobald hochgeladen
 
 
-class AionDedup(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
-        self.db = bot.db
-        self.records = RunRecords(bot.db)
+class RunPosts(BotModule):
+    info: ClassVar[ModuleInfo] = ModuleInfo(
+        id="aion2.runs", name="Run-Posts", category="AION 2", icon="mdi-sword-cross",
+        summary="Ein Post je Dungeon-Run aus dem NexBoard, mit Rekorden, Bestenliste und Dungeon-Rangliste.",
+    )
+    Settings = RunPostSettings
+
+    def __init__(self, ctx: BotContext) -> None:
+        super().__init__(ctx)
+        self.records = RunRecords(ctx.db)
         self.api_pending: dict[int, list[ApiCluster]] = {}  # guild_id -> offene API-Cluster
         self.api_posted: list[tuple[float, dict, discord.Message]] = []  # (gepostet, Lauf, Nachricht)
         self.runner: web.AppRunner | None = None
 
-    async def cog_load(self) -> None:
+    def cog(self) -> commands.Cog:
+        from .commands import RunsCog
+
+        return RunsCog(self)
+
+    async def start(self) -> None:
         app = web.Application(client_max_size=2 * MAX_IMAGE_BYTES)  # Base64-Bild + Rest
         app.add_routes([
             web.post("/api/aion/fight", self.handle_api_fight),
@@ -289,13 +304,28 @@ class AionDedup(commands.Cog):
         await web.TCPSite(self.runner, "0.0.0.0", port).start()
         log.info("AION-API und Bestenliste hören auf Port %d", port)
 
-    async def cog_unload(self) -> None:
+    async def shutdown(self) -> None:
         for clusters in self.api_pending.values():
             for c in clusters:
                 if c.task:
                     c.task.cancel()
         if self.runner:
             await self.runner.cleanup()
+            self.runner = None
+        await super().shutdown()
+
+    async def token(self, guild_id: int, *, renew: bool = False) -> str:
+        """API-Token des Servers für das NexBoard; fehlt er oder soll er neu sein, wird er erzeugt."""
+        current = self.db.get(guild_id, "aion_api_token")
+        if current and not renew:
+            return current
+        new = secrets.token_urlsafe(TOKEN_BYTES)
+        await self.db.set(guild_id, "aion_api_token", new)
+        return new
+
+    def delay(self, guild_id: int) -> int:
+        """Sekunden, die der Bot auf weitere Meldungen desselben Laufs wartet."""
+        return self.db.get_int(guild_id, "aion_dedup_delay") or DEFAULT_DELAY
 
     def api_url(self) -> str:
         return f"{public_url() or '<AION_PUBLIC_URL fehlt in .env>'}/api/aion/fight"
@@ -332,7 +362,7 @@ class AionDedup(commands.Cog):
                 log.info("AION-API: Lauf %s bekommt weitere Meldung (jetzt %d)", run["dungeon"], len(c.reports))
                 return web.json_response({"ok": True, "merged": True})
 
-        delay = self.db.get_int(guild_id, "aion_dedup_delay") or DEFAULT_DELAY
+        delay = self.delay(guild_id)
         cluster = ApiCluster(run, guild_id)
         clusters.append(cluster)
         cluster.task = asyncio.create_task(self._finalize_api_later(cluster, delay, channel_id))
@@ -343,7 +373,7 @@ class AionDedup(commands.Cog):
         clusters = self.api_pending.get(cluster.guild_id, [])
         if cluster in clusters:
             clusters.remove(cluster)
-        channel = self.bot.get_channel(channel_id)
+        channel = self.client.get_channel(channel_id)
         if not channel:
             log.warning("AION-API: Zielkanal %s nicht gefunden", channel_id)
             return
@@ -375,7 +405,7 @@ class AionDedup(commands.Cog):
             return [discord.File(io.BytesIO(image), filename="aion_run.webp")]
         if not players:
             return []
-        from .aion_image import render_boss_image, render_run_image
+        from .image import render_boss_image, render_run_image
 
         loop = asyncio.get_running_loop()
         run = cluster.run
@@ -426,7 +456,7 @@ class AionDedup(commands.Cog):
         """Öffentliche Bestenliste je Boss, ohne Login. Die Guild-ID ist kein Geheimnis (steht in
         jedem Invite-Link), ohne Treffer in `aion_leaderboard` ist die Seite einfach leer."""
         raw = request.match_info["guild_id"]
-        guild = self.bot.get_guild(int(raw)) if raw.isdigit() else None
+        guild = self.client.get_guild(int(raw)) if raw.isdigit() else None
         if not guild:
             return web.Response(text="Unbekannter Server.", status=404)
         rows = await self.db.fetchall(
@@ -434,47 +464,3 @@ class AionDedup(commands.Cog):
             (guild.id,),
         )
         return web.Response(text=leaderboard_html(guild.name, rows), content_type="text/html")
-
-    @app_commands.command(name="aion", description="AION-2-Posts aus dem NexBoard einrichten")
-    @app_commands.describe(
-        kanal="Kanal für die zusammengeführten AION-Posts",
-        wartezeit="Sekunden, die auf weitere Meldungen vom selben Lauf gewartet wird (Standard 15)",
-        token="Neuen API-Token erzeugen (alten ungültig machen)",
-        aus="AION-Posts abschalten",
-    )
-    @app_commands.default_permissions(manage_guild=True)
-    @app_commands.guild_only()
-    async def aion_settings(
-        self, interaction: discord.Interaction, kanal: discord.TextChannel | None = None,
-        wartezeit: app_commands.Range[int, 5, 300] | None = None, token: bool = False, aus: bool = False,
-    ):
-        if aus:
-            await self.db.set(interaction.guild_id, "aion_channel", None)
-            return await interaction.response.send_message("AION-Posts sind aus.", ephemeral=True)
-        if kanal:
-            await self.db.set(interaction.guild_id, "aion_channel", kanal.id)
-        if wartezeit:
-            await self.db.set(interaction.guild_id, "aion_dedup_delay", wartezeit)
-
-        channel_id = self.db.get_int(interaction.guild_id, "aion_channel")
-        channel = interaction.guild.get_channel(channel_id) if channel_id else None
-        delay = self.db.get_int(interaction.guild_id, "aion_dedup_delay") or DEFAULT_DELAY
-        if not channel:
-            return await interaction.response.send_message(
-                "Noch kein Kanal festgelegt. `/aion kanal:#dein-aion-kanal`.", ephemeral=True
-            )
-        api_token = self.db.get(interaction.guild_id, "aion_api_token")
-        if token or not api_token:
-            api_token = secrets.token_urlsafe(24)
-            await self.db.set(interaction.guild_id, "aion_api_token", api_token)
-        await interaction.response.send_message(
-            f"Kanal: {channel.mention}, Wartezeit {delay}s.\n\n"
-            f"Im NexBoard unter Discord-Bot eintragen:\n`{self.api_url()}`\nToken: `{api_token}`\n"
-            "Geheim halten, nur an NexBoards geben, die mitmachen sollen. Mit `token:True` einen neuen "
-            "erzeugen (macht den alten ungültig).",
-            ephemeral=True,
-        )
-
-
-async def setup(bot):
-    await bot.add_cog(AionDedup(bot))
