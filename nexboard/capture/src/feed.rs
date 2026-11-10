@@ -1,15 +1,17 @@
 //! Spieldaten für die A2Tools-Plugins, die nicht aus einzelnen Paketen kommen (Daemon:
 //! `deckbar_daemon/plugins.py`): der eigene Charakter und die Meldungen, die im Meter dessen
-//! Ereignis-Schleife liest (Feldboss-Karte, Abyss, Todesursachen, Würfeln).
+//! Ereignis-Schleife liest (Feldboss-Karte, Abyss, Todesursachen, Würfeln, Schwarzmarkt, Kills/Tode).
 //!
 //!   stdout  {"type":"plugin_character","data":…}         bei jeder Änderung
-//!           {"type":"plugin_feed","event":"bossMap"|"abyss"|"deathRecap"|"lootRoll","data":…,"at":ms}
+//!           {"type":"plugin_feed","event":"bossMap"|"abyss"|"deathRecap"|"lootRoll"|"blackMarket"|"kda",
+//!            "data":…,"at":ms}
 
 use std::sync::Arc;
 
 use a2tools_dps_meter_lib::capture::abyss_artifacts::ArtifactState;
 use a2tools_dps_meter_lib::capture::boss_map::BossMap;
 use a2tools_dps_meter_lib::combat::data_storage::DataStorage;
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::out::{Message, Out};
@@ -80,6 +82,8 @@ struct Feed {
     abyss_seq: u64,
     recap_seq: u64,
     roll_seq: u64,
+    market_seq: u64,
+    kda_seq: u64,
 }
 
 impl Feed {
@@ -102,18 +106,30 @@ impl Feed {
                 feed("abyss", seen_ms, abyss_event(&artifacts, seen_ms));
             }
         }
+        // Nummerierte Ereignisse: jedes einzeln, der Daemon hebt sie für später geöffnete Fenster auf
         if let Some((next, recaps)) = storage.death_recaps_since(self.recap_seq) {
             self.recap_seq = next;
-            for recap in recaps {
-                feed("deathRecap", recap.at, serde_json::to_value(&recap).unwrap_or_default());
-            }
+            send_each(out, "deathRecap", &recaps, |r| r.at);
         }
         if let Some((next, rolls)) = storage.loot_rolls_since(self.roll_seq) {
             self.roll_seq = next;
-            for roll in rolls {
-                feed("lootRoll", roll.at, serde_json::to_value(&roll).unwrap_or_default());
-            }
+            send_each(out, "lootRoll", &rolls, |r| r.at);
         }
+        if let Some((next, markets)) = storage.black_markets_since(self.market_seq) {
+            self.market_seq = next;
+            send_each(out, "blackMarket", &markets, |m| m.at);
+        }
+        if let Some((next, events)) = storage.kda_since(self.kda_seq) {
+            self.kda_seq = next;
+            send_each(out, "kda", &events, |e| e.at);
+        }
+    }
+}
+
+fn send_each<T: Serialize>(out: &Out, event: &str, items: &[T], at: impl Fn(&T) -> i64) {
+    for item in items {
+        let data = serde_json::to_value(item).unwrap_or_default();
+        out.send(&Message::PluginFeed { event, at: at(item), data: &data });
     }
 }
 
