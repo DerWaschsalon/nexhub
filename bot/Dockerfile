@@ -10,9 +10,11 @@ COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-# Gemeinsame Formate (Termine, Klassen, Dungeons) als Paket, zweiter Build-Kontext „proto“ = Ordner proto/
+# Pakete aus dem Monorepo, je ein weiterer Build-Kontext: „proto“ = proto/ (Termine, Klassen, Dungeons),
+# „nexcore“ = packages/nexcore (Module, Registry, Ereignisse)
 COPY --from=proto . /tmp/proto
-RUN pip install --no-cache-dir /tmp/proto && rm -rf /tmp/proto
+COPY --from=nexcore . /tmp/nexcore
+RUN pip install --no-cache-dir /tmp/proto /tmp/nexcore && rm -rf /tmp/proto /tmp/nexcore
 COPY bot ./bot
 COPY entrypoint.sh .
 
