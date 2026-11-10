@@ -9,7 +9,7 @@ import pytest
 
 from bot.__main__ import Bot
 from bot.db import Database
-from bot.sources import SPOTIFY_RE, Track, _find_key, is_url
+from bot.modules.music.player.sources import SPOTIFY_RE, Track, _find_key, is_url
 
 
 def run(coro):
@@ -66,7 +66,6 @@ def test_all_commands_register():
             await bot.get_cog("AionDedup").cog_unload()
             await bot.get_cog("Notifications").manager.close()
             await bot.db.close()
-            await bot.get_cog("Music").session.close()
             return names, pages
     names, pages = run(go())
     check_hub_pages(pages)
@@ -111,7 +110,7 @@ def test_db_roundtrip():
 
 
 def make_player(tracks, loop="aus"):
-    from bot.cogs.music import Player
+    from bot.modules.music.player.player import Player
     p = Player.__new__(Player)
     p.queue, p.current, p.loop, p._skipped = list(tracks), None, loop, False
     return p
