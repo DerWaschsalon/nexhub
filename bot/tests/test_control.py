@@ -13,6 +13,9 @@ from bot.cogs.control import Control
 from bot.core import BotContext
 from bot.db import Database
 from bot.modules.aion2.runs import RunPosts
+from bot.modules.community.levels import Levels
+from bot.modules.server.announcements import Announcements
+from bot.modules.server.custom_commands import CustomCommands
 
 KEY = "k" * 32
 AUTH = {"Authorization": f"Bearer {KEY}"}
@@ -64,7 +67,8 @@ def fake_guild():
     roles = [everyone, member, bot_role, admin]
     return SimpleNamespace(
         id=GUILD, name="Testserver", icon=None, member_count=3, members=[], default_role=everyone,
-        channels=channels, categories=[cat], roles=roles, me=SimpleNamespace(top_role=bot_role),
+        channels=channels, categories=[cat], roles=roles,
+        me=SimpleNamespace(top_role=bot_role, guild_permissions=discord.Permissions(manage_roles=True)),
         get_channel=lambda i: next((c for c in channels if c.id == i), None),
         get_role=lambda i: next((r for r in roles if r.id == i), None),
     )
@@ -81,8 +85,9 @@ def run(test):
                                   get_cog=lambda name: None, cogs={}, user=None, latency=float("nan"),
                                   is_ready=lambda: True, dispatched=[])
             bot.dispatch = lambda event, *args: bot.dispatched.append((event, *args))
-            runs = RunPosts(BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock()))
-            bot.modules = SimpleNamespace(module=lambda mid: runs, pages=lambda: [])
+            ctx = BotContext(bus=EventBus(), paths=Paths("test"), db=db, client=MagicMock())
+            modules = {m.info.id: m for m in (RunPosts(ctx), Levels(ctx), Announcements(ctx), CustomCommands(ctx))}
+            bot.modules = SimpleNamespace(module=modules.__getitem__, pages=lambda: [])
             guild.bot = bot  # für Tests, die gemeldete Ereignisse prüfen
             cog = Control(bot)
             cog.key = KEY

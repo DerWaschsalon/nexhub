@@ -23,7 +23,6 @@ import hmac
 import json
 import logging
 import os
-import re
 import time
 import urllib.parse
 from typing import Any, Awaitable, Callable
@@ -33,6 +32,7 @@ from aiohttp import web
 from discord.ext import commands
 
 from .. import hubpages
+from ..core.discord_checks import can_assign
 from ..errors import UserError
 from ..forms import SECTIONS, Section, convert_field, parse_id, read_field, save_values
 from ..hubpages import ApiError, Ctx, Field, Form, Page
@@ -40,6 +40,8 @@ from ..hubpages import ApiError, Ctx, Field, Form, Page
 log = logging.getLogger(__name__)
 
 DEFAULT_PORT = 8790
+MAX_MESSAGE = 2000  # Länge einer Discord-Nachricht
+MIN_INTERVAL_MIN = 5
 STARTED = time.time()
 
 TEXT_TYPES = hubpages.TEXT_TYPES
@@ -361,14 +363,16 @@ class Control(commands.Cog):
         text = str((await self.body(request)).get("text") or "")
         await self.verify_module().set_text(self.guild(), text)
 
-    # ---- Level-Belohnungen ---------------------------------------------------------------------
+    # ---- Daten der Module (Level-Belohnungen, Ankündigungen, eigene Befehle) --------------------
+
+    def store(self, module_id: str) -> Any:
+        """Der Store eines Moduls; dieselben Daten, die auch seine Slash-Befehle benutzen."""
+        return self.bot.modules.module(module_id).store
 
     async def rewards(self, request: web.Request) -> list[dict]:
         guild = self.guild()
-        rows = await self.db.fetchall(
-            "SELECT level, role_id FROM level_rewards WHERE guild_id=? ORDER BY level", (guild.id,))
         out = []
-        for r in rows:
+        for r in await self.store("community.levels").rewards(guild.id):
             role = guild.get_role(r["role_id"])
             out.append({"level": r["level"], "role_id": str(r["role_id"]), "role": role.name if role else None})
         return out
@@ -383,32 +387,21 @@ class Control(commands.Cog):
     async def reward_set(self, request: web.Request) -> list[dict]:
         guild = self.guild()
         level = self._level(request)
-        role_id = parse_id((await self.body(request)).get("role_id"), "Rolle")
-        role = guild.get_role(role_id or 0)
+        role = guild.get_role(parse_id((await self.body(request)).get("role_id"), "Rolle") or 0)
         if role is None:
             raise ApiError(400, "Rolle gibt es nicht")
-        if role.managed or (guild.me and role >= guild.me.top_role):
+        if not can_assign(guild, role):
             raise ApiError(400, f"{role.name} kann der Bot nicht vergeben (muss unter seiner eigenen Rolle stehen)")
-        await self.db.execute(
-            "INSERT INTO level_rewards (guild_id, level, role_id) VALUES (?, ?, ?) "
-            "ON CONFLICT(guild_id, level) DO UPDATE SET role_id=excluded.role_id",
-            (guild.id, level, role.id))
+        await self.store("community.levels").set_reward(guild.id, level, role.id)
         return await self.rewards(request)
 
     async def reward_delete(self, request: web.Request) -> None:
-        guild = self.guild()
-        await self.db.execute("DELETE FROM level_rewards WHERE guild_id=? AND level=?",
-                              (guild.id, self._level(request)))
-
-    # ---- Ankündigungen -------------------------------------------------------------------------
+        await self.store("community.levels").set_reward(self.guild().id, self._level(request), None)
 
     async def announcements(self, request: web.Request) -> list[dict]:
         guild = self.guild()
-        rows = await self.db.fetchall(
-            "SELECT id, channel_id, text, interval_minutes, next_run FROM scheduled WHERE guild_id=? ORDER BY id",
-            (guild.id,))
         out = []
-        for r in rows:
+        for r in await self.store("server.announcements").of_guild(guild.id):
             ch = guild.get_channel(r["channel_id"])
             out.append({"id": r["id"], "channel_id": str(r["channel_id"]), "channel": ch.name if ch else None,
                         "text": r["text"], "interval_minutes": r["interval_minutes"], "next_run": r["next_run"]})
@@ -422,55 +415,35 @@ class Control(commands.Cog):
         interval = data.get("interval_minutes")
         if channel_id is None or not text:
             raise ApiError(400, "Kanal und Text angeben")
-        if len(text) > 2000:
-            raise ApiError(400, "Höchstens 2000 Zeichen (Discord-Grenze)")
-        if isinstance(interval, bool) or not isinstance(interval, int) or interval < 5:
-            raise ApiError(400, "Intervall mindestens 5 Minuten")
-        await self.db.execute(
-            "INSERT INTO scheduled (guild_id, channel_id, text, interval_minutes, next_run) VALUES (?, ?, ?, ?, ?)",
-            (guild.id, channel_id, text, interval, time.time()))
+        if len(text) > MAX_MESSAGE:
+            raise ApiError(400, f"Höchstens {MAX_MESSAGE} Zeichen (Discord-Grenze)")
+        if isinstance(interval, bool) or not isinstance(interval, int) or interval < MIN_INTERVAL_MIN:
+            raise ApiError(400, f"Intervall mindestens {MIN_INTERVAL_MIN} Minuten")
+        await self.store("server.announcements").add(guild.id, channel_id, text, interval)
         return await self.announcements(request)
 
     async def announcement_delete(self, request: web.Request) -> None:
-        guild = self.guild()
         ann_id = request.match_info["id"]
         if not ann_id.isdigit():
             raise ApiError(404, "Ankündigung gibt es nicht")
-        await self.db.execute("DELETE FROM scheduled WHERE id=? AND guild_id=?", (int(ann_id), guild.id))
-
-    # ---- Eigene Befehle ------------------------------------------------------------------------
+        await self.store("server.announcements").delete(self.guild().id, int(ann_id))
 
     async def custom_commands(self, request: web.Request) -> list[dict]:
-        guild = self.guild()
-        rows = await self.db.fetchall(
-            "SELECT name, response FROM custom_commands WHERE guild_id=? ORDER BY name", (guild.id,))
+        rows = await self.store("server.custom_commands").of_guild(self.guild().id)
         return [{"name": r["name"], "response": r["response"]} for r in rows]
-
-    @staticmethod
-    def _command_name(request: web.Request) -> str:
-        name = request.match_info["name"].strip().lower().lstrip("!")
-        if not re.fullmatch(r"[a-z0-9_-]{1,32}", name):
-            raise ApiError(400, "Name: 1–32 Zeichen, nur a–z, 0–9, _ und -")
-        return name
 
     async def command_set(self, request: web.Request) -> list[dict]:
         guild = self.guild()
-        name = self._command_name(request)
         response = str((await self.body(request)).get("response") or "").strip()
         if not response:
             raise ApiError(400, "Antwort fehlt")
-        if len(response) > 2000:
-            raise ApiError(400, "Höchstens 2000 Zeichen (Discord-Grenze)")
-        await self.db.execute(
-            "INSERT INTO custom_commands (guild_id, name, response) VALUES (?, ?, ?) "
-            "ON CONFLICT(guild_id, name) DO UPDATE SET response=excluded.response",
-            (guild.id, name, response))
+        if len(response) > MAX_MESSAGE:
+            raise ApiError(400, f"Höchstens {MAX_MESSAGE} Zeichen (Discord-Grenze)")
+        await self.store("server.custom_commands").put(guild.id, request.match_info["name"], response)
         return await self.custom_commands(request)
 
     async def command_delete(self, request: web.Request) -> None:
-        guild = self.guild()
-        await self.db.execute("DELETE FROM custom_commands WHERE guild_id=? AND name=?",
-                              (guild.id, self._command_name(request)))
+        await self.store("server.custom_commands").delete(self.guild().id, request.match_info["name"])
 
     # ---- Sichtbarkeits-Matrix ------------------------------------------------------------------
 
