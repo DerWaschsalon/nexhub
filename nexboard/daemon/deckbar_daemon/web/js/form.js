@@ -1,7 +1,7 @@
 /* Formulare aus dem Einstellungs-Schema eines Moduls (pydantic): eine Stelle für alle Einstellungsseiten.
    Hinweise im Schema (json_schema_extra): hidden, advanced (unter „Erweitert“), secret, labels {Wert: Text},
    show_if {Feld: [Werte]} und choices "pages" (Seiten der Leiste). */
-import { el, fill, api, on, S, field, input, select, sw, settingsRow, card, saver } from "./core.js";
+import { el, fill, api, on, S, field, input, select, sw, settingsRow, card, saver, collapsible } from "./core.js";
 
 const NO_PAGE = "— nicht wechseln —";
 
@@ -53,10 +53,7 @@ export function schemaForm(schema, values, patch, view = {}) {
     else items.push(el("div", { class: "grid" }, entry));
   }
   if (!groups.advanced.length) return groups.basic;
-  const advanced = el("details", { class: "advanced" }, el("summary", { text: "Erweitert" }), groups.advanced);
-  advanced.open = !!view.open;
-  advanced.addEventListener("toggle", () => { view.open = advanced.open; });
-  return [groups.basic, advanced];
+  return [groups.basic, collapsible("Erweitert", view, groups.advanced)];
 }
 
 /** Karte mit den Einstellungen eines Moduls: lädt, zeigt und speichert über /api/m/<id>/settings.

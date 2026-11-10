@@ -22,6 +22,7 @@ from ..config import ID, Layout, Settings, _Strict
 from ..core.devices import CLOSE_MODULE_OFF, DeviceHub
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
+from ..core.topics import DPS_RESET
 from ..deck_layout import DeckLayout, error_text
 from ..mdns import Announcer
 from ..media import Media
@@ -33,7 +34,6 @@ from .base import WebModule
 log = logging.getLogger(__name__)
 
 WEB_DIR_DEFAULT_BG = "bg.png"
-DPS_RESET = "dps.reset"  # Thema auf dem Bus: Reset-Knopf der DPS-Kachel
 BACKGROUND_POLL_S = 5
 LAYOUT_POLL_S = 1
 STATE_KEY_MAX = 32

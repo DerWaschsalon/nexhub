@@ -17,9 +17,10 @@ from .base import WebModule
 class RadarModule(WebModule):
     info = ModuleInfo(
         "aion2.radar", "AION 2 · Radar", "ingame", "radar",
-        "Hidden Cubes, Karte, Boss-Warnungen und PvP der Sitzung als Widgets im Overlay, Feldbosse und "
-        "Vertraute in der Web-UI. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
-        tags=("AION 2", "Desktop"),
+        "Hidden Cubes, Karte, Boss-Warnungen und PvP der Sitzung als Widgets im Overlay, Feldbosse unter "
+        "Termine. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
+        # die Feldbosse und ihre Ansage stehen auf der Seite des Moduls Termine
+        requires=("aion2.schedule",), tags=("AION 2", "Desktop"),
     )
 
     def __init__(self, ctx: Context, live: LiveHub, radar: Radar, boss_effects: BossEffekte) -> None:
@@ -37,7 +38,7 @@ class RadarModule(WebModule):
         router.add_get("/api/radar", self.api_get)
         router.add_put("/api/radar", self.api_put)
         router.add_post("/api/radar/befehl", self.api_command)
-        router.add_get("/api/radar/uebersicht", self.api_overview)
+        router.add_get("/api/radar/feldbosse", self.api_field_bosses)
         router.add_get("/api/radar/kampf", self.api_fight)
 
     def overlay_routes(self, router: web.UrlDispatcher) -> None:
@@ -69,8 +70,8 @@ class RadarModule(WebModule):
     async def api_fight(self, request: web.Request) -> web.Response:
         return web.json_response({**self.radar.kampf(), **await self.boss_effects.aktuell()})
 
-    async def api_overview(self, request: web.Request) -> web.Response:
-        return web.json_response(self.radar.uebersicht())
+    async def api_field_bosses(self, request: web.Request) -> web.Response:
+        return web.json_response({"feldbosse": self.radar.field_bosses()})
 
     async def api_map(self, request: web.Request) -> web.Response:
         return web.json_response(self.radar.karte())

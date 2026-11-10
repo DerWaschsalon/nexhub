@@ -15,8 +15,11 @@ from pydantic import ValidationError
 
 from .a2ui import A2Ui
 from .app import NexBoard, build_app
-from .config import config_dir, load_settings
+from .config import config_dir, is_default_config, load_settings
 from .core.http import local_only
+from .core.topics import LANGUAGE
+from .migrate import migrate
+from .radar import SETTINGS_FILE as RADAR_SETTINGS
 
 log = logging.getLogger("deckbar")
 SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Standard: 60 s)
@@ -24,6 +27,8 @@ SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Stan
 
 async def serve(args: argparse.Namespace) -> NexBoard:
     cdir = args.config_dir or config_dir()
+    # erst umziehen, dann laden: der Umzug schreibt auch in config.yaml (Sprache, Charaktername)
+    migrate(cdir, RADAR_SETTINGS if is_default_config(cdir) else None)
     settings = load_settings(cdir)
     deck = NexBoard(settings, cdir, mdns=not args.no_mdns)
     app = build_app(deck)
@@ -36,6 +41,10 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     a2 = A2Ui(deck.dps.capture, cdir / "a2-settings.json")
     a2.plugins.overlay = deck.overlay.plugin_command
     a2.plugins.start()
+    # eine Sprache für alles: die der allgemeinen Einstellungen (System → Allgemein)
+    a2.on_language = deck.set_language
+    deck.bus.on(LANGUAGE, a2.apply_language)
+    await a2.apply_language(settings.language)
 
     @web.middleware
     async def overlay_on(request: web.Request, handler):

@@ -1,31 +1,21 @@
-"""Feldbosse und Vertraute: Respawn-Timer der Feldbosse, Riss-Zeitplan und Seelen-Stand der Vertrauten.
-Angezeigt auf der NexBoard-Seite des Radars, angesagt vom RadarDienst."""
+"""Feldbosse: Respawn-Timer und Ansagen (auch für den Riss). Angezeigt auf der NexBoard-Seite „Termine“,
+angesagt vom RadarDienst. Die Termine selbst rechnet nexproto.termine."""
 from __future__ import annotations
 
 import time
 
 from nexproto.termine import TERMINE, termin
-from nexproto.termine import alle as alle_termine
 
-from .daten import VERTRAUTE, npc_name
+from .daten import npc_name
 from .konfig import konfig_laden
 from .warnung import ansage, tr
 
 VERMUTLICH_DA = 2 * 3600  # so lange nach dem Respawn gilt ein Feldboss als "vermutlich da"
 GRUEN, ORANGE, GRAU = "ok", "warn", "leise"  # Farbklassen der NexBoard-Seite
-SEELEN = (5, 25, 75)  # Seelen fuer Stufe 1, 2 und 3 (MAX), 105 insgesamt (laut aion2pettracker, passt zum Mitschnitt)
 
 
 def riss(jetzt: float) -> tuple[float, bool]:
     return termin(jetzt, *TERMINE[0][1:])
-
-
-def fehlende_seelen(stufe: int, seelen: int) -> tuple[int, int]:
-    """(Seelen bis zur naechsten Stufe, Seelen bis MAX)."""
-    if stufe >= 3:
-        return 0, 0
-    naechste = SEELEN[stufe] - seelen
-    return naechste, naechste + sum(SEELEN[stufe + 1:])
 
 
 def feldboss_name(platz: str, boss: dict) -> str:
@@ -68,12 +58,6 @@ def feldboss_ansagen(zustand, gemeldet: set) -> None:
                     ansage(feldboss_name(platz, boss) + tr(satz))
 
 
-def termine(jetzt: float) -> list[dict]:
-    """Feste Termine: Name, Beginn (Sekunden seit 1970), offen bis (nur wenn gerade offen)."""
-    return [{"name": tr(name), "beginn": beginn, "offen_bis": offen_bis}
-            for name, beginn, offen_bis in alle_termine(jetzt)]
-
-
 def feldbosse(plaetze: dict[str, dict], zone: int | None) -> list[dict]:
     """Alle bekannten Feldboss-Plaetze, die der aktuellen Karte (zone) zuerst, dann nach Respawn."""
     jetzt, zeilen = time.time(), []
@@ -84,14 +68,3 @@ def feldbosse(plaetze: dict[str, dict], zone: int | None) -> list[dict]:
                                         "status": text, "farbe": farbe, "hier": hier}))
     return [z for *_, z in sorted(zeilen, key=lambda z: z[:2])]
 
-
-def vertraute(stand: dict[str, list[int]]) -> list[dict]:
-    """Jeder Vertraute mit Stufe, Seelen, was zur naechsten Stufe fehlt und wo man ihn farmt."""
-    sprache, zeilen = konfig_laden()["sprache"], []
-    for vid, v in VERTRAUTE.items():
-        stufe, seelen = stand.get(vid, [0, 0])
-        monster = list(dict.fromkeys(npc_name(m, sprache) or "?" for m in v["monster"]))
-        zeilen.append({"name": v[sprache], "art": tr(v["art"]), "stufe": stufe, "seelen": seelen,
-                       "fehlen": fehlende_seelen(stufe, seelen)[0], "angefangen": vid in stand,
-                       "bis_max": fehlende_seelen(stufe, seelen)[1], "wo": monster + v["orte"]})
-    return zeilen

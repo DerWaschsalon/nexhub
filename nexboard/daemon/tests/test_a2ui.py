@@ -84,3 +84,17 @@ async def test_takt_aus_den_meter_einstellungen(tmp_path, monkeypatch):
     assert capture.interval_ms == 200
     await ui.call("update_settings", {"key": "dpsMeter.updateRateMs", "value": "7"})  # nicht im Meter wählbar
     assert capture.interval_ms == 500
+
+
+async def test_sprachwahl_im_meter_ist_die_allgemeine(tmp_path):
+    from deckbar_daemon.app import NexBoard
+    from deckbar_daemon.config import Settings
+    from deckbar_daemon.core.topics import LANGUAGE
+    deck = NexBoard(Settings(token="testtoken123", mdns=False, usb="off"), tmp_path, mdns=False)
+    ui = A2Ui(deck.dps.capture, tmp_path / "a2-settings.json", plugin_dir=tmp_path)
+    ui.on_language = deck.set_language
+    deck.bus.on(LANGUAGE, ui.apply_language)
+    await ui.call("set_language", {"language": "de"})
+    assert deck.settings.language == "de" and deck.dps.language() == "de"
+    assert "language: de" in (tmp_path / "config.yaml").read_text()
+    assert ui.settings["dpsMeter.language"] == "de"

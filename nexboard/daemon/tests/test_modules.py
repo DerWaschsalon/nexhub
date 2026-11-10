@@ -16,8 +16,9 @@ def test_dependency_graph(tmp_path):
     assert m.requirements("discord.bot") == {"aion2.dps"}
     assert {"aion2.overlay", "aion2.runs", "discord.bot"} <= m.dependents("aion2.dps")
     assert m.dependents("deck") == set()
-    assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.runs", "aion2.radar", "discord.bot", "hub",
-                       "updates"]
+    assert m.requirements("aion2.radar") == {"aion2.schedule"}  # Feldbosse stehen unter Termine
+    assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.runs", "aion2.schedule", "aion2.radar",
+                       "discord.bot", "hub", "updates"]
     for mid, info in m.infos.items():
         assert all(r in m.infos for r in info.requires), mid
 

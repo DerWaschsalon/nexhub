@@ -11,7 +11,7 @@
   },
   "sprache": "de",
   "meldungen_dungeon": "Feuertempel",
-  "aufnahme_auto": true,
+  "aufnahme_auto": false,
   "feldboss_ansage": true,
   "karte_folgen": false,
   "bei_karte_ausblenden": true,
