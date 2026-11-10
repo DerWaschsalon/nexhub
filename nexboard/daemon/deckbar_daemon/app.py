@@ -21,8 +21,6 @@ from nexcore.settings import MASK, SettingsStore, is_mask
 from . import __version__
 from .a2ui import A2Ui
 from .boss_effekte import BossEffekte
-from .bot import SETTINGS_FILE as bot_settings_file
-from .bot import DiscordBot
 from .capture import aion2_running, history_root
 from .config import Settings, is_default_config, save_settings
 from .core.http import api_errors, local_only, ok, read_object
@@ -33,7 +31,6 @@ from .dps import DpsFeed
 from .hub import Hub
 from .modules import CATEGORIES
 from .modules.base import WebModule
-from .modules.bot import BotModule
 from .modules.deck import DeckModule
 from .modules.dps import DpsModule
 from .modules.hub import HubModule
@@ -84,7 +81,6 @@ class NexBoard:
             RunsModule(ctx, self.live, self.runs, self.state),
             ScheduleModule(ctx, self.live, Schedule(config_dir)),
             self.radar_module,
-            BotModule(ctx, self.live, self.bot, self.runs),
             HubModule(ctx, self.live, self.hub),
             UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json")),
         ]
@@ -106,9 +102,6 @@ class NexBoard:
         own = lambda: self.dps.settings.source == "capture"  # noqa: E731
         self.runs.event_driven = self.runs.own_history = own
         self.dps.capture.data_listeners.append(self._capture_event)
-        self.bot = DiscordBot(c)
-        self.dps.fight_listeners.append(self.bot.on_fight)
-        self.runs.run_listeners.append(self.bot.on_run)
         self.hub = Hub(c)
         self.hub.history_dir = self._history_dir
         self.hub.language = lambda: self.settings.language
@@ -143,8 +136,6 @@ class NexBoard:
             ids.add("aion2.dps")
         if (c / runs_settings_file).exists():
             ids.add("aion2.runs")
-        if (c / bot_settings_file).exists():
-            ids.add("discord.bot")
         unit = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user" / OVERLAY_UNIT
         if self.real_config and unit.exists():
             ids.add("aion2.overlay")
@@ -317,7 +308,6 @@ def build_app(deck: NexBoard) -> web.Application:
 
     async def cleanup(_app: web.Application) -> None:
         await deck.bar.art.close()
-        await deck.bot.close()
         await deck.hub.close()
 
     app.on_cleanup.append(cleanup)

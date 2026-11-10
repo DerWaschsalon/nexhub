@@ -179,7 +179,7 @@ def dungeon_name(dungeon: int) -> str:
 
 def dungeon_parts_en(dungeon: int) -> tuple[str, str | None]:
     """Englischer Name und Schwierigkeit („Hard“) – sprachunabhängig, für Weitergaben an andere
-    Programme (bot.py), damit Meldungen verschiedener Spieler zusammenpassen."""
+    Programme (report.py, der Bot), damit Meldungen verschiedener Spieler zusammenpassen."""
     entry = _i18n("dungeons/en.json").get(str(dungeon)) or {}
     diff = {"normal": "Normal", "exploration": "Exploration", "hard": "Hard"}.get(entry.get("difficulty"))
     return entry.get("name") or EXTRA_DUNGEONS.get(dungeon) or f"Dungeon {dungeon}", diff
@@ -818,7 +818,7 @@ class DungeonRuns:
         self.last: Run | None = None  # zuletzt beendeter Run (Vorschau, Testpost)
         self.result = ""  # letzter Post: Erfolg oder Fehler, für die Web-UI
         self.listeners: list[Callable[[], Awaitable[None]]] = []
-        # Jeder beendete Run mit besiegtem Boss, Namen schon aufgelöst (z. B. Discord-Bot, bot.py)
+        # Jeder beendete Run mit besiegtem Boss, Namen schon aufgelöst (z. B. NexHub, hub.py)
         self.run_listeners: list[Callable[[Run], Awaitable[None]]] = []
         self._ready = False
         # Wo die History liegt, hängt an der DPS-Quelle (app.py setzt das)

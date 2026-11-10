@@ -187,6 +187,7 @@ class Control(commands.Cog):
         r.add_get("/control/matrix", self.matrix)
         r.add_put("/control/matrix", self.matrix_set)
         r.add_post("/control/run-link", self.run_link)
+        r.add_post("/control/run", self.run)
         r.add_get("/control/pages", self.pages)
         r.add_get("/control/pages/{page}", self.page)
         r.add_post("/control/pages/{page}/{block}/{action}", self.page_action)
@@ -578,6 +579,26 @@ class Control(commands.Cog):
         return {"message": message or "Erledigt.", "page": out}
 
     # ---- Runs aus dem Hub ---------------------------------------------------------------------
+
+    async def run(self, request: web.Request) -> dict:
+        """Der Hub leitet den Run-Bericht eines NexBoards weiter (nexproto RunReport, geprüft im Hub), mit Link
+        zum Run im Hub: wie die Run-API, aber für den Discord-Server des Hubs."""
+        data = await self.body(request)
+        guild_id, report, url = data.get("guild_id"), data.get("report"), data.get("url")
+        if not isinstance(guild_id, int) or isinstance(guild_id, bool) or self.bot.get_guild(guild_id) is None:
+            raise ApiError(400, "guild_id fehlt oder der Bot ist auf diesem Server nicht")
+        if not isinstance(report, dict):
+            raise ApiError(400, "report fehlt")
+        link_ok = isinstance(url, str) and url.startswith(("https://", "http://")) and len(url) <= 500
+        if url is not None and not link_ok:
+            raise ApiError(400, "url ungültig")
+        aion = self.bot.get_cog("AionDedup")
+        if aion is None:
+            raise ApiError(503, "AION-Modul ist nicht geladen")
+        status, body = await aion.accept_report(guild_id, report, url)
+        if status != 200:
+            raise ApiError(status, str(body.get("error")))
+        return body
 
     async def run_link(self, request: web.Request) -> dict:
         """Der Hub hat einen Run gespeichert: Link an den passenden AION-Post (aion_dedup.attach_hub_link)."""

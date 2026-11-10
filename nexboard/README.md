@@ -21,14 +21,14 @@ Eine Touch-Leiste unter dem Monitor im Stil eines Stream Deck, gebaut auf dem Wa
   Termine, Namenseffekt) und nach jedem Dungeon-Run ein Bild mit dem Schaden pro Boss nach Discord
 - **AION-2-Radar:** Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse unter
   Termine in der Web-UI (`radar/`), läuft im Daemon mit dem Spiel, alle Einstellungen in der Web-UI
-- **Discord-Bot:** Gruppen-DPS und Run-Ergebnisse an einen Bot, der Meldungen mehrerer Spieler zusammenführt
+- **Runs in Discord:** über den NexHub an TheWashBot, der Meldungen mehrerer Spieler zu einem Post zusammenführt
 - **Verbindung** per WLAN, bei Bedarf per USB-Kabel als Rückfall
 - **Ruhemodus:** Ist 30 s lang kein PC verbunden (weder WLAN noch USB), blendet das Display aus und
   geht wieder an, sobald der Daemon da ist. Eine Berührung zeigt kurz den Verbindungsstatus
   (`DECKBAR_SLEEP_AFTER_S`, `DECKBAR_SLEEP_PEEK_S` in `firmware/include/deckbar_config.h`)
 - **Web-UI** mit Dashboard und einer Seite je Modul, Leisten-Editor mit Drag & Drop und
   Live-Vorschau, dazu ein SDL-Simulator zum Testen ohne Gerät
-- **Modular:** Jeder Teil (Touch-Leiste, AION-2-Mitschnitt, Overlay, Runs, Radar, Discord-Bot, Updates)
+- **Modular:** Jeder Teil (Touch-Leiste, AION-2-Mitschnitt, Overlay, Runs, Radar, NexHub, Updates)
   lässt sich in der Web-UI einzeln ein- und ausschalten, ohne Neustart
 
 ```
@@ -122,7 +122,6 @@ umschalten, die Seite passt sich auch an schmale Fenster an.
 | AION 2 · Plugins | Plugins: installiert, Katalog, Updates mit Zustimmung, ein/aus, Fenster öffnen | Overlay |
 | Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte (mit „Im Kampf zur Seite“) | – |
 | AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | Kampfdaten |
-| Discord-Bot | Gruppen-DPS und Run-API eines Bots | Kampfdaten |
 | NexHub | Dieses NexBoard mit einem Konto im NexHub koppeln | – |
 | Updates | Stand von Repo und A2Tools-Kern, Aktualisieren | – |
 
@@ -338,22 +337,14 @@ Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
 Die History maskiert fremde Namen. Die NexBoard lernt die vollen Namen aus dem Live-Stream und
 speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von Hand korrigieren.
 
-## Discord-Bot
+## Runs in Discord
 
-Das Modul „Discord-Bot“ schickt Ergebnisse an einen Bot, der sie postet, etwa
-TheWashBot. Beides ist aus, bis eine Adresse eingetragen
-ist, und schickt Charakternamen der Mitspieler an den Server des Bots; nur mit Absprache der Gruppe
-einschalten. Einstellungen in `~/.config/deckbar/discord.bot.yaml` (Modus 600).
-
-- **Gruppen-DPS:** Endet ein Kampf, geht der Endstand der eigenen Gruppe (nicht aller Spieler in
-  der Nähe) per POST an die Webhook-URL des Bots, Format in `daemon/deckbar_daemon/bot.py`. Filter:
-  nur Bosse, nur besiegte, Mindestdauer, Mindestgröße der Gruppe. Wer zur Gruppe gehört, weiß
-  `deckbar-capture` ab 0.2 aus dem Gruppen-Roster des Spiels (`party` in `capture/src/view.rs`).
-- **Dungeon-Runs:** Nach jedem Run (Modul „Dungeon-Runs“) zusätzlich ein POST mit Bearer-Token an
-  die Run-API des Bots. Dungeon- und Bossnamen sind englisch und kommen mit IDs, damit der Bot
-  Meldungen verschiedener Spieler zum selben Run zusammenführen kann.
-
-Beide Wege lassen sich mit „Letzten Kampf senden“ bzw. „Letzten Run senden“ prüfen.
+Ein Weg für alles (Umbau-Konzept): NexBoard → NexHub → TheWashBot. Unter NexHub → „Runs teilen“ erst
+„Hochladen“, dann „In Discord posten“ einschalten, beides mit Zustimmung (Namen der Mitspieler). Nach dem
+Upload geht der Run-Bericht (`daemon/deckbar_daemon/report.py`, Format `nexproto.runreport.RunReport`) an den
+Hub, der ihn mit Link zum Run an den Bot weiterleitet; der Bot postet im Kanal des Hub-Servers. Das frühere
+Modul „Discord-Bot“ (eigene Bot-Adresse und Token je NexBoard, Gruppen-DPS) ist entfallen. Das Run-Bild per
+Discord-Webhook bleibt als Option im Modul „Dungeon-Runs“.
 
 ## NexHub
 

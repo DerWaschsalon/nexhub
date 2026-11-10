@@ -13,7 +13,6 @@ import runs from "./modules/aion2-runs.js";
 import radar from "./modules/aion2-radar.js";
 import schedule from "./modules/aion2-schedule.js";
 import plugins from "./modules/aion2-plugins.js";
-import bot from "./modules/discord-bot.js";
 import hub from "./modules/hub.js";
 import updates from "./modules/updates.js";
 
@@ -22,7 +21,7 @@ export const BRAND = "NexBoard";
 // Kampfdaten, Plugins)
 const UI = {
   "aion2.overlay": overlay, "aion2.radar": radar, "aion2.schedule": schedule, "aion2.dps": dps, "aion2.plugins": plugins,
-  deck, "aion2.runs": runs, "discord.bot": bot, hub, updates,
+  deck, "aion2.runs": runs, hub, updates,
 };
 // Seiten-ID → { page, mid }; die erste Seite eines Moduls trägt meist seine ID
 const PAGES = new Map(Object.entries(UI).flatMap(([mid, ui]) => ui.pages.map((page) => [page.id, { page, mid }])));
@@ -163,7 +162,7 @@ function dashboard(ctx) {
   };
   let frame = 0;
   const soon = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; draw(); }); };
-  for (const t of ["hello", "modules", "devices", "dps", "runs", "updates", "bot", "hub", "overlay", "settings", "online"]) ctx.onUnmount(on(t, soon));
+  for (const t of ["hello", "modules", "devices", "dps", "runs", "updates", "hub", "overlay", "settings", "online"]) ctx.onUnmount(on(t, soon));
   // State-Diffs (im Kampf 2×/s) betreffen hier nur die DPS-Kachel: nur diese, höchstens 1×/s
   const slow = throttle(soon, 1000);
   ctx.onUnmount(on("state", (v) => { if (dpsDiff(v)) slow(); }));
@@ -317,7 +316,7 @@ async function init() {
   on("online", () => { renderConn(); renderBanners(); });
   on("layout_error", renderBanners);
   on("layout", renderBanners);
-  for (const t of ["dps", "runs", "updates", "bot", "hub", "overlay", "devices"]) on(t, renderNav);
+  for (const t of ["dps", "runs", "updates", "hub", "overlay", "devices"]) on(t, renderNav);
   // Erststand per REST (sofort sichtbar), danach live über den WebSocket
   try {
     const [modules, st, deck] = await Promise.all([api("GET", "/api/modules"), api("GET", "/api/status"), api("GET", "/api/layout")]);

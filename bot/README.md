@@ -156,8 +156,10 @@ die Discord-Oberfläche in `bot/cogs/notifications.py` kennt nichts Dienst-Spezi
 
 ## AION-2: Runs aus dem NexBoard
 
-Jedes [NexBoard](../nexboard/) schickt nach einem beendeten Dungeon-Run die Eckdaten an den Bot
-(Modul „Discord-Bot“, `nexboard/daemon/deckbar_daemon/bot.py`). Laufen mehrere Leute denselben
+Jedes [NexBoard](../nexboard/) schickt nach einem beendeten Dungeon-Run seinen Run-Bericht
+(`nexproto.runreport.RunReport`) an den NexHub, der ihn über die Steuer-API (`control.py`, `run`) mit Link
+weiterreicht; beide Wege (Hub und die ältere Run-API `POST /api/aion/fight`) nutzen
+`AionDedup.accept_report`. Laufen mehrere Leute denselben
 Dungeon, wartet der Bot kurz (`wartezeit`, Standard 15 s), führt alle Meldungen zu einer Rangliste
 zusammen und postet genau einmal: Gesamt-Rangliste als Bild, dazu je Boss ein Bild (max. 9 pro
 Nachricht, Discords Limit). Unter „📊 Analyse“ stehen „Im NexHub ansehen“ (den Link meldet der Hub

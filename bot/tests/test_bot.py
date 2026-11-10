@@ -1484,3 +1484,36 @@ def test_termin_tafel_und_pings():
     assert faellige_pings(jetzt, set(faellig)) == []  # nicht doppelt
     # läuft gerade: Riss offen bis 03:10
     assert f"läuft, bis <t:{int(um('2026-10-07 03:10'))}:t>" in tafel(um("2026-10-07 03:05")).description
+
+
+def test_run_bericht_vom_hub_mit_link():
+    """accept_report: Run-API und Steuer-Route /control/run (Bericht über den NexHub) teilen die Annahme."""
+    from types import SimpleNamespace
+
+    from bot.cogs.aion_dedup import AionDedup
+
+    gestartet = []
+
+    async def finalize(cluster, delay, channel_id):
+        gestartet.append((cluster, channel_id))
+
+    kanal = {"aion_channel": 77}
+    fake = SimpleNamespace(api_pending={}, _finalize_api_later=finalize,
+                           db=SimpleNamespace(get_int=lambda guild, key: kanal.get(key)))
+    spieler = [{"name": "Gamunex", "cls": "chanter", "damage": 1000, "dps": 10}]
+    bericht = {"dungeon": "Fire Temple", "bosses_total": 1, "bosses_killed": 1, "start_ms": 1_000,
+               "fight_ms": 100, "players": spieler}
+
+    async def go():
+        erster = await AionDedup.accept_report(fake, 5, dict(bericht), "https://hub.example.com/hub/runs/1")
+        zweiter = await AionDedup.accept_report(fake, 5, dict(bericht))  # gleicher Run, zweiter Spieler
+        await asyncio.sleep(0)
+        return erster, zweiter
+
+    erster, zweiter = run(go())
+    assert erster == (200, {"ok": True, "merged": False}) and zweiter == (200, {"ok": True, "merged": True})
+    (cluster, channel_id), = gestartet
+    assert channel_id == 77 and len(cluster.reports) == 2 and cluster.hub_url.endswith("/runs/1")
+    assert run(AionDedup.accept_report(fake, 5, {"dungeon": ""}))[0] == 400
+    kanal.clear()
+    assert run(AionDedup.accept_report(fake, 5, dict(bericht)))[0] == 409

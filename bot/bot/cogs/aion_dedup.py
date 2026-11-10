@@ -305,18 +305,24 @@ class AionDedup(commands.Cog):
         guild_id = self.db.guild_for_value("aion_api_token", auth[7:]) if auth.startswith("Bearer ") else None
         if guild_id is None:
             return web.json_response({"error": "unauthorized"}, status=401)
-        channel_id = self.db.get_int(guild_id, "aion_channel")
-        if not channel_id:
-            return web.json_response({"error": "kein aion_channel eingerichtet (/aion kanal:)"}, status=409)
         try:
             data = await request.json()
         except ValueError:
             return web.json_response({"error": "invalid json"}, status=400)
         if not isinstance(data, dict):
             return web.json_response({"error": "invalid json"}, status=400)
+        status, body = await self.accept_report(guild_id, data)
+        return web.json_response(body, status=status)
+
+    async def accept_report(self, guild_id: int, data: dict, hub_url: str | None = None) -> tuple[int, dict]:
+        """Ein Run-Bericht, direkt von einem NexBoard oder über den NexHub (control.py, /control/run, dann mit
+        Link): prüfen und mit Meldungen desselben Runs zu einem Post zusammenführen. Antwort: (Status, Inhalt)."""
+        channel_id = self.db.get_int(guild_id, "aion_channel")
+        if not channel_id:
+            return 409, {"error": "kein aion_channel eingerichtet (/aion kanal:)"}
         error = validate_fight_payload(data)
         if error:
-            return web.json_response({"error": error}, status=400)
+            return 400, {"error": error}
 
         run = {
             "dungeon": data["dungeon"].strip(), "difficulty": (data.get("difficulty") or "").strip() or None,
@@ -329,14 +335,16 @@ class AionDedup(commands.Cog):
         for c in clusters:
             if same_api_run(c.run, run):
                 c.reports.append(run)
+                c.hub_url = c.hub_url or hub_url
                 log.info("AION-API: Lauf %s bekommt weitere Meldung (jetzt %d)", run["dungeon"], len(c.reports))
-                return web.json_response({"ok": True, "merged": True})
+                return 200, {"ok": True, "merged": True}
 
         delay = self.db.get_int(guild_id, "aion_dedup_delay") or DEFAULT_DELAY
         cluster = ApiCluster(run, guild_id)
+        cluster.hub_url = hub_url
         clusters.append(cluster)
         cluster.task = asyncio.create_task(self._finalize_api_later(cluster, delay, channel_id))
-        return web.json_response({"ok": True, "merged": False})
+        return 200, {"ok": True, "merged": False}
 
     async def _finalize_api_later(self, cluster: ApiCluster, delay: int, channel_id: int) -> None:
         await asyncio.sleep(delay)
