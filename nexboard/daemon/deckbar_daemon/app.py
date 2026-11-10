@@ -19,6 +19,7 @@ from nexcore.registry import CHANGED
 from nexcore.settings import MASK, SettingsStore, is_mask
 
 from . import __version__
+from .a2ui import A2Ui
 from .boss_effekte import BossEffekte
 from .bot import SETTINGS_FILE as bot_settings_file
 from .bot import DiscordBot
@@ -37,6 +38,7 @@ from .modules.deck import DeckModule
 from .modules.dps import DpsModule
 from .modules.hub import HubModule
 from .modules.overlay import OverlayModule
+from .modules.plugins import PluginsModule
 from .modules.radar import RadarModule
 from .modules.runs import RunsModule
 from .modules.schedule import ScheduleModule
@@ -78,6 +80,7 @@ class NexBoard:
             self.bar,
             DpsModule(ctx, self.live, self.dps, self.state),
             OverlayModule(ctx, self.live, self.overlay, self.state),
+            PluginsModule(ctx, self.live, self.a2.plugins),
             RunsModule(ctx, self.live, self.runs, self.state),
             ScheduleModule(ctx, self.live, Schedule(config_dir)),
             self.radar_module,
@@ -85,7 +88,9 @@ class NexBoard:
             HubModule(ctx, self.live, self.hub),
             UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json")),
         ]
-        self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules)
+        # Plugins liefen bis zum eigenen Modul einfach mit dem Overlay: bei alten modules.yaml neu
+        self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules,
+                                introduced=frozenset({"aion2.plugins"}))
         self.bus.on(CHANGED, self._modules_changed)
         self.state.subscribe(self._state_changed)
         for key, provider in (("state", lambda: self.state.values), ("status", self.status),
@@ -115,6 +120,13 @@ class NexBoard:
         self.radar = Radar(lambda stand: self.overlay.publish("radar", stand), spiel_laeuft=self._game_running)
         self.hub.deaths = self.radar.tode_zwischen
         self._sync_radar()
+        # Oberfläche des A2Tools-Meters mit dem Plugin-Host (eigener Port, siehe __main__); Testinstanzen
+        # bekommen eigene Plugin-Ordner, damit sie die installierten Plugins nicht anfassen
+        self.a2 = A2Ui(self.dps.capture, c / "a2-settings.json", None if self.real_config else c / "a2")
+        self.a2.plugins.overlay = self.overlay.plugin_command
+        # eine Sprache für alles: die der allgemeinen Einstellungen (System → Allgemein)
+        self.a2.on_language = self.set_language
+        self.bus.on(LANGUAGE, self.a2.apply_language)
 
     def _sync_radar(self) -> None:
         """Name und Sprache ans Radar. Seine Datei liegt fest in ~/.config, Testinstanzen fassen sie nicht an."""

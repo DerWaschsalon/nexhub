@@ -281,6 +281,7 @@ class PluginHost:
         self.decoder_errors: dict[str, str] = {}
         # Eingebaute Plugins, deren Update neue Rechte will: bis zur Zustimmung in der Plugin-Liste sichtbar
         self.awaiting_consent: set[str] = set()
+        self.active = False  # Modul AION 2 · Plugins an: Plugins laufen und bekommen Spieldaten
         self.widgets: dict[str, WidgetState] = {}
         self.pending: list[Pending] = []
         self.logs: dict[str, EventLog] = {}
@@ -392,7 +393,9 @@ class PluginHost:
                 "disabled": self.disabled(), "hideClosed": self._listed(HIDE_CLOSED_KEY),
                 "hideUnfocused": self._listed(HIDE_UNFOCUSED_KEY),
                 # Ein Dock wie im Meter gibt es nicht: jedes Plugin hat sein Fenster
-                "ownWindow": [p for p in self.loaded if p not in BUILTIN]}
+                "ownWindow": [p for p in self.loaded if p not in BUILTIN],
+                # Für die Web-UI: fest eingebaut, ohne Ausschalter und Entfernen
+                "builtIn": [self.info(p) for p in self.loaded.values() if p.id in BUILTIN]}
 
     async def send_decoders(self) -> None:
         """Decoder der laufenden Plugins an deckbar-capture (auch nach dessen Neustart)."""
@@ -400,7 +403,7 @@ class PluginHost:
             return
         off = set(self.disabled())
         plugins = [{"plugin": p.id, "decoders": p.manifest.get("decoders") or []}
-                   for p in self.loaded.values() if p.id not in off]
+                   for p in self.loaded.values() if self.active and p.id not in off]
         try:
             result = await self.capture.request("plugin_decoders", timeout=10, plugins=plugins)
         except (RuntimeError, TimeoutError) as e:
@@ -413,6 +416,7 @@ class PluginHost:
             log.warning("Plugin %s: Decoder abgelehnt: %s", plugin, why)
 
     def start(self) -> None:
+        self.active = True
         if not self._tasks:
             self._tasks = [asyncio.create_task(self._flusher()), asyncio.create_task(self._game_loop()),
                            asyncio.create_task(self._keep_builtin())]
@@ -445,6 +449,15 @@ class PluginHost:
                 continue
             await self.install(plugin)
 
+    async def deactivate(self) -> None:
+        """Modul aus: Fenster und Widgets zu, keine Spieldaten mehr. Installiert bleibt alles."""
+        self.active = False
+        for plugin in self.loaded:
+            await self._overlay({"action": "close", "id": plugin})
+            await self._drop_widgets(plugin)
+        await self.stop()
+        await self.send_decoders()
+
     async def stop(self) -> None:
         for task in [*self._tasks, *self._live.values()]:
             task.cancel()
@@ -456,7 +469,7 @@ class PluginHost:
 
     # ------------------------------------------------------------ Ereignisse aus dem Mitschnitt
     async def _on_capture(self, event: str, payload: Any) -> None:
-        if event == "hello":
+        if event == "hello" and self.active:
             self.start()
             asyncio.ensure_future(self.send_decoders())
         elif event == "ping":

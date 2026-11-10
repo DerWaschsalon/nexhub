@@ -1,4 +1,4 @@
-/* Modul AION 2 · Kampfdaten: Live-Ansicht, Quelle und Status, Zugang zu Meter-Einstellungen und Plugins.
+/* Modul AION 2 · Kampfdaten: Live-Ansicht, Quelle und Status, Zugang zu den Meter-Einstellungen.
    Die Sprache der Namen steht unter System → Einstellungen (gilt für alles). */
 import { fill, el, icon, S, on, button, chip, callout, card, settingsRow, fmtAmount, fmtTime, classColor, modOn } from "../core.js";
 import { cmd as overlayCommand } from "./aion2-overlay.js";
@@ -71,12 +71,12 @@ function liveTab(ctx) {
   return box;
 }
 
-/** Meter-Einstellungen und Plugins hat das A2Tools-Meter selbst; das Overlay öffnet sein Fenster. */
+/** Meter-Einstellungen hat das A2Tools-Meter selbst; das Overlay öffnet sein Fenster. Plugins: eigene Seite. */
 function meterCard() {
   const hint = modOn("aion2.overlay") ? "Öffnet das Fenster des A2Tools-Meters über dem Spiel (Overlay muss laufen)"
     : "Braucht das Modul Overlay";
-  return card("Meter und Plugins", null, null,
-    settingsRow("Meter-Einstellungen und Plugins", hint,
+  return card("Meter", "Plugins verwaltest du unter Im Spiel → Plugins", null,
+    settingsRow("Meter-Einstellungen", hint,
       button("Öffnen", () => overlayCommand("settings"), "sm", "open-in-new", { disabled: !modOn("aion2.overlay") })));
 }
 

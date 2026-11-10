@@ -95,6 +95,7 @@ async def host(tmp_path, cdn):
     h = PluginHost(FakeCapture(), lambda: settings, save, emit, tmp_path / "plugins", tmp_path / "data",
                    base_url=cdn.url, key_hex=cdn.key_hex)
     h.emitted, h.saved = emitted, settings
+    h.active = True  # Modul AION 2 · Plugins an
     h.overlay_calls = []
 
     async def overlay(command):
@@ -321,6 +322,18 @@ async def test_ausgeschaltet_bekommt_nichts(host, cdn):
     assert host.pending == [] and host.windows_to_restore() == []
     await host.call("plugin_set_enabled", {"id": "seelen", "enabled": True}, None)
     assert host.capture.sent[-1][1]["plugins"][0]["plugin"] == "seelen"
+
+
+async def test_modul_aus_schliesst_fenster_und_nimmt_die_decoder(host, cdn):
+    cdn.add("seelen", permissions=["storage", "decoder:s"], decoders=[{"name": "s", "opcode": "0D 90", "fields": []}])
+    await host.install("seelen")
+    host.capture.running = True
+    await host.deactivate()
+    assert not host.active and host.overlay_calls[-1] == {"action": "close", "id": "seelen"}
+    assert host.capture.sent[-1] == ("plugin_decoders", {"plugins": []})
+    await host._on_capture("hello", {})  # Mitschnitt startet neu: Plugins bleiben aus
+    assert host.capture.sent[-1] == ("plugin_decoders", {"plugins": []}) and not host._tasks
+    assert "seelen" in host.loaded  # installiert bleibt es
 
 
 async def test_widgets(host, cdn):
