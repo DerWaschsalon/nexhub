@@ -11,10 +11,9 @@ strict = true
 ignore_missing_imports = true
 # Das ganze Paket wird strikt geprüft. Die alten Sammel-Tests (tests/test_*.py) folgen, sobald sie
 # auf die Module aufgeteilt sind (Konzept „TheWashBot – Umbau auf kleine Module“).
-files = ["bot", "tests/core", "tests/modules"]
+files = ["bot", "tests"]
 follow_imports = "silent"
 # nexcore und nexproto aus dem Monorepo (im Image als Pakete installiert)
 mypy_path = ["../packages/nexcore", "../proto"]
 # bot/ und bot/cogs/ haben keine __init__.py (Namespace-Pakete)
 explicit_package_bases = true
-

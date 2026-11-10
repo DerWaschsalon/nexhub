@@ -14,8 +14,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from bot.cogs.control import SECTIONS, Field, read_field
 from bot.db import Database
+from bot.forms import SECTIONS, read_field
+from bot.hubpages import Field
 
 GOLDEN = Path(__file__).parent / "golden" / "settings.json"
 GUILD = 1
