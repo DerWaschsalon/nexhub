@@ -237,9 +237,9 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   Kennung `id` der Werte, die es ab diesem Stand gibt) und Arkana-Sets ohne Bonus. Ohne Vergleich mit
   anderen, Reihenfolge von schnell erledigt bis teuer. Alte Stände ohne `id` zeigen erst nach dem
   nächsten Abruf alles.
-- Echte Skill-Stufe im Profil (Runs und Armory, `modules/logs/skillLevels.ts`): Stufe aus der
-  Skill-Liste plus Daevanion-Boni plus verstärkte Skills der Ausrüstung, farbig, wenn Boni dabei sind;
-  Stigmen ohne Boni.
+- Skill-Stufen zeigt das Profil so, wie NC sie schickt: die Stufe in der Skill-Liste enthält die Boni
+  aus Daevanion und Ausrüstung schon (wie im Spiel und auf shugo.gg, höchstens 20). Früher wurden sie
+  noch einmal aufaddiert (bis 29 statt 20), das ist entfernt.
 - Einen Build-Check gegen die Top-Spieler (Rangliste von Abyss Logs) gab es bis November 2026; Migration
   0010 entfernt seine Tabelle `build_checks`, der Code steht in der Git-Historie (Stand `bb2a01a`).
 
