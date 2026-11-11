@@ -220,8 +220,10 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   und Vergleich.
 - Vergleich (`hub/armory/vergleich?links=<id>&rechts=<Server-ID>/<Name>`): links ein Charakter aus
   der Armory, rechts ein beliebiger, den `GET /api/armory/live?server_id=…&name=…` jetzt von der
-  Website holt und **nicht speichert**. Kampfkraft, Werte, Ausrüstung je Platz und Skills mit
-  Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
+  Website holt und **nicht speichert**. Kampfkraft, Werte samt zusammengezählter Effekte, Ausrüstung
+  und Arkana je Platz mit allem, was darauf ist (`compareItems` in `modules/armory/compare.ts`:
+  Grundwerte samt Verzauberung, Seelenbindung, Manasteine zusammengezählt, verstärkte Skills, Set),
+  und Skills mit Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
   rot umrandet ist, was der andere schon offen hat. Die Adresse zeigt Angemeldeten denselben Vergleich.
 - Teilen ohne Login: `POST /api/armory/compare/share` (`left`, `server_id`, `name`) speichert nur das
   Paar (`models.Comparison`) und gibt einen Link `/v/<token>`; derselbe Vergleich vom selben Konto
