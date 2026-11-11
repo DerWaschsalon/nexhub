@@ -1,4 +1,4 @@
-"""Modul Radar: Hidden Cubes, Karte, Boss-Warnungen und PvP als Widgets im Overlay."""
+"""Modul Radar: Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay."""
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +10,7 @@ from nexcore.errors import ApiError
 from ..boss_effekte import BossEffekte
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
+from ..overlay_layout import WidgetSpec
 from ..radar import Radar
 from .base import WebModule
 
@@ -17,10 +18,18 @@ from .base import WebModule
 class RadarModule(WebModule):
     info = ModuleInfo(
         "aion2.radar", "AION 2 · Radar", "ingame", "radar",
-        "Hidden Cubes, Karte, Boss-Warnungen und PvP der Sitzung als Widgets im Overlay, Feldbosse unter "
+        "Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse unter "
         "Termine. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
         # die Feldbosse und ihre Ansage stehen auf der Seite des Moduls Termine
         requires=("aion2.schedule",), tags=("AION 2", "Desktop"),
+    )
+    overlay_widgets = (
+        WidgetSpec("cube", "Cube-Radar", "Kleines Radar mit Richtung und Abstand; zeigt sich nur, solange ein "
+                   "Hidden Cube in Sicht ist"),
+        WidgetSpec("map", "Karte", "Karte mit Cubes, Spawnpunkten und Teleportern; die Kartenbilder kommen aus "
+                   "dem Plugin Pet Soul Tracker", enabled=False, size=(340, 300), profiles=()),
+        WidgetSpec("warnings", "Boss-Warnungen", "Nur während einer Warnung; was gewarnt wird, steht unter "
+                   "Warnungen"),
     )
 
     def __init__(self, ctx: Context, live: LiveHub, radar: Radar, boss_effects: BossEffekte) -> None:

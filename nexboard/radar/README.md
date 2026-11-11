@@ -79,13 +79,9 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 - **Laufrichtung oben** (Schalter auf der Seite „Radar“): dreht das Radar so, dass die Laufrichtung oben ist (aus den
   letzten Metern Weg) statt Norden. Weitere Cube-IDs (ungeprüft): 1000549–1000565, 1300081, 1300082.
 - **Dungeon-Restzeit** (`0x6100`) in der Statuszeile unter dem Radar.
-- **PvP der Sitzung** (`radar/pvp.py`, Widget „PvP“ im Overlay): Kills und Tode zählt `0x8D04`
-  (Tod mit Täter und dessen Namen, nur bei Spielern als Täter), Kills über die eigene Entity oder den
-  eigenen Namen (auch Begleiter). Assists, Abyss-Rangpunkte, Rang und Grad kommen aus der eigenen
-  Saisonwertung `0x8D57` (JSON mit kill/death/assist_count); das Spiel schickt sie beim Einloggen und
-  nach manchen Zonenwechseln, der Server rechnet etwa stündlich neu. Gezeigt wird der Zuwachs seit
-  Spielstart bzw. „PvP neu beginnen“. Opcodes und Formate nach dem Desktop-Programm von questlog.gg,
-  an eigenen Mitschnitten geprüft; PvP-Kills selbst sind noch nicht live geprüft.
+- **Tode** (`0x8D04`, CharDie; Name nach dem Desktop-Programm von questlog.gg): jeder Tod mit Skill und, bei einem
+  Spieler als Täter, dessen Namen. Daraus kommt die Todesursache im Run. PvP zählt das Radar nicht mehr, das macht
+  das A2Tools-Plugin PvP Tracker.
 - **Feldbosse** (NexBoard-Seite „Termine“): Respawn-Timer aller gesehenen
   Feldbosse (`0x9101`), Ansage 5 Minuten vorher und beim Respawn (nur aktuelle Karte), lebende Feldbosse
   als lila Raute auf dem Radar. Namen lernt das Radar, sobald ein Boss neben dem Platz erscheint.
@@ -93,7 +89,7 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
   zeigt das Modul Termine, gerechnet in UTC nach jackships/aion2-data (`nexproto.termine`). Ansage 5
   Minuten vor dem Riss.
   Stand in `~/.local/share/aion2-radar/feldbosse.json`. Die Vertraute-Tabelle ist gestrichen, das zeigt der
-  Pet Soul Tracker (Reiter „Vertraute“ im Radar-Widget); die Opcodes liest das Radar bis Schritt 7 des Umbaus noch mit.
+  Pet Soul Tracker (eigenes Plugin-Fenster); die Opcodes liest das Radar bis Schritt 7 des Umbaus noch mit.
 - **Lernmodus:** Beim Betreten eines Dungeons startet eine Aufnahme nach `~/.local/share/aion2-radar/mitschnitte/<Dungeon>-<Zeit>.pcap`,
   beim Verlassen stoppt sie (Statuszeile „● REC“), jeder Lauf eine Datei. Standardmäßig aus; einschalten unter
   Warnungen → Erweitert („Lernmodus: Dungeons aufnehmen“), dort auch von Hand starten und stoppen. Auswerten mit
@@ -102,7 +98,7 @@ tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_a
 
 Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seiten „Warnungen“ und „Radar & Karte“). Ist es an, startet der Daemon das Radar
 (`RadarDienst`), sobald AION 2 läuft, und beendet es 30 s nach Spielende. Den Stand schickt er etwa fünfmal pro
-Sekunde als Overlay-Ereignis `radar`, gezeichnet in `daemon/deckbar_daemon/web/overlay/radar.js`. Auf den Seiten
+Sekunde als Overlay-Ereignis `radar`, gezeichnet von den Widgets `cube.js`, `map.js` und `warnings.js` unter `daemon/deckbar_daemon/web/overlay/widgets/`. Auf den Seiten
 stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den allgemeinen Einstellungen
 (der Daemon schreibt sie in die Datei des Radars). Standardwerte und Warnungsliste stehen in
 `radar/standard.json` und `radar/meldungen.json` (liest auch die Seite).

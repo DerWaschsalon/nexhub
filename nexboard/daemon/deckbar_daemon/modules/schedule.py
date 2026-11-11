@@ -10,6 +10,7 @@ from nexcore.settings import SettingsStore
 
 from ..core.live import LiveHub
 from ..core.topics import SCHEDULE
+from ..overlay_layout import WidgetSpec
 from ..schedule import Schedule
 from .base import WebModule
 
@@ -22,6 +23,10 @@ class ScheduleModule(WebModule):
         "Feste Termine der Server (Riss, Shugo-Fest, Resets …) und eigene Ereignisse mit Countdown, "
         "in der Web-UI und als Widget im Overlay.",
         tags=("AION 2",),
+    )
+    overlay_widgets = (
+        WidgetSpec("timers", "Termine", "Countdown bis zum nächsten Termin; welche, steht unter Termine",
+                   enabled=False),
     )
 
     def __init__(self, ctx: Context, live: LiveHub, schedule: Schedule) -> None:

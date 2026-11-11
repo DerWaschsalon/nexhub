@@ -107,7 +107,7 @@ async def test_api_module_settings(client):
 
 async def test_api_plugins_nur_verwalten(client):
     r = await client.post("/api/plugins", json={"cmd": "plugin_list"})
-    assert r.status == 200 and "builtIn" in (await r.json())["result"]
+    assert r.status == 200 and "plugins" in (await r.json())["result"]
     # Was eine Plugin-Seite darf (Daten lesen, Fenster steuern), darf die Web-UI nicht
     r = await client.post("/api/plugins", json={"cmd": "plugin_storage_get", "args": {}})
     assert r.status == 400

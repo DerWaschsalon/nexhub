@@ -49,8 +49,8 @@ async def test_overlay_bekommt_die_liste(tmp_path):
     await deck.modules.set("aion2.schedule", True)
     await deck.modules.start()
     await asyncio.sleep(0.05)  # erste Runde der Aufgabe
-    assert [r["name"] for r in deck.overlay.schedule] and all(r["shown"] for r in deck.overlay.schedule)
+    assert [r["name"] for r in deck.overlay.retained["schedule"]] and all(r["shown"] for r in deck.overlay.retained["schedule"])
     module = deck.modules.modules["aion2.schedule"]
     await module.update_settings({"hidden": list(BUILTIN_NAMES)})
-    assert deck.overlay.schedule == []  # sofort, nicht erst nach dem nächsten Takt
+    assert deck.overlay.retained["schedule"] == []  # sofort, nicht erst nach dem nächsten Takt
     await deck.modules.shutdown()

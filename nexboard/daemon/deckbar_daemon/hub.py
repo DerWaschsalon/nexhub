@@ -35,7 +35,8 @@ from pydantic import Field, field_validator
 from . import __version__
 from .config import _Strict
 from .report import run_report
-from .runs import Run, dungeon_parts_en, run_image
+from .run_image import run_image
+from .run_model import Run, dungeon_parts_en
 
 log = logging.getLogger(__name__)
 

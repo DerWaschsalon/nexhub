@@ -13,91 +13,23 @@
 <div id="toolbar" role="toolbar" aria-label="Overlay bearbeiten">
   <div class="tb-title"><span class="dot"></span>Overlay bearbeiten</div>
   <span class="tb-hint">Ziehen = verschieben · Mausrad = Größe · Shift = frei · Esc = fertig</span>
-  <label class="tb-select" title="Profil = welche Widgets sichtbar sind (Tastenkürzel: deckbar-overlay --profil NAME)">Profil
-    <select id="profil"></select>
+  <label class="tb-select" title="Profil = welche Widgets sichtbar sind (Tastenkürzel: deckbar-overlay --profile NAME)">Profil
+    <select id="profile"></select>
   </label>
   <div class="tb-group" id="toggles"></div>
-  <label class="tb-select" title="Effekt auf deinem Namen in der Meter-Zeile">Namenseffekt
-    <select id="fx">
-      <option value="">aus</option><option value="glanz">Glanz</option><option value="brennen">Brennen</option>
-      <option value="gold">Gold</option><option value="frost">Frost</option><option value="holo">Holo</option>
-      <option value="leere">Leere</option>
-    </select>
-  </label>
   <button id="reset" type="button">Positionen zurücksetzen</button>
   <button id="done" type="button" class="primary">Fertig</button>
 </div>
 
-<button id="edit-knopf" type="button" title="Overlay bearbeiten (Widgets verschieben und an-/ausschalten)" aria-label="Overlay bearbeiten">
+<button id="edit-button" type="button" title="Overlay bearbeiten (Widgets verschieben und an-/ausschalten)" aria-label="Overlay bearbeiten">
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zm17.7-10.2a1 1 0 0 0 0-1.42l-2.33-2.33a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
 </button>
 
 <div id="offline" hidden>NexBoard-Daemon nicht erreichbar – verbinde neu …</div>
 
-<section class="widget" id="w-meter" data-id="meter" data-title="DPS-Meter" data-click>
-  <iframe id="meter" title="DPS-Meter" src="about:blank"></iframe>
-</section>
+<!-- Die Widgets hängt stage.js ein: eines je Anmeldung der eingeschalteten Module (widgets/<id>.js) -->
+<main id="stage"></main>
 
-<section class="widget hud" id="w-boss" data-id="boss" data-title="Boss">
-  <div class="boss-head"><span class="boss-name" id="boss-name">Boss</span><span class="boss-pct" id="boss-pct"></span></div>
-  <div class="boss-bar"><div class="boss-fill" id="boss-fill"></div><div class="boss-glow" id="boss-glow"></div></div>
-  <div class="boss-foot"><span id="boss-time"></span><span id="boss-ttk"></span></div>
-</section>
-
-<section class="widget hud" id="w-timers" data-id="timers" data-title="Termine">
-  <div class="timer-list" id="timer-list"></div>
-</section>
-
-<section class="widget hud" id="w-radar" data-id="radar" data-title="Radar" data-click>
-  <div class="radar-kopf">
-    <nav class="radar-reiter" role="tablist">
-      <button type="button" data-reiter="karte" class="an">Karte</button>
-      <button type="button" data-reiter="vertraute">Vertraute</button>
-      <button type="button" data-reiter="wuerfel">Würfel</button>
-    </nav>
-    <span id="karte-name" class="radar-titel"></span>
-    <button type="button" id="radar-falten" title="Einklappen" aria-label="Einklappen">–</button>
-  </div>
-  <div id="wuerfel-live"></div>
-  <div class="radar-inhalt">
-    <div class="radar-seite an" data-seite="karte">
-      <canvas id="karte-bild"></canvas>
-      <div class="karte-knoepfe">
-        <button type="button" id="karte-rein" title="Vergrößern">+</button>
-        <button type="button" id="karte-raus" title="Verkleinern">−</button>
-        <button type="button" id="karte-folgen" title="Zurück zu dir" hidden>⌖</button>
-      </div>
-      <canvas id="radar-bild" width="520" height="520" hidden></canvas>
-      <div class="karte-tipp" id="karte-tipp" hidden></div>
-      <p class="karte-notiz" id="karte-notiz" hidden></p>
-      <a class="karte-quelle" id="karte-quelle" href="https://www.aion2timers.com/map/" title="Kartenbilder und Spawnpunkte: Aion 2 Timers, Live-Karte öffnen">Karte: Aion 2 Timers</a>
-      <div class="radar-info">
-        <div id="radar-cube"></div>
-        <div class="radar-zeile"><span id="radar-status"></span><span id="karte-status"></span></div>
-      </div>
-    </div>
-    <div class="radar-seite" data-seite="vertraute"></div>
-    <div class="radar-seite" data-seite="wuerfel"></div>
-  </div>
-  <div id="karte-bilder" hidden></div>
-  <div id="radar-griff" title="Größe ändern" aria-hidden="true"></div>
-</section>
-
-<section class="widget" id="w-warnung" data-id="warnung" data-title="Boss-Warnungen">
-  <div class="warn-vorschau" id="warn-vorschau" hidden></div>
-  <div id="warn-liste"></div>
-</section>
-
-<section class="widget hud" id="w-pvp" data-id="pvp" data-title="PvP">
-  <div class="pvp-kopf"><span>PvP · Sitzung</span><span id="pvp-zeit"></span></div>
-  <div class="pvp-kda" id="pvp-kda"></div>
-  <div class="pvp-punkte" id="pvp-punkte"></div>
-  <div class="pvp-letzte" id="pvp-letzte"></div>
-</section>
-
-<script src="radar.js"></script>
-<script src="pvp.js"></script>
-<script src="plugins.js"></script>
-<script src="overlay.js"></script>
+<script type="module" src="main.js"></script>
 </body>
 </html>

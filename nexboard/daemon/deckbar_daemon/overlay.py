@@ -4,8 +4,9 @@ Das Programm (overlay/deckbar-overlay, Qt) legt unter Wayland eine durchsichtige
 über den Spielmonitor und zeigt darin die Seite web/overlay/ (vom Daemon auf Port+1, wie die
 Meter-Oberfläche). Die Seite holt hier:
 
-    GET  /api/overlay/layout     Layout (OverlayLayout), PUT speichert (nach Ziehen im Bearbeiten-Modus)
-    GET  /api/overlay/events     Server-Sent Events: layout, dps (State dps + dps_active), radar, schedule
+    GET  /api/overlay/layout     Layout (overlay_layout.py), PUT speichert (nach Ziehen im Bearbeiten-Modus)
+    GET  /api/overlay/events     Server-Sent Events, die einzige Datenverbindung der Seite: widgets (angemeldete
+                                 Widgets), layout, dazu was die Module veröffentlichen (dps, schedule, radar …)
 
 Die Web-UI (Port 8765) nutzt dieselben Daten über /api/overlay und schickt Befehle an das
 Programm (Bearbeiten, Sperren, Ein-/Ausblenden) über dessen Socket im Laufzeitordner.
@@ -20,13 +21,14 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Annotated, Any, Awaitable, Callable, Literal
+from typing import Any, Awaitable, Callable, Iterable
 
 from aiohttp import web
-from pydantic import Field, StringConstraints, ValidationError, field_validator, model_validator
+from pydantic import ValidationError
 
 from .capture import aion2_running
-from .config import _atomic_write, _Strict
+from .config import _atomic_write
+from .overlay_layout import OverlayLayout, WidgetSpec, default_profiles, merge
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +41,8 @@ GAME_GRACE_S = 30  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebilds
 UNIT_POLL_S = 30   # Dienststatus fürs Dashboard auffrischen (nur mit Spiel oder offener Web-UI)
 COMMANDS = ("toggle", "show", "hide", "edit", "lock", "click", "reload", "details", "history", "settings",
             "autohide-on", "autohide-off")
-FX = Literal["", "glanz", "brennen", "gold", "frost", "holo", "leere"]
+# Ereignisse, deren letzter Stand eine neu verbundene Overlay-Seite sofort bekommt
+RETAINED = ("dps", "schedule", "veil", "plugin-widgets")
 
 
 def launcher_path() -> Path:
@@ -54,129 +57,10 @@ def socket_path() -> Path:
     return Path(base) / "deckbar-overlay.sock"
 
 
-# ---------------------------------------------------------------- Layout
-class Widget(_Strict):
-    enabled: bool = True
-    # Position in CSS-Pixeln auf dem Monitor; None = Standardplatz der Seite
-    x: int | None = Field(None, ge=-4000, le=16000)
-    y: int | None = Field(None, ge=-4000, le=16000)
-    scale: float = Field(1.0, ge=0.5, le=3.0)
-    opacity: float = Field(1.0, ge=0.2, le=1.0)
-
-
-class BossWidget(Widget):
-    show_ttk: bool = True  # Kill-Prognose aus dem HP-Verlauf
-    hide_idle: bool = True  # außerhalb von Kämpfen ausblenden
-
-
-class RadarWidget(Widget):
-    # Größe in CSS-Pixeln, zieht der Griff unten rechts; scale vergrößert zusätzlich alles darin
-    width: int = Field(440, ge=300, le=2000)
-    height: int = Field(580, ge=220, le=1600)
-
-
-class TimersWidget(Widget):
-    enabled: bool = False
-
-    @model_validator(mode="before")
-    @classmethod
-    def _ereignisse_sind_jetzt_termine(cls, data: Any) -> Any:
-        """Die Ereignisliste lebt seit dem Umbau im Modul Termine (migrate.py zieht sie um)."""
-        if isinstance(data, dict) and "events" in data:
-            data = {k: v for k, v in data.items() if k != "events"}
-        return data
-
-
-def _from(module: str) -> dict[str, str]:
-    """Zu welchem Modul ein Widget gehört: die Web-UI zeigt es nur, solange das Modul an ist."""
-    return {"module": module}
-
-
-def _from_field(wid: str) -> str:
-    extra = Widgets.model_fields[wid].json_schema_extra
-    assert isinstance(extra, dict)
-    return str(extra["module"])
-
-
-class Widgets(_Strict):
-    # title: Name in der Web-UI und in den Tastenkürzeln (KDE-Starter)
-    meter: Widget = Field(default_factory=Widget, title="DPS-Meter", json_schema_extra=_from("aion2.dps"))
-    boss: BossWidget = Field(default_factory=BossWidget, title="Boss-Leiste", json_schema_extra=_from("aion2.dps"))
-    timers: TimersWidget = Field(default_factory=TimersWidget, title="Termine",
-                                 json_schema_extra=_from("aion2.schedule"))
-    # Modul AION 2 · Radar: Karte, Vertraute und Würfel in einem Widget; die Warnungen zeigen sich nur bei einer
-    radar: RadarWidget = Field(default_factory=RadarWidget, title="Radar", json_schema_extra=_from("aion2.radar"))
-    warnung: Widget = Field(default_factory=Widget, title="Boss-Warnungen", json_schema_extra=_from("aion2.radar"))
-    pvp: Widget = Field(default_factory=lambda: Widget(enabled=False), title="PvP",
-                        json_schema_extra=_from("aion2.radar"))
-
-
-WIDGET_IDS = tuple(Widgets.model_fields)
-WIDGET_TITEL = {wid: Widgets.model_fields[wid].title for wid in WIDGET_IDS}
-WIDGET_MODULE = {wid: _from_field(wid) for wid in WIDGET_IDS}
-# Profil = welche Widgets sichtbar sind; die Positionen gelten für alle Profile
-ProfilName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9-]{1,24}$")]  # auch Aktions-ID im Starter
-DEFAULT_PROFILE = {"PvE": ["meter", "boss", "timers", "radar", "warnung"], "PvP": ["meter", "pvp"]}
-
-
-class OverlayLayout(_Strict):
-    version: Literal[1] = 1
-    screen: str = Field("", max_length=64)  # Ausgang (kscreen-doctor -o), leer = Hauptmonitor laut KDE
-    start_mode: Literal["click", "lock"] = "click"
-    fx: FX = ""  # Namenseffekt auf dem eigenen Namen in der Meter-Zeile
-    gpu: bool = True  # Chromium-GPU-Compositing (unter layer-shell ohne Transparenzfehler)
-    hide_unfocused: bool = True  # Fläche nur zeigen, solange AION 2 das aktive Fenster ist (KWin)
-    widgets: Widgets = Field(default_factory=Widgets)
-    profil: str = Field("", max_length=24)  # aktives Profil, leer = keins
-    profile: dict[ProfilName, list[str]] = Field(default_factory=lambda: dict(DEFAULT_PROFILE), max_length=12)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _karte_ist_jetzt_radar(cls, data: Any) -> Any:
-        """Das Widget „Karte“ gibt es nicht mehr, es steckt im Radar. War sie an, übernimmt das Radar
-        ihren Platz; das neue Widget zeigt Listen und braucht mindestens 80 % Größe."""
-        if not isinstance(data, dict):
-            return data
-        widgets = data.get("widgets")
-        if isinstance(widgets, dict) and isinstance(widgets.get("karte"), dict):
-            data = {**data, "widgets": dict(widgets)}
-            karte = data["widgets"].pop("karte")
-            if karte.get("enabled"):
-                data["widgets"]["radar"] = {**karte, "scale": max(float(karte.get("scale") or 1), 0.8)}
-        if isinstance(data.get("profile"), dict):
-            data = {**data, "profile": {n: list(dict.fromkeys("radar" if i == "karte" else i for i in ids))
-                                        for n, ids in data["profile"].items()}}
-        return data
-
-    @field_validator("profile")
-    @classmethod
-    def _bekannte_widgets(cls, profile: dict[str, list[str]]) -> dict[str, list[str]]:
-        for name, ids in profile.items():
-            if not set(ids) <= set(WIDGET_IDS):
-                raise ValueError(f"Profil {name}: unbekanntes Widget")
-        return profile
-
-    @model_validator(mode="after")
-    def _bekanntes_profil(self) -> OverlayLayout:
-        if self.profil and self.profil not in self.profile:
-            raise ValueError(f"Profil {self.profil} gibt es nicht")
-        return self
-
-    def sichtbar(self) -> list[str]:
-        return [wid for wid in WIDGET_IDS if getattr(self.widgets, wid).enabled]
-
-    def profil_anwenden(self) -> None:
-        """Sichtbarkeit der Widgets aus dem aktiven Profil übernehmen."""
-        for wid in WIDGET_IDS:
-            getattr(self.widgets, wid).enabled = wid in self.profile[self.profil]
-
-
-def merge(base: dict, patch: dict) -> dict:
-    """Tiefes Zusammenführen für Teil-Updates (Listen werden ersetzt)."""
-    out = dict(base)
-    for k, v in patch.items():
-        out[k] = merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
-    return out
+def _sse(event: str, payload: Any) -> str:
+    """Eine Meldung an die Overlay-Seite. Alle kommen als gewöhnliche Nachricht mit Namen und Inhalt: die
+    Seite braucht so nur einen Empfänger und verpasst nichts, bevor ein Widget geladen ist."""
+    return f"data: {json.dumps({'event': event, 'payload': payload}, ensure_ascii=False)}\n\n"
 
 
 # ---------------------------------------------------------------- Dienst
@@ -186,11 +70,14 @@ class Overlay:
         Konfiguration; Testinstanzen (--config-dir) fassen systemd nie an."""
         self.manage_unit = manage_unit
         self.path = config_dir / "overlay" / "layout.json"
-        self.layout = self._load()
+        self.specs: dict[str, WidgetSpec] = {}
+        self.module_on: Callable[[str], bool] = lambda _: True  # setzt der Daemon (Modulschalter)
+        self.fresh = not self.path.exists()  # neue Datei: Profile kommen aus den Angaben der Widgets
+        self.stored = self._load()  # wie in der Datei, auch mit Widgets noch nicht angemeldeter Module
+        self.layout = self._fitted(self.stored)
         self.enabled = False
         self.clients: set[asyncio.Queue] = set()
-        self.dps: dict[str, Any] = {"dps": None, "dps_active": False}
-        self.schedule: list[dict[str, Any]] = []  # sichtbare Termine (Modul Termine), fürs Widget
+        self.retained: dict[str, Any] = {"dps": {"dps": None, "dps_active": False}, "schedule": []}
         self.unit: dict[str, Any] = {"installed": None, "active": None}
         # Läuft AION 2? Setzt der Daemon (nutzt den Blick des Mitschnitts, sonst eigener Scan)
         self.game_check: Callable[[], Awaitable[bool]] | None = None
@@ -198,6 +85,16 @@ class Overlay:
         self.ui_watching: Callable[[], bool] = lambda: True  # Web-UI offen? (setzt der Daemon)
         self.screens: list[dict] = []
         self.listeners: list = []
+
+    # ------------------------------------------------------------ Widgets und Layout
+    def register(self, module: str, specs: Iterable[WidgetSpec]) -> None:
+        """Ein Modul meldet seine Widgets an; ihr gespeicherter Stand gilt ab jetzt."""
+        for spec in specs:
+            self.specs[spec.id] = WidgetSpec(**{**spec.__dict__, "module": module})
+        self.layout = self._fitted(self.stored)
+
+    def widgets_info(self) -> list[dict[str, Any]]:
+        return [spec.public(self.module_on(spec.module)) for spec in self.specs.values()]
 
     def _load(self) -> OverlayLayout:
         try:
@@ -208,20 +105,29 @@ class Overlay:
             log.error("%s ungültig, nutze Standard: %s", self.path, e)
             return OverlayLayout()
 
+    def _fitted(self, stored: OverlayLayout) -> OverlayLayout:
+        layout = stored.model_copy(deep=True)
+        if self.fresh:
+            layout.profiles = default_profiles(self.specs)
+        layout.fit(self.specs)
+        return layout
+
     def save(self, layout: OverlayLayout) -> None:
         _atomic_write(self.path, json.dumps(layout.model_dump(), ensure_ascii=False, indent=1) + "\n")
-        self.layout = layout
+        self.fresh = False
+        self.stored = self.layout = layout
 
     async def update(self, patch: dict) -> OverlayLayout:
         base = self.layout.model_dump()
-        if "profile" in patch:
-            base["profile"] = {}  # die Liste kommt immer ganz, sonst ließe sich kein Profil löschen
+        if "profiles" in patch:
+            base["profiles"] = {}  # die Liste kommt immer ganz, sonst ließe sich kein Profil löschen
         layout = OverlayLayout.model_validate(merge(base, patch))
-        self._profil_abgleichen(layout)
+        layout.fit(self.specs)
+        self._sync_profile(layout)
         autohide = layout.hide_unfocused != self.layout.hide_unfocused
-        profile_neu = layout.profile != self.layout.profile
+        profiles_changed = layout.profiles != self.layout.profiles
         self.save(layout)
-        if profile_neu:
+        if profiles_changed:
             self.write_launcher()
         if autohide and socket_path().exists():
             try:  # sofort ans laufende Programm, sonst gilt es beim nächsten Start
@@ -233,34 +139,33 @@ class Overlay:
             await fn()
         return layout
 
-    def _profil_abgleichen(self, layout: OverlayLayout) -> None:
+    def _sync_profile(self, layout: OverlayLayout) -> None:
         """Profilwechsel blendet die Widgets des Profils ein. Sonst merkt sich das aktive Profil jede
         Änderung der Sichtbarkeit (Bearbeiten-Modus, Web-UI, Tastenkürzel)."""
-        if not layout.profil:
+        if not layout.profile:
             return
-        if layout.profil != self.layout.profil:
-            layout.profil_anwenden()
+        if layout.profile != self.layout.profile:
+            layout.apply_profile()
         else:
-            layout.profile[layout.profil] = layout.sichtbar()
+            layout.profiles[layout.profile] = layout.visible()
 
     def write_launcher(self) -> None:
         """Tastenkürzel: der Starter bekommt je Profil und Widget eine Aktion, der man unter KDE
         (Systemeinstellungen → Kurzbefehle → NexBoard Overlay) eine Taste gibt. Nur wenn das Overlay
         eingerichtet ist und nie aus Testinstanzen."""
-        ziel = launcher_path()
-        if not self.manage_unit or not ziel.exists():
+        target = launcher_path()
+        if not self.manage_unit or not target.exists():
             return
-        aktionen = [(f"profil-{name}", f"Profil {name}", f"--profil {name}") for name in self.layout.profile]
-        for wid in WIDGET_IDS:
-            aktionen.append((f"widget-{wid}", f"{WIDGET_TITEL[wid]} ein/aus", f"--widget {wid}"))
-        text = LAUNCHER.read_text().rstrip("\n") + "\nActions=" + ";".join(a[0] for a in aktionen) + ";\n"
-        for aktion, name, argumente in aktionen:
-            text += f"\n[Desktop Action {aktion}]\nName={name}\nExec=deckbar-overlay {argumente}\n"
-        if ziel.read_text() != text:
-            _atomic_write(ziel, text)
+        actions = [(f"profile-{name}", f"Profil {name}", f"--profile {name}") for name in self.layout.profiles]
+        actions += [(f"widget-{spec.id}", f"{spec.title} ein/aus", f"--widget {spec.id}") for spec in self.specs.values()]
+        text = LAUNCHER.read_text().rstrip("\n") + "\nActions=" + ";".join(a[0] for a in actions) + ";\n"
+        for action, name, arguments in actions:
+            text += f"\n[Desktop Action {action}]\nName={name}\nExec=deckbar-overlay {arguments}\n"
+        if target.read_text() != text:
+            _atomic_write(target, text)
 
     def info(self) -> dict:
-        return {"layout": self.layout.model_dump(), "widget_titel": WIDGET_TITEL, "widget_module": WIDGET_MODULE,
+        return {"layout": self.layout.model_dump(), "widgets": self.widgets_info(),
                 "unit": self.unit, "socket": socket_path().exists(),
                 "clients": len(self.clients), "screens": self.screens, "game": self.game}
 
@@ -283,18 +188,26 @@ class Overlay:
     # ------------------------------------------------------------ Live-Daten
     async def on_state(self, diff: dict) -> None:
         part = {k: diff[k] for k in ("dps", "dps_active") if k in diff}
-        if part and self.clients:
-            self.dps.update(part)
-            await self.publish("dps", part)
-        elif part:
-            self.dps.update(part)
+        if part:  # immer der ganze Stand: ein später eingeblendetes Widget bekommt ihn so in einem Stück
+            await self.publish("dps", {**self.retained["dps"], **part})
 
     async def on_schedule(self, entries: list[dict[str, Any]]) -> None:
-        self.schedule = entries
         await self.publish("schedule", entries)
 
+    async def modules_changed(self) -> None:
+        """Ein Modul ging an oder aus: die Seite hängt seine Widgets ein oder aus."""
+        await self.publish("widgets", self.widgets_info())
+
     async def publish(self, event: str, payload: Any) -> None:
-        text = f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        """Ereignis an alle offenen Overlay-Seiten. Ereignisse aus RETAINED bekommt auch, wer später kommt."""
+        if event in RETAINED:
+            self.retained[event] = payload
+        await self._send(event, payload)
+
+    async def _send(self, event: str, payload: Any) -> None:
+        if not self.clients:
+            return
+        text = _sse(event, payload)
         for q in list(self.clients):
             if q.full():
                 try:
@@ -361,14 +274,14 @@ class Overlay:
 
     async def plugin_command(self, command: dict) -> None:
         """Plugin-Fenster öffnen, zeigen, verbergen … (plugins.py)."""
-        await self._send(b"plugin " + json.dumps(command).encode())
+        await self._socket_send(b"plugin " + json.dumps(command).encode())
 
     async def command(self, cmd: str) -> None:
         if cmd not in COMMANDS:
             raise ValueError(f"unbekannter Befehl {cmd}")
-        await self._send(cmd.encode())
+        await self._socket_send(cmd.encode())
 
-    async def _send(self, line: bytes) -> None:
+    async def _socket_send(self, line: bytes) -> None:
         path = socket_path()
         try:
             _, writer = await asyncio.wait_for(asyncio.open_unix_connection(str(path)), 2)
@@ -446,9 +359,9 @@ class Overlay:
         q: asyncio.Queue = asyncio.Queue(QUEUE_MAX)
         self.clients.add(q)
         try:
-            await resp.write(f"event: layout\ndata: {json.dumps(self.layout.model_dump())}\n\n".encode())
-            await resp.write(f"event: dps\ndata: {json.dumps(self.dps, ensure_ascii=False)}\n\n".encode())
-            await resp.write(f"event: schedule\ndata: {json.dumps(self.schedule, ensure_ascii=False)}\n\n".encode())
+            first = {"widgets": self.widgets_info(), "layout": self.layout.model_dump(), **self.retained}
+            for event, payload in first.items():
+                await resp.write(_sse(event, payload).encode())
             while True:
                 try:
                     text = await asyncio.wait_for(q.get(), 15)

@@ -9,7 +9,7 @@ import base64
 
 from nexproto.runreport import MAX_IMAGE_BYTES, ReportPlayer, RunReport
 
-from .runs import Player, Run, boss_name_en, dungeon_parts_en
+from .run_model import Player, Run, boss_name_en, dungeon_parts_en
 
 
 def _players(players: dict[str, Player], ms: int) -> list[ReportPlayer]:

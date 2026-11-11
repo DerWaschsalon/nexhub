@@ -10,7 +10,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from deckbar_daemon.a2ui import A2Ui
-from deckbar_daemon.plugins import PluginError, PluginHost, content_policy, newer, safe_path, take_ready, verify_catalog, Pending, valid_id
+from deckbar_daemon.plugin_files import PluginError, newer, safe_path, valid_id, verify_catalog
+from deckbar_daemon.plugin_page import content_policy
+from deckbar_daemon.plugins import Pending, PluginHost, take_ready
 
 
 class FakeCapture:
@@ -146,7 +148,7 @@ async def test_grosse_datei_kommt_ganz_an(host, cdn):
 async def test_zu_grosser_katalog_wird_abgelehnt(host, cdn):
     cdn.body = b" " * (1024 * 1024 + 1)
     with pytest.raises(PluginError, match="größer als"):
-        await host.fetch_catalog()
+        await host.catalog.fetch()
 
 
 async def test_veraenderte_datei_wird_nicht_installiert(host, cdn):
@@ -184,7 +186,7 @@ async def test_kein_zurueck_auf_alten_katalog_oder_alte_version(host, cdn):
     cdn.serial = 50
     cdn.add("ping", "1.0.0")
     with pytest.raises(PluginError, match="älter"):
-        await host.fetch_catalog()
+        await host.catalog.fetch()
     cdn.serial = 200
     cdn.add("ping", "1.0.0")
     with pytest.raises(PluginError, match="neuer als der Katalog"):
@@ -339,10 +341,10 @@ async def test_modul_aus_schliesst_fenster_und_nimmt_die_decoder(host, cdn):
 async def test_widgets(host, cdn):
     cdn.add("ping", permissions=["storage", "widgets", "window"])
     await host.install("ping")
-    host.screen = {"width": 1000, "height": 800}
+    host.widgets.screen = {"width": 1000, "height": 800}
     await host.call("plugin_widget_open", {"name": "a", "width": 100, "height": 50}, "plugin-ping")
     await host.call("plugin_widget_open", {"name": "b", "width": 5000, "height": 1}, "plugin-ping")
-    state = host.widgets_state()
+    state = host.widgets.state()
     assert state[0]["label"] == "widget:ping:a" and state[0]["x"] == 860  # freier Platz rechts
     assert state[1]["width"] == 800 and state[1]["height"] == 24  # Grenzen wie im Original
     with pytest.raises(PluginError, match="Widget-Name"):
@@ -362,15 +364,15 @@ async def test_widgets(host, cdn):
     hello = await host.call("plugin_widget_hello", {}, "widget:ping:a")
     assert hello["name"] == "a" and hello["locked"] is False
     await host.call("plugin_widgets_lock", {"locked": True}, "plugin-ping")
-    assert host.widgets_state()[0]["locked"] is True
+    assert host.widgets.state()[0]["locked"] is True
     await host.call("plugin_widget_area", {"rects": [{"x": 1, "y": 2, "width": 3, "height": 4}], "scale": 1}, "widget:ping:a")
-    assert host.widgets_state()[0]["areas"] == [[1.0, 2.0, 3.0, 4.0]]
+    assert host.widgets.state()[0]["areas"] == [[1.0, 2.0, 3.0, 4.0]]
     where = await host.call("plugin_widget_where", {"name": "a"}, "plugin-ping")
     assert where["x"] == 900 and where["screen"]["width"] == 1000
     await host.call("plugin_widget_close", {"name": "a"}, "plugin-ping")
-    assert host.widgets_state()[0]["open"] is False
+    assert host.widgets.state()[0]["open"] is False
     await host.call("plugin_hello", {"fresh": True}, "plugin-ping")  # frischer Start: alte Widgets weg
-    assert host.widgets_state() == []
+    assert host.widgets.state() == []
 
 
 async def test_fenster_merkt_sichtbarkeit(host, cdn):
@@ -409,7 +411,7 @@ def test_csp_ohne_netz():
 @pytest.fixture
 async def ui(tmp_path, cdn):
     a2 = A2Ui(FakeCapture(), tmp_path / "s.json", plugin_dir=tmp_path)
-    a2.plugins.base_url, a2.plugins.key_hex = cdn.url, cdn.key_hex
+    a2.plugins.catalog.base_url, a2.plugins.catalog.key_hex = cdn.url, cdn.key_hex
     client = TestClient(TestServer(a2.app()))
     await client.start_server()
     a2.client = client
@@ -453,101 +455,31 @@ async def test_invoke_leitet_an_den_host(ui, cdn):
     assert (await r.json())["result"] is True
 
 
-# ---------------------------------------------------------------- Im Radar-Widget
-async def test_pet_soul_und_wuerfel_laufen_im_radar(host, cdn):
-    cdn.add("pet-souls", permissions=["storage", "window", "widgets"])
-    cdn.add("dice-rolls", permissions=["storage", "window", "widgets"])
-    cdn.add("ping", permissions=["storage", "window"])
-    for plugin in ("pet-souls", "dice-rolls", "ping"):
+# ---------------------------------------------------------------- Keine Sonderrollen
+async def test_pet_souls_and_dice_rolls_are_ordinary_plugins(host, cdn):
+    """Früher liefen beide im Radar-Widget und der Pet Soul Tracker war fest eingebaut. Jetzt haben sie wie
+    jedes Plugin ihr Fenster, ihre eigenen Einstellungen und lassen sich ausschalten und entfernen."""
+    for plugin in ("pet-souls", "dice-rolls"):
+        cdn.add(plugin, permissions=["storage", "window", "widgets"])
         await host.install(plugin)
-    assert [w["id"] for w in host.windows_to_restore()] == ["ping"]  # nur Ping bekommt ein Fenster
-    assert host.embedded() == ["dice-rolls", "pet-souls"]
-    assert not any(c.get("id") in ("pet-souls", "dice-rolls") for c in host.overlay_calls)
-    assert ("plugin-embed", {"plugin": "pet-souls", "shown": False}) in host.emitted  # springt nicht nach vorn
-    assert ("plugin-embed", {"plugin": "dice-rolls", "shown": True}) in host.emitted
-    assert (await host.call("plugin_hello", {}, "plugin-pet-souls"))["visible"] is True
-    host.emitted.clear()
-    # Pet Soul holt sich nicht nach vorn, ein Klick auf die Würfelkarte schon
-    await host.call("plugin_window", {"visible": True}, "plugin-pet-souls")
-    assert host.emitted == []
-    await host.call("plugin_window", {"visible": True}, "plugin-dice-rolls")
-    assert host.emitted == [("plugin-embed", {"plugin": "dice-rolls", "shown": True})]
-    await host.call("plugin_close", {}, "plugin-pet-souls")
-    await host.call("plugin_window_fit", {"height": 80}, "plugin-pet-souls")
-    assert not any(c.get("id") == "pet-souls" for c in host.overlay_calls)
+    assert [w["id"] for w in host.windows_to_restore()] == ["dice-rolls", "pet-souls"]
+    assert [e["id"] for e in await host.call("plugin_catalog", {}, None)] == ["pet-souls", "dice-rolls"]
+    prefs = json.dumps({"mapPopped": False})
+    await host.call("plugin_storage_set", {"key": "prefs", "value": prefs}, "plugin-pet-souls")
+    assert await host.call("plugin_storage_get", {"key": "prefs"}, "plugin-pet-souls") == prefs
+    view = await host.call("plugin_set_enabled", {"id": "pet-souls", "enabled": False}, None)
+    assert view["disabled"] == ["pet-souls"]
+    view = await host.call("plugin_uninstall", {"id": "pet-souls"}, None)
+    assert [p["id"] for p in view["plugins"]] == ["dice-rolls"]
 
 
-async def test_pet_soul_karte_steht_fest_auf_ausgelagert(host, cdn):
-    cdn.add("pet-souls", permissions=["storage"])
-    await host.install("pet-souls")
-    prefs = json.loads(await host.call("plugin_storage_get", {"key": "prefs"}, "plugin-pet-souls"))
-    assert prefs == {"nearby": True, "mapPopped": True, "farmPopup": False}
-    await host.call("plugin_storage_set", {"key": "prefs", "value": json.dumps({"sort": "left", "nearby": False})}, "plugin-pet-souls")
-    prefs = json.loads(await host.call("plugin_storage_get", {"key": "prefs"}, "plugin-pet-souls"))
-    assert prefs["sort"] == "left" and prefs["nearby"] is True
-    assert await host.call("plugin_storage_get", {"key": "anderes"}, "plugin-pet-souls") is None
+async def test_widget_state_also_goes_to_the_overlay_page(host, cdn):
+    """Die Overlay-Seite hat nur ihre eine Ereignisverbindung: der Stand der Plugin-Widgets kommt dort mit."""
+    seen: list[list[dict]] = []
 
+    async def listener(state: list[dict]) -> None:
+        seen.append(state)
 
-async def test_pet_art_filter_geht_an_die_radar_karte(host, cdn):
-    cdn.add("pet-souls", permissions=["storage"])
-    await host.install("pet-souls")
-    host.emitted.clear()
-    await host.call("plugin_storage_set", {"key": "prefs", "value": json.dumps({"genus": "fera"})}, "plugin-pet-souls")
-    await host.call("plugin_storage_set", {"key": "prefs", "value": json.dumps({"genus": ""})}, "plugin-pet-souls")
-    await host.call("plugin_storage_set", {"key": "andere", "value": json.dumps({"genus": "fera"})}, "plugin-pet-souls")
-    assert host.emitted == [("radar-pet-art", {"art": "fera"}), ("radar-pet-art", {"art": ""})]
-
-
-# ---------------------------------------------------------------- Fest eingebaut
-async def test_pet_soul_installiert_und_aktualisiert_sich_selbst(host, cdn):
-    cdn.add("pet-souls", "1.0.0", permissions=["storage"])
-    await host._install_builtin()
-    assert host.loaded["pet-souls"].manifest["version"] == "1.0.0" and host.embedded() == ["pet-souls"]
-    cdn.add("pet-souls", "1.1.0", permissions=["storage"])
-    await host._install_builtin()
-    assert host.loaded["pet-souls"].manifest["version"] == "1.1.0"
-    # Will es mehr dürfen: bleibt auf der alten Version und erscheint zur Zustimmung im Meter
-    cdn.add("pet-souls", "2.0.0", permissions=["storage", "screenshot"])
-    await host._install_builtin()
-    assert host.loaded["pet-souls"].manifest["version"] == "1.1.0"
-    assert [p["id"] for p in host.view()["plugins"]] == ["pet-souls"]
-    waiting = (await host.check_updates())["available"]
-    assert [(a["id"], a["newPermissions"]) for a in waiting] == [("pet-souls", ["screenshot"])]
-    await host.install("pet-souls")  # Zustimmung im Dialog
-    assert host.loaded["pet-souls"].manifest["version"] == "2.0.0" and host.view()["plugins"] == []
-
-
-async def test_pet_soul_steht_in_keiner_liste_und_bleibt_an(host, cdn):
-    cdn.add("pet-souls", permissions=["storage"])
-    cdn.add("ping", permissions=["storage"])
-    await host._install_builtin()
-    await host.install("ping")
-    view = await host.call("plugin_list", {}, None)
-    assert [p["id"] for p in view["plugins"]] == ["ping"] and "pet-souls" not in view["ownWindow"]
-    assert [e["id"] for e in await host.call("plugin_catalog", {}, None)] == ["ping"]
-    with pytest.raises(PluginError, match="ausschalten"):
-        await host.call("plugin_set_enabled", {"id": "pet-souls", "enabled": False}, None)
-    with pytest.raises(PluginError, match="entfernen"):
-        await host.call("plugin_uninstall", {"id": "pet-souls"}, None)
-    # früher ausgeschaltet oder geänderter Ordner: läuft wieder, wird neu geholt
-    host.saved["dpsMeter.pluginsDisabled"] = '["pet-souls"]'
-    assert "pet-souls" in host.embedded()
-    (host.folder / "pet-souls" / "index.html").write_text("boese")
-    host.reload()
-    assert "pet-souls" not in host.loaded and (await host.call("plugin_list", {}, None))["plugins"][0]["id"] == "ping"
-    await host._install_builtin()
-    assert "pet-souls" in host.loaded and not host.errors
-
-
-async def test_ohne_netz_wird_es_spaeter_versucht(host, cdn, monkeypatch):
-    import deckbar_daemon.plugins as modul
-    monkeypatch.setattr(modul, "BUILTIN_RETRY", 0.01)
-    cdn.add("pet-souls", permissions=["storage"])
-    gut = cdn.signature
-    cdn.signature = b"00"
-    task = asyncio.create_task(host._keep_builtin())
-    await asyncio.sleep(0.05)
-    assert "pet-souls" not in host.loaded and not task.done()
-    cdn.signature = gut
-    await asyncio.wait_for(task, 5)
-    assert "pet-souls" in host.loaded
+    host.widgets.listener = listener
+    await host.widgets.publish()
+    assert seen == [host.widgets.state()]

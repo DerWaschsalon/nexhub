@@ -43,8 +43,9 @@ from .modules.updates import UpdatesModule
 from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
 from .radar import Radar
+from .run_model import a2tools_dir
 from .runs import SETTINGS_FILE as runs_settings_file
-from .runs import DungeonRuns, a2tools_dir
+from .runs import DungeonRuns
 from .schedule import Schedule
 from .state import State
 from .updates import Updates
@@ -88,6 +89,9 @@ class NexBoard:
         self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules,
                                 introduced=frozenset({"aion2.plugins"}))
         self.bus.on(CHANGED, self._modules_changed)
+        for module in self.web_modules:
+            self.overlay.register(module.info.id, module.overlay_widgets)
+        self.overlay.module_on = self.modules.on
         self.state.subscribe(self._state_changed)
         for key, provider in (("state", lambda: self.state.values), ("status", self.status),
                               ("modules", self.modules_info), ("settings", self.settings_info)):
@@ -110,13 +114,14 @@ class NexBoard:
         self.runs.run_listeners.append(self.hub.on_run)
         self.overlay = Overlay(c, manage_unit=self.real_config)
         self.overlay.game_check = self._game_running
-        self.radar = Radar(lambda stand: self.overlay.publish("radar", stand), spiel_laeuft=self._game_running)
+        self.radar = Radar(self._publish_radar, spiel_laeuft=self._game_running)
         self.hub.deaths = self.radar.tode_zwischen
         self._sync_radar()
         # Oberfläche des A2Tools-Meters mit dem Plugin-Host (eigener Port, siehe __main__); Testinstanzen
         # bekommen eigene Plugin-Ordner, damit sie die installierten Plugins nicht anfassen
         self.a2 = A2Ui(self.dps.capture, c / "a2-settings.json", None if self.real_config else c / "a2")
         self.a2.plugins.overlay = self.overlay.plugin_command
+        self.a2.plugins.widgets.listener = lambda state: self.overlay.publish("plugin-widgets", state)
         # eine Sprache für alles: die der allgemeinen Einstellungen (System → Allgemein)
         self.a2.on_language = self.set_language
         self.bus.on(LANGUAGE, self.a2.apply_language)
@@ -150,6 +155,7 @@ class NexBoard:
 
     async def _modules_changed(self, _: object) -> None:
         await self.live.send({"type": "modules", "modules": self.modules_info()})
+        await self.overlay.modules_changed()
 
     async def _game_running(self) -> bool:
         """Läuft AION 2? Schaut der Mitschnitt ohnehin alle 5 s in /proc, gilt sein Blick."""
@@ -157,6 +163,13 @@ class NexBoard:
         if self.modules.on("aion2.dps") and self.dps.settings.source == "capture" and game is not None:
             return game
         return await asyncio.to_thread(aion2_running)
+
+    async def _publish_radar(self, stand: dict[str, Any]) -> None:
+        """Stand des Radars an seine Widgets. Ist die Karte im Spiel offen, verschwindet das ganze Overlay."""
+        await self.overlay.publish("radar", stand)
+        veil = {"hidden": bool(stand.get("karte_offen"))}
+        if self.overlay.retained.get("veil") != veil:
+            await self.overlay.publish("veil", veil)
 
     async def _capture_event(self, event: str, payload: Any) -> None:
         if event == "fights_saved":

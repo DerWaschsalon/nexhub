@@ -89,10 +89,7 @@ class Aufzeichnung:
 
     def ende(self) -> None:
         s = self.dienst.zustand.schnappschuss()
-        pvp = self.dienst.zustand.pvp.stand()
-        del pvp["beginn"]  # Wanduhr beim Anlegen des Dienstes, nicht aus dem Mitschnitt
-        self.notieren("ende", {k: s[k] for k in ("nachrichten", "eid", "eid_sicher", "dungeon")}
-                      | {"pvp": wert(pvp)})
+        self.notieren("ende", {k: s[k] for k in ("nachrichten", "eid", "eid_sicher", "dungeon")})
 
 
 def server_segmente(pcap: Path) -> Iterator[tuple[float, tuple, int, int, bytes]]:
