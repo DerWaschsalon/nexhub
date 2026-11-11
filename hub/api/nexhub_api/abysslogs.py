@@ -86,11 +86,26 @@ def best_per_name(entries: list[dict]) -> list[dict]:
 
 
 async def top_players(http: httpx.AsyncClient, cls: str, wanted: int) -> tuple[str, list[dict]]:
-    """Top-Spieler einer Klasse im neuesten Raid, der genug Einträge hat (Hard vor Normal).
-    Gibt die Bezeichnung der Gruppe („Raid · Hard“) und die Einträge zurück, stärkste zuerst."""
-    for name, tier, bosses in await raids(http):
-        entries = [e for boss in bosses for e in await leaderboard(http, abyss_class(cls), boss)]
-        players = best_per_name(entries)
+    """Top-Spieler einer Klasse im neuesten Raid, der genug Einträge hat: zuerst Hard, mit Normal
+    aufgefüllt. Gibt den Namen des Raids und höchstens `wanted` Einträge zurück, jeder mit `tier`."""
+    tiers_by_raid: dict[str, list[tuple[str, list[int]]]] = {}
+    for name, tier, bosses in await raids(http):  # neuester zuerst, darin Hard vor Normal
+        tiers_by_raid.setdefault(name, []).append((tier, bosses))
+    for name, tiers in tiers_by_raid.items():
+        players = await _raid_players(http, cls, tiers)
         if len(players) >= wanted:
-            return f"{name} · {tier}", players
+            return name, players[:wanted]
     raise AbyssError("Abyss Logs: kein Raid mit genug Einträgen")
+
+
+async def _raid_players(http: httpx.AsyncClient, cls: str, tiers: list[tuple[str, list[int]]]) -> list[dict]:
+    """Spieler eines Raids, je Name einmal: wer Hard gespielt hat, zählt mit seinem Hard-Kampf."""
+    seen: set[str] = set()
+    out = []
+    for tier, bosses in tiers:
+        entries = [e for boss in bosses for e in await leaderboard(http, abyss_class(cls), boss)]
+        for entry in best_per_name(entries):
+            if entry["playerName"] not in seen:
+                seen.add(entry["playerName"])
+                out.append({**entry, "tier": tier})
+    return out
