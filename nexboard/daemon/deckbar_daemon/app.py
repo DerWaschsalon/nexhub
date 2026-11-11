@@ -43,8 +43,9 @@ from .modules.updates import UpdatesModule
 from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
 from .radar import Radar
+from .run_model import a2tools_dir
 from .runs import SETTINGS_FILE as runs_settings_file
-from .runs import DungeonRuns, a2tools_dir
+from .runs import DungeonRuns
 from .schedule import Schedule
 from .state import State
 from .updates import Updates

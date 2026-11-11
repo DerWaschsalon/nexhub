@@ -5,7 +5,7 @@ from test_runs import DUNGEON, fight
 
 from deckbar_daemon.dps import fight_view
 from deckbar_daemon.report import run_report
-from deckbar_daemon.runs import Run, parse_fight
+from deckbar_daemon.run_model import Run, parse_fight
 
 
 def run_from_history():
@@ -29,7 +29,7 @@ def test_bericht_passt_zum_vertrag():
 
 
 async def test_bild_einmal_gezeichnet_und_nach_umbenennen_neu(monkeypatch):
-    from deckbar_daemon import runs as runs_mod
+    from deckbar_daemon import run_image as runs_mod
 
     calls = []
     monkeypatch.setattr(runs_mod, "render_run", lambda r: calls.append(1) or b"RIFF\0\0\0\0WEBPbild")

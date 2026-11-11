@@ -169,7 +169,7 @@ import json  # noqa: E402
 
 from nexproto import unpack  # noqa: E402
 
-from deckbar_daemon.runs import Run, parse_fight  # noqa: E402
+from deckbar_daemon.run_model import Run, parse_fight  # noqa: E402
 
 from test_runs import DUNGEON, fight  # noqa: E402
 
@@ -327,7 +327,7 @@ async def test_fehlende_kampfdatei(tmp_path):
 
 
 async def test_run_bericht_geht_nach_dem_upload_an_den_hub(tmp_path, monkeypatch):
-    from deckbar_daemon import runs as runs_mod
+    from deckbar_daemon import run_image as runs_mod
 
     monkeypatch.setattr(runs_mod, "render_run", lambda r: b"RIFF\0\0\0\0WEBPbild")
     runner, url, got = await fake_runs_hub()

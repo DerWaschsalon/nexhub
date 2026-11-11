@@ -7,9 +7,11 @@ import pytest
 from aiohttp import ClientSession, web
 from pydantic import ValidationError
 
+from deckbar_daemon import run_image, run_model
 from deckbar_daemon import runs as runs_mod
-from deckbar_daemon.runs import (DungeonRuns, RunSettings, RunTracker, char_key, mask, parse_fight,
-                                 post_discord, render_run)
+from deckbar_daemon.run_image import render_run
+from deckbar_daemon.run_model import RunTracker, char_key, mask, parse_fight
+from deckbar_daemon.runs import DungeonRuns, RunSettings, post_discord
 
 T0 = 1_791_700_000_000
 DUNGEON = 600022
@@ -260,7 +262,7 @@ def test_learned_keys_follow_mask_rule(tmp_path):
 
 def test_listed_end_boss_closes_first_run(monkeypatch):
     """Endboss aus END_BOSSES beendet schon den ersten Run; dort zählen gelernte HP nicht."""
-    monkeypatch.setattr(runs_mod, "is_end_boss", lambda mob: mob == 3)
+    monkeypatch.setattr(run_model, "is_end_boss", lambda mob: mob == 3)
     tr = RunTracker(idle_ms=15 * 60_000)
     assert tr.add(F(1, 0, max_hp=5000, dmg=(4000, 1000))) == []
     assert tr.add(F(2, 60)) == []
@@ -345,7 +347,8 @@ def test_cleanup_only_own_history(tmp_path):
 
 def test_kampfkraft_und_itemlevel():
     """combatPower/gearScore aus der History, je Boss und gesamt der höchste Wert, Text im Bild."""
-    from deckbar_daemon.runs import Run, player_info
+    from deckbar_daemon.run_image import player_info
+    from deckbar_daemon.run_model import Run
 
     a = fight(2400001, 0)
     a["actors"][0].update(combatPower=163_761, gearScore=2848)
@@ -366,4 +369,4 @@ def test_jede_klasse_hat_ein_icon():
     from nexproto.classes import CLASS_KEYS, JOB_CLASSES
     assert JOB_CLASSES[19] == "brawler"
     for cls in CLASS_KEYS:
-        assert runs_mod.class_icon(cls, 20) is not None
+        assert run_image.class_icon(cls, 20) is not None
