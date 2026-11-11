@@ -78,7 +78,7 @@
 		display: grid;
 		grid-template-columns: 250px minmax(0, 1fr);
 		gap: 20px;
-		max-width: 1280px;
+		max-width: var(--page-width);
 		margin: 0 auto;
 		padding: 16px;
 		min-height: 100vh;

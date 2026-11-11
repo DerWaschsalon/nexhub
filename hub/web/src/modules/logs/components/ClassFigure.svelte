@@ -1,21 +1,27 @@
-<!-- Figur der Klasse im Klassenlicht mit den Stellen der Ausrüstung (data/figureZones.ts): Zeigen auf eine
-     Stelle hebt sie und ihren Platz hervor (`active`, gemeinsam mit der Ausrüstungsspalte), ein Klick meldet
-     den Platz (onPick). Stellen gibt es nur für Plätze mit Gegenstand (`slots`); kleine liegen über großen. -->
+<!-- Figur der Klasse im Klassenlicht, der eine große Effekt der Seite, mit den Stellen der Ausrüstung
+     (data/figureZones.ts). Zeigen oder Fokus wählt eine Stelle und ihren Platz (`active`, gemeinsam mit den
+     Platzspalten), ein Klick meldet den Platz (onPick). Stellen gibt es nur für Plätze mit Gegenstand
+     (`names`: Platz → Name des Gegenstands, für Screenreader); kleine liegen über großen. -->
 <script lang="ts">
 	import { classInfo } from '../classes.ts';
 	import { FIGURE_ZONES } from '../data/figureZones.ts';
 
 	let {
 		cls,
-		slots,
+		names,
 		active = $bindable(null),
 		onPick
-	}: { cls: string | null; slots: Set<string>; active?: string | null; onPick: (slot: string) => void } = $props();
+	}: {
+		cls: string | null;
+		names: Map<string, string>;
+		active?: string | null;
+		onPick: (slot: string) => void;
+	} = $props();
 
 	const info = $derived(classInfo(cls));
 	const zones = $derived(
 		[...((cls && FIGURE_ZONES[cls]) || [])]
-			.filter((z) => slots.has(z.slot))
+			.filter((z) => names.has(z.slot))
 			.sort((a, b) => b.w * b.h - a.w * a.h)
 	);
 	// Für manche Klassen gibt es noch keine Figur (Faustkämpfer): dann bleibt die Mitte leer
@@ -23,36 +29,31 @@
 </script>
 
 {#if info}
-	<div class="stage" style:--glow={info.color}>
-		<div class="figure">
-			<img src={info.figure} alt="" onerror={hide} />
-			{#each zones as z, i (i)}
-				<button
-					class="zone"
-					class:lit={active === z.slot}
-					style:left="{z.x}%"
-					style:top="{z.y}%"
-					style:width="{z.w}%"
-					style:height="{z.h}%"
-					aria-label={z.slot}
-					onmouseenter={() => (active = z.slot)}
-					onmouseleave={() => (active = null)}
-					onclick={() => onPick(z.slot)}
-				></button>
-			{/each}
-		</div>
+	<div class="figure" style:--glow={info.color}>
+		<img src={info.figure} alt="" onerror={hide} />
+		{#each zones as z, i (i)}
+			<button
+				class="zone"
+				class:lit={active === z.slot}
+				style:left="{z.x}%"
+				style:top="{z.y}%"
+				style:width="{z.w}%"
+				style:height="{z.h}%"
+				aria-label={names.get(z.slot)}
+				onmouseenter={() => (active = z.slot)}
+				onfocus={() => (active = z.slot)}
+				onclick={() => onPick(z.slot)}
+			></button>
+		{/each}
 	</div>
 {/if}
 
 <style>
-	/* Licht in der Klassenfarbe hinter der Figur */
-	.stage {
-		padding-top: 30px;
-		background: radial-gradient(ellipse 55% 40% at 50% 60%, color-mix(in srgb, var(--glow) 30%, transparent), transparent);
-	}
-	/* Die Stellen sind in Prozent des Bildes angegeben: der Rahmen ist genau so groß wie das Bild */
+	/* Die Stellen sind in Prozent des Bildes angegeben: der Rahmen ist genau so groß wie das Bild.
+	   Licht in der Klassenfarbe dahinter */
 	.figure {
 		position: relative;
+		background: radial-gradient(ellipse 55% 40% at 50% 55%, color-mix(in srgb, var(--glow) 30%, transparent), transparent);
 	}
 	img {
 		display: block;

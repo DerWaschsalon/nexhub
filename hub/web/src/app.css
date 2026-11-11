@@ -2,7 +2,16 @@
  * NexHub-Design: dunkles „Liquid Glass“.
  * Farben und Maße stehen als Variablen oben; Bausteine (.glass, .btn, .chip, .table) darunter.
  * Seiten benutzen diese Klassen und bringen nur noch ihr eigenes Layout mit.
+ * Schriften wie in den Design-Regeln vom 11.11.2026 („Ban the AI Look“): Unbounded für Überschriften,
+ * IBM Plex für Text, lokal eingebunden (Fontsource), keine Anfrage an fremde Server.
  */
+@import '@fontsource-variable/unbounded';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
 :root {
 	--bg: #05060d;
 	--text: #f4f5fa;
@@ -18,6 +27,11 @@
 	--radius: 22px;
 	--radius-sm: 12px;
 	--blur: 28px;
+	--font-heading: 'Unbounded Variable', system-ui, sans-serif;
+	--font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+	/* Inhaltsbreite des Hubs: auf breiten Bildschirmen die Mitte, nicht der ganze Monitor */
+	--page-width: 1680px;
 	color-scheme: dark;
 }
 
@@ -36,7 +50,7 @@ html {
 body {
 	background: var(--bg);
 	color: var(--text);
-	font: 15px/1.55 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+	font: 15px/1.55 var(--font-sans);
 	-webkit-font-smoothing: antialiased;
 	overflow-x: hidden;
 }
@@ -44,7 +58,8 @@ h1,
 h2,
 h3 {
 	margin: 0;
-	font-weight: 650;
+	font-family: var(--font-heading);
+	font-weight: 600;
 	letter-spacing: -0.01em;
 }
 a {
@@ -134,6 +149,13 @@ a {
 }
 .pad {
 	padding: 24px;
+}
+/* Ruhige Fläche ohne Glas für dichte Inhalte (Charakterfenster: Stat Info, Skills); enger Radius nach den
+   Design-Regeln vom 11.11.2026, der große Effekt der Seite ist die Figur */
+.panel {
+	background: linear-gradient(#1c2433, #171e2a);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 6px;
 }
 
 /* Knöpfe: Glaspillen; .primary leuchtet im Akzentverlauf */

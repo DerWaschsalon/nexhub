@@ -29,7 +29,7 @@
 	let tab: Tab = $state('progression');
 </script>
 
-<section>
+<section class="panel">
 	<h3>{t('logs.char.statInfo')}</h3>
 	<div class="tab-row" role="tablist">
 		{#each TABS as name (name)}
@@ -51,15 +51,11 @@
 </section>
 
 <style>
-	section {
-		background: linear-gradient(#1c2433, #171e2a);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-	}
 	h3 {
 		margin: 0;
 		padding: 10px 0 8px;
 		text-align: center;
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-heading);
 		font-size: 20px;
 		font-weight: 400;
 		color: #fff;

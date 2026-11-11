@@ -79,7 +79,8 @@
 				</dl>
 			{/if}
 
-			{#if d.sub.length || !isNaN(rate)}
+			<!-- Seelenbindung: Zusatzwerte und verstärkte Skills gehören beide dazu -->
+			{#if d.sub.length || d.skills.length || !isNaN(rate)}
 				<div class="block">
 					{#if !isNaN(rate)}
 						<p class="rate"><span>{t('logs.char.soulBindRate')}</span><b>{rate.toFixed(1)}%</b></p>
@@ -93,6 +94,16 @@
 							<dd>{s.value}{@render ratedTail(rated('stat', s.name))}</dd>
 						{/each}
 					</dl>
+					{#if d.skills.length}
+						<ul class="skills">
+							{#each d.skills as s, i (i)}
+								<li>
+									{#if s.icon}<img src={s.icon} alt="" width="26" height="26" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
+									<span>{s.name}</span><b>+{s.level}{@render ratedTail(rated('skill', s.name))}</b>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
 			{/if}
 
@@ -116,17 +127,6 @@
 					</div>
 				</div>
 			{/each}
-
-			{#if d.skills.length}
-				<ul class="block skills">
-					{#each d.skills as s, i (i)}
-						<li>
-							{#if s.icon}<img src={s.icon} alt="" width="26" height="26" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
-							<span>{s.name}</span><b>+{s.level}{@render ratedTail(rated('skill', s.name))}</b>
-						</li>
-					{/each}
-				</ul>
-			{/if}
 
 			{#if d.set}
 				<div class="block set">
@@ -211,7 +211,7 @@
 	}
 	h3 {
 		margin: 0 0 6px;
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-heading);
 		font-size: 23px;
 		font-weight: 400;
 		color: color-mix(in srgb, var(--grade) 45%, #fff);
@@ -224,7 +224,7 @@
 		color: #fff;
 	}
 	.heading strong {
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-heading);
 		font-size: 23px;
 		font-weight: 400;
 		color: #fff;
@@ -322,6 +322,10 @@
 		margin: 4px 0 0;
 		white-space: pre-line;
 		color: var(--dim);
+	}
+	/* verstärkte Skills direkt unter den Zusatzwerten der Seelenbindung */
+	.skills {
+		margin: 10px 0 0;
 	}
 	.skills li {
 		display: flex;
