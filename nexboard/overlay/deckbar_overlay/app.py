@@ -123,14 +123,8 @@ class Overlay(QObject):
         (oder Autohide aus ist, oder gerade bearbeitet wird)."""
         if self.surface is None:
             return
-        want = not self.manual_hidden and (self.layer.mode == "edit" or not (self.autohide and self.focus_away))
-        if want == self.surface.isVisible():
-            return
-        if want:
-            self.layer.apply_input()
-            self.surface.show()
-        else:
-            self.surface.hide()
+        self.layer.set_shown(not self.manual_hidden
+                             and (self.layer.mode == "edit" or not (self.autohide and self.focus_away)))
 
     @staticmethod
     def _target_screen():
@@ -251,7 +245,7 @@ class Overlay(QObject):
 
     def visible(self) -> bool:
         if self.surface is not None:
-            return self.surface.isVisible()
+            return self.layer.shown
         return bool(self.main and self.main.isVisible())
 
     def show_main(self) -> None:
@@ -275,7 +269,7 @@ class Overlay(QObject):
             self.manual_hidden = True
             if self.layer.mode == "edit":
                 self.layer.finishEdit()
-            self.surface.hide()
+            self._sync_surface()
         for w in list(self.windows.values()):
             if w.label == "main":
                 if w.isVisible():

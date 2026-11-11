@@ -62,7 +62,8 @@ Window {
         url: host.pageUrl
         // Erst zeigen, wenn die Seite sich gemeldet hat: Fehlerseiten (Daemon weg, Modul aus) wären
         // sonst bildschirmfüllend und undurchsichtig über dem Spiel
-        visible: host.ready
+        // ausgeblendet (Kürzel, Spiel ohne Fokus) bleibt die Fläche stehen, nur der Inhalt geht
+        visible: host.ready && host.shown
         settings.showScrollBars: false
         settings.localStorageEnabled: true
         onJavaScriptConsoleMessage: (level, message, line, source) => host.log(message + " (" + source + ":" + line + ")")
