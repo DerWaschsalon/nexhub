@@ -181,3 +181,26 @@ class Comparison(Base):
     right_server_id: Mapped[int] = mapped_column(Integer)
     right_name: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ClassCensus(Base):
+    """Zählung der Top-Spieler einer Klasse (census.py): je Platz, wie viele welche Zeile der
+    Seelenbindung tragen, und der größte Wert je Zeile (rating.count_players/add_tops). Keine Namen."""
+
+    __tablename__ = "class_census"
+
+    cls: Mapped[str] = mapped_column(String(32), primary_key=True)
+    group_label: Mapped[str] = mapped_column(String(300))  # woher die Spieler stammen („Raid · Hard“)
+    data: Mapped[dict] = mapped_column(JSON)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ItemRolls(Base):
+    """Würfeltabelle eines Gegenstands von MetaBot.GG (metabot.py), je englischem Namen; `data` leer,
+    wenn MetaBot den Gegenstand nicht kennt (dann erst nach einer Woche neu fragen)."""
+
+    __tablename__ = "item_rolls"
+
+    name: Mapped[str] = mapped_column(String(128), primary_key=True)
+    data: Mapped[dict | None] = mapped_column(JSON)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

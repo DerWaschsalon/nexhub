@@ -244,6 +244,25 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   noch einmal aufaddiert (bis 29 statt 20), das ist entfernt.
 - Einen Build-Check gegen die Top-Spieler (Rangliste von Abyss Logs) gab es bis November 2026; Migration
   0010 entfernt seine Tabelle `build_checks`, der Code steht in der Git-Historie (Stand `bb2a01a`).
+- Bewertung der Ausrüstung (Vorbild kisk.app/scoring), Feld `ratings` in `GET /api/armory/{id}` je Sprache:
+  - **Zählung** (`census.py`, einmal am Tag je Klasse, die in der Armory vorkommt): 30 Top-Spieler aus dem
+    neuesten Raid mit genug Einträgen bei Abyss Logs (`abysslogs.py`, Hard vor Normal), Server über die
+    NC-Suche, Ausrüstung über `NC.gear` (nur Ausrüstung mit Werten, rund 26 Anfragen je Spieler).
+    Gespeichert in `class_census` nur je Platz, wie viele welche Zeile der Seelenbindung tragen, und der
+    größte Wert je Zeile; keine Namen.
+  - **Würfeltabellen** (`metabot.py`, Tabelle `item_rolls`): Bereich und Chance je Zeile und die
+    Skill-Optionen je Klasse von MetaBot.GG, englisch und deutsch (`/de_DE/`, gleiche Reihenfolge), je
+    Gegenstand einmal pro Woche, 3 s Pause zwischen Seiten. MetaBot erlaubt das mit Link auf die Seite
+    (Nutzungsbedingungen, „Data Usage & Attribution“): das Gegenstandsfenster verlinkt sie.
+  - **Rechnung** (`rating.py`, rein): Punkte einer Zeile = Anteil der Top-Spieler × Wert ÷ größter Wert
+    des Platzes, Note = Summe ÷ bestes mögliches Stück, Bänder wie bei kisk (BiS ab 90, S+ ab 55 …).
+    Upgrades: jede Zeile, die nicht zu den idealen gehört, neu würfeln, Ziel sind die fehlenden idealen
+    Zeilen nach Priorität (auch bei S+). Die Chance pro Versuch kommt aus MetaBot; wie oft ein Wurf ein
+    Skill wird, ist geschätzt (Anteil der Skill-Zeilen bei den Top-Spielern). Werte aus dem Durchbruch
+    schickt NC nicht.
+  - **Web**: Note je Platz (`EquipmentPanel`), Rolls mit Höchstwert und Anteil, „Weg zu Best in Slot“
+    im Gegenstandsfenster, Reiter „Upgrades“ in „Stat Info“ (`modules/logs/rating.ts`, `UpgradeList`,
+    `UpgradeSteps`, `RatingBadge`).
 
 ## Bot
 

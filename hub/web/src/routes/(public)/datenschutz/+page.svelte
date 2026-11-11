@@ -76,6 +76,12 @@
 			Armory-Charakters und holt den anderen Charakter neu von der AION-2-Website, ohne ihn zu speichern;
 			wer eingetragen oder geteilt hat, zeigt er nicht. Der Link gilt, bis er zurückgezogen oder der
 			Armory-Charakter ausgetragen wird.
+			Für die Bewertung der Ausrüstung in der Armory zählt der Hub einmal täglich je Klasse der Armory die
+			Ausrüstung von 30 Top-Spielern: Die Namen kommen aus der öffentlichen Rangliste von Abyss Logs
+			(abysslogs.com), die Ausrüstung von den öffentlichen Charakterseiten der AION-2-Website. Gespeichert
+			wird nur die Zählung (wie viele welche Werte tragen), keine Namen und keine Profile dieser Spieler.
+			Würfelbereiche und Chancen der Gegenstände kommen von MetaBot.GG (metabot.gg) und enthalten keine
+			Personendaten.
 			Suchmaschinen werden gebeten, solche Seiten nicht aufzunehmen. Zweck ist die gemeinsame Auswertung der Spielrunden in der
 			Gemeinschaft (Art. 6 Abs. 1 lit. f DSGVO). Runs bleiben gespeichert, bis die Hochladenden oder ein
 			Admin sie löschen; eine automatische Löschfrist gibt es derzeit nicht.
@@ -160,7 +166,11 @@
 			which armory character is compared and the name and server of the other character. When opened, the
 			link shows the armory character's snapshot and fetches the other character again from the AION 2
 			website without storing it; it does not show who added or shared anything. The link stays valid until
-			it is withdrawn or the armory character is removed. Search engines are asked not to index such pages. Purpose: analysing the
+			it is withdrawn or the armory character is removed. To rate armory gear, the hub counts the
+			gear of 30 top players once a day for each class in the armory: their names come from the public Abyss
+			Logs rankings (abysslogs.com), their gear from the public character pages of the AION 2 website. Only
+			the counts (how many carry which stats) are stored, not those players' names or profiles. Roll ranges
+			and chances of items come from MetaBot.GG (metabot.gg) and contain no personal data. Search engines are asked not to index such pages. Purpose: analysing the
 			community's runs together (Art. 6(1)(f) GDPR). Runs are kept until the uploader or an admin deletes
 			them; there is currently no automatic deletion.
 		</p>

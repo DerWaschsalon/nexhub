@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from .aion2 import NC
 from .armory import Armory
+from .census import Census
 from .characters import Fetcher
 from .config import Settings
 from .deps import DB, SESSION_COOKIE
@@ -38,9 +39,11 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
             nc = NC(app.state.http, settings.hub_aion2_pause)
             app.state.characters = Fetcher(app.state.sessionmaker, nc)
             app.state.armory = Armory(app.state.sessionmaker, nc)
+            census = Census(app.state.sessionmaker, nc, app.state.http)
             # liegengebliebene Abrufe vom letzten Lauf und der tägliche Armory-Abruf; laufen neben dem Webserver
             tasks = [asyncio.create_task(app.state.characters.resume()),
-                     asyncio.create_task(app.state.armory.daily())]
+                     asyncio.create_task(app.state.armory.daily()),
+                     asyncio.create_task(census.daily())]
         yield
         for task in tasks:
             task.cancel()  # ein Neustart soll nicht auf NC warten; der Rest kommt beim nächsten Start

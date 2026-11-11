@@ -1,6 +1,7 @@
 // Antworten der Hub-API für die Armory (hub/api/nexhub_api/routes/armory.py). Ein Armory-Charakter
 // ist eine Momentaufnahme wie ein Mitspieler im Run – Typen und Ansicht kommen aus modules/logs.
 import type { CharacterData, CharacterListItem, CharacterSnapshot } from '#modules/logs/api.ts';
+import type { Ratings } from '#modules/logs/rating.ts';
 
 export type ArmoryItem = CharacterListItem & {
 	owner: string;
@@ -20,6 +21,8 @@ export type ArmoryDetail = ArmoryItem & {
 	can_delete: boolean;
 	/** Sprache → Hinweise „das zuerst verbessern“ (hub/api/nexhub_api/ratgeber.py) */
 	hints: Record<string, ArmoryHint[]>;
+	/** Sprache → Bewertung gegen Top-Spieler (hub/api/nexhub_api/rating.py); leer ohne Zählung der Klasse */
+	ratings: Record<string, Ratings>;
 };
 
 type HintItem = { slot: string; item: string; icon: string | null; grade: string };

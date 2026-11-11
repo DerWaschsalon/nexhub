@@ -27,7 +27,9 @@ from ..ratgeber import hints
 from ..config import Settings
 from ..db import aware
 from ..deps import DB, CurrentUser, SettingsDep
-from ..models import Character, CharacterDay, Comparison, User
+from ..census import character_class
+from ..models import Character, CharacterDay, ClassCensus, Comparison, ItemRolls, User
+from ..rating import rate
 from .characters import CharacterOut, _out
 from .runs import Shared
 
@@ -59,6 +61,8 @@ class ArmoryDetail(ArmoryOut):
     days: list[Day]
     can_delete: bool
     hints: dict[str, list[dict]]  # Sprache → Hinweise aus ratgeber.py
+    # Sprache → Bewertung der Ausrüstung gegen Top-Spieler (rating.py); leer ohne Zählung der Klasse
+    ratings: dict[str, dict]
 
 
 class Hit(BaseModel):
@@ -254,6 +258,20 @@ async def add(body: NewCharacter, request: Request, user: CurrentUser, db: DB,
     return ArmoryOut(**_armory_out(row, user, user, _profile_of(row)))
 
 
+async def _ratings(db: DB, row: Character) -> dict[str, dict]:
+    """Bewertung je Sprache aus der gespeicherten Zählung der Klasse und den Würfeltabellen (census.py)."""
+    cls = character_class(row)
+    census = await db.get(ClassCensus, cls) if cls and row.data else None
+    if census is None or not row.data:
+        return {}
+    en, de = localized(row.data, "en"), localized(row.data, "de")
+    names = {str(e.get("name")) for e in en.get("equipment") or []}
+    rolls = {r.name: r.data for r in (await db.scalars(select(ItemRolls).where(ItemRolls.name.in_(names)))).all()
+             if r.data}
+    data = {**census.data, "group": census.group_label}
+    return {lang: rate(data, rolls, en, de, cls, lang) for lang in LANGS}
+
+
 @router.get("/{character_id}")
 async def get_character(character_id: int, user: CurrentUser, db: DB) -> ArmoryDetail:
     row, owner = await _get(db, character_id)
@@ -261,6 +279,7 @@ async def get_character(character_id: int, user: CurrentUser, db: DB) -> ArmoryD
     return ArmoryDetail(**_armory_out(row, owner, user, _profile_of(row)),
                         data=row.data, error=row.error,
                         hints={lang: hints(localized(row.data, lang), row.cls) for lang in LANGS} if row.data else {},
+                        ratings=await _ratings(db, row),
                         days=[Day(day=d.day, combat_power=d.combat_power, item_level=d.item_level) for d in days],
                         can_delete=row.user_id == user.id or user.role == "admin")
 
