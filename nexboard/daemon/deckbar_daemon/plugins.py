@@ -33,6 +33,14 @@ from typing import Any
 import aiohttp
 
 from .plugin_catalog import PluginCatalog
+from .plugin_commands import (
+    HIDE_CLOSED_KEY,
+    HIDE_UNFOCUSED_KEY,
+    MIN_PANEL_HEIGHT,
+    THEME_KEY,
+    WIDGET_NAME,
+    PluginCommands,
+)
 from .plugin_files import (
     PUBLIC_KEY_HEX,
     PluginError,
@@ -52,10 +60,7 @@ CATALOG_MAX_AGE = 300.0
 MAX_STORED = 1024 * 1024
 MAX_STORED_KEYS = 256
 MAX_WIDGETS = 16
-MAX_MESSAGE = 64 * 1024
-MAX_AREAS = 64
 MAX_FOLLOW = 50
-MIN_PANEL_HEIGHT = 60.0
 SETTLE = 0.5  # Decoder-Ereignisse warten auf den Charakter (beim Login kommt er erst danach)
 BATCH_WAIT = 0.04
 MAX_LOGGED = 20_000
@@ -65,27 +70,13 @@ FEED_CACHE = 2.0
 
 WINDOWS_KEY = "dpsMeter.pluginWindows"
 DISABLED_KEY = "dpsMeter.pluginsDisabled"
-HIDE_CLOSED_KEY = "dpsMeter.pluginsHideClosed"
-HIDE_UNFOCUSED_KEY = "dpsMeter.pluginsHideUnfocused"
-THEME_KEY = "dpsMeter.pluginTheme"
 DEFAULT_THEME = {"bg": "#0a0e16", "panel": "#0a0e16", "accent": "#8fc2ff"}
 LANGUAGE_KEY = "dpsMeter.language"
 STORAGE_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
-WIDGET_NAME = re.compile(r"[a-z0-9-]{1,32}")
 
 # Nummerierte Ereignisse aus deckbar-capture (feed.rs) → Recht, das ein Plugin dafür braucht (wie mod.rs im Meter)
 NUMBERED_FEEDS = {"deathRecap": "events:death-recap", "lootRoll": "events:loot-rolls",
                   "blackMarket": "events:black-market", "kda": "events:kda"}
-# Was eine Plugin-Seite (Fenster oder Widget) aufrufen darf, wie PLUGIN_SURFACE_COMMANDS im Original
-SURFACE = {
-    "meter_shown", "set_meter_shown", "open_settings_at", "open_settings_window", "open_url",
-    "plugin_abyss_siege", "plugin_boss_follow", "plugin_boss_timers", "plugin_close", "plugin_fps_admin",
-    "plugin_fps_watch", "plugin_hello", "plugin_screenshot", "plugin_set_docked", "plugin_storage_get",
-    "plugin_storage_set", "plugin_widget_area", "plugin_widget_close", "plugin_widget_drag",
-    "plugin_widget_hello", "plugin_widget_open", "plugin_widget_place", "plugin_widget_post",
-    "plugin_widget_send", "plugin_widget_where", "plugin_widgets_lock", "plugin_widgets_locked",
-    "plugin_window", "plugin_window_fit", "start_tool_drag", "window_resize_drag", "get_settings",
-}
 
 
 @dataclass
@@ -155,7 +146,7 @@ def take_ready(pending: list[Pending], now: float) -> list[Pending]:
     return ready
 
 
-class PluginHost:
+class PluginHost(PluginCommands):
     def __init__(self, capture: Any, settings: Callable[[], dict[str, str]], save_setting: Callable[[str, str], None],
                  emit: Callable[[str, Any], Awaitable[None]], folder: Path, data_folder: Path,
                  base_url: str = BASE_URL, key_hex: str = PUBLIC_KEY_HEX) -> None:
@@ -753,190 +744,3 @@ class PluginHost:
                 "visible": self._windows().get(plugin) == "shown",
                 "reviewed": True, "game": bool(self.capture.status.get("game")),
                 "ping": ping if isinstance(ping, (int, float)) else None}
-
-    async def call(self, cmd: str, a: dict, window: str | None) -> Any:
-        """Ein Befehl von einer Seite. `window`: die Fensterkennung, die das Shim mitschickt."""
-        if window and window.startswith(("plugin-", "widget:")) and cmd not in SURFACE:
-            raise PluginError(f"{cmd}: für Plugins nicht erlaubt")
-        match cmd:
-            case "plugin_list" | "plugin_set_dev_mode" | "plugin_add_folder" | "plugin_remove_folder":
-                return self.view()  # Entwickler-Ordner gibt es hier nicht, nur den signierten Katalog
-            case "plugin_catalog":
-                try:
-                    return await self.catalog_items()
-                except (aiohttp.ClientError, TimeoutError) as e:
-                    raise PluginError(str(e)) from e
-            case "plugin_install":
-                return await self.install(str(a.get("id")))
-            case "plugin_uninstall":
-                return await self.uninstall(str(a.get("id")))
-            case "plugin_check_updates":
-                return await self.check_updates()
-            case "plugin_pending_updates":
-                return []
-            case "plugin_set_enabled":
-                return await self._set_enabled(str(a.get("id")), bool(a.get("enabled")))
-            case "plugin_set_hide":
-                plugin = str(a.get("id"))
-                self._require_id(plugin)
-                key = {"closed": HIDE_CLOSED_KEY, "unfocused": HIDE_UNFOCUSED_KEY}.get(str(a.get("when")))
-                if key is None:
-                    raise PluginError("closed oder unfocused")
-                ids = [x for x in self._listed(key) if x != plugin]
-                if a.get("hide"):
-                    ids.append(plugin)
-                self._save_list(key, ids)
-                return self.view()
-            case "plugin_open":
-                plugin = str(a.get("id"))
-                if plugin not in self.loaded:
-                    raise PluginError("Plugin nicht geladen")
-                self._remember_window(plugin, "shown")
-                await self._open(plugin, True)
-                return None
-            case "plugin_set_docked" | "set_meter_shown":
-                return None
-            case "meter_shown":
-                return True
-            case "set_plugin_theme":
-                theme = clean_theme(a.get("theme"))
-                if theme is None:
-                    raise PluginError("kein Farbschema")
-                if theme != self.theme():
-                    self.save_setting(THEME_KEY, json.dumps(theme))
-                    await self.tell_all("theme", theme)
-                return None
-            case "plugin_windows":
-                return self.windows_to_restore()
-            case "plugin_widgets_state":
-                return self.widgets_state()
-            case "plugin_overlay_screen":
-                self.screen = {"width": max(320, int(a.get("width") or 1920)), "height": max(240, int(a.get("height") or 1080))}
-                return None
-            case "plugin_widget_moved":
-                await self._widget_moved(str(a.get("label")), int(a.get("x") or 0), int(a.get("y") or 0))
-                return None
-        plugin = self._plugin_of(window)
-        match cmd:
-            case "plugin_hello":
-                if a.get("fresh"):  # Ein frisch startendes Plugin kennt alte Widgets nicht und schlösse sie nie
-                    await self._drop_widgets(plugin)
-                return self._hello(plugin)
-            case "plugin_window":
-                visible = bool(a.get("visible"))
-                self._require(plugin, "window")
-                self._remember_window(plugin, "shown" if visible else "hidden")
-                await self._overlay({"action": "show" if visible else "hide", "id": plugin})
-                await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": visible})
-                return None
-            case "plugin_close":
-                self._remember_window(plugin, "hidden")
-                await self._overlay({"action": "hide", "id": plugin})
-                await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": False})
-                return None
-            case "plugin_window_fit":
-                self._require(plugin, "window")
-                height = a.get("height")
-                await self._overlay({"action": "fit", "id": plugin,
-                                     "height": max(MIN_PANEL_HEIGHT, float(height)) if isinstance(height, (int, float)) else None})
-                return None
-            case "plugin_storage_get":
-                self._require(plugin, "storage")
-                key = str(a.get("key"))
-                try:
-                    text = self._data_file(plugin, key).read_text(encoding="utf-8")
-                except FileNotFoundError:
-                    text = None
-                return text
-            case "plugin_storage_set":
-                self._require(plugin, "storage")
-                self._storage_set(plugin, str(a.get("key")), str(a.get("value")))
-                return None
-            case "plugin_boss_timers":
-                self._require(plugin, "feed:boss-timers")
-                return await self._feed("boss-timers", int(a.get("server") or 0))
-            case "plugin_abyss_siege":
-                self._require(plugin, "feed:boss-timers")
-                return await self._feed("abyss-artifacts", int(a.get("server") or 0))
-            case "plugin_boss_follow":
-                self._require(plugin, "feed:boss-timers")
-                await self._boss_follow(plugin, int(a.get("server") or 0), list(a.get("bosses") or []))
-                return None
-            case "plugin_fps_watch":
-                self._require(plugin, "fps")
-                return {"fps": None, "state": "unsupported"}  # Die Zählung gibt es nur im Windows-Meter
-            case "plugin_fps_admin":
-                self._require(plugin, "fps")
-                return False
-            case "plugin_widget_open":
-                await self._widget_open(plugin, a)
-                return None
-            case "plugin_widget_close":
-                self._require(plugin, "widgets")
-                if w := self.widgets.get(f"widget:{plugin}:{a.get('name')}"):
-                    w.open = False
-                    await self._publish_widgets()
-                return None
-            case "plugin_widget_send":
-                self._require(plugin, "widgets")
-                data = a.get("data")
-                if len(json.dumps(data)) > MAX_MESSAGE:
-                    raise PluginError("Nachricht zu groß")
-                await self.emit("plugin-event", {"plugin": plugin, "event": "widget", "data": data,
-                                                 "__window": f"widget:{plugin}:{a.get('name')}"})
-                return None
-            case "plugin_widgets_lock":
-                self._require(plugin, "widgets")
-                locked = bool(a.get("locked"))
-                self.save_setting(self._locked_key(plugin), "true" if locked else "false")
-                await self.emit("plugin-event", {"plugin": plugin, "event": "locked", "data": locked})
-                await self._publish_widgets()
-                return None
-            case "plugin_widgets_locked":
-                self._require(plugin, "widgets")
-                return self._locked(plugin)
-            case "plugin_widget_where":
-                self._require(plugin, "widgets")
-                w = self.widgets.get(f"widget:{plugin}:{a.get('name')}")
-                if w is None:
-                    return None
-                return {"x": w.x, "y": w.y, "width": int(w.width), "height": int(w.height),
-                        "screen": {"x": 0, "y": 0, **self.screen}}
-            case "plugin_widget_place":
-                self._require(plugin, "widgets")
-                name = str(a.get("name"))
-                if not WIDGET_NAME.fullmatch(name):
-                    raise PluginError("Ein Widget-Name hat 1 bis 32 Kleinbuchstaben, Ziffern oder '-'")
-                x, y = int(a.get("x") or 0), int(a.get("y") or 0)
-                w = self.widgets.get(f"widget:{plugin}:{name}")
-                x, y = self._on_screen(x, y, w.width if w else 64, w.height if w else 64)
-                self.save_setting(self._place_key(plugin, name), f"{x},{y}")
-                if w:
-                    w.x, w.y = x, y
-                    await self._publish_widgets()
-                return None
-            case "plugin_widget_hello":
-                if not (window or "").startswith("widget:"):
-                    raise PluginError("kein Widget-Fenster")
-                name = (window or "").split(":")[2]
-                return {"plugin": plugin, "name": name, "locked": self._locked(plugin), "language": self.language()}
-            case "plugin_widget_post":
-                if not (window or "").startswith("widget:"):
-                    raise PluginError("kein Widget-Fenster")
-                data = a.get("data")
-                if len(json.dumps(data)) > MAX_MESSAGE:
-                    raise PluginError("Nachricht zu groß")
-                await self.emit("plugin-event", {"plugin": plugin, "event": "widget-message",
-                                                 "data": {"name": (window or "").split(":")[2], "data": data}})
-                return None
-            case "plugin_widget_area":
-                w = self.widgets.get(window or "")
-                if w is None:
-                    raise PluginError("kein Widget-Fenster")
-                rects = a.get("rects")
-                if not isinstance(rects, list) or len(rects) > MAX_AREAS:
-                    raise PluginError("keine Fläche")
-                w.areas = [[float(r["x"]), float(r["y"]), float(r["width"]), float(r["height"])] for r in rects]
-                await self._publish_widgets()
-                return None
-        raise PluginError(f"{cmd}: im NexBoard nicht verfügbar")
