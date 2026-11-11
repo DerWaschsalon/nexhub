@@ -148,7 +148,7 @@ async def test_grosse_datei_kommt_ganz_an(host, cdn):
 async def test_zu_grosser_katalog_wird_abgelehnt(host, cdn):
     cdn.body = b" " * (1024 * 1024 + 1)
     with pytest.raises(PluginError, match="größer als"):
-        await host.fetch_catalog()
+        await host.catalog.fetch()
 
 
 async def test_veraenderte_datei_wird_nicht_installiert(host, cdn):
@@ -186,7 +186,7 @@ async def test_kein_zurueck_auf_alten_katalog_oder_alte_version(host, cdn):
     cdn.serial = 50
     cdn.add("ping", "1.0.0")
     with pytest.raises(PluginError, match="älter"):
-        await host.fetch_catalog()
+        await host.catalog.fetch()
     cdn.serial = 200
     cdn.add("ping", "1.0.0")
     with pytest.raises(PluginError, match="neuer als der Katalog"):
@@ -411,7 +411,7 @@ def test_csp_ohne_netz():
 @pytest.fixture
 async def ui(tmp_path, cdn):
     a2 = A2Ui(FakeCapture(), tmp_path / "s.json", plugin_dir=tmp_path)
-    a2.plugins.base_url, a2.plugins.key_hex = cdn.url, cdn.key_hex
+    a2.plugins.catalog.base_url, a2.plugins.catalog.key_hex = cdn.url, cdn.key_hex
     client = TestClient(TestServer(a2.app()))
     await client.start_server()
     a2.client = client

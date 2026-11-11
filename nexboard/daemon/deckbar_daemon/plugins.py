@@ -32,8 +32,14 @@ from typing import Any
 
 import aiohttp
 
-from .plugin_files import (API_VERSION, MAX_PLUGIN, PUBLIC_KEY_HEX, PluginError, check_files, load_manifest, newer,
-                           safe_path, sha256_hex, valid_id, verify_catalog)
+from .plugin_catalog import PluginCatalog
+from .plugin_files import (
+    PUBLIC_KEY_HEX,
+    PluginError,
+    load_manifest,
+    newer,
+    valid_id,
+)
 from .plugin_page import clean_theme
 
 log = logging.getLogger(__name__)
@@ -41,9 +47,6 @@ log = logging.getLogger(__name__)
 BASE_URL = "https://cdn.a2tools.app/plugins"
 FEED_URL = "https://cdn.a2tools.app/feeds"
 LIVE_URL = "wss://a2tools.app/api/boss-timers/live"
-PROOF_DIR = ".proof"
-MAX_CATALOG = 1024 * 1024
-PARALLEL_DOWNLOADS = 4
 CATALOG_MAX_AGE = 300.0
 
 MAX_STORED = 1024 * 1024
@@ -162,8 +165,7 @@ class PluginHost:
         self.emit = emit
         self.folder = folder
         self.data_folder = data_folder
-        self.base_url = base_url
-        self.key_hex = key_hex
+        self.catalog = PluginCatalog(folder, base_url, key_hex, self._session)
         self.overlay: Callable[[dict], Awaitable[None]] | None = None  # Befehle ans Overlay-Programm
         # Stand der Plugin-Widgets für die Overlay-Seite (ihre eine Ereignisverbindung)
         self.widgets_listener: Callable[[list[dict]], Awaitable[None]] | None = None
@@ -180,7 +182,6 @@ class PluginHost:
         self.character: Any = None
         self.screen = {"width": 1920, "height": 1080}
         self.game = False
-        self._catalog: tuple[float, dict, str, str] | None = None
         self._feeds: dict[tuple[str, int], tuple[float, Any]] = {}
         self._follows: dict[tuple[str, int], set[str]] = {}
         self._live: dict[int, asyncio.Task] = {}
@@ -230,21 +231,6 @@ class PluginHost:
             return DEFAULT_THEME
 
     # ------------------------------------------------------------ Laden
-    def _proof(self, plugin: str) -> Path:
-        return self.folder / PROOF_DIR / f"{plugin}.json"
-
-    def _verify_installed(self, plugin: str, folder: Path, version: str) -> None:
-        try:
-            signed = json.loads(self._proof(plugin).read_text())
-            index, signature = signed["index"], signed["signature"]
-        except (OSError, ValueError, KeyError, TypeError) as e:
-            raise PluginError("ohne Nachweis aus dem Katalog: bitte neu installieren") from e
-        catalog = verify_catalog(index.encode(), signature, self.key_hex)
-        entry = next((e for e in catalog.get("plugins", []) if e.get("id") == plugin and e.get("version") == version), None)
-        if entry is None:
-            raise PluginError(f"der Katalog kennt {plugin} {version} nicht")
-        check_files(entry, folder)
-
     def reload(self) -> None:
         loaded: dict[str, Loaded] = {}
         errors: dict[str, dict] = {}
@@ -257,7 +243,7 @@ class PluginHost:
                 manifest = load_manifest(folder)
                 if manifest["id"] != folder.name:
                     raise PluginError("Ordner und Kennung passen nicht zusammen")
-                self._verify_installed(manifest["id"], folder, str(manifest.get("version", "")))
+                self.catalog.verify_installed(manifest["id"], folder, str(manifest.get("version", "")))
                 loaded[manifest["id"]] = Loaded(manifest, folder)
             except PluginError as e:
                 log.warning("Plugin %s läuft nicht: %s", folder.name, e)
@@ -415,47 +401,8 @@ class PluginHost:
             self._http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300))
         return self._http
 
-    async def _get(self, url: str, cap: int) -> bytes:
-        http = await self._session()
-        async with http.get(url) as r:
-            if r.status != 200:
-                raise PluginError(f"{url}: HTTP {r.status}")
-            data = bytearray()
-            async for chunk in r.content.iter_chunked(64 * 1024):
-                data += chunk
-                if len(data) > cap:
-                    raise PluginError(f"{url}: größer als {cap} Byte")
-            return bytes(data)
-
-    def _check_serial(self, serial: int) -> None:
-        """Einen älteren Katalog als den schon gelesenen ablehnen (alter signierter Stand erneut ausgeliefert)."""
-        path = self.folder / PROOF_DIR / "serials.json"
-        try:
-            seen = json.loads(path.read_text())
-        except (OSError, ValueError):
-            seen = {}
-        last = int(seen.get("main", 0))
-        if serial < last:
-            raise PluginError(f"Der Plugin-Katalog ist älter als ein schon gelesener ({serial} < {last})")
-        if serial > last:
-            seen["main"] = serial
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(seen))
-
-    async def fetch_catalog(self, max_age: float = 0) -> dict:
-        now = time.monotonic()
-        if self._catalog and now - self._catalog[0] < max_age:
-            return self._catalog[1]
-        body, signature = await asyncio.gather(self._get(f"{self.base_url}/index.json", MAX_CATALOG),
-                                               self._get(f"{self.base_url}/index.json.sig", 1024))
-        text = signature.decode("ascii", "replace").strip()
-        catalog = verify_catalog(body, text, self.key_hex)
-        self._check_serial(int(catalog.get("serial") or 0))
-        self._catalog = (now, catalog, body.decode("utf-8"), text)
-        return catalog
-
     async def catalog_items(self) -> list[dict]:
-        catalog = await self.fetch_catalog(CATALOG_MAX_AGE)
+        catalog = await self.catalog.fetch(CATALOG_MAX_AGE)
         return [{"id": e.get("id"), "name": e.get("name"), "version": e.get("version"),
                  "description": e.get("description", ""), "author": e.get("author", ""),
                  "permissions": e.get("permissions") or [], "source": e.get("source", ""),
@@ -465,14 +412,14 @@ class PluginHost:
 
     async def install(self, plugin: str) -> dict:
         plugin = plugin.strip().lower()
-        catalog = await self.fetch_catalog()
+        catalog = await self.catalog.fetch()
         entry = next((e for e in catalog.get("plugins", []) if e.get("id") == plugin), None)
         if entry is None:
             raise PluginError("Dieses Plugin steht nicht im Katalog")
-        files = await self._download(entry)
+        files = await self.catalog.download(entry)
         await self.emit("plugin-install-phase", {"id": plugin, "phase": "installing"})
         updating = plugin in self.loaded
-        await asyncio.to_thread(self._write_install, entry, files)
+        await asyncio.to_thread(self.catalog.write, entry, files)
         self.reload()
         await self.send_decoders()
         if plugin in self.errors:
@@ -485,73 +432,6 @@ class PluginHost:
             await self._open(plugin, True)
         return self.view()
 
-    async def _download(self, entry: dict) -> list[tuple[str, bytes]]:
-        plugin = str(entry.get("id"))
-        if not valid_id(plugin):
-            raise PluginError(f"Plugin-Kennung {plugin!r} ungültig")
-        api = entry.get("apiVersion")
-        if not isinstance(api, int) or not 0 < api <= API_VERSION:
-            raise PluginError(f"{entry.get('name')} braucht ein neueres NexBoard (Plugin-API {api})")
-        files: dict[str, str] = entry.get("files") or {}
-        if "manifest.json" not in files or "index.html" not in files:
-            raise PluginError(f"{entry.get('name')}: Manifest oder Seite fehlt")
-        for path in files:
-            if not safe_path(path):
-                raise PluginError(f"{entry.get('name')}: Datei {path!r} nicht erlaubt")
-        limit = asyncio.Semaphore(PARALLEL_DOWNLOADS)
-
-        async def one(path: str, want: str) -> tuple[str, bytes]:
-            url = f"{self.base_url}/{plugin}/{entry.get('version')}/{path}"
-            async with limit:
-                try:
-                    data = await self._get(url, MAX_PLUGIN)
-                except (PluginError, aiohttp.ClientError, TimeoutError):
-                    data = await self._get(url, MAX_PLUGIN)
-            if sha256_hex(data).lower() != want.lower():
-                raise PluginError(f"{entry.get('name')}: {path} passt nicht zum Katalog, keine Installation")
-            return path, data
-
-        try:
-            got = await asyncio.gather(*(one(p, h) for p, h in files.items()))
-        except (aiohttp.ClientError, TimeoutError) as e:
-            raise PluginError(f"Download fehlgeschlagen: {e}") from e
-        if sum(len(d) for _, d in got) > MAX_PLUGIN:
-            raise PluginError(f"{entry.get('name')} ist größer als {MAX_PLUGIN} Byte")
-        return got
-
-    def _write_install(self, entry: dict, files: list[tuple[str, bytes]]) -> None:
-        assert self._catalog
-        plugin = entry["id"]
-        self.folder.mkdir(parents=True, exist_ok=True)
-        staging = self.folder / f".staging-{plugin}"
-        target = self.folder / plugin
-        shutil.rmtree(staging, ignore_errors=True)
-        try:
-            for path, data in files:
-                file = staging / path
-                file.parent.mkdir(parents=True, exist_ok=True)
-                file.write_bytes(data)
-            manifest = load_manifest(staging)
-            # Was der Zustimmungsdialog gezeigt hat (Katalog), ist, was das Manifest gewährt
-            if (manifest["id"] != plugin or manifest.get("version") != entry.get("version")
-                    or sorted(entry.get("permissions") or []) != sorted(manifest.get("permissions") or [])):
-                raise PluginError(f"{entry.get('name')}: Manifest passt nicht zum Katalog")
-            if target.is_dir():
-                try:
-                    old = load_manifest(target)
-                except PluginError:
-                    old = None
-                if old and newer(str(old.get("version")), str(entry.get("version"))):
-                    raise PluginError(f"{entry.get('name')} {old.get('version')} ist neuer als der Katalog")
-                shutil.rmtree(target)
-            staging.rename(target)
-        finally:
-            shutil.rmtree(staging, ignore_errors=True)
-        proof = self._proof(plugin)
-        proof.parent.mkdir(parents=True, exist_ok=True)
-        _, _, index, signature = self._catalog
-        proof.write_text(json.dumps({"index": index, "signature": signature}))
-
     async def uninstall(self, plugin: str) -> dict:
         self._require_id(plugin)
         await self._overlay({"action": "close", "id": plugin})
@@ -560,7 +440,7 @@ class PluginHost:
         self.logs.pop(plugin, None)
         self._save_list(DISABLED_KEY, [x for x in self.disabled() if x != plugin])
         shutil.rmtree(self.folder / plugin, ignore_errors=True)
-        self._proof(plugin).unlink(missing_ok=True)
+        self.catalog.proof(plugin).unlink(missing_ok=True)
         await self._forget_follows(plugin)
         self.reload()
         await self.send_decoders()
@@ -570,7 +450,7 @@ class PluginHost:
         self.reload()
         available, error = [], None
         try:
-            catalog = await self.fetch_catalog()
+            catalog = await self.catalog.fetch()
             for entry in catalog.get("plugins", []):
                 p = self.loaded.get(entry.get("id"))
                 if p and newer(str(entry.get("version")), str(p.manifest.get("version"))):
