@@ -1,5 +1,5 @@
 <!-- Modul BiS-Listen: Klasse wählen (?k=ranger), dann die Ausrüstungsspalte wie in der Armory mit dem
-     typischen Gegenstand je Platz. Ein Klick öffnet das Gegenstandsfenster mit dem Anteil je Zeile,
+     typischen Gegenstand je Platz, daneben die Figur der Klasse im Klassenlicht. Ein Klick öffnet das Gegenstandsfenster mit dem Anteil je Zeile,
      daneben Skills, Stigmen und Arkana mit Anteil. Wahlweise nur Spieler aus dem Schwer-Modus. -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
@@ -41,6 +41,9 @@
 	const arcana = $derived(items.filter((i) => ARCANA.includes(i.slot_name)));
 	const pick = (slot: string) => (open = stats?.slots.find((s) => s.item.slot_name === slot) ?? null);
 	const choose = (key: string) => goto(`?k=${key}`, { replaceState: true });
+	const shown = $derived(classInfo(cls));
+	// Für manche Klassen gibt es noch keine Figur (Faustkämpfer): dann bleibt die Mitte leer
+	const hide = (e: Event) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden');
 </script>
 
 <svelte:head><title>{t('bis.title')} · NexHub</title></svelte:head>
@@ -91,6 +94,11 @@
 					<SkillGrid data={{ skills: stats.skills }} />
 					<ArcanaRow {arcana} onItem={(item) => pick(item.slot_name)} />
 				</section>
+				{#if shown}
+					<div class="figure" style:--glow={shown.color} aria-hidden="true">
+						<img src={shown.figure} alt="" onerror={hide} />
+					</div>
+				{/if}
 				<div class="doll"><EquipmentPanel data={equipment} onItem={(item) => pick(item.slot_name)} /></div>
 			</div>
 		{/if}
@@ -129,15 +137,36 @@
 	}
 	.layout {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-columns: minmax(0, 1fr) 380px auto;
 		gap: 18px;
 		align-items: start;
+	}
+	/* Figur über die volle Spaltenbreite, beim Blättern sichtbar; Licht in der Klassenfarbe dahinter */
+	.figure {
+		position: sticky;
+		top: 18px;
+		padding-top: 40px;
+		background: radial-gradient(ellipse 55% 40% at 50% 60%, color-mix(in srgb, var(--glow) 30%, transparent), transparent);
+	}
+	.figure img {
+		display: block;
+		width: 100%;
+		height: auto;
+		filter: drop-shadow(0 0 24px color-mix(in srgb, var(--glow) 40%, transparent));
+	}
+	/* Mittelbreit: ohne Figur; schmal: erst die Ausrüstung, dann Skills und Arkana */
+	@media (max-width: 1400px) {
+		.layout {
+			grid-template-columns: minmax(0, 1fr) auto;
+		}
+		.figure {
+			display: none;
+		}
 	}
 	@media (max-width: 760px) {
 		.layout {
 			grid-template-columns: 1fr;
 		}
-		/* schmal: erst die Ausrüstung, dann Skills und Arkana */
 		.doll {
 			order: -1;
 		}

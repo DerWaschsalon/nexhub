@@ -1,9 +1,10 @@
 // AION-2-Klassen aus nexproto (proto/nexproto/classes.py): Namen, Farben wie im Meter; Symbole in
-// hub/web/static/klassen/, Herkunft in data/HERKUNFT.md.
+// hub/web/static/klassen/, Figuren in hub/web/static/klassen/figur/ (für Faustkämpfer gibt es noch keine);
+// Herkunft in data/HERKUNFT.md.
 import { i18n } from '#lib/i18n.svelte.ts';
 import { CLASSES, UNKNOWN_CLASS_COLOR } from '#lib/nexproto.ts';
 
-export type ClassInfo = { label: string; color: string; icon: string };
+export type ClassInfo = { label: string; color: string; icon: string; figure: string };
 
 const BY_KEY = new Map(CLASSES.map((c) => [c.key, c]));
 
@@ -12,7 +13,8 @@ export const CLASS_KEYS = CLASSES.map((c) => c.key);
 
 export function classInfo(cls: string | null | undefined): ClassInfo | null {
 	const c = cls ? BY_KEY.get(cls) : undefined;
-	return c ? { label: c[i18n.lang], color: c.color, icon: `/klassen/${cls}.png` } : null;
+	if (!c) return null;
+	return { label: c[i18n.lang], color: c.color, icon: `/klassen/${cls}.png`, figure: `/klassen/figur/${cls}.webp` };
 }
 
 /** Klasse zum Klassennamen, wie die AION-2-Website ihn schreibt (Englisch oder Deutsch). */

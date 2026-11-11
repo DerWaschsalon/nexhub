@@ -6,3 +6,8 @@ Spieldaten für das Modul Logs aus A2Tools-DPS-Meter (https://github.com/taengu/
 - `buffs/icons.json`: Buff-ID → Bildname, aus `abnormals.json` (nur das Feld `icon`)
 
 Die Inhalte stammen aus AION 2 (NCSOFT). Zum Aktualisieren die Dateien aus einer neueren A2Tools-Version kopieren.
+
+Figuren der Klassen in `hub/web/static/klassen/figur/` (freigestellte Renderbilder von NCSOFT, wie sie
+auch die offizielle Klassenseite zeigt), am 11.11.2026 übernommen von Questlog
+(`https://cdn.questlog.gg/aion-2/assets/classes/<klasse>.webp`); `elementalist` heißt im Hub `spiritmaster`.
+Für den Faustkämpfer gibt es dort noch keine Figur.
