@@ -14,6 +14,7 @@
 	import CharacterLayout from './CharacterLayout.svelte';
 	import EquipmentPanel from './EquipmentPanel.svelte';
 	import ItemDialog from './ItemDialog.svelte';
+	import ItemTooltip from './ItemTooltip.svelte';
 	import SkillGrid from './SkillGrid.svelte';
 	import StatInfo from './StatInfo.svelte';
 
@@ -36,18 +37,26 @@
 	const cls = $derived(character.cls ?? classFromName(data.profile.class));
 	const arcana = $derived(data.equipment.filter((e) => ARCANA.includes(e.slot_name)));
 	const rated = $derived(bySlot(ratings));
+	const items = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
+	const slots = $derived(new Set(items.keys()));
 	let open: CharacterItem | null = $state(null);
+	let active: string | null = $state(null);
 	const show = (item: CharacterItem) => (open = item);
+	const pick = (slot: string) => (open = items.get(slot) ?? null);
 </script>
 
 <CharacterHeader {character} {data} {aside} />
 
-<CharacterLayout {cls}>
+<CharacterLayout {cls} {slots} bind:active onPick={pick}>
+	{#snippet tip(slot)}
+		{@const item = items.get(slot)}
+		{#if item}<ItemTooltip {item} rating={rated.get(slot)} />{/if}
+	{/snippet}
 	{#snippet main()}
 		<StatInfo {data} {cls} {arcana} onItem={show} />
 	{/snippet}
 	{#snippet doll()}
-		<EquipmentPanel {data} ratings={rated} onItem={show} />
+		<EquipmentPanel {data} ratings={rated} bind:active onItem={show} />
 	{/snippet}
 	{#snippet below()}
 		<section class="skills">

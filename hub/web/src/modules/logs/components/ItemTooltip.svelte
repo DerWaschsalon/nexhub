@@ -2,7 +2,8 @@
      Grundwerte, Durchbruch (orange), Seelenbindung mit Balken, Manasteine, Gottstein, Skills und bei
      Arkana das Set (erreichte Stufen hell). Mit `rating` dazu die Note, je Roll Höchstwert und Anteil
      der Top-Spieler und der Weg zu S+ (rating.ts). Die BiS-Listen geben nur `lines` (Anteile je Zeile,
-     auch Manasteine und Göttersteine) und unter dem Kopf ihren eigenen Teil (`children`). -->
+     auch Manasteine und Göttersteine) und unter dem Kopf ihren eigenen Teil (`children`). Ohne `onclose`
+     (Fenster beim Zeigen auf Figur oder Platz) gibt es keinen Knopf zum Schließen. -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { t } from '#lib/i18n.svelte.ts';
@@ -18,7 +19,7 @@
 		lines,
 		children,
 		onclose
-	}: { item: CharacterItem; rating?: Rating; lines?: RatedLine[]; children?: Snippet; onclose: () => void } = $props();
+	}: { item: CharacterItem; rating?: Rating; lines?: RatedLine[]; children?: Snippet; onclose?: () => void } = $props();
 
 	// Bewertete Zeile zu einem Roll, Skill oder Stein des Gegenstands, verbunden über Art und Namen
 	const rated = (kind: RatedLine['kind'], name: string): RatedLine | undefined =>
@@ -155,9 +156,11 @@
 
 		{#if item.id}<footer><strong>#{item.id}</strong></footer>{/if}
 	</article>
-	<nav>
-		<button class="close" onclick={onclose} aria-label={t('logs.char.close')}>×</button>
-	</nav>
+	{#if onclose}
+		<nav>
+			<button class="close" onclick={onclose} aria-label={t('logs.char.close')}>×</button>
+		</nav>
+	{/if}
 </div>
 
 <style>

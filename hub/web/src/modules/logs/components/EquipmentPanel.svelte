@@ -1,6 +1,7 @@
 <!-- Ausrüstungsspalte wie im Spiel: zwei Spalten in der Reihenfolge des Ausrüstungsfensters, leere
      Plätze mit ihrem Namen, unten Flügel und Haustier. Ein Klick meldet den Gegenstand nach oben (onItem).
-     Mit `ratings` trägt jeder bewertete Platz seine Note in der Ecke. -->
+     Mit `ratings` trägt jeder bewertete Platz seine Note in der Ecke. `active`: der Platz, auf den gerade gezeigt
+     wird, hier oder an der Figur (ClassFigure); er leuchtet auf. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterItem } from '../api.ts';
@@ -12,10 +13,12 @@
 	let {
 		data,
 		ratings,
+		active = $bindable(null),
 		onItem
 	}: {
 		data: Pick<CharacterData, 'equipment' | 'wing' | 'pet'>;
 		ratings?: Map<string, Rating>;
+		active?: string | null;
 		onItem: (item: CharacterItem) => void;
 	} = $props();
 
@@ -30,7 +33,13 @@
 		{#each GAME_ORDER as slot (slot)}
 			{@const item = bySlot.get(slot)}
 			{#if item}
-				<button onclick={() => onItem(item)} aria-label={item.name}>
+				<button
+					class:lit={active === slot}
+					onclick={() => onItem(item)}
+					onmouseenter={() => (active = slot)}
+					onmouseleave={() => (active = null)}
+					aria-label={item.name}
+				>
 					<ItemIcon name={item.name} icon={item.icon} grade={item.grade} enchant={item.enchant} exceed={item.exceed} size={64} filled />
 					{#if ratings?.get(slot)}<span class="note"><RatingBadge letter={ratings.get(slot)!.letter} small /></span>{/if}
 				</button>
@@ -86,6 +95,7 @@
 		line-height: 0;
 	}
 	button:hover,
+	button.lit,
 	button:focus-visible {
 		filter: brightness(1.2);
 		outline: 1px solid #fff;
