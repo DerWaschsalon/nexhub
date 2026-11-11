@@ -41,7 +41,8 @@ class RadarModule(WebModule):
         self.spawn(self.radar.watch)
 
     def status(self) -> dict[str, Any]:
-        return {"laeuft": self.radar.laeuft, "spiel": self.radar.spiel, "aufnahme": self.radar.aufnahme}
+        return {"laeuft": self.radar.laeuft, "spiel": self.radar.spiel, "aufnahme": self.radar.aufnahme,
+                "fehler": self.radar.fehler}
 
     def routes(self, router: web.UrlDispatcher) -> None:
         router.add_get("/api/radar", self.api_get)

@@ -70,6 +70,7 @@ function rufListe(r, gruppe, setzen) {
 
 function statusChip(r) {
   if (!r) return chip("…");
+  if (r.fehler) return chip(`Fehler: ${r.fehler}`, "bad");
   if (r.laeuft) return r.aufnahme ? chip("läuft · ● REC", "bad") : chip("läuft", "ok");
   return chip("wartet auf AION 2");
 }
@@ -172,7 +173,7 @@ function radarUndKarte(ctx) {
 }
 
 export default {
-  status: (m) => (m.status?.laeuft ? "" : "off"),
+  status: (m) => (m.status?.fehler ? "bad" : m.status?.laeuft ? "" : "off"),
   card(m) {
     return el("div", { class: "row wrap" }, statusChip(m.status));
   },

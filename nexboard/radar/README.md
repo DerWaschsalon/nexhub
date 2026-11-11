@@ -6,6 +6,8 @@ Es läuft im NexBoard-Daemon und zeigt sich als Widgets im NexBoard-Overlay (Rad
 Karte), kein eigenes Programm und keine eigenen Fenster.
 
 tcpdump einrichten: `sudo pacman -S tcpdump && sudo setcap cap_net_raw,cap_net_admin=eip /usr/bin/tcpdump`
+Ein Update von tcpdump löscht die Capability wieder (dann kein Cube, keine Warnung, Radar-Seite zeigt „Fehler: tcpdump
+beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc/pacman.d/hooks/tcpdump-cap.hook`
 
 - **Cube-Radar:** rundes Radar im Overlay, erscheint nur, solange ein Hidden Cube in Sicht ist; Ton bei
   neuem Cube. Unter dem Radar Entfernung, Höhe und wie lange der Cube schon steht (Spawnzeit vom Server).
