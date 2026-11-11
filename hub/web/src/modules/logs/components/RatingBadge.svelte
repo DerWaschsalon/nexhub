@@ -17,7 +17,7 @@
 		padding: 1px 7px;
 		border: 1.5px solid var(--c);
 		border-radius: 4px;
-		background: rgba(10, 14, 22, 0.85);
+		background: var(--surface);
 		color: var(--c);
 		line-height: 1.3;
 	}

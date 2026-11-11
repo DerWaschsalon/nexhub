@@ -170,7 +170,7 @@
 		height: 18px;
 		border-color: transparent;
 		background: radial-gradient(circle at 35% 30%, #c5efff, var(--accent) 60%);
-		box-shadow: 0 0 12px -2px rgba(106, 211, 255, 0.7);
+		box-shadow: 0 0 12px -2px color-mix(in srgb, var(--accent) 70%, transparent);
 	}
 	.cell:disabled {
 		cursor: progress;

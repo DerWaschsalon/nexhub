@@ -28,7 +28,7 @@
 		flex-shrink: 0;
 		border-radius: 7px;
 		border: 1px solid var(--edge-soft);
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 	}
 	.fallback {
 		display: inline-grid;

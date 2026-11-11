@@ -100,7 +100,7 @@
 	.item {
 		padding: 14px;
 		border-radius: var(--radius-sm);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 		border: 1px solid var(--edge-soft);
 		min-width: 0;
 	}

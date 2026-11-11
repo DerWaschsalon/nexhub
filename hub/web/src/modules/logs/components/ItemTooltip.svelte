@@ -170,9 +170,9 @@
 <style>
 	.frame {
 		display: flex;
-		background: #1c2432;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6);
+		background: var(--surface-3);
+		border: 1px solid var(--fill-strong);
+		box-shadow: 0 16px 50px var(--shade-strong);
 		color: #e8ecf2;
 	}
 	article {
@@ -182,8 +182,8 @@
 	nav {
 		width: 56px;
 		flex-shrink: 0;
-		border-left: 1px solid rgba(255, 255, 255, 0.1);
-		background: #182030;
+		border-left: 1px solid var(--fill-strong);
+		background: var(--surface-2);
 	}
 	.close {
 		width: 100%;
@@ -238,12 +238,12 @@
 		height: 120px;
 		object-fit: contain;
 		align-self: center;
-		filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+		filter: drop-shadow(0 6px 10px var(--shade-strong));
 	}
 	.block {
 		margin: 0 16px;
 		padding: 12px 0;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		border-bottom: 1px solid var(--fill-strong);
 	}
 	dl {
 		display: grid;
@@ -267,21 +267,21 @@
 		font-size: 17px;
 	}
 	.rate span {
-		color: #3fd6e8;
+		color: var(--game-cyan);
 		font-weight: 600;
 	}
 	.rate b {
-		color: #f2d55f;
+		color: var(--game-gold-soft);
 	}
 	.bar {
 		height: 4px;
 		margin-bottom: 10px;
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--fill-strong);
 	}
 	.bar i {
 		display: block;
 		height: 100%;
-		background: #f2c522;
+		background: var(--game-gold);
 	}
 	ul {
 		list-style: none;
@@ -308,8 +308,8 @@
 	}
 	.stones img {
 		padding: 2px;
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.15);
+		background: var(--edge-soft);
+		border: 1px solid var(--fill-strong);
 	}
 	/* Name füllt die Zeile, damit die Anteile wie bei der Seelenbindung rechts untereinander stehen */
 	.stones span {
@@ -353,7 +353,7 @@
 		gap: 10px;
 		margin: 4px 0;
 		font-size: 14px;
-		color: rgba(255, 255, 255, 0.4);
+		color: var(--faint);
 	}
 	.set .set-head {
 		justify-content: space-between;
@@ -368,7 +368,7 @@
 		flex-shrink: 0;
 	}
 	.set .active {
-		color: #8fd16a;
+		color: var(--game-green);
 	}
 	.rating {
 		display: flex;
@@ -381,7 +381,7 @@
 		font-size: 12px;
 	}
 	.max {
-		color: rgba(255, 255, 255, 0.45);
+		color: var(--faint);
 		font-weight: 500;
 	}
 	/* Anteil der Top-Spieler: kleiner Balken mit Zahl hinter dem Wert */
@@ -393,14 +393,14 @@
 		text-align: right;
 		font-size: 12px;
 		font-weight: 600;
-		color: #f2c522;
+		color: var(--game-gold);
 	}
 	.share i {
 		position: absolute;
 		right: 0;
 		top: 2px;
 		bottom: 2px;
-		background: rgba(242, 197, 34, 0.18);
+		background: color-mix(in srgb, var(--game-gold) 18%, transparent);
 	}
 	.up-head {
 		display: flex;
@@ -420,7 +420,7 @@
 		display: flex;
 		justify-content: flex-end;
 		padding: 12px 16px;
-		background: #182030;
+		background: var(--surface-2);
 		font-size: 15px;
 	}
 </style>

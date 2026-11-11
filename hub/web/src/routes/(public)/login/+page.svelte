@@ -71,7 +71,7 @@
 		user-select: all;
 		padding: 8px 10px;
 		border-radius: var(--radius);
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 	}
 	.btn.large {
 		width: 100%;

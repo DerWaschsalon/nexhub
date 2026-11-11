@@ -117,11 +117,11 @@
 	}
 	.menu a:hover {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 	}
 	.menu a.active {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--fill-strong);
 		border-color: var(--edge-soft);
 	}
 	.menu a.active :global(svg) {

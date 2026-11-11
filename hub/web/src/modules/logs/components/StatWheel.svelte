@@ -119,10 +119,10 @@
 		margin-bottom: 0.4cqw;
 	}
 	.base span {
-		color: #3fd6e8;
+		color: var(--game-cyan);
 		font-weight: 700;
 		font-size: max(12px, 2.7cqw);
 		white-space: nowrap;
-		text-shadow: 0 0 8px rgba(63, 214, 232, 0.35), 0 1px 3px rgba(0, 0, 0, 0.8);
+		text-shadow: 0 0 8px color-mix(in srgb, var(--game-cyan) 35%, transparent), 0 1px 3px rgba(0, 0, 0, 0.8);
 	}
 </style>

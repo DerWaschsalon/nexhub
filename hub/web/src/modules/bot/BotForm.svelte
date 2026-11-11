@@ -54,7 +54,7 @@
 		padding: 18px;
 		border-radius: var(--radius-sm);
 		border: 1px solid var(--edge-soft);
-		background: rgba(255, 255, 255, 0.035);
+		background: var(--fill);
 		animation: open 0.18s ease-out;
 	}
 	.grid {

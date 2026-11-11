@@ -125,15 +125,15 @@
 		padding: 6px 12px;
 		border-radius: 999px;
 		border: 1px solid var(--edge-soft);
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--fill);
 		color: var(--dim);
 		font-size: 14px;
 		cursor: pointer;
 	}
 	.pick.on {
 		color: var(--text);
-		border-color: rgba(106, 211, 255, 0.45);
-		background: rgba(106, 211, 255, 0.12);
+		border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
 	}
 	.pick input {
 		margin: 0;

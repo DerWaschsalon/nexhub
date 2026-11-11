@@ -74,7 +74,7 @@
 	.share {
 		font-size: 12px;
 		font-weight: 600;
-		color: #f2c522;
+		color: var(--game-gold);
 	}
 	li {
 		display: flex;
@@ -89,7 +89,7 @@
 		height: 56px;
 		border-radius: 12px;
 		border: 2px solid var(--edge);
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 		display: flex;
 		align-items: center;
 		justify-content: center;

@@ -120,11 +120,11 @@
 	}
 	nav a:hover {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 	}
 	nav a.active {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--fill-strong);
 		border-color: var(--edge-soft);
 	}
 	nav a:focus-visible {
@@ -146,7 +146,7 @@
 			display: block;
 			border-radius: var(--radius-sm);
 			border: 1px solid var(--edge-soft);
-			background: rgba(255, 255, 255, 0.05);
+			background: var(--fill);
 		}
 		.menu summary {
 			padding: 10px 14px;

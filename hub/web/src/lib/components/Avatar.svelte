@@ -23,6 +23,6 @@
 		place-items: center;
 		font-weight: 650;
 		font-size: calc(var(--size) * 0.45);
-		background: linear-gradient(135deg, rgba(106, 211, 255, 0.35), rgba(167, 139, 250, 0.35));
+		background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 35%, transparent), color-mix(in srgb, var(--accent-2) 35%, transparent));
 	}
 </style>

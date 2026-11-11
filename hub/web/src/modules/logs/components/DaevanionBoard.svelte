@@ -171,7 +171,7 @@
 		position: relative;
 		z-index: 1;
 		outline: none;
-		filter: drop-shadow(0 0 6px rgba(106, 211, 255, 0.7));
+		filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent));
 	}
 	.info {
 		min-height: 3.2em;
@@ -195,7 +195,7 @@
 		padding: 3px 9px;
 		border-radius: 999px;
 		border: 1px solid var(--edge-soft);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.node {

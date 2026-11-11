@@ -44,7 +44,7 @@
 		transition: background 0.15s;
 	}
 	tr.link:hover {
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 	}
 	td a {
 		color: var(--text);

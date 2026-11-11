@@ -179,7 +179,7 @@
 		width: 90px;
 		flex-shrink: 0;
 		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 		overflow: hidden;
 	}
 	.bar > span {
@@ -189,7 +189,7 @@
 	}
 	tr.open td,
 	tr.detail td {
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 	}
 	tr.detail td {
 		border-top: 0;

@@ -88,7 +88,7 @@
 		position: relative;
 		height: 22px;
 		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.035);
+		background: var(--fill);
 	}
 	.axis .track {
 		background: none;

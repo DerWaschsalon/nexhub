@@ -31,6 +31,17 @@
 	--surface-2: #141829;
 	--surface-3: #1b2036;
 	--on-accent: #03131b;
+	/* helle Schleier auf Flächen (Zeile, Hover) und dunkle Abdeckung (Bild, Schatten) */
+	--fill: rgba(255, 255, 255, 0.05);
+	--fill-strong: rgba(255, 255, 255, 0.1);
+	--shade: rgba(0, 0, 0, 0.35);
+	--shade-strong: rgba(0, 0, 0, 0.6);
+	/* Farben aus dem Spiel: Zusatzwert, Gold/Verstärkung, Bonus */
+	--game-cyan: #3fd6e8;
+	--game-gold: #f2c522;
+	--game-gold-soft: #f2d55f;
+	--game-green: #8fd16a;
+	--game-plain: #d8dde6;
 	--radius: 6px;
 	--radius-sm: 4px;
 	--font-heading: 'Unbounded Variable', system-ui, sans-serif;

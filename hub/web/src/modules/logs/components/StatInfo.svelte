@@ -64,15 +64,15 @@
 		display: grid;
 		grid-auto-columns: 1fr;
 		grid-auto-flow: column;
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		border-top: 1px solid var(--fill-strong);
+		border-bottom: 1px solid var(--fill-strong);
 	}
 	button {
 		padding: 8px 6px;
 		border: 0;
 		border-bottom: 2px solid transparent;
 		background: none;
-		color: rgba(255, 255, 255, 0.45);
+		color: var(--faint);
 		font: inherit;
 		font-size: 13px;
 		font-weight: 700;

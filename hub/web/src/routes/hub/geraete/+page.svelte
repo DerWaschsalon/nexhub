@@ -148,7 +148,7 @@
 	input:focus {
 		outline: none;
 		border-color: var(--accent);
-		box-shadow: 0 0 0 3px rgba(106, 211, 255, 0.18);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 	}
 	.notice {
 		margin: 16px 0 0;

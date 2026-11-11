@@ -114,7 +114,7 @@
 		font-size: 11px;
 	}
 	.cursor {
-		stroke: rgba(255, 255, 255, 0.4);
+		stroke: var(--faint);
 		stroke-dasharray: 3 3;
 	}
 	.tip {
@@ -129,7 +129,7 @@
 		font-size: 13px;
 		pointer-events: none;
 		min-width: 180px;
-		background: rgba(12, 14, 28, 0.88);
+		background: var(--surface);
 	}
 	.tip span,
 	.legend span {

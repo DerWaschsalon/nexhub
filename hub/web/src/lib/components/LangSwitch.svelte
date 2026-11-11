@@ -18,7 +18,7 @@
 		padding: 3px;
 		border-radius: var(--radius);
 		border: 1px solid var(--edge-soft);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 	}
 	button {
 		border: 0;
@@ -34,6 +34,6 @@
 	}
 	button.active {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.12);
+		background: var(--fill-strong);
 	}
 </style>

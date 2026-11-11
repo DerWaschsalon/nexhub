@@ -177,7 +177,7 @@
 		overflow-wrap: anywhere;
 		padding: 3px 8px;
 		border-radius: var(--radius);
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 	}
 	code.blur {
 		filter: blur(5px);

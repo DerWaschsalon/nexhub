@@ -48,7 +48,7 @@
 		transition: background 0.15s;
 	}
 	.card:hover {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 	}
 	.portrait {
 		width: 52px;

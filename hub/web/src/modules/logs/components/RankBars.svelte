@@ -99,10 +99,10 @@
 	}
 	button.row:hover,
 	a.row:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--fill);
 	}
 	.selected .row {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--edge-soft);
 		border-color: var(--edge-soft);
 	}
 	.rank {
@@ -114,7 +114,7 @@
 		display: block;
 		height: 12px;
 		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 		overflow: hidden;
 	}
 	.bar > span {

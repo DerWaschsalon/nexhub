@@ -113,8 +113,8 @@
 		gap: 4px;
 		width: 100px;
 		padding: 10px 6px;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: var(--fill);
+		border: 1px solid var(--edge-soft);
 		text-align: center;
 		color: inherit;
 		font: inherit;
@@ -142,9 +142,9 @@
 		width: 260px;
 		padding: 12px 14px;
 		text-align: left;
-		background: #141a24;
-		border: 1px solid rgba(255, 255, 255, 0.14);
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+		background: var(--surface-2);
+		border: 1px solid var(--edge);
+		box-shadow: 0 10px 30px var(--shade-strong);
 	}
 	.title:hover .tip,
 	.title:focus-within .tip {
@@ -173,10 +173,10 @@
 		color: var(--dim);
 	}
 	.effect {
-		color: #3fd6e8;
+		color: var(--game-cyan);
 	}
 	.equipped {
-		color: #f2d55f;
+		color: var(--game-gold-soft);
 	}
 	.ring {
 		display: grid;
@@ -184,14 +184,14 @@
 		width: 52px;
 		height: 52px;
 		border-radius: 50%;
-		background: conic-gradient(#3fd6e8 var(--progress), rgba(255, 255, 255, 0.1) 0);
+		background: conic-gradient(var(--game-cyan) var(--progress), var(--fill-strong) 0);
 	}
 	.ring img {
 		width: 44px;
 		height: 44px;
 		padding: 7px;
 		border-radius: 50%;
-		background: #141a24;
+		background: var(--surface-2);
 		object-fit: contain;
 	}
 	.closed {
@@ -203,9 +203,9 @@
 	.board-window {
 		position: relative;
 		padding: 18px;
-		background: #1c2432;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		box-shadow: 0 16px 50px rgba(0, 0, 0, 0.6);
+		background: var(--surface-3);
+		border: 1px solid var(--fill-strong);
+		box-shadow: 0 16px 50px var(--shade-strong);
 	}
 	.close {
 		position: absolute;
