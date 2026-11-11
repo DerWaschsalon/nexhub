@@ -26,6 +26,7 @@
 	let stats = $state<BisStats | null>(null);
 	let error = $state('');
 	let open = $state<BisSlot | null>(null);
+	let active = $state<string | null>(null);
 
 	// Neu laden, wenn Klasse, Modus oder Sprache wechseln (die Namen kommen übersetzt von der API)
 	$effect(() => {
@@ -41,7 +42,9 @@
 	const skills = $derived(stats?.skills ?? []);
 	const equipment = $derived({ equipment: items, wing: null, pet: null });
 	const arcana = $derived(items.filter((i) => ARCANA.includes(i.slot_name)));
-	const pick = (slot: string) => (open = stats?.slots.find((s) => s.item.slot_name === slot) ?? null);
+	const bySlot = $derived(new Map((stats?.slots ?? []).map((s) => [s.item.slot_name, s])));
+	const slots = $derived(new Set(bySlot.keys()));
+	const pick = (slot: string) => (open = bySlot.get(slot) ?? null);
 	const choose = (key: string) => goto(`?k=${key}`, { replaceState: true });
 </script>
 
@@ -87,7 +90,11 @@
 		{#if !stats.slots.length}
 			<p class="notice">{t('bis.notEnough', { n: stats.size, min: stats.min_sample })}</p>
 		{:else}
-			<CharacterLayout {cls}>
+			<CharacterLayout {cls} {slots} bind:active onPick={pick}>
+				{#snippet tip(slot)}
+					{@const s = bySlot.get(slot)}
+					{#if s}<ItemTooltip item={s.item} lines={s.lines}>{@render shares(s)}</ItemTooltip>{/if}
+				{/snippet}
 				{#snippet main()}
 					<section class="glass pad">
 						<h3>{t('bis.skills')}</h3>
@@ -96,24 +103,27 @@
 					</section>
 				{/snippet}
 				{#snippet doll()}
-					<EquipmentPanel data={equipment} onItem={(item) => pick(item.slot_name)} />
+					<EquipmentPanel data={equipment} bind:active onItem={(item) => pick(item.slot_name)} />
 				{/snippet}
 			</CharacterLayout>
 		{/if}
 	{/if}
 {/if}
 
+<!-- Häufigste Gegenstände und Anteil voll verzaubert, im Fenster beim Zeigen und beim Klick -->
+{#snippet shares(s: BisSlot)}
+	<p class="dim small">{t('bis.items')}</p>
+	<ul class="items">
+		{#each s.items as i (i.name)}
+			<li><span>{i.name}</span><b class="num">{formatPct(i.share * 100)}</b></li>
+		{/each}
+	</ul>
+	<p class="dim small">{t('bis.maxEnchant', { pct: formatPct(s.max_enchant * 100) })}</p>
+{/snippet}
+
 <Modal open={open !== null} onclose={() => (open = null)}>
 	{#if open}
-		<ItemTooltip item={open.item} lines={open.lines} onclose={() => (open = null)}>
-			<p class="dim small">{t('bis.items')}</p>
-			<ul class="items">
-				{#each open.items as i (i.name)}
-					<li><span>{i.name}</span><b class="num">{formatPct(i.share * 100)}</b></li>
-				{/each}
-			</ul>
-			<p class="dim small">{t('bis.maxEnchant', { pct: formatPct(open.max_enchant * 100) })}</p>
-		</ItemTooltip>
+		<ItemTooltip item={open.item} lines={open.lines} onclose={() => (open = null)}>{@render shares(open)}</ItemTooltip>
 	{/if}
 </Modal>
 

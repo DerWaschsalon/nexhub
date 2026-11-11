@@ -1,28 +1,40 @@
 <!-- Aufbau wie das Charakterfenster im Spiel: links `main` (Armory: Stat Info, BiS-Listen: Skills), in der
-     Mitte die Figur der Klasse im Klassenlicht, rechts die Ausrüstung (`doll`), darunter wahlweise `below`
-     über die ganze Breite (Armory: Skills). Umbrüche nach der Breite des Inhalts, nicht des Fensters (im Hub
-     nimmt die Seitenleiste Platz weg): mittelbreit ohne Figur, schmal untereinander mit der Ausrüstung zuerst. -->
+     Mitte die Figur der Klasse (ClassFigure), rechts die Ausrüstung (`doll`), darunter wahlweise `below` über
+     die ganze Breite (Armory: Skills). Zeigt man auf eine Stelle der Figur oder einen Platz der Ausrüstung
+     (`active`, beide Seiten setzen es), erscheint `tip` für diesen Platz links neben der Figur. Umbrüche nach
+     der Breite des Inhalts, nicht des Fensters (im Hub nimmt die Seitenleiste Platz weg): mittelbreit ohne
+     Figur, schmal untereinander mit der Ausrüstung zuerst. -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { classInfo } from '../classes.ts';
+	import ClassFigure from './ClassFigure.svelte';
 
 	let {
 		cls,
+		slots,
+		active = $bindable(null),
+		onPick,
+		tip,
 		main,
 		doll,
 		below
-	}: { cls: string | null; main: Snippet; doll: Snippet; below?: Snippet } = $props();
-
-	const info = $derived(classInfo(cls));
-	// Für manche Klassen gibt es noch keine Figur (Faustkämpfer): dann bleibt die Mitte leer
-	const hide = (e: Event) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden');
+	}: {
+		cls: string | null;
+		slots: Set<string>;
+		active?: string | null;
+		onPick: (slot: string) => void;
+		tip: Snippet<[string]>;
+		main: Snippet;
+		doll: Snippet;
+		below?: Snippet;
+	} = $props();
 </script>
 
 <div class="frame">
 	<div class="layout">
 		<div class="main">{@render main()}</div>
-		<div class="figure" style:--glow={info?.color ?? 'transparent'} aria-hidden="true">
-			{#if info}<img src={info.figure} alt="" onerror={hide} />{/if}
+		<div class="figure">
+			<ClassFigure {cls} {slots} bind:active {onPick} />
+			{#if active}<div class="tip">{@render tip(active)}</div>{/if}
 		</div>
 		<div class="doll">{@render doll()}</div>
 		{#if below}<div class="below">{@render below()}</div>{/if}
@@ -42,18 +54,20 @@
 	.below {
 		grid-column: 1 / -1;
 	}
-	/* Figur über die volle Spaltenbreite, beim Blättern sichtbar; Licht in der Klassenfarbe dahinter */
+	/* Figur beim Blättern sichtbar */
 	.figure {
 		position: sticky;
 		top: 18px;
-		padding-top: 30px;
-		background: radial-gradient(ellipse 55% 40% at 50% 60%, color-mix(in srgb, var(--glow) 30%, transparent), transparent);
 	}
-	.figure img {
-		display: block;
-		width: 100%;
-		height: auto;
-		filter: drop-shadow(0 0 24px color-mix(in srgb, var(--glow) 40%, transparent));
+	/* Gegenstandsfenster beim Zeigen: links neben der Figur über den Werten, damit die leuchtende Stelle
+	   sichtbar bleibt; nur zum Ansehen */
+	.tip {
+		position: absolute;
+		top: 0;
+		right: calc(100% + 12px);
+		z-index: 10;
+		width: 440px;
+		pointer-events: none;
 	}
 	@container (max-width: 820px) {
 		.layout {
