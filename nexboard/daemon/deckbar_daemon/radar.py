@@ -43,8 +43,7 @@ WARNING_PRESETS: dict[str, dict[str, Any]] = {
     "wichtig": {"warn_an": True, "nur_mich": True},  # nur, was dich betrifft (Standard)
     "alles": {"warn_an": True, "nur_mich": False},  # auch Angriffe und Effekte auf andere Spieler
 }
-BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "pvp_neu",
-           "ansage_testen")
+BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "ansage_testen")
 
 
 async def _aion2_laeuft() -> bool:
@@ -150,7 +149,6 @@ class Radar:
         aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
                     "aufnahme_start": self.dienst.aufnahme_starten,
                     "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen,
-                    "pvp_neu": self.dienst.pvp_neu,
                     "ansage_testen": lambda: self.dienst.ansage_testen(ruf)}
         aktionen[name]()
 

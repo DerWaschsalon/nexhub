@@ -29,9 +29,6 @@ class FakeDienst:
     def warnung_testen(self) -> None:
         self.aufrufe.append("warnung_testen")
 
-    def pvp_neu(self) -> None:
-        self.aufrufe.append("pvp_neu")
-
     def ansage_testen(self, schluessel: str) -> None:
         self.aufrufe.append(f"ansage_testen {schluessel}")
 
@@ -123,12 +120,11 @@ async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel():
     assert gesendet[-1] == {"aktiv": True, "cubes": []}
     dienst = r.dienst
     await r.befehl("warnung_testen")
-    await r.befehl("pvp_neu")
     await r.befehl("ansage_testen", "thamon-red")
     await r.befehl("aufnahme_start")
     assert r.aufnahme
     await r.speichern({"ton": False})
-    assert dienst.aufrufe == ["starten", "warnung_testen", "pvp_neu", "ansage_testen thamon-red", "neu_laden"]
+    assert dienst.aufrufe == ["starten", "warnung_testen", "ansage_testen thamon-red", "neu_laden"]
     assert {"schluessel": "thamon-red", "art": "Zauber", "vorgabe": "Rot — keine physischen Angriffe",
             "zeile": "Es glüht rot auf!"} in r.info()["ansagen"]["ansage_thamon"]
     spiel_an = False

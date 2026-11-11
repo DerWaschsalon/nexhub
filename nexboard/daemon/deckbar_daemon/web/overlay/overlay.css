@@ -22,7 +22,7 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
   transition: opacity .25s ease;
 }
 .widget.idle { opacity: 0 !important; }
-body.karte-offen .widget { opacity: 0 !important; } /* Ingame-Karte offen */
+body.veiled .widget { opacity: 0 !important; } /* ein Modul blendet alles aus (Karte im Spiel offen) */
 .hud {
   background: var(--hud);
   border: 1px solid var(--hud-line);
@@ -33,7 +33,7 @@ body.karte-offen .widget { opacity: 0 !important; } /* Ingame-Karte offen */
 
 /* ------------------------------------------------------------ Meter */
 #w-meter { width: 380px; height: 260px; }
-#meter { width: 100%; height: 100%; border: 0; background: transparent; display: block; }
+#w-meter iframe { width: 100%; height: 100%; border: 0; background: transparent; display: block; }
 
 /* ------------------------------------------------------------ Boss */
 #w-boss { width: 420px; }
@@ -72,7 +72,9 @@ body.edit .widget::before {
   font-size: 11.5px; font-weight: 650; padding: 3px 8px; border-radius: 999px;
   background: rgba(106, 166, 255, .9); color: #06101f; white-space: nowrap;
 }
-body.edit #meter { pointer-events: none; } /* sonst schluckt das iframe das Ziehen */
+body.edit .widget iframe, body.edit .widget canvas { pointer-events: none; } /* sonst schlucken sie das Ziehen */
+/* Meter an Kopf- oder Fußzeile ziehen: fängt die Maus über der ganzen Fläche */
+.drag-shield { position: fixed; inset: 0; z-index: 99; cursor: grabbing; }
 
 #toolbar {
   display: none; position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
@@ -113,55 +115,47 @@ body.edit #guides { display: block; }
   padding: 8px 14px; border-radius: 999px; background: rgba(9, 13, 24, .85); color: var(--warn); font-size: 13px;
 }
 
-/* ------------------------------------------------------------ Radar (Modul AION 2 · Radar) */
-#w-radar { width: 440px; height: 580px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
-#w-radar.gefaltet { height: auto !important; }
-#w-radar.gefaltet .radar-inhalt, #w-radar.gefaltet #radar-griff { display: none; }
-#radar-griff {
-  position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 5; cursor: nwse-resize; touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, .55) 50% 58%, transparent 58% 68%,
-    rgba(255, 255, 255, .55) 68% 76%, transparent 76%);
+/* ------------------------------------------------------------ Cube-Radar (Modul AION 2 · Radar) */
+#w-cube { padding: 6px 6px 7px; text-align: center; }
+#w-cube canvas { display: block; width: 190px; height: 190px; }
+.cube-text { margin-top: 4px; font-weight: 650; font-size: 12.5px; color: var(--bad); white-space: nowrap; }
+.cube-text.opening { color: var(--warn); }
+
+/* ------------------------------------------------------------ Karte (Modul AION 2 · Radar) */
+#w-map { width: 340px; height: 300px; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.map-head {
+  display: flex; justify-content: space-between; gap: 12px; padding: 5px 10px; font-size: 12px; flex: none;
+  border-bottom: 1px solid var(--hud-line); background: rgba(10, 14, 24, .8); white-space: nowrap;
 }
-.radar-kopf {
-  display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; flex: none;
-  border-bottom: 1px solid var(--hud-line); background: rgba(10, 14, 24, .8);
-}
-.radar-reiter { display: flex; gap: 2px; }
-.radar-kopf button {
-  border: 0; border-radius: 6px; padding: 3px 9px; font: inherit; color: var(--muted);
-  background: transparent; cursor: pointer;
-}
-.radar-kopf button:hover { color: var(--text); }
-.radar-reiter button.an { color: var(--text); background: rgba(255, 255, 255, .12); font-weight: 650; }
-.radar-titel { flex: 1; min-width: 0; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#wuerfel-live { flex: none; }
-#wuerfel-live iframe { display: block; width: 100%; border: 0; background: transparent; }
-.radar-inhalt { position: relative; flex: 1; min-height: 0; }
-.radar-seite { position: absolute; inset: 0; visibility: hidden; }
-.radar-seite.an { visibility: visible; }
-.radar-seite > iframe { width: 100%; height: 100%; border: 0; display: block; background: transparent; }
-#karte-bild { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 46px); display: block; cursor: grab; }
-.karte-knoepfe { position: absolute; top: 34px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
-.karte-knoepfe button {
+.map-name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
+.map-status { color: var(--muted); }
+.map-canvas { flex: 1; min-height: 0; width: 100%; display: block; cursor: grab; }
+.map-buttons { position: absolute; top: 36px; right: 8px; display: flex; flex-direction: column; gap: 4px; }
+.map-buttons button {
   width: 26px; height: 26px; border: 1px solid var(--hud-line); border-radius: 6px; color: var(--text);
   background: rgba(10, 14, 24, .85); font-size: 15px; line-height: 1; cursor: pointer;
 }
-#radar-bild { position: absolute; right: 8px; bottom: 54px; width: 130px; height: 130px; pointer-events: none; }
-.radar-info {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 46px; box-sizing: border-box; padding: 5px 10px 6px; text-align: center;
-  background: rgba(10, 14, 24, .78); border-top: 1px solid var(--hud-line);
-}
-#radar-cube { font-weight: 650; font-size: 12.5px; color: var(--bad); white-space: nowrap; }
-#radar-cube.oeffnet { color: var(--warn); }
-.radar-zeile { display: flex; justify-content: space-between; gap: 12px; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
-#radar-status { overflow: hidden; text-overflow: ellipsis; }
-.karte-quelle {
-  position: absolute; left: 8px; bottom: 72px; padding: 1px 6px; border-radius: 5px; font-size: 10px;
+.map-source {
+  position: absolute; left: 8px; bottom: 8px; padding: 1px 6px; border-radius: 5px; font-size: 10px;
   color: rgba(238, 242, 255, .75); background: rgba(10, 14, 24, .7); text-decoration: none;
 }
-.karte-notiz { position: absolute; left: 20px; right: 20px; top: 40%; margin: 0; text-align: center; color: var(--muted); font-size: 12px; }
+.map-note { position: absolute; left: 20px; right: 20px; top: 40%; margin: 0; text-align: center; color: var(--muted); font-size: 12px; }
+.map-tip {
+  position: absolute; padding: 3px 8px; border-radius: 6px; font-size: 12px; pointer-events: none;
+  background: rgba(10, 14, 24, .92); border: 1px solid var(--hud-line);
+}
 
-#w-warnung { width: 460px; }
+/* Griff unten rechts an Widgets mit ziehbarer Größe, nur im Bearbeiten-Modus */
+.grip {
+  display: none; position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 5;
+  cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, .55) 50% 58%, transparent 58% 68%,
+    rgba(255, 255, 255, .55) 68% 76%, transparent 76%);
+}
+body.edit .grip { display: block; }
+
+/* ------------------------------------------------------------ Boss-Warnungen (Modul AION 2 · Radar) */
+#w-warnings { width: 460px; }
 .warn-vorschau {
   margin: 0 auto 6px; width: fit-content; max-width: 100%; padding: 4px 14px; border-radius: 10px;
   background: rgba(14, 20, 32, .8); font-weight: 600; font-size: 13px; white-space: nowrap;
@@ -180,40 +174,17 @@ body.edit #guides { display: block; }
 .warn-balken { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 4px; }
 .warn-balken div { height: 100%; border-radius: 2px; background: var(--farbe); transform-origin: 0 50%; }
 
-.karte-tipp {
-  position: absolute; padding: 3px 8px; border-radius: 6px; font-size: 12px; pointer-events: none;
-  background: rgba(10, 14, 24, .92); border: 1px solid var(--hud-line);
-}
-
-/* ------------------------------------------------------------ PvP (Daten vom Modul AION 2 · Radar) */
-#w-pvp { min-width: 250px; }
-.pvp-kopf { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; color: var(--muted); }
-.pvp-kopf span:first-child { font-weight: 650; color: var(--text); }
-.pvp-kda { display: flex; gap: 18px; margin: 6px 0 4px; }
-.pvp-kda div { display: flex; flex-direction: column; align-items: center; min-width: 34px; }
-.pvp-kda b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px #000; }
-.pvp-kda span { font-size: 10.5px; color: var(--muted); }
-.pvp-kda div:first-child b { color: var(--ok); }
-.pvp-kda div:nth-child(2) b { color: var(--bad); }
-.pvp-punkte { font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.pvp-punkte .plus { color: var(--ok); font-weight: 650; }
-.pvp-punkte .leise { color: var(--muted); font-size: 11px; }
-.pvp-letzte { margin-top: 4px; font-size: 12px; }
-.pvp-letzte:empty { display: none; }
-.pvp-letzte .kill { color: var(--ok); }
-.pvp-letzte .tod { color: var(--bad); }
-
 /* Widgets der A2Tools-Plugins (plugins.js) */
 .plugin-widget { position: fixed; border: 0; background: transparent; z-index: 40; }
 
 /* ------------------------------------------------------------ Bearbeiten-Knopf (unten rechts) */
-#edit-knopf {
+#edit-button {
   position: fixed; right: 10px; bottom: 10px; z-index: 50;
   width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
   color: var(--text); background: var(--hud); border: 1px solid var(--hud-line); border-radius: 8px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .35); cursor: pointer;
   opacity: .35; transition: opacity .2s ease, transform .2s ease, border-color .2s ease;
 }
-#edit-knopf:hover { opacity: 1; border-color: var(--accent); transform: scale(1.08); }
-#edit-knopf:active { transform: scale(.96); }
-body.edit #edit-knopf { display: none; } /* im Bearbeiten-Modus gibt es „Fertig“ in der Leiste */
+#edit-button:hover { opacity: 1; border-color: var(--accent); transform: scale(1.08); }
+#edit-button:active { transform: scale(.96); }
+body.edit #edit-button { display: none; } /* im Bearbeiten-Modus gibt es „Fertig“ in der Leiste */

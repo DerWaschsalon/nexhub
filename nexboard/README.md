@@ -244,15 +244,20 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Kämpfen ausgeblendet.
 - **Termine:** Countdown bis zum nächsten Termin (Riss, Shugo-Fest, Resets … und eigene Ereignisse).
   Dieselbe Liste wie auf der Seite „Termine“, gerechnet im Daemon aus `nexproto.termine`.
-- **PvP** (Daten vom Modul „AION 2 · Radar“): Kills und Tode der Sitzung live, dazu Assists,
-  Abyss-Rangpunkte und Rang aus der Saisonwertung des Servers (rechnet etwa stündlich neu, daher
-  „Stand“). Neu beginnen: Web-UI → Radar & Karte → „PvP neu beginnen“. Details in `radar/README.md`.
+- **Cube-Radar** (Modul „AION 2 · Radar“): kleiner Kreis mit Richtung, Abstand und Höhe zum nächsten Hidden
+  Cube; erscheint nur, solange einer in Sicht ist.
+- **Karte** (Modul „AION 2 · Radar“, standardmäßig aus): Cubes, Spawnpunkte, Fundorte und Teleporter. Bilder
+  und Kartenlogik kommen aus dem installierten Plugin Pet Soul Tracker.
+- **Boss-Warnungen** (Modul „AION 2 · Radar“): nur während einer Warnung.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
 
+PvP (Kills, Tode, Assists, Abyss-Punkte), Vertraute und Würfel zeigt das Overlay nicht selbst: dafür gibt es die
+A2Tools-Plugins PvP Tracker, Pet Soul Tracker und Dice Rolls (Im Spiel → Plugins) mit eigenen Fenstern und Widgets.
+
 **Profile** legen fest, welche Widgets sichtbar sind (Standard: PvE und PvP). Wechsel in der
-Bearbeiten-Leiste, in der Web-UI (Im Spiel → Overlay) oder per `--profil NAME`; das aktive
+Bearbeiten-Leiste, in der Web-UI (Im Spiel → Overlay) oder per `--profile NAME`; das aktive
 Profil merkt sich jedes Ein- und Ausblenden. `--widget ID` blendet ein einzelnes Widget ein oder aus
-(meter, boss, timers, radar, warnung, pvp). Beides geht ohne Qt direkt an den Daemon, wirkt
+(meter, boss, timers, cube, map, warnings). Beides geht ohne Qt direkt an den Daemon, wirkt
 also sofort. Der Daemon trägt je Profil und Widget eine Aktion in den Starter „NexBoard Overlay
 ein/aus“ ein; dort in den Systemeinstellungen (Kurzbefehle) eine Taste zuweisen.
 
@@ -310,14 +315,14 @@ Meter: kein Dock, keine FPS-Anzeige (zählt nur unter Windows), keine Entwickler
 „ausblenden“ wirkt nur über das Overlay selbst, Widgets nur mit layer-shell. Plugin-API bis Version 2;
 ein Plugin mit neuerer API wird abgelehnt, dann `API_VERSION` und den Host nachziehen.
 
-**Radar-Widget:** Karte, Cubes, Vertraute und Würfel stecken in einem Widget (`web/overlay/radar.js`), das
-frühere Widget „Karte“ geht darin auf. Pet Soul Tracker und Dice Rolls laufen dort statt im eigenen Fenster
-(`EMBEDDED` in `plugins.py`). Der Pet Soul Tracker ist fest eingebaut (`BUILTIN`): Das NexBoard installiert und
-aktualisiert ihn selbst aus dem signierten Katalog (beim ersten Start also mit Netz), er steht in keiner
-Plugin-Liste und lässt sich nicht ausschalten. Ein Update, das neue Berechtigungen will, bleibt liegen, bis
-jemand es prüft. Die Karte nutzt seine `MiniMap` und Kartenbilder und
-zeichnet darüber, was nur das Radar kennt. Tippen geht dort nur im Bearbeiten-Modus, sonst hat das Overlay
-keine Tastatur.
+**Aufbau der Overlay-Seite** (`daemon/deckbar_daemon/web/overlay/`, ES-Module ohne Build): `stage.js` hängt je
+angemeldetem Widget `widgets/<id>.js` ein, `layout.js` lädt und speichert Positionen, `edit.js` ist der
+Bearbeiten-Modus, `plugins.js` trägt die Widgets der A2Tools-Plugins, `host.js` spricht mit dem Overlay-Programm.
+Ein Modul des Daemons meldet seine Widgets über `overlay_widgets` an (`WidgetSpec` in `overlay_layout.py`: Titel,
+Hilfetext, Schalter, Startgröße); ein neues Widget ist also eine Anmeldung plus eine Datei unter `widgets/`, der
+Kern bleibt unberührt. Die Seite hat eine Datenverbindung (`/api/overlay/events`), ein ausgeschaltetes Widget
+bekommt nichts und beim Einschalten den letzten Stand. `layout.json` der Version 1 (deutsche Schlüssel, Radar als
+ein Fenster, eigenes PvP-Widget) wird beim Laden übersetzt.
 
 **Alternative: A2Tools-Meter selbst.** Läuft das Meter, kann die NexBoard stattdessen dessen
 Stream-Overlay lesen (Quelle „A2Tools-Meter“, `/overlay/events`, Server-Sent Events). Dafür im

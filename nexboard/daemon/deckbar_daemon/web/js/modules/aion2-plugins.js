@@ -61,14 +61,14 @@ function pluginsPage(ctx) {
     state.catalogError = res.catalogError;
   }, "Nach Updates gesucht");
 
-  const installedRow = (p, builtIn) => {
+  const installedRow = (p) => {
     const on = !(state.view.disabled || []).includes(p.id);
     const update = state.updates[p.id];
     const controls = el("div", { class: "row" },
       update ? button(`Update auf ${update.to}`, () => install({ id: p.id, name: p.name }, update.newPermissions, "aktualisieren"), "sm primary", "update") : null,
       button(null, () => run(() => call("plugin_open", { id: p.id })), "sm icon ghost", "open-in-new", { title: "Fenster öffnen (Overlay muss laufen)", disabled: !on }),
-      builtIn ? chip("eingebaut") : button(null, () => remove(p), "sm icon ghost", "delete", { title: "Entfernen" }),
-      builtIn ? null : sw(on, (v) => run(async () => { state.view = await call("plugin_set_enabled", { id: p.id, enabled: v }); })));
+      button(null, () => remove(p), "sm icon ghost", "delete", { title: "Entfernen" }),
+      sw(on, (v) => run(async () => { state.view = await call("plugin_set_enabled", { id: p.id, enabled: v }); })));
     return el("div", { class: "row-group" },
       settingsRow(`${p.name} ${p.version}`, p.error ? `Fehler: ${p.error}` : p.description, controls),
       permissionList(p.permissions, viewOf(p.id)));
@@ -81,7 +81,7 @@ function pluginsPage(ctx) {
 
   const draw = () => {
     if (!state.view) { fill(box, el("div", { class: "empty" }, "Lade Plugins …")); return; }
-    const installed = [...state.view.builtIn.map((p) => installedRow(p, true)), ...state.view.plugins.map((p) => installedRow(p, false))];
+    const installed = state.view.plugins.map(installedRow);
     const available = state.catalog.filter((e) => !e.installed);
     fill(box,
       callout("info", "information-outline", "Plugins aus dem signierten Katalog von A2Tools, mit Zustimmung zu dem, was sie dürfen. Bitte nur hier installieren: Das eigenständige A2Tools-Programm hat einen eigenen Ordner, die NexBoard sieht dessen Plugins nicht."),

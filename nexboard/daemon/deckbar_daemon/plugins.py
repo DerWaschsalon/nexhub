@@ -76,19 +76,9 @@ STORAGE_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
 WIDGET_NAME = re.compile(r"[a-z0-9-]{1,32}")
 PLAIN_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
-# Laufen im Radar-Widget der Overlay-Seite (web/overlay/radar.js), nicht im eigenen Fenster. Der Pet Soul
-# Tracker schickt seine Karte als Szene an ein Widget, das Radar zeichnet sie auf seiner Karte: dafür steht
-# die Karte fest auf „ausgelagert“. Sein Aufklappen beim Farmen wäre im Radar ein Reiterwechsel.
-EMBEDDED = {"pet-souls", "dice-rolls"}
-EMBEDDED_PREFS = {"pet-souls": {"nearby": True, "mapPopped": True, "farmPopup": False}}
-# Fest eingebaut: Teil des Radars, kein Addon. Das NexBoard installiert und aktualisiert ihn selbst aus dem
-# signierten Katalog, er steht in keiner Liste und lässt sich nicht ausschalten oder entfernen. Die Dateien
-# liegen nicht im Repo: Die Kartenbilder sind von aion2timers.com für den Tracker freigegeben.
-BUILTIN = {"pet-souls"}
 # Nummerierte Ereignisse aus deckbar-capture (feed.rs) → Recht, das ein Plugin dafür braucht (wie mod.rs im Meter)
 NUMBERED_FEEDS = {"deathRecap": "events:death-recap", "lootRoll": "events:loot-rolls",
                   "blackMarket": "events:black-market", "kda": "events:kda"}
-BUILTIN_RETRY = 60.0
 # Was eine Plugin-Seite (Fenster oder Widget) aufrufen darf, wie PLUGIN_SURFACE_COMMANDS im Original
 SURFACE = {
     "meter_shown", "set_meter_shown", "open_settings_at", "open_settings_window", "open_url",
@@ -99,15 +89,6 @@ SURFACE = {
     "plugin_widget_send", "plugin_widget_where", "plugin_widgets_lock", "plugin_widgets_locked",
     "plugin_window", "plugin_window_fit", "start_tool_drag", "window_resize_drag", "get_settings",
 }
-
-
-def pet_art(prefs: str) -> str:
-    """Die im Pet Soul Tracker gefilterte Pet-Art (cogni, fera, natura, varian), leer = alle. Die Radar-Karte zeigt nur sie."""
-    try:
-        art = json.loads(prefs).get("genus")
-    except (ValueError, AttributeError):
-        return ""
-    return art if isinstance(art, str) else ""
 
 
 class PluginError(RuntimeError):
@@ -276,11 +257,11 @@ class PluginHost:
         self.base_url = base_url
         self.key_hex = key_hex
         self.overlay: Callable[[dict], Awaitable[None]] | None = None  # Befehle ans Overlay-Programm
+        # Stand der Plugin-Widgets für die Overlay-Seite (ihre eine Ereignisverbindung)
+        self.widgets_listener: Callable[[list[dict]], Awaitable[None]] | None = None
         self.loaded: dict[str, Loaded] = {}
         self.errors: dict[str, dict] = {}
         self.decoder_errors: dict[str, str] = {}
-        # Eingebaute Plugins, deren Update neue Rechte will: bis zur Zustimmung in der Plugin-Liste sichtbar
-        self.awaiting_consent: set[str] = set()
         self.active = False  # Modul AION 2 · Plugins an: Plugins laufen und bekommen Spieldaten
         self.widgets: dict[str, WidgetState] = {}
         self.pending: list[Pending] = []
@@ -314,7 +295,7 @@ class PluginHost:
         self.save_setting(key, json.dumps(ids))
 
     def disabled(self) -> list[str]:
-        return [x for x in self._listed(DISABLED_KEY) if x not in BUILTIN]
+        return self._listed(DISABLED_KEY)
 
     def _windows(self) -> dict[str, str]:
         try:
@@ -382,20 +363,13 @@ class PluginHost:
                 "description": m.get("description", ""), "path": str(p.folder), "permissions": p.permissions,
                 "reviewed": True, "error": self.decoder_errors.get(p.id)}
 
-    def _listed_plugin(self, plugin: str) -> bool:
-        """In der Plugin-Liste des Meters: alle außer den eingebauten, die nur zur Zustimmung erscheinen."""
-        return plugin not in BUILTIN or plugin in self.awaiting_consent
-
     def view(self) -> dict:
         return {"devMode": False, "online": True,
-                "plugins": [self.info(p) for p in self.loaded.values() if self._listed_plugin(p.id)]
-                + [e for e in self.errors.values() if e["id"] not in BUILTIN],
+                "plugins": [self.info(p) for p in self.loaded.values()] + list(self.errors.values()),
                 "disabled": self.disabled(), "hideClosed": self._listed(HIDE_CLOSED_KEY),
                 "hideUnfocused": self._listed(HIDE_UNFOCUSED_KEY),
                 # Ein Dock wie im Meter gibt es nicht: jedes Plugin hat sein Fenster
-                "ownWindow": [p for p in self.loaded if p not in BUILTIN],
-                # Für die Web-UI: fest eingebaut, ohne Ausschalter und Entfernen
-                "builtIn": [self.info(p) for p in self.loaded.values() if p.id in BUILTIN]}
+                "ownWindow": list(self.loaded)}
 
     async def send_decoders(self) -> None:
         """Decoder der laufenden Plugins an deckbar-capture (auch nach dessen Neustart)."""
@@ -418,36 +392,7 @@ class PluginHost:
     def start(self) -> None:
         self.active = True
         if not self._tasks:
-            self._tasks = [asyncio.create_task(self._flusher()), asyncio.create_task(self._game_loop()),
-                           asyncio.create_task(self._keep_builtin())]
-
-    async def _keep_builtin(self) -> None:
-        """Beim Start: Eingebautes installieren oder aktualisieren. Ohne Netz später noch einmal."""
-        while True:
-            try:
-                await self._install_builtin()
-                return
-            except (PluginError, aiohttp.ClientError, TimeoutError, OSError) as e:
-                log.warning("Eingebautes Plugin nicht aktuell: %s", e)
-            await asyncio.sleep(BUILTIN_RETRY)
-
-    async def _install_builtin(self) -> None:
-        catalog = await self.fetch_catalog()
-        for entry in catalog.get("plugins", []):
-            plugin = entry.get("id")
-            if plugin not in BUILTIN:
-                continue
-            p = self.loaded.get(plugin)
-            if p and not newer(str(entry.get("version")), str(p.manifest.get("version"))):
-                continue
-            # Ohne Dialog gibt es keine Zustimmung zu Neuem: Solche Updates warten auf den Dialog im Meter
-            added = [x for x in entry.get("permissions") or [] if p and x not in p.permissions]
-            if added:
-                self.awaiting_consent.add(plugin)
-                log.warning("%s %s will mehr dürfen (%s): Zustimmung unter Meter-Einstellungen → Plugins → "
-                            "Nach Updates suchen", plugin, entry.get("version"), added)
-                continue
-            await self.install(plugin)
+            self._tasks = [asyncio.create_task(self._flusher()), asyncio.create_task(self._game_loop())]
 
     async def deactivate(self) -> None:
         """Modul aus: Fenster und Widgets zu, keine Spieldaten mehr. Installiert bleibt alles."""
@@ -608,7 +553,7 @@ class PluginHost:
                  "permissions": e.get("permissions") or [], "source": e.get("source", ""),
                  "installed": self.loaded[e["id"]].manifest.get("version") if e.get("id") in self.loaded else None,
                  "test": False, "changes": e.get("changes") or []}
-                for e in catalog.get("plugins", []) if e.get("id") not in BUILTIN]
+                for e in catalog.get("plugins", [])]
 
     async def install(self, plugin: str) -> dict:
         plugin = plugin.strip().lower()
@@ -620,7 +565,6 @@ class PluginHost:
         await self.emit("plugin-install-phase", {"id": plugin, "phase": "installing"})
         updating = plugin in self.loaded
         await asyncio.to_thread(self._write_install, entry, files)
-        self.awaiting_consent.discard(plugin)  # zugestimmt: wieder nur eingebaut
         self.reload()
         await self.send_decoders()
         if plugin in self.errors:
@@ -630,7 +574,7 @@ class PluginHost:
             await self._overlay({"action": "reload", "id": plugin})
         else:
             self._remember_window(plugin, "shown")
-            await self._open(plugin, plugin not in BUILTIN)  # Eingebautes springt nicht nach vorn
+            await self._open(plugin, True)
         return self.view()
 
     async def _download(self, entry: dict) -> list[tuple[str, bytes]]:
@@ -702,8 +646,6 @@ class PluginHost:
 
     async def uninstall(self, plugin: str) -> dict:
         self._require_id(plugin)
-        if plugin in BUILTIN:
-            raise PluginError("Fest eingebaut, lässt sich nicht entfernen")
         await self._overlay({"action": "close", "id": plugin})
         await self._drop_widgets(plugin)
         self._remember_window(plugin, None)
@@ -714,8 +656,6 @@ class PluginHost:
         await self._forget_follows(plugin)
         self.reload()
         await self.send_decoders()
-        if plugin in EMBEDDED:
-            await self.emit("plugin-embed", {"plugin": plugin, "shown": False})
         return self.view()  # gespeicherte Daten bleiben für eine spätere Installation
 
     async def check_updates(self) -> dict:
@@ -725,7 +665,7 @@ class PluginHost:
             catalog = await self.fetch_catalog()
             for entry in catalog.get("plugins", []):
                 p = self.loaded.get(entry.get("id"))
-                if p and self._listed_plugin(p.id) and newer(str(entry.get("version")), str(p.manifest.get("version"))):
+                if p and newer(str(entry.get("version")), str(p.manifest.get("version"))):
                     frm, to = str(p.manifest.get("version")), str(entry.get("version"))
                     available.append({
                         "id": p.id, "name": entry.get("name"), "from": frm, "to": to,
@@ -758,20 +698,13 @@ class PluginHost:
                 "minWidth": 240, "minHeight": min(height + 30, 230)}
 
     async def _open(self, plugin: str, shown: bool) -> None:
-        if plugin in EMBEDDED:
-            await self.emit("plugin-embed", {"plugin": plugin, "shown": shown})
-            return
         await self._overlay({"action": "open", "shown": shown, **self._window_info(plugin)})
         await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": shown})
 
     def windows_to_restore(self) -> list[dict]:
         """Für den Start des Overlays: jedes eingeschaltete Plugin läuft, sichtbar wie zuletzt."""
         windows = self._windows()
-        return [{**self._window_info(p), "shown": windows.get(p) == "shown"} for p in self._on_ids() if p not in EMBEDDED]
-
-    def embedded(self) -> list[str]:
-        """Für die Overlay-Seite: welche Plugins sie selbst trägt."""
-        return [p for p in self._on_ids() if p in EMBEDDED]
+        return [{**self._window_info(p), "shown": windows.get(p) == "shown"} for p in self._on_ids()]
 
     def _require_id(self, plugin: str) -> None:
         if not valid_id(plugin):
@@ -797,8 +730,6 @@ class PluginHost:
 
     async def _set_enabled(self, plugin: str, enabled: bool) -> dict:
         self._require_id(plugin)
-        if plugin in BUILTIN and not enabled:
-            raise PluginError("Fest eingebaut, lässt sich nicht ausschalten")
         ids = [x for x in self.disabled() if x != plugin]
         if not enabled:
             ids.append(plugin)
@@ -813,8 +744,6 @@ class PluginHost:
             await self._forget_follows(plugin)
             self.pending[:] = [p for p in self.pending if p.plugin != plugin]
             self.logs.pop(plugin, None)
-            if plugin in EMBEDDED:
-                await self.emit("plugin-embed", {"plugin": plugin, "shown": False})
         await self.send_decoders()
         return self.view()
 
@@ -832,6 +761,8 @@ class PluginHost:
 
     async def _publish_widgets(self) -> None:
         await self.emit("plugin-widgets", self.widgets_state())
+        if self.widgets_listener:
+            await self.widgets_listener(self.widgets_state())
 
     async def _drop_widgets(self, plugin: str) -> None:
         gone = [k for k, w in self.widgets.items() if w.plugin == plugin]
@@ -1031,7 +962,7 @@ class PluginHost:
         return {"manifest": p.public(), "replay": replay, "run": self.run,
                 "character": self.character if "events:character" in p.permissions else None,
                 "language": self.language(), "theme": self.theme(),
-                "visible": plugin in EMBEDDED or self._windows().get(plugin) == "shown",
+                "visible": self._windows().get(plugin) == "shown",
                 "reviewed": True, "game": bool(self.capture.status.get("game")),
                 "ping": ping if isinstance(ping, (int, float)) else None}
 
@@ -1091,8 +1022,6 @@ class PluginHost:
                 return self.windows_to_restore()
             case "plugin_widgets_state":
                 return self.widgets_state()
-            case "plugin_embedded":
-                return self.embedded()
             case "plugin_overlay_screen":
                 self.screen = {"width": max(320, int(a.get("width") or 1920)), "height": max(240, int(a.get("height") or 1080))}
                 return None
@@ -1108,26 +1037,17 @@ class PluginHost:
             case "plugin_window":
                 visible = bool(a.get("visible"))
                 self._require(plugin, "window")
-                if plugin in EMBEDDED:
-                    # Klick auf die Würfelkarte: zum Reiter; sich selbst nach vorn holen darf kein Plugin im Radar
-                    if visible and plugin == "dice-rolls":
-                        await self.emit("plugin-embed", {"plugin": plugin, "shown": True})
-                    return None
                 self._remember_window(plugin, "shown" if visible else "hidden")
                 await self._overlay({"action": "show" if visible else "hide", "id": plugin})
                 await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": visible})
                 return None
             case "plugin_close":
-                if plugin in EMBEDDED:
-                    return None
                 self._remember_window(plugin, "hidden")
                 await self._overlay({"action": "hide", "id": plugin})
                 await self.emit("plugin-event", {"plugin": plugin, "event": "visible", "data": False})
                 return None
             case "plugin_window_fit":
                 self._require(plugin, "window")
-                if plugin in EMBEDDED:
-                    return None
                 height = a.get("height")
                 await self._overlay({"action": "fit", "id": plugin,
                                      "height": max(MIN_PANEL_HEIGHT, float(height)) if isinstance(height, (int, float)) else None})
@@ -1139,14 +1059,10 @@ class PluginHost:
                     text = self._data_file(plugin, key).read_text(encoding="utf-8")
                 except FileNotFoundError:
                     text = None
-                if key == "prefs" and plugin in EMBEDDED_PREFS:
-                    return json.dumps({**json.loads(text or "{}"), **EMBEDDED_PREFS[plugin]})
                 return text
             case "plugin_storage_set":
                 self._require(plugin, "storage")
                 self._storage_set(plugin, str(a.get("key")), str(a.get("value")))
-                if plugin == "pet-souls" and a.get("key") == "prefs":
-                    await self.emit("radar-pet-art", {"art": pet_art(str(a.get("value")))})
                 return None
             case "plugin_boss_timers":
                 self._require(plugin, "feed:boss-timers")

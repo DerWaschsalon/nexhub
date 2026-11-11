@@ -20,8 +20,8 @@ Unter KWin blendet sich die Fläche aus, solange ein anderes Fenster als AION 2 
     deckbar-overlay --lock | --click | --show | --hide | --reload
     deckbar-overlay --details | --history | --settings | --quit
     deckbar-overlay --autohide-on | --autohide-off   nur bei aktivem Spiel zeigen an/aus
-    deckbar-overlay --profil NAME   Overlay-Profil wählen (welche Widgets sichtbar sind)
-    deckbar-overlay --widget ID     ein Widget ein-/ausblenden (meter, boss, timers, radar, pvp, …)
+    deckbar-overlay --profile NAME  Overlay-Profil wählen (welche Widgets sichtbar sind)
+    deckbar-overlay --widget ID     ein Widget ein-/ausblenden (meter, boss, timers, cube, map, warnings)
     deckbar-overlay --legacy        altes Meter-Fenster unter XWayland (ohne Widgets)
 
 Ein zweiter Aufruf gibt den Befehl an die laufende Instanz weiter (Socket im Laufzeitordner,
@@ -112,14 +112,14 @@ def choose_backend(args: list[str]) -> str:
 
 
 def change_layout(args: list[str]) -> int | None:
-    """--profil NAME bzw. --widget ID (an/aus): ändert nur das Layout beim Daemon, ganz ohne Qt, damit
+    """--profile NAME bzw. --widget ID (an/aus): ändert nur das Layout beim Daemon, ganz ohne Qt, damit
     das Tastenkürzel sofort wirkt. Der Daemon schickt das neue Layout an die Overlay-Seite.
     Gibt den Exit-Code zurück, None bei anderen Befehlen."""
-    if len(args) != 2 or args[0] not in ("profil", "widget"):
+    if len(args) != 2 or args[0] not in ("profile", "profil", "widget"):  # --profil: Schreibweise bis Version 1
         return None
     key, value = args
-    if key == "profil":
-        patch = {"profil": value}
+    if key != "widget":
+        patch = {"profile": value}
     else:
         current = fetch_layout().get("widgets", {}).get(value, {})
         patch = {"widgets": {value: {"enabled": not current.get("enabled", False)}}}

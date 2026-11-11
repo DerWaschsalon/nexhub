@@ -11,6 +11,7 @@ from ..core.http import ok, read_object
 from ..core.live import LiveHub
 from ..core.topics import DPS_RESET
 from ..dps import STATUS_TEXT, DpsFeed
+from ..overlay_layout import WidgetOption, WidgetSpec
 from ..state import State
 from .base import WebModule
 
@@ -23,6 +24,13 @@ class DpsModule(WebModule):
         tags=("AION 2", "Live"),
     )
     ui_key = "dps"
+    overlay_widgets = (
+        WidgetSpec("meter", "DPS-Meter", "Oberfläche des A2Tools-Meters", profiles=("PvE", "PvP")),
+        WidgetSpec("boss", "Boss-Leiste", "HP des Ziels mit Kill-Prognose", options=(
+            WidgetOption("show_ttk", "Kill-Prognose", "Restzeit aus dem HP-Verlauf der letzten 40 s"),
+            WidgetOption("hide_idle", "Außerhalb von Kämpfen ausblenden"),
+        )),
+    )
 
     def __init__(self, ctx: Context, live: LiveHub, dps: DpsFeed, state: State) -> None:
         super().__init__(ctx, live)

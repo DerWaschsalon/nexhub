@@ -18,9 +18,9 @@ from typing import Callable
 
 from . import daten
 from .protokoll import Leser, uvarint
-from .pvp import OPCODES as PVP_OPCODES
-from .pvp import PvpSitzung
 
+OP_TOD = 0x8D04       # CharDie_NT (Name wie im Desktop-Programm von questlog.gg): Opfer (Varint), Skill u32,
+                      # Taeter (Varint), Server u16, Name des Taeters (nur bei einem Spieler als Taeter)
 OP_SPAWN = 0x3634     # Objekt erscheint: Entity, 2 Byte, Objekt-ID u32, x/y/z, 8 Byte, 01 01, Zustand u8,
                       # seit u64 ms (Format aus a2kit, am Cube geprueft)
 OP_WEG = 0x3635       # Objekt verschwindet, auch nach dem Oeffnen (geprueft)
@@ -175,7 +175,17 @@ class RadarZustand:
         self.status_ids: set[int] = set()
         self.treffer_ids: set[int] = set()
         self.dungeon_ende: float | None = None  # Zeitlimit des laufenden Dungeons (Sekunden seit 1970)
-        self.pvp = PvpSitzung(self)
+
+    def _tod(self, p: bytes) -> None:
+        """Jeder Tod, auch durch Monster: die Todesursache im Run. Den Namen gibt es nur bei einem Spieler als Taeter."""
+        r = Leser(p)
+        opfer = r.varint()
+        skill = r.i32()
+        r.varint()  # Taeter
+        r.u16()  # Server des Taeters
+        name = r.text()
+        for f in self.bei_tod:
+            f(opfer, skill, name)
 
     def _stagger(self, boss: int, p: bytes, n: int) -> None:
         """Gebrochene Leiste (Flags 0): Boss ist groggy. Jede andere Leisten-Nachricht heißt, die
@@ -309,8 +319,8 @@ class RadarZustand:
             elif op == OP_DUNGEON:
                 laeuft = p[4] == 2
                 self.dungeon_ende = struct.unpack_from("<Q", p, 13)[0] / 1000 if laeuft else None
-            elif op in PVP_OPCODES:
-                self.pvp.verarbeiten(op, p)
+            elif op == OP_TOD:
+                self._tod(p)
             elif op == OP_MARKIERUNG and len(p) == n + 29 and eid != self.eigene_eid and eid not in self.spieler:
                 skill = struct.unpack_from("<I", p, n)[0]
                 x, y, _z = struct.unpack_from("<fff", p, n + 11)

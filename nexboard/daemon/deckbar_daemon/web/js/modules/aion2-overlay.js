@@ -6,14 +6,6 @@ const FX = { "": "aus", glanz: "Glanz", brennen: "Brennen", gold: "Gold", frost:
 // Ein Begriff je Sache: „Durchklicken an“ = Overlay nimmt keine Klicks an, „aus“ = Meter bedienbar
 const START_MODE = { click: "Durchklicken aus (Meter bedienbar)", lock: "Durchklicken an (alles klickt durch)" };
 const DONE = { edit: "Bearbeiten-Modus umgeschaltet", toggle: "Overlay umgeschaltet", lock: "Durchklicken an", click: "Durchklicken aus", settings: "Meter-Einstellungen geöffnet" };
-const WIDGET_HELP = {
-  meter: "Oberfläche des A2Tools-Meters",
-  boss: "HP des Ziels mit Kill-Prognose",
-  timers: "Countdown bis zum nächsten Termin; welche, steht unter Termine",
-  radar: "Karte, Cubes, Vertraute und Würfel; zeigt sich, solange ein Cube in Sicht ist",
-  warnung: "Boss-Warnungen, nur während einer Warnung; was gewarnt wird, steht unter Warnungen",
-  pvp: "Kills, Tode und Rangpunkte seit Spielstart",
-};
 const SHORTCUT_HINT = "Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „NexBoard Overlay ein/aus“. "
   + "Dort steht je Profil und je Widget eine eigene Aktion, der du eine Taste gibst.";
 
@@ -42,14 +34,15 @@ function unitChip(o) {
 function profilesCard(o, put) {
   const L = o.layout;
   const remove = (name) => {
-    const rest = { ...L.profile };
+    const rest = { ...L.profiles };
     delete rest[name];
-    put({ profile: rest, profil: name === L.profil ? "" : L.profil }, `Profil ${name} gelöscht`);
+    put({ profiles: rest, profile: name === L.profile ? "" : L.profile }, `Profil ${name} gelöscht`);
   };
-  const rows = Object.entries(L.profile).map(([name, ids]) => settingsRow(name,
-    ids.map((id) => o.widget_titel[id]).join(", ") || "keine Widgets",
+  const title = Object.fromEntries(o.widgets.map((w) => [w.id, w.title]));
+  const rows = Object.entries(L.profiles).map(([name, ids]) => settingsRow(name,
+    ids.map((id) => title[id]).join(", ") || "keine Widgets",
     el("div", { class: "row" },
-      name === L.profil ? chip("aktiv", "ok") : button("Wählen", () => put({ profil: name }, `Profil ${name}`), "sm"),
+      name === L.profile ? chip("aktiv", "ok") : button("Wählen", () => put({ profile: name }, `Profil ${name}`), "sm"),
       button(null, () => remove(name), "sm icon ghost", "delete", { title: "Löschen" }))));
   let neu = "";
   const visible = Object.keys(L.widgets).filter((id) => L.widgets[id].enabled);
@@ -57,16 +50,15 @@ function profilesCard(o, put) {
     ...rows,
     el("div", { class: "row wrap", style: "margin-top:14px" },
       input("", (v) => { neu = v.trim(); }, { placeholder: "Name ohne Leerzeichen, z. B. Raid", maxlength: 24 }),
-      button("Aus der aktuellen Ansicht anlegen", () => put({ profile: { ...L.profile, [neu]: visible }, profil: neu }, `Profil ${neu} angelegt`), "sm", "plus")));
+      button("Aus der aktuellen Ansicht anlegen", () => put({ profiles: { ...L.profiles, [neu]: visible }, profile: neu }, `Profil ${neu} angelegt`), "sm", "plus")));
 }
 
-/** Ein Widget: Schalter in der Zeile, Deckkraft, Position und Eigenes unter „Anpassen“. */
-function widgetRow(o, id, set, view) {
+/** Ein Widget: Schalter in der Zeile, Deckkraft, Position und seine eigenen Schalter unter „Anpassen“. */
+function widgetRow(o, spec, set, view) {
+  const id = spec.id;
   const w = o.layout.widgets[id];
-  const extra = id === "boss" ? [
-    settingsRow("Kill-Prognose", "Restzeit aus dem HP-Verlauf der letzten 40 s", sw(w.show_ttk, (v) => set(id, { show_ttk: v }))),
-    settingsRow("Außerhalb von Kämpfen ausblenden", null, sw(w.hide_idle, (v) => set(id, { hide_idle: v }))),
-  ] : [];
+  const extra = spec.options.map((option) => settingsRow(option.title, option.help || null,
+    sw(w.options[option.key], (v) => set(id, { options: { [option.key]: v } }))));
   const opacity = el("input", { type: "range", min: 20, max: 100, value: Math.round(w.opacity * 100), style: "max-width:200px" });
   const opacityRow = settingsRow("Deckkraft", `${opacity.value} %`, opacity);
   opacity.addEventListener("input", () => {
@@ -74,7 +66,7 @@ function widgetRow(o, id, set, view) {
     opacityRow.querySelector(".txt span").textContent = `${opacity.value} %`;
   });
   const reset = () => { set(id, { x: null, y: null, scale: 1 }); toast("Zurückgesetzt"); };
-  return el("div", { class: "row-group" }, settingsRow(o.widget_titel[id], WIDGET_HELP[id], sw(w.enabled, (v) => set(id, { enabled: v }))),
+  return el("div", { class: "row-group" }, settingsRow(spec.title, spec.help, sw(w.enabled, (v) => set(id, { enabled: v }))),
     collapsible("Anpassen", view,
       opacityRow,
       settingsRow("Position zurücksetzen", "An den Standardplatz, Größe 100 %", button("Zurücksetzen", reset, "sm", "refresh")),
@@ -82,10 +74,10 @@ function widgetRow(o, id, set, view) {
 }
 
 function widgetsCard(o, set, views) {
-  const ids = Object.keys(o.layout.widgets).filter((id) => modOn(o.widget_module[id]));
-  return card("Widgets", "Nur von eingeschalteten Modulen", null, ids.map((id) => {
-    views[id] ??= {};
-    return widgetRow(o, id, set, views[id]);
+  const specs = o.widgets.filter((spec) => modOn(spec.module));
+  return card("Widgets", "Nur von eingeschalteten Modulen", null, specs.map((spec) => {
+    views[spec.id] ??= {};
+    return widgetRow(o, spec, set, views[spec.id]);
   }));
 }
 
@@ -129,7 +121,12 @@ function overlayPage(ctx) {
   const draw = () => {
     const o = S.overlay;
     if (!o) return;
-    const setWidget = (id, patch) => { Object.assign(o.layout.widgets[id], patch); save({ widgets: { [id]: patch } }); };
+    const setWidget = (id, patch) => {
+      const { options, ...rest } = patch;
+      Object.assign(o.layout.widgets[id], rest);
+      Object.assign(o.layout.widgets[id].options, options);
+      save({ widgets: { [id]: patch } });
+    };
     const put = async (patch, text) => {
       try { S.overlay = await api("PUT", "/api/overlay", patch); toast(text); draw(); } catch (e) { toast(e.message, true); }
     };
@@ -155,7 +152,7 @@ export default {
     const w = o?.layout?.widgets;
     const active = w ? Object.entries(w).filter(([, v]) => v.enabled).length : 0;
     return el("div", { class: "stack", style: "gap:10px" },
-      el("div", { class: "row wrap" }, unitChip(o), o?.layout?.profil ? chip(`Profil ${o.layout.profil}`, "info") : null),
+      el("div", { class: "row wrap" }, unitChip(o), o?.layout?.profile ? chip(`Profil ${o.layout.profile}`, "info") : null),
       el("div", { class: "metric" }, el("b", { text: String(active) }), el("span", { text: active === 1 ? "Widget aktiv" : "Widgets aktiv" })));
   },
   pages: [{ id: "aion2.overlay", render: (tab, ctx) => overlayPage(ctx) }],

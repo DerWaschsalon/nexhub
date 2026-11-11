@@ -82,10 +82,6 @@ class RadarDienst:
     def warnung_testen(self) -> None:
         self.zentrale.cast(0, TODESMAL, self.zustand.eigene_eid)
 
-    def pvp_neu(self) -> None:
-        """PvP-Sitzung neu beginnen (Kills, Tode, Punkte ab jetzt)."""
-        self.zustand.pvp.zuruecksetzen()
-
     def aufnahme_starten(self) -> None:
         self.quelle.aufnahme_starten(self.zustand.dungeon or "dungeon")
 
@@ -184,7 +180,6 @@ class RadarDienst:
             "karte_offen": s["karte_offen"] and self.k["bei_karte_ausblenden"],  # Overlay ausblenden
             "punkte": len(self.punkte.punkte),  # aendert sich die Zahl, laedt die Karte die Punkte neu
             "einstellungen": {k: self.k[k] for k in ("reichweite", "drehung", "spiegeln", "karte_folgen", "kurs_oben")},
-            "pvp": self.zustand.pvp.stand(),
         }
 
     @staticmethod

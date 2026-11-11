@@ -1,5 +1,5 @@
 /* Modul AION 2 · Radar: die Seiten „Warnungen“ und „Radar & Karte“. Die Feldbosse stehen unter Termine.
-   Das Radar selbst läuft im Daemon und zeigt sich als Widgets im Overlay (Radar, Boss-Warnungen, PvP);
+   Das Radar selbst läuft im Daemon und zeigt sich als Widgets im Overlay (Cube-Radar, Karte, Boss-Warnungen);
    ein- und ausschalten, Deckkraft und Position dort unter Overlay. Charaktername und Sprache stehen
    unter System → Einstellungen. */
 import { fill, el, api, S, field, input, select, button, chip, card, settingsRow, sw, saver, toast, seg, collapsible } from "../core.js";
@@ -154,8 +154,7 @@ function radarUndKarte(ctx) {
         card("Radar", "Läuft mit AION 2 und endet 30 s nach dem Spiel", statusChip(r),
           el("div", { class: "row wrap" },
             button("Radar neu starten", () => befehl("neustart", "Radar startet neu"), "sm", "restart", { disabled: !r.spiel }),
-            knopf(r, "Ton testen", "ton_testen", "volume-high", "Ton gespielt"),
-            knopf(r, "PvP neu beginnen", "pvp_neu", "sword-cross", "PvP-Sitzung beginnt neu")),
+            knopf(r, "Ton testen", "ton_testen", "volume-high", "Ton gespielt")),
           settingsRow("Ton bei neuem Cube", null, sw(k.ton, (v) => setzen("ton", v))),
           settingsRow("Reichweite", null, select(REICHWEITEN, String(k.reichweite), (v) => setzen("reichweite", Number(v)))),
           settingsRow("Ausrichtung drehen", null, select(DREHUNG, String(k.drehung), (v) => setzen("drehung", Number(v)))),

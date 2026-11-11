@@ -9,11 +9,14 @@ from nexcore.errors import ApiError
 from pydantic import BaseModel
 
 from ..core.live import LiveHub
+from ..overlay_layout import WidgetSpec
 
 
 class WebModule(Module):
     # Live-Meldung {"type": ui_key, ui_key: ui_info()} und gleichnamiger Teil der Begrüßung
     ui_key: ClassVar[str | None] = None
+    # Widgets, die das Modul ins Overlay bringt (die Seite lädt dazu web/overlay/widgets/<id>.js)
+    overlay_widgets: ClassVar[tuple[WidgetSpec, ...]] = ()
 
     def __init__(self, ctx: Context, live: LiveHub) -> None:
         super().__init__(ctx)
