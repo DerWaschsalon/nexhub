@@ -10,7 +10,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from deckbar_daemon.a2ui import A2Ui
-from deckbar_daemon.plugins import PluginError, PluginHost, content_policy, newer, safe_path, take_ready, verify_catalog, Pending, valid_id
+from deckbar_daemon.plugin_files import PluginError, newer, safe_path, valid_id, verify_catalog
+from deckbar_daemon.plugin_page import content_policy
+from deckbar_daemon.plugins import Pending, PluginHost, take_ready
 
 
 class FakeCapture:

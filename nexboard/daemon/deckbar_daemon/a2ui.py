@@ -25,7 +25,9 @@ from aiohttp import web
 
 from .capture import DEFAULT_INTERVAL_MS, Capture, history_root
 from .config import _atomic_write
-from .plugins import LANGUAGE_KEY, PluginError, PluginHost, content_policy, valid_id, with_fonts
+from .plugin_files import PluginError, valid_id
+from .plugin_page import content_policy, with_fonts
+from .plugins import LANGUAGE_KEY, PluginHost
 
 log = logging.getLogger(__name__)
 

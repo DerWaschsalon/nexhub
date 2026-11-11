@@ -18,8 +18,6 @@ den Daemon nicht direkt (local_only lehnt ihren Origin ab); was sie dürfen, pr�
 from __future__ import annotations
 
 import asyncio
-import base64
-import hashlib
 import json
 import logging
 import os
@@ -33,20 +31,18 @@ from pathlib import Path
 from typing import Any
 
 import aiohttp
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+from .plugin_files import (API_VERSION, MAX_PLUGIN, PUBLIC_KEY_HEX, PluginError, check_files, load_manifest, newer,
+                           safe_path, sha256_hex, valid_id, verify_catalog)
+from .plugin_page import clean_theme
 
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://cdn.a2tools.app/plugins"
 FEED_URL = "https://cdn.a2tools.app/feeds"
 LIVE_URL = "wss://a2tools.app/api/boss-timers/live"
-# Öffentlicher Schlüssel des Katalogs (src-tauri/src/plugins/catalog.rs, PUBLIC_KEY_HEX)
-PUBLIC_KEY_HEX = "d71e888cd5530b57254a4f87bf8f1861d8ddd8f7ddf45ecdba0771bb8f7d54ae"
-API_VERSION = 2
 PROOF_DIR = ".proof"
 MAX_CATALOG = 1024 * 1024
-MAX_PLUGIN = 8 * 1024 * 1024
 PARALLEL_DOWNLOADS = 4
 CATALOG_MAX_AGE = 300.0
 
@@ -71,10 +67,8 @@ HIDE_UNFOCUSED_KEY = "dpsMeter.pluginsHideUnfocused"
 THEME_KEY = "dpsMeter.pluginTheme"
 DEFAULT_THEME = {"bg": "#0a0e16", "panel": "#0a0e16", "accent": "#8fc2ff"}
 LANGUAGE_KEY = "dpsMeter.language"
-HEX_COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 STORAGE_KEY = re.compile(r"[A-Za-z0-9_-]{1,64}")
 WIDGET_NAME = re.compile(r"[a-z0-9-]{1,32}")
-PLAIN_NAME = re.compile(r"[A-Za-z0-9._-]+")
 
 # Nummerierte Ereignisse aus deckbar-capture (feed.rs) → Recht, das ein Plugin dafür braucht (wie mod.rs im Meter)
 NUMBERED_FEEDS = {"deathRecap": "events:death-recap", "lootRoll": "events:loot-rolls",
@@ -89,92 +83,6 @@ SURFACE = {
     "plugin_widget_send", "plugin_widget_where", "plugin_widgets_lock", "plugin_widgets_locked",
     "plugin_window", "plugin_window_fit", "start_tool_drag", "window_resize_drag", "get_settings",
 }
-
-
-class PluginError(RuntimeError):
-    """Fehlertext für die Oberfläche."""
-
-
-def valid_id(plugin: str) -> bool:
-    return 0 < len(plugin) <= 40 and all(c.islower() and c.isascii() or c.isdigit() and c.isascii() or c == "-" for c in plugin)
-
-
-def safe_path(path: str) -> bool:
-    return 0 < len(path) <= 128 and all(
-        p not in ("", ".", "..") and PLAIN_NAME.fullmatch(p) for p in path.split("/"))
-
-
-def newer(candidate: str, current: str) -> bool:
-    """Ob `candidate` eine spätere Version ist ("1.2.10" > "1.2.9")."""
-    def parts(v: str) -> list[int]:
-        return [int(p) if p.isdigit() else 0 for p in v.split(".")]
-    a, b = parts(candidate), parts(current)
-    n = max(len(a), len(b))
-    return a + [0] * (n - len(a)) > b + [0] * (n - len(b))
-
-
-def sha256_hex(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def verify_catalog(body: bytes, signature_hex: str, key_hex: str = PUBLIC_KEY_HEX) -> dict:
-    """Signatur prüfen und den Katalog lesen."""
-    try:
-        key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(key_hex))
-        key.verify(bytes.fromhex(signature_hex.strip()), body)
-    except (ValueError, InvalidSignature) as e:
-        raise PluginError("Die Signatur des Plugin-Katalogs stimmt nicht: keine Installation daraus") from e
-    catalog = json.loads(body)
-    if catalog.get("format") != 1:
-        raise PluginError(f"Plugin-Katalog im Format {catalog.get('format')}: dieses NexBoard liest Format 1")
-    return catalog
-
-
-def load_manifest(folder: Path) -> dict:
-    """Manifest eines Plugin-Ordners lesen und prüfen."""
-    try:
-        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        raise PluginError(f"manifest.json: {e}") from e
-    if not isinstance(manifest, dict) or not valid_id(str(manifest.get("id", ""))):
-        raise PluginError("manifest.json: Kennung ungültig")
-    api = manifest.get("apiVersion")
-    if not isinstance(api, int) or not 0 < api <= API_VERSION:
-        raise PluginError(f"apiVersion {api} (dieses NexBoard kann bis {API_VERSION}): NexBoard aktualisieren")
-    if not (folder / "index.html").is_file():
-        raise PluginError("index.html fehlt")
-    permissions = manifest.get("permissions") or []
-    for spec in manifest.get("decoders") or []:
-        if f"decoder:{spec.get('name')}" not in permissions:
-            raise PluginError(f"Decoder {spec.get('name')} braucht die Berechtigung decoder:{spec.get('name')}")
-    return manifest
-
-
-def check_files(entry: dict, folder: Path) -> None:
-    """Der Ordner enthält genau die Dateien des Katalogs."""
-    files: dict[str, str] = entry.get("files") or {}
-    found = set()
-    total = 0
-    root = folder.resolve()
-    for path in sorted(folder.rglob("*")):
-        if path.is_symlink():
-            raise PluginError(f"{path.name} ist ein Link")
-        if path.is_dir():
-            continue
-        rel = path.relative_to(folder).as_posix()
-        want = files.get(rel)
-        if want is None or not path.resolve().is_relative_to(root):
-            raise PluginError(f"{rel} gehört nicht dazu")
-        data = path.read_bytes()
-        total += len(data)
-        if total > MAX_PLUGIN:
-            raise PluginError(f"größer als {MAX_PLUGIN} Byte")
-        if sha256_hex(data).lower() != want.lower():
-            raise PluginError(f"{rel} weicht vom Katalog ab")
-        found.add(rel)
-    missing = set(files) - found
-    if missing:
-        raise PluginError(f"{sorted(missing)[0]} fehlt")
 
 
 @dataclass
@@ -1152,50 +1060,3 @@ class PluginHost:
                 await self._publish_widgets()
                 return None
         raise PluginError(f"{cmd}: im NexBoard nicht verfügbar")
-
-
-def clean_theme(theme: Any) -> dict | None:
-    """Genau die drei Farben, je #rrggbb: sie landen als CSS auf den Plugin-Seiten."""
-    if not isinstance(theme, dict):
-        return None
-    colors = {k: theme.get(k) for k in ("bg", "panel", "accent")}
-    return colors if all(isinstance(c, str) and HEX_COLOR.fullmatch(c) for c in colors.values()) else None
-
-
-# ---------------------------------------------------------------- Auslieferung der Plugin-Dateien
-FONTS = Path(__file__).resolve().parents[2] / "capture" / "a2tools" / "src-tauri" / "src" / "plugins" / "fonts"
-TEXT_RANGE = ("font-weight:45 920;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,"
-              "U+2000-206F,U+2074,U+20AC,U+2122,U+2190-2199,U+2212,U+2215;")
-_font_style: str | None = None
-
-
-def font_style() -> str:
-    """Die Schriften des Meters, die Plugin-Seiten erwarten (wie with_meter_fonts im Original)."""
-    global _font_style
-    if _font_style is None:
-        def face(family: str, file: str, extra: str) -> str:
-            try:
-                data = base64.b64encode((FONTS / file).read_bytes()).decode()
-            except OSError:
-                return ""
-            return f'@font-face{{font-family:"{family}";src:url(data:font/woff2;base64,{data}) format("woff2");{extra}}}'
-        _font_style = "<style>" + face("Pretendard", "PretendardLatin.woff2", TEXT_RANGE) \
-            + face("Segoe UI", "PretendardLatin.woff2", TEXT_RANGE) \
-            + face("Bahnschrift", "Saira.woff2", "font-weight:100 900;font-stretch:50% 125%;") + "</style>"
-    return _font_style
-
-
-def with_fonts(page: str) -> str:
-    i = page.lower().find("<head")
-    at = page.find(">", i) + 1 if i >= 0 else 0
-    return page[:at] + font_style() + page[at:]
-
-
-def content_policy(origin: str, prefix: str, plugin: str) -> str:
-    """Nur der eigene Ordner und das SDK, kein Netz (content_policy im Original)."""
-    own = f"'self' {origin}/_sdk/a2.js"
-    if valid_id(plugin):
-        own += f" {origin}{prefix}{plugin}/"
-    return (f"default-src 'none'; script-src {own}; style-src {own} 'unsafe-inline'; img-src {own} data:; "
-            f"font-src {own} data:; media-src {own}; connect-src 'none'; frame-src 'none'; base-uri 'none'; "
-            "form-action 'none'")
