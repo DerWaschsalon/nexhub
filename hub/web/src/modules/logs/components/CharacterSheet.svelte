@@ -1,6 +1,8 @@
 <!-- Charakter wie im Spiel (Armory): links die Skills, in der Mitte „Werte“ (Hauptwerte, Nebenwerte,
-     Fortschritt), rechts die Ausrüstungsspalte; ein Klick auf Gegenstand oder Arkana öffnet alle Werte. -->
+     Fortschritt), rechts die Ausrüstungsspalte; ein Klick auf Gegenstand oder Arkana öffnet alle Werte.
+     `aside` steht im Kopf rechts neben dem Namen (Armory: der Verlauf). -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import { localized, type CharacterItem, type CharacterListItem, type CharacterSnapshot } from '../api.ts';
 	import { ARCANA } from '../slots.ts';
@@ -13,8 +15,9 @@
 	let {
 		character,
 		data: snapshot,
-		source
-	}: { character: CharacterListItem; data: CharacterSnapshot; source?: string } = $props();
+		source,
+		aside
+	}: { character: CharacterListItem; data: CharacterSnapshot; source?: string; aside?: Snippet } = $props();
 
 	const data = $derived(localized(snapshot, i18n.lang));
 	const arcana = $derived(data.equipment.filter((e) => ARCANA.includes(e.slot_name)));
@@ -22,7 +25,7 @@
 	const show = (item: CharacterItem) => (open = item);
 </script>
 
-<CharacterHeader {character} {data} />
+<CharacterHeader {character} {data} {aside} />
 
 <div class="frame">
 	<div class="layout">

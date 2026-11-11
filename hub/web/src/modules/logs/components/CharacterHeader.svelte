@@ -1,75 +1,115 @@
-<!-- Kopf eines Charakterprofils: Bild, Name in Klassenfarbe, Klasse/Stufe/Server/Legion, Titel,
-     Kampfkraft, Gegenstandsstufe und Stand. Für Profil (Runs) und Spielansicht (Armory). -->
+<!-- Kopf eines Charakters wie im Spiel: Titel, Stufe im Kreis, Name groß, Klasse · Server · Legion,
+     Gegenstandsstufe und Kampfkraft in Gold, Stand. Rechts Platz für mehr (`aside`, z. B. den Verlauf
+     in der Armory). Für Run-Profil und Armory. -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterListItem } from '../api.ts';
-	import PlayerName from './PlayerName.svelte';
+	import { classInfo } from '../classes.ts';
 
-	let { character, data }: { character: CharacterListItem; data: CharacterData } = $props();
+	let {
+		character,
+		data,
+		aside
+	}: { character: CharacterListItem; data: CharacterData; aside?: Snippet } = $props();
+	const info = $derived(classInfo(character.cls));
 </script>
 
-<header class="glass pad head">
-	{#if data.profile.image}
-		<img class="portrait" src={data.profile.image} alt="" width="72" height="72" referrerpolicy="no-referrer" />
-	{/if}
+<header class="head">
 	<div class="who">
-		<h2><PlayerName name={data.profile.name} cls={character.cls} size={26} /></h2>
-		<p class="dim">
-			{[data.profile.class, t('logs.char.level', { n: data.profile.level }), data.profile.server, data.profile.guild]
-				.filter(Boolean)
-				.join(' · ')}
-		</p>
-		{#if data.profile.title}<p class="dim">„{data.profile.title}“</p>{/if}
-	</div>
-	<div class="numbers">
-		<div>
-			<span class="label">{t('logs.char.combatPower')}</span>
-			<strong class="num">{formatNumber(data.profile.combat_power)}</strong>
-		</div>
-		{#if character.item_level}
+		{#if data.profile.title}<p class="title">{data.profile.title}</p>{/if}
+		<div class="line">
+			<span class="level" title={t('logs.char.level', { n: data.profile.level })}>{data.profile.level}</span>
 			<div>
-				<span class="label">{t('logs.char.itemLevel')}</span>
-				<strong class="num">{formatNumber(character.item_level)}</strong>
+				<h2>
+					{#if info}<img src={info.icon} alt={info.label} title={info.label} width="34" height="34" />{/if}
+					{data.profile.name}
+				</h2>
+				<p class="dim">{[data.profile.class, data.profile.server, data.profile.guild].filter(Boolean).join(' · ')}</p>
 			</div>
-		{/if}
+			<dl>
+				{#if character.item_level}
+					<div><dt>{t('logs.char.itemLevel')}</dt><dd class="num">{formatNumber(character.item_level)}</dd></div>
+				{/if}
+				<div><dt>{t('logs.char.combatPower')}</dt><dd class="num">{formatNumber(data.profile.combat_power)}</dd></div>
+			</dl>
+		</div>
 		{#if character.fetched_at}
-			<span class="dim small">{t('logs.char.asOf', { d: formatDateTime(character.fetched_at) })}</span>
+			<p class="dim small">{t('logs.char.asOf', { d: formatDateTime(character.fetched_at) })}</p>
 		{/if}
 	</div>
+	{#if aside}<div class="aside">{@render aside()}</div>{/if}
 </header>
 
 <style>
 	.head {
 		display: flex;
-		gap: 16px;
-		align-items: center;
 		flex-wrap: wrap;
-		margin-bottom: 16px;
+		gap: 18px 28px;
+		align-items: center;
+		margin-bottom: 18px;
 	}
 	.who {
 		min-width: 0;
 	}
-	.portrait {
-		border-radius: var(--radius-sm);
-		object-fit: cover;
+	.aside {
+		flex: 1 1 380px;
+		min-width: 0;
 	}
-	.numbers {
-		margin-left: auto;
+	.title {
+		margin: 0 0 4px;
+		color: #8fd16a;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		font-size: 13px;
+	}
+	.line {
 		display: flex;
-		gap: 20px;
-		align-items: center;
 		flex-wrap: wrap;
+		align-items: center;
+		gap: 12px 18px;
 	}
-	.numbers > div {
+	.level {
+		display: grid;
+		place-items: center;
+		width: 62px;
+		height: 62px;
+		border: 2px solid rgba(255, 255, 255, 0.5);
+		border-radius: 50%;
+		font-weight: 700;
+	}
+	h2 {
 		display: flex;
-		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		margin: 0;
+		font-family: Georgia, 'Times New Roman', serif;
+		font-size: 48px;
+		font-weight: 400;
+		line-height: 1.05;
 	}
-	.label {
-		font-size: 12px;
+	.line p {
+		margin: 4px 0 0;
+	}
+	dl {
+		display: flex;
+		gap: 26px;
+		margin: 0;
+	}
+	dt {
+		font-size: 11px;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
 		color: var(--dim);
 	}
+	dd {
+		margin: 0;
+		font-size: 28px;
+		color: #f2c522;
+	}
 	.small {
+		margin: 8px 0 0;
 		font-size: 12px;
 	}
 </style>
