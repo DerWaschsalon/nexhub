@@ -79,6 +79,11 @@ class Radar:
         return self.dienst is not None
 
     @property
+    def fehler(self) -> str | None:
+        """Warum der Mitschnitt des Radars nicht läuft (etwa tcpdump ohne Rechte), sonst None."""
+        return self.dienst.quelle.fehler if self.dienst else None
+
+    @property
     def aufnahme(self) -> bool:
         return bool(self.dienst and self.dienst.aufnahme)
 
@@ -97,7 +102,7 @@ class Radar:
         return {"einstellungen": self.einstellungen(), "meldungen": self.meldungen, "ansagen": self.ansagen,
                 "karten": [k.name for k in Karte.alle()], "presets": WARNING_PRESETS,
                 "preset": self.warning_preset(),
-                "laeuft": self.laeuft, "aufnahme": self.aufnahme, "spiel": self.spiel}
+                "laeuft": self.laeuft, "aufnahme": self.aufnahme, "spiel": self.spiel, "fehler": self.fehler}
 
     def _pruefen(self, aenderung: dict) -> None:
         for schluessel, wert in aenderung.items():
