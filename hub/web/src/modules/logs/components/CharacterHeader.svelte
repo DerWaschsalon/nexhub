@@ -84,7 +84,7 @@
 		align-items: center;
 		gap: 10px;
 		margin: 0;
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-heading);
 		font-size: 48px;
 		font-weight: 400;
 		line-height: 1.05;

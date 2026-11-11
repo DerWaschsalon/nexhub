@@ -1,6 +1,6 @@
-<!-- Charakter wie im Spiel (Armory, Mitspieler eines Runs): links „Stat Info“ (Fortschritt, Hauptwerte,
-     Nebenwerte), in der Mitte die Figur der Klasse, rechts die Ausrüstungsspalte, darunter die Skills
-     (CharacterLayout); ein Klick auf Gegenstand oder Arkana öffnet alle Werte. `aside` steht im Kopf rechts
+<!-- Charakter wie im Spiel (Armory, Mitspieler eines Runs): oben das Charakterfenster (CharacterLayout:
+     Ausrüstung um die Figur der Klasse, daneben der gewählte Gegenstand), darunter „Stat Info“ (Fortschritt,
+     Hauptwerte, Nebenwerte) und die Skills nebeneinander; ein Klick auf Arkana öffnet alle Werte. `aside` steht im Kopf rechts
      neben dem Namen (Armory: der Verlauf). Mit `ratings` (rating.ts) Noten an den Plätzen, Rolls mit
      Höchstwert und Anteil und der Weg zu Best in Slot im Gegenstandsfenster. -->
 <script lang="ts">
@@ -12,7 +12,6 @@
 	import { ARCANA } from '../slots.ts';
 	import CharacterHeader from './CharacterHeader.svelte';
 	import CharacterLayout from './CharacterLayout.svelte';
-	import EquipmentPanel from './EquipmentPanel.svelte';
 	import ItemDialog from './ItemDialog.svelte';
 	import ItemTooltip from './ItemTooltip.svelte';
 	import SkillGrid from './SkillGrid.svelte';
@@ -38,32 +37,23 @@
 	const arcana = $derived(data.equipment.filter((e) => ARCANA.includes(e.slot_name)));
 	const rated = $derived(bySlot(ratings));
 	const items = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
-	const slots = $derived(new Set(items.keys()));
 	let open: CharacterItem | null = $state(null);
-	let active: string | null = $state(null);
 	const show = (item: CharacterItem) => (open = item);
 	const pick = (slot: string) => (open = items.get(slot) ?? null);
 </script>
 
 <CharacterHeader {character} {data} {aside} />
 
-<CharacterLayout {cls} {slots} bind:active onPick={pick}>
-	{#snippet tip(slot)}
+<CharacterLayout {cls} {data} ratings={rated} onOpen={pick}>
+	{#snippet detail(slot)}
 		{@const item = items.get(slot)}
 		{#if item}<ItemTooltip {item} rating={rated.get(slot)} />{/if}
 	{/snippet}
-	{#snippet main()}
-		<StatInfo {data} {cls} {arcana} onItem={show} />
-	{/snippet}
-	{#snippet doll()}
-		<EquipmentPanel {data} ratings={rated} bind:active onItem={show} />
-	{/snippet}
-	{#snippet below()}
-		<section class="skills">
-			<h3>{t('logs.char.skills')}</h3>
-			<SkillGrid {data} />
-		</section>
-	{/snippet}
+	<StatInfo {data} {cls} {arcana} onItem={show} />
+	<section class="panel skills">
+		<h3>{t('logs.char.skills')}</h3>
+		<SkillGrid {data} />
+	</section>
 </CharacterLayout>
 
 {#if source}<p class="dim small source">{source}</p>{/if}
@@ -73,12 +63,10 @@
 <style>
 	.skills {
 		padding: 14px;
-		background: linear-gradient(#1c2433, #171e2a);
-		border: 1px solid rgba(255, 255, 255, 0.1);
 	}
 	.skills h3 {
 		margin: 0 0 12px;
-		font-family: Georgia, 'Times New Roman', serif;
+		font-family: var(--font-heading);
 		font-size: 20px;
 		font-weight: 400;
 		text-align: center;

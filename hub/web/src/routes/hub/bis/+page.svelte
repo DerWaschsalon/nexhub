@@ -12,7 +12,6 @@
 	import { ARCANA } from '#modules/logs/slots.ts';
 	import ArcanaRow from '#modules/logs/components/ArcanaRow.svelte';
 	import CharacterLayout from '#modules/logs/components/CharacterLayout.svelte';
-	import EquipmentPanel from '#modules/logs/components/EquipmentPanel.svelte';
 	import ItemTooltip from '#modules/logs/components/ItemTooltip.svelte';
 	import Modal from '#modules/logs/components/Modal.svelte';
 	import SkillGrid from '#modules/logs/components/SkillGrid.svelte';
@@ -26,7 +25,6 @@
 	let stats = $state<BisStats | null>(null);
 	let error = $state('');
 	let open = $state<BisSlot | null>(null);
-	let active = $state<string | null>(null);
 
 	// Neu laden, wenn Klasse, Modus oder Sprache wechseln (die Namen kommen übersetzt von der API)
 	$effect(() => {
@@ -43,7 +41,6 @@
 	const equipment = $derived({ equipment: items, wing: null, pet: null });
 	const arcana = $derived(items.filter((i) => ARCANA.includes(i.slot_name)));
 	const bySlot = $derived(new Map((stats?.slots ?? []).map((s) => [s.item.slot_name, s])));
-	const slots = $derived(new Set(bySlot.keys()));
 	const pick = (slot: string) => (open = bySlot.get(slot) ?? null);
 	const choose = (key: string) => goto(`?k=${key}`, { replaceState: true });
 </script>
@@ -90,21 +87,16 @@
 		{#if !stats.slots.length}
 			<p class="notice">{t('bis.notEnough', { n: stats.size, min: stats.min_sample })}</p>
 		{:else}
-			<CharacterLayout {cls} {slots} bind:active onPick={pick}>
-				{#snippet tip(slot)}
+			<CharacterLayout {cls} data={equipment} onOpen={pick}>
+				{#snippet detail(slot)}
 					{@const s = bySlot.get(slot)}
 					{#if s}<ItemTooltip item={s.item} lines={s.lines}>{@render shares(s)}</ItemTooltip>{/if}
 				{/snippet}
-				{#snippet main()}
-					<section class="glass pad">
-						<h3>{t('bis.skills')}</h3>
-						<SkillGrid data={{ skills }} />
-						<ArcanaRow {arcana} onItem={(item) => pick(item.slot_name)} />
-					</section>
-				{/snippet}
-				{#snippet doll()}
-					<EquipmentPanel data={equipment} bind:active onItem={(item) => pick(item.slot_name)} />
-				{/snippet}
+				<section class="panel pad">
+					<h3>{t('bis.skills')}</h3>
+					<SkillGrid data={{ skills }} />
+					<ArcanaRow {arcana} onItem={(item) => pick(item.slot_name)} />
+				</section>
 			</CharacterLayout>
 		{/if}
 	{/if}

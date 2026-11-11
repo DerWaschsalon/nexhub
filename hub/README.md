@@ -278,10 +278,16 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
     schickt NC nicht.
   - **Web**: Note je Platz (`EquipmentPanel`), Rolls mit Höchstwert und Anteil und „Weg zu Best in Slot“
     im Gegenstandsfenster (`modules/logs/rating.ts`, `UpgradeSteps`, `RatingBadge`).
-- Profil (Armory, Mitspieler eines Runs) und BiS-Listen teilen sich den Aufbau `CharacterLayout` wie das
-  Charakterfenster im Spiel: links „Stat Info“ (Reiter Fortschritt, Hauptwerte, Nebenwerte) bzw. die Skills,
-  in der Mitte die Figur der Klasse (`web/static/klassen/figur/`), rechts die Ausrüstung, im Profil darunter
-  die Skills.
+- Profil (Armory, Mitspieler eines Runs) und BiS-Listen teilen sich das Charakterfenster `CharacterLayout`
+  wie im Spiel: links die Spalte Waffen und Rüstung (`slots.LEFT`, darunter Flügel und Haustier), in der Mitte
+  die Figur der Klasse (`ClassFigure`, Bilder in `web/static/klassen/figur/`), rechts der Schmuck
+  (`slots.RIGHT`), daneben das Fenster des gewählten Gegenstands; darunter nebeneinander „Stat Info“ und
+  Skills (BiS: Skills und Arkana). Jede Körperstelle der Figur gehört zu einem Platz
+  (`modules/logs/data/figureZones.ts`, Rechtecke in Prozent des Bildes, Ringe an den Fingern, die Waffe als
+  ein Block): Zeigen oder Tastaturfokus wählt Stelle und Platz gemeinsam, ein Klick öffnet den Gegenstand
+  als Dialog, wenn das Detailfenster ausgeblendet ist.
+- Schriften (Design-Regeln vom 11.11.2026): Unbounded für Überschriften, IBM Plex für Text, lokal über
+  Fontsource (`app.css`, `--font-heading`, `--font-sans`, `--font-mono`); Inhaltsbreite `--page-width`.
 
 ## Bot
 
