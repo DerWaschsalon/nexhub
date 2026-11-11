@@ -41,6 +41,7 @@ from .plugin_commands import (
     WIDGET_NAME,
     PluginCommands,
 )
+from .plugin_feeds import BossFeeds
 from .plugin_files import (
     PUBLIC_KEY_HEX,
     PluginError,
@@ -53,20 +54,16 @@ from .plugin_page import clean_theme
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://cdn.a2tools.app/plugins"
-FEED_URL = "https://cdn.a2tools.app/feeds"
-LIVE_URL = "wss://a2tools.app/api/boss-timers/live"
 CATALOG_MAX_AGE = 300.0
 
 MAX_STORED = 1024 * 1024
 MAX_STORED_KEYS = 256
 MAX_WIDGETS = 16
-MAX_FOLLOW = 50
 SETTLE = 0.5  # Decoder-Ereignisse warten auf den Charakter (beim Login kommt er erst danach)
 BATCH_WAIT = 0.04
 MAX_LOGGED = 20_000
 MAX_LOGGED_BYTES = 2 * 1024 * 1024
 GAME_CHECK = 5.0
-FEED_CACHE = 2.0
 
 WINDOWS_KEY = "dpsMeter.pluginWindows"
 DISABLED_KEY = "dpsMeter.pluginsDisabled"
@@ -173,10 +170,7 @@ class PluginHost(PluginCommands):
         self.character: Any = None
         self.screen = {"width": 1920, "height": 1080}
         self.game = False
-        self._feeds: dict[tuple[str, int], tuple[float, Any]] = {}
-        self._follows: dict[tuple[str, int], set[str]] = {}
-        self._live: dict[int, asyncio.Task] = {}
-        self._live_wanted: dict[int, asyncio.Event] = {}
+        self.feeds = BossFeeds(self._session, lambda event, data: self.tell_permitted("feed:boss-timers", event, data))
         self._http: aiohttp.ClientSession | None = None
         self._wake = asyncio.Event()
         self._tasks: list[asyncio.Task] = []
@@ -289,10 +283,11 @@ class PluginHost(PluginCommands):
         await self.send_decoders()
 
     async def stop(self) -> None:
-        for task in [*self._tasks, *self._live.values()]:
+        for task in self._tasks:
             task.cancel()
-        await asyncio.gather(*self._tasks, *self._live.values(), return_exceptions=True)
-        self._tasks, self._live = [], {}
+        await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks = []
+        await self.feeds.stop()
         if self._http:
             await self._http.close()
             self._http = None
@@ -432,7 +427,7 @@ class PluginHost(PluginCommands):
         self._save_list(DISABLED_KEY, [x for x in self.disabled() if x != plugin])
         shutil.rmtree(self.folder / plugin, ignore_errors=True)
         self.catalog.proof(plugin).unlink(missing_ok=True)
-        await self._forget_follows(plugin)
+        await self.feeds.forget(plugin)
         self.reload()
         await self.send_decoders()
         return self.view()  # gespeicherte Daten bleiben für eine spätere Installation
@@ -520,7 +515,7 @@ class PluginHost(PluginCommands):
         else:
             await self._overlay({"action": "close", "id": plugin})
             await self._drop_widgets(plugin)
-            await self._forget_follows(plugin)
+            await self.feeds.forget(plugin)
             self.pending[:] = [p for p in self.pending if p.plugin != plugin]
             self.logs.pop(plugin, None)
         await self.send_decoders()
@@ -609,112 +604,6 @@ class PluginHost(PluginCommands):
         await self.emit("plugin-event", {"plugin": w.plugin, "event": "widget-moved",
                                          "data": {"name": w.name, "x": w.x, "y": w.y}})
         await self._publish_widgets()
-
-    # ------------------------------------------------------------ Boss-Daten (online)
-    async def _feed(self, feed: str, server: int) -> Any:
-        if not 1000 <= server < 10000:
-            raise PluginError("keine Server-Kennung")
-        key = (feed, server)
-        now = time.monotonic()
-        cached = self._feeds.get(key)
-        if cached and now - cached[0] < FEED_CACHE:
-            return cached[1]
-        http = await self._session()
-        try:
-            async with http.get(f"{FEED_URL}/{feed}/{server}.json", timeout=aiohttp.ClientTimeout(total=15)) as r:
-                if r.status == 404:
-                    value = None
-                elif r.status == 200:
-                    value = json.loads(await r.read())
-                else:
-                    raise PluginError(f"Der Feed antwortete {r.status}")
-        except (aiohttp.ClientError, TimeoutError, ValueError) as e:
-            raise PluginError(str(e)) from e
-        self._feeds[key] = (now, value)
-        return value
-
-    def _wanted(self, server: int) -> list[str]:
-        return sorted({b for (_, s), bosses in self._follows.items() if s == server for b in bosses})
-
-    async def _boss_follow(self, plugin: str, server: int, bosses: list) -> None:
-        if not 1000 <= server < 10000:
-            raise PluginError("keine Server-Kennung")
-        clean = {str(b) for b in bosses if isinstance(b, (str, int)) and str(b).isdigit() and len(str(b)) <= 16}
-        clean = set(sorted(clean)[:MAX_FOLLOW])
-        if clean:
-            self._follows[(plugin, server)] = clean
-        else:
-            self._follows.pop((plugin, server), None)
-        self._apply_follows(server)
-
-    def _apply_follows(self, server: int) -> None:
-        if self._wanted(server):
-            task = self._live.get(server)
-            if task is None or task.done():
-                self._live_wanted[server] = asyncio.Event()
-                self._live[server] = asyncio.create_task(self._live_run(server))
-            else:
-                self._live_wanted[server].set()
-        elif server in self._live:
-            self._live.pop(server).cancel()
-            self._live_wanted.pop(server, None)
-
-    async def _forget_follows(self, plugin: str) -> None:
-        servers = [s for p, s in self._follows if p == plugin]
-        for server in servers:
-            self._follows.pop((plugin, server), None)
-            self._apply_follows(server)
-
-    async def _live_run(self, server: int) -> None:
-        """Eine Verbindung je Server, solange etwas verfolgt wird, sonst nur die Feed-Datei."""
-        backoff = 2.0
-        changed = self._live_wanted[server]
-        while self._wanted(server):
-            try:
-                http = await self._session()
-                async with http.ws_connect(f"{LIVE_URL}?server={server}", timeout=aiohttp.ClientWSTimeout(ws_close=15),
-                                           max_msg_size=1 << 20) as ws:
-                    backoff = 2.0
-                    follow = self._wanted(server)
-                    await ws.send_str(json.dumps({"op": "follow", "bosses": follow}))
-                    await self.tell_permitted("feed:boss-timers", "bossLive",
-                                              {"type": "status", "server": server, "connected": True})
-                    last_ping = time.monotonic()
-                    heard = last_ping
-                    while True:
-                        if changed.is_set():
-                            changed.clear()
-                            if self._wanted(server) != follow:
-                                follow = self._wanted(server)
-                                await ws.send_str(json.dumps({"op": "follow", "bosses": follow}))
-                        if time.monotonic() - last_ping >= 30:
-                            await ws.send_str("ping")
-                            last_ping = time.monotonic()
-                        if time.monotonic() - heard >= 75:
-                            break  # zwei Pings ohne Antwort: Verbindung tot
-                        try:
-                            msg = await ws.receive(timeout=5)
-                        except TimeoutError:
-                            continue
-                        if msg.type == aiohttp.WSMsgType.TEXT:
-                            heard = time.monotonic()
-                            if msg.data == "pong":
-                                continue
-                            data = json.loads(msg.data)
-                            if isinstance(data, dict):
-                                await self.tell_permitted("feed:boss-timers", "bossLive", {**data, "server": server})
-                        elif msg.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
-                            if ws.close_code == 4004:
-                                return  # Diesen Server führt die Seite nicht
-                            break
-            except asyncio.CancelledError:
-                raise
-            except (aiohttp.ClientError, TimeoutError, ValueError, OSError) as e:
-                log.debug("Boss live %s: %s", server, e)
-            await self.tell_permitted("feed:boss-timers", "bossLive",
-                                      {"type": "status", "server": server, "connected": False})
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60.0)
 
     # ------------------------------------------------------------ Speicher
     def _data_file(self, plugin: str, key: str) -> Path:

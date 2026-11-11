@@ -214,15 +214,15 @@ class PluginCommands:
 
     @plugin_command("plugin_boss_timers", permission="feed:boss-timers")
     async def _cmd_boss_timers(self, plugin: str, a: dict, window: str | None) -> Any:
-        return await self._feed("boss-timers", int(a.get("server") or 0))
+        return await self.feeds.get("boss-timers", int(a.get("server") or 0))
 
     @plugin_command("plugin_abyss_siege", permission="feed:boss-timers")
     async def _cmd_abyss_siege(self, plugin: str, a: dict, window: str | None) -> Any:
-        return await self._feed("abyss-artifacts", int(a.get("server") or 0))
+        return await self.feeds.get("abyss-artifacts", int(a.get("server") or 0))
 
     @plugin_command("plugin_boss_follow", permission="feed:boss-timers")
     async def _cmd_boss_follow(self, plugin: str, a: dict, window: str | None) -> None:
-        await self._boss_follow(plugin, int(a.get("server") or 0), list(a.get("bosses") or []))
+        await self.feeds.follow(plugin, int(a.get("server") or 0), list(a.get("bosses") or []))
 
     @plugin_command("plugin_fps_watch", permission="fps")
     async def _cmd_fps_watch(self, plugin: str, a: dict, window: str | None) -> dict:
