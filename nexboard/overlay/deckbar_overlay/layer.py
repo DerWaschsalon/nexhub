@@ -21,6 +21,7 @@ class LayerHost(QObject):
     modeChanged = Signal()
     screenChanged = Signal()
     readyChanged = Signal()
+    shownChanged = Signal()
     pointerMoved = Signal(float, float)
     pointerReleased = Signal()
 
@@ -34,6 +35,7 @@ class LayerHost(QObject):
         self.window = None
         self._screen = None
         self._ready = False
+        self._shown = True
 
     @Property(bool, notify=readyChanged)
     def ready(self) -> bool:
@@ -54,6 +56,20 @@ class LayerHost(QObject):
             self.readyChanged.emit()
         if self._mode != "edit":
             self.apply_input()
+
+    @Property(bool, notify=shownChanged)
+    def shown(self) -> bool:
+        return self._shown
+
+    def set_shown(self, shown: bool) -> None:
+        """Ein- und ausblenden, ohne die Fläche zu verbergen: Mit Chromium-GPU-Compositing kommt eine
+        per hide() verborgene layer-shell-Fläche deckend schwarz zurück (11.11. gemessen). Sie bleibt
+        deshalb stehen, nur leer und ohne Eingabe."""
+        if shown == self._shown:
+            return
+        self._shown = shown
+        self.apply_input()
+        self.shownChanged.emit()
 
     @Property(QObject, notify=screenChanged)
     def screen(self):
@@ -83,15 +99,16 @@ class LayerHost(QObject):
         self.overlay.mode_changed(mode)
 
     def apply_input(self) -> None:
-        """Eingabe-Region: alles (edit), nur Widgets mit data-click (click), nur Schloss (lock)."""
+        """Eingabe-Region: alles (edit), nur Widgets mit data-click (click), nur Schloss (lock),
+        nichts (ausgeblendet)."""
         w = self.window
         if w is None:
             return
-        if self._mode == "edit":
+        if self._mode == "edit" and self._shown:
             w.setFlag(Qt.WindowTransparentForInput, False)
             w.setMask(QRegion())  # leere Maske = keine Maske = ganze Fläche
             return
-        rects = self.regions.get(self._mode) or []
+        rects = self.regions.get(self._mode) or [] if self._shown else []
         if not rects:
             # zuerst die Flagge, sonst ist kurz die ganze Fläche klickbar (13.10. gemessen)
             w.setFlag(Qt.WindowTransparentForInput, True)
