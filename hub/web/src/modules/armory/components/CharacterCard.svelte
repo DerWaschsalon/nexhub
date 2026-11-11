@@ -48,12 +48,12 @@
 		transition: background 0.15s;
 	}
 	.card:hover {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 	}
 	.portrait {
 		width: 52px;
 		height: 52px;
-		border-radius: 12px;
+		border-radius: var(--radius);
 		object-fit: cover;
 		flex-shrink: 0;
 	}

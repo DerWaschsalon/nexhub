@@ -260,7 +260,7 @@
 		gap: 10px;
 	}
 	.btn.active {
-		border-color: rgba(106, 211, 255, 0.45);
+		border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 	}
 	dl {
 		display: grid;

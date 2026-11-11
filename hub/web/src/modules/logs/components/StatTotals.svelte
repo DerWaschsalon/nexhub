@@ -33,11 +33,11 @@
 		justify-content: space-between;
 		gap: 10px;
 		padding: 6px 10px;
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 		font-size: 13px;
 	}
 	dt {
-		color: #d8dde6;
+		color: var(--game-plain);
 	}
 	dd {
 		margin: 0;

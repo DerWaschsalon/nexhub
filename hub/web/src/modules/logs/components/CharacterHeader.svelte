@@ -59,7 +59,7 @@
 	}
 	.title {
 		margin: 0 0 4px;
-		color: #8fd16a;
+		color: var(--game-green);
 		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		font-size: 13px;
@@ -106,7 +106,7 @@
 	dd {
 		margin: 0;
 		font-size: 28px;
-		color: #f2c522;
+		color: var(--game-gold);
 	}
 	.small {
 		margin: 8px 0 0;

@@ -45,8 +45,8 @@
 		gap: 4px;
 		width: 100px;
 		padding: 10px 6px;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: var(--fill);
+		border: 1px solid var(--edge-soft);
 		text-align: center;
 		color: inherit;
 		font: inherit;

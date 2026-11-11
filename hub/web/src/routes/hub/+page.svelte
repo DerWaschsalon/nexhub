@@ -60,7 +60,7 @@
 		transition: background 0.15s;
 	}
 	.head:hover {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 	}
 	.head :global(svg) {
 		color: var(--accent);

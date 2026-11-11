@@ -300,7 +300,7 @@
 		font-size: 11px;
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
-		color: #3fd6e8;
+		color: var(--game-cyan);
 	}
 	.values td {
 		font-size: 13px;

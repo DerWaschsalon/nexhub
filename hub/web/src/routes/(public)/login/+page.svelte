@@ -70,8 +70,8 @@
 		display: block;
 		user-select: all;
 		padding: 8px 10px;
-		border-radius: 8px;
-		background: rgba(0, 0, 0, 0.35);
+		border-radius: var(--radius);
+		background: var(--shade);
 	}
 	.btn.large {
 		width: 100%;

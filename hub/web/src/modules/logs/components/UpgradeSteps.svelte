@@ -52,7 +52,7 @@
 	}
 	.chance {
 		margin-left: 6px;
-		color: #f2c522;
+		color: var(--game-gold);
 		font-weight: 700;
 	}
 	.tier {

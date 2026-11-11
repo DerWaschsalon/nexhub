@@ -108,17 +108,16 @@
 		padding: 12px 16px;
 		border-radius: var(--radius-sm);
 		border: 1px solid var(--edge-soft);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 		color: var(--text);
 		text-decoration: none;
 	}
 	.fights a:hover {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--edge-soft);
 	}
 	.fights a.active {
-		border-color: rgba(106, 211, 255, 0.55);
-		background: rgba(106, 211, 255, 0.1);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+		border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
 	}
 	.fights span {
 		display: inline-flex;

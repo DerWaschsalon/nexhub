@@ -111,7 +111,7 @@
 	}
 	nav a {
 		padding: 6px 12px;
-		border-radius: 10px;
+		border-radius: var(--radius);
 		border: 1px solid transparent;
 		color: var(--dim);
 		font-size: 14px;
@@ -120,13 +120,12 @@
 	}
 	nav a:hover {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--fill);
 	}
 	nav a.active {
 		color: var(--text);
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--fill-strong);
 		border-color: var(--edge-soft);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 	}
 	nav a:focus-visible {
 		outline: 2px solid var(--accent);
@@ -147,7 +146,7 @@
 			display: block;
 			border-radius: var(--radius-sm);
 			border: 1px solid var(--edge-soft);
-			background: rgba(255, 255, 255, 0.05);
+			background: var(--fill);
 		}
 		.menu summary {
 			padding: 10px 14px;

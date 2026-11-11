@@ -34,7 +34,7 @@
 		{#if note?.(p)}<small>{note(p)}</small>{/if}
 	</span>
 	<span class="bar" aria-hidden="true">
-		<span style:width="{(100 * p.damage) / max}%" style:background={color} style:box-shadow="0 0 18px -4px {color}"></span>
+		<span style:width="{(100 * p.damage) / max}%" style:background={color}></span>
 	</span>
 	<span class="value num" title="{formatNumber(p.damage)} {t('logs.skills.col.damage')}">
 		{formatCompact(p.damage)}<small>{Math.round((100 * p.damage) / total)} %</small>
@@ -99,10 +99,10 @@
 	}
 	button.row:hover,
 	a.row:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--fill);
 	}
 	.selected .row {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--edge-soft);
 		border-color: var(--edge-soft);
 	}
 	.rank {
@@ -114,7 +114,7 @@
 		display: block;
 		height: 12px;
 		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 		overflow: hidden;
 	}
 	.bar > span {

@@ -176,8 +176,8 @@
 		font-size: 13px;
 		overflow-wrap: anywhere;
 		padding: 3px 8px;
-		border-radius: 8px;
-		background: rgba(0, 0, 0, 0.35);
+		border-radius: var(--radius);
+		background: var(--shade);
 	}
 	code.blur {
 		filter: blur(5px);

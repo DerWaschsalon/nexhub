@@ -40,7 +40,7 @@
 		margin: 12px auto 0;
 		min-height: 56px;
 		padding: 10px 12px 10px 18px;
-		border-radius: 999px;
+		border-radius: var(--radius);
 	}
 	footer {
 		display: flex;

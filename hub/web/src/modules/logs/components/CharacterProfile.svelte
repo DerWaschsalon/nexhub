@@ -245,7 +245,7 @@
 		margin-bottom: 14px;
 		padding: 12px 14px;
 		border-radius: var(--radius-sm);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--fill);
 		border: 1px solid var(--edge-soft);
 	}
 	.set-head {
@@ -300,7 +300,7 @@
 		display: block;
 		height: 6px;
 		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.35);
+		background: var(--shade);
 		overflow: hidden;
 		margin-bottom: 6px;
 	}

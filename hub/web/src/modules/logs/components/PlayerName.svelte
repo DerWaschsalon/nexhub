@@ -35,6 +35,6 @@
 	.dot {
 		flex-shrink: 0;
 		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.12);
+		background: var(--fill-strong);
 	}
 </style>

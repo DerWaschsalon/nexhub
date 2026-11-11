@@ -87,8 +87,8 @@
 		width: 64px;
 		height: 64px;
 		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid rgba(255, 255, 255, 0.06);
+		background: var(--fill);
+		border: 1px solid var(--fill);
 		color: rgba(255, 255, 255, 0.25);
 		font-size: 11px;
 	}
