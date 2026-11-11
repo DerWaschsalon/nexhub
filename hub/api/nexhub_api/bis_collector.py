@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import time
 from datetime import UTC, datetime
 
 import httpx
@@ -55,11 +56,13 @@ class BisCollector:
         """Läuft, bis der Hub beendet wird. Die Warteschlange liegt in der Datenbank: nach einem
         Neustart geht es beim nächsten Takt einfach weiter."""
         while True:
+            started = time.monotonic()
             try:
                 await self.tick()
             except Exception:  # eine kaputte Quelle hält den Sammler nicht für immer an
                 log.exception("BiS: Takt abgebrochen")
-            await asyncio.sleep(TICK_SECONDS)
+            # Takt von Beginn zu Beginn: ein Spieler braucht rund eine Minute bei NC
+            await asyncio.sleep(max(0.0, TICK_SECONDS - (time.monotonic() - started)))
 
     async def tick(self) -> None:
         if not await self._next():

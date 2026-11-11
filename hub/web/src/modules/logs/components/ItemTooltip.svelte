@@ -286,6 +286,10 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px 14px;
 	}
+	/* mit Anteilen (BiS-Listen) braucht jeder Stein die ganze Breite */
+	.stones:has(.share) {
+		grid-template-columns: 1fr;
+	}
 	.stones li {
 		display: flex;
 		align-items: center;

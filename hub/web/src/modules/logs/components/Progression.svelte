@@ -1,13 +1,13 @@
 <!-- Fortschritt: angelegte Titel (Sammlung und Effekte beim Zeigen), Daevanion-Bretter als Ring mit
-     Prozent (Klick öffnet das Brett) und die Arkana (Klick meldet die Karte nach oben). Jede Gruppe
+     Prozent (Klick öffnet das Brett) und die Arkana (ArcanaRow). Jede Gruppe
      eine Reihe, die bei Bedarf umbricht. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterItem } from '../api.ts';
 	import { CHARACTER_ART } from '../assets.ts';
 	import { gradeColor } from '../grades.ts';
+	import ArcanaRow from './ArcanaRow.svelte';
 	import DaevanionBoard from './DaevanionBoard.svelte';
-	import ItemIcon from './ItemIcon.svelte';
 	import Modal from './Modal.svelte';
 
 	let {
@@ -88,20 +88,7 @@
 	</Modal>
 {/if}
 
-{#if arcana.length}
-	<section>
-		<h4>{t('logs.char.arcana')}</h4>
-		<div class="row">
-			{#each arcana as card (card.slot)}
-				<button class="arcana" onclick={() => onItem?.(card)}>
-					<ItemIcon name={card.name} icon={card.icon} grade={card.grade} size={64} filled />
-					<strong>+{card.enchant}</strong>
-					<small>{card.name}</small>
-				</button>
-			{/each}
-		</div>
-	</section>
-{/if}
+<ArcanaRow {arcana} {onItem} />
 
 <style>
 	section {
@@ -118,8 +105,7 @@
 		gap: 10px;
 	}
 	article,
-	.board,
-	.arcana {
+	.board {
 		flex: 0 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -139,7 +125,6 @@
 		outline: none;
 	}
 	.title strong,
-	.arcana small,
 	.board small {
 		font-size: 12px;
 		line-height: 1.25;
@@ -212,8 +197,7 @@
 	.closed {
 		opacity: 0.45;
 	}
-	.board,
-	.arcana {
+	.board {
 		cursor: pointer;
 	}
 	.board-window {
@@ -234,8 +218,5 @@
 		font-size: 30px;
 		line-height: 1;
 		cursor: pointer;
-	}
-	.arcana strong {
-		color: #fff;
 	}
 </style>

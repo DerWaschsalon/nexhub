@@ -1,6 +1,6 @@
 <!-- Modul BiS-Listen: Klasse wählen (?k=ranger), dann die Ausrüstungsspalte wie in der Armory mit dem
      typischen Gegenstand je Platz. Ein Klick öffnet das Gegenstandsfenster mit dem Anteil je Zeile,
-     daneben Skills und Stigmen mit Anteil. Wahlweise nur Spieler aus dem Schwer-Modus. -->
+     daneben Skills, Stigmen und Arkana mit Anteil. Wahlweise nur Spieler aus dem Schwer-Modus. -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
@@ -9,6 +9,8 @@
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import type { BisSlot, BisStats } from '#modules/bis/api.ts';
 	import { CLASS_KEYS, classInfo } from '#modules/logs/classes.ts';
+	import { ARCANA } from '#modules/logs/slots.ts';
+	import ArcanaRow from '#modules/logs/components/ArcanaRow.svelte';
 	import EquipmentPanel from '#modules/logs/components/EquipmentPanel.svelte';
 	import ItemTooltip from '#modules/logs/components/ItemTooltip.svelte';
 	import Modal from '#modules/logs/components/Modal.svelte';
@@ -34,7 +36,9 @@
 			.catch((e) => (error = e instanceof Error ? e.message : String(e)));
 	});
 
-	const equipment = $derived({ equipment: stats?.slots.map((s) => s.item) ?? [], wing: null, pet: null });
+	const items = $derived(stats?.slots.map((s) => s.item) ?? []);
+	const equipment = $derived({ equipment: items, wing: null, pet: null });
+	const arcana = $derived(items.filter((i) => ARCANA.includes(i.slot_name)));
 	const pick = (slot: string) => (open = stats?.slots.find((s) => s.item.slot_name === slot) ?? null);
 	const choose = (key: string) => goto(`?k=${key}`, { replaceState: true });
 </script>
@@ -85,8 +89,9 @@
 				<section class="glass pad">
 					<h3>{t('bis.skills')}</h3>
 					<SkillGrid data={{ skills: stats.skills }} />
+					<ArcanaRow {arcana} onItem={(item) => pick(item.slot_name)} />
 				</section>
-				<EquipmentPanel data={equipment} onItem={(item) => pick(item.slot_name)} />
+				<div class="doll"><EquipmentPanel data={equipment} onItem={(item) => pick(item.slot_name)} /></div>
 			</div>
 		{/if}
 	{/if}
@@ -131,6 +136,10 @@
 	@media (max-width: 760px) {
 		.layout {
 			grid-template-columns: 1fr;
+		}
+		/* schmal: erst die Ausrüstung, dann Skills und Arkana */
+		.doll {
+			order: -1;
 		}
 	}
 	.items {
