@@ -42,9 +42,13 @@
 
 <div class="frame">
 	<div class="window">
-		<EquipmentPanel {data} slots={LEFT} {ratings} bind:active onPick={pick} extras />
-		<div class="figure"><ClassFigure {cls} {names} bind:active onPick={pick} /></div>
-		<EquipmentPanel {data} slots={RIGHT} {ratings} bind:active onPick={pick} />
+		<!-- Spalten und Figur für sich: die Figur richtet sich nur nach den Spalten, nicht nach dem
+		     Detailfenster, dessen Höhe mit jedem Gegenstand wechselt -->
+		<div class="doll">
+			<EquipmentPanel {data} slots={LEFT} {ratings} bind:active onPick={pick} extras />
+			<div class="figure"><ClassFigure {cls} {names} bind:active onPick={pick} /></div>
+			<EquipmentPanel {data} slots={RIGHT} {ratings} bind:active onPick={pick} />
+		</div>
 		<div class="detail" bind:this={pane}>{#if shown}{@render detail(shown)}{/if}</div>
 	</div>
 	<div class="below">{@render children()}</div>
@@ -56,13 +60,17 @@
 	}
 	.window {
 		display: grid;
-		grid-template-columns: 64px minmax(240px, 480px) 64px minmax(0, 440px);
+		grid-template-columns: minmax(0, 648px) minmax(0, 440px);
 		gap: 18px;
 		justify-content: center;
 		align-items: start;
 	}
-	.figure {
-		align-self: center;
+	.doll {
+		display: grid;
+		grid-template-columns: 64px minmax(200px, 480px) 64px;
+		gap: 18px;
+		justify-content: center;
+		align-items: center;
 	}
 	.detail {
 		position: sticky;
@@ -78,14 +86,14 @@
 	}
 	@container (max-width: 1100px) {
 		.window {
-			grid-template-columns: 64px minmax(200px, 460px) 64px;
+			grid-template-columns: minmax(0, 648px);
 		}
 		.detail {
 			display: none;
 		}
 	}
 	@container (max-width: 480px) {
-		.window {
+		.doll {
 			grid-template-columns: 64px 64px;
 		}
 		.figure {
