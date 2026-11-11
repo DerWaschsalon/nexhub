@@ -311,7 +311,9 @@
 		background: rgba(255, 255, 255, 0.08);
 		border: 1px solid rgba(255, 255, 255, 0.15);
 	}
+	/* Name füllt die Zeile, damit die Anteile wie bei der Seelenbindung rechts untereinander stehen */
 	.stones span {
+		flex: 1;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
