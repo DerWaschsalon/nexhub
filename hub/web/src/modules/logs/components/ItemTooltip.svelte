@@ -29,6 +29,17 @@
 	const main = $derived(d?.main.filter((s) => !s.exceed) ?? []);
 	const amplify = $derived(d?.main.filter((s) => s.exceed) ?? []);
 	const rate = $derived(Number(d?.soul_bind_rate ?? NaN));
+	// Seelenbindung als eine Liste: Zusatzwerte und verstärkte Skills sind beide Rolls. Wie bei NC
+	// erst die Werte, dann die Skills; in den BiS-Listen (`lines`) alle nach Anteil der Top-Spieler.
+	type BindingRow = { name: string; value: string; icon?: string | null; line?: RatedLine };
+	const binding = $derived.by((): BindingRow[] => {
+		const rows: BindingRow[] = [
+			...(d?.sub ?? []).map((s) => ({ name: s.name, value: s.value, line: rated('stat', s.name) })),
+			...(d?.skills ?? []).map((s) => ({ name: s.name, value: `+${s.level}`, icon: s.icon, line: rated('skill', s.name) }))
+		];
+		return lines ? rows.sort((a, b) => (b.line?.share ?? 0) - (a.line?.share ?? 0)) : rows;
+	});
+	const withIcons = $derived(!!d?.skills.length);
 	// Bonus aus der Verzauberung nur zeigen, wenn es einen gibt („0“, „0%“ und „0.0%“ nicht)
 	const withExtra = (value: string, extra: string | null | undefined) =>
 		extra && parseFloat(extra) !== 0 ? `${value}(+${extra})` : value;
@@ -79,7 +90,7 @@
 				</dl>
 			{/if}
 
-			<!-- Seelenbindung: Zusatzwerte und verstärkte Skills gehören beide dazu -->
+			<!-- Seelenbindung: Zusatzwerte und verstärkte Skills in einer Liste (binding) -->
 			{#if d.sub.length || d.skills.length || !isNaN(rate)}
 				<div class="block">
 					{#if !isNaN(rate)}
@@ -88,22 +99,15 @@
 					{:else}
 						<p class="rate"><span>{t('logs.char.soulBinding')}</span></p>
 					{/if}
-					<dl>
-						{#each d.sub as s, i (i)}
-							<dt>{s.name}</dt>
-							<dd>{s.value}{@render ratedTail(rated('stat', s.name))}</dd>
+					<ul class="binding">
+						{#each binding as r, i (i)}
+							<li>
+								{#if r.icon}<img src={r.icon} alt="" width="26" height="26" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />
+								{:else if withIcons}<i class="no-icon"></i>{/if}
+								<span>{r.name}</span><b>{r.value}{@render ratedTail(r.line)}</b>
+							</li>
 						{/each}
-					</dl>
-					{#if d.skills.length}
-						<ul class="skills">
-							{#each d.skills as s, i (i)}
-								<li>
-									{#if s.icon}<img src={s.icon} alt="" width="26" height="26" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
-									<span>{s.name}</span><b>+{s.level}{@render ratedTail(rated('skill', s.name))}</b>
-								</li>
-							{/each}
-						</ul>
-					{/if}
+					</ul>
 				</div>
 			{/if}
 
@@ -323,18 +327,24 @@
 		white-space: pre-line;
 		color: var(--dim);
 	}
-	/* verstärkte Skills direkt unter den Zusatzwerten der Seelenbindung */
-	.skills {
-		margin: 10px 0 0;
+	/* Seelenbindung: Werte und Skills in einer Liste, Skills mit Symbol */
+	.binding {
+		margin: 0;
+		font-size: 16px;
 	}
-	.skills li {
+	.binding li {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		margin: 3px 0;
+		min-height: 26px;
 	}
-	.skills span {
+	.binding span {
 		flex: 1;
+	}
+	.no-icon {
+		width: 26px;
+		flex-shrink: 0;
 	}
 	.set p {
 		display: flex;
