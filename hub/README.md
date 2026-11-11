@@ -180,17 +180,25 @@ Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nac
 - Web: Modul `logs`, Seite `hub/runs/<id>/spieler/<char>`, Namen in der Run-Übersicht verlinken
   dorthin. Bilder direkt von NCSOFT ohne Herkunftsadresse; das Daevanion-Brett nutzt die Kacheln der
   offiziellen Charakterseite, ebenso die Symbole der Werte und Titel (Pfade in `modules/logs/assets.ts`).
-  Ansicht in `CharacterProfile.svelte` mit `ItemCard`, `StatPanel`, `SkillGrid`, `DaevanionBoard`.
+  Ansicht in `CharacterProfile.svelte` mit `ItemCard`, `StatPanel`, `SkillGrid`, `DaevanionBoard`;
+  den Kopf teilen sich Profil und Armory (`CharacterHeader.svelte`).
 - Tests gegen eine nachgebaute Seite (`tests/fake_nc.py`, nur erfundene Daten). Format gegen die
   echte Seite: `AION2_LIVE=1 AION2_NAME=<Charakter> AION2_SERVER=<Server-ID> uv run pytest -q tests/test_aion2.py -k echte`.
 
 ## Armory
 
 Mitglieder tragen ihre Charaktere ein, alle Angemeldeten sehen alle. Code in `armory.py` (Abruf,
-täglicher Lauf) und `routes/armory.py`. Abruf, Speicherformat und Profilansicht sind dieselben wie
+täglicher Lauf) und `routes/armory.py`. Abruf und Speicherformat sind dieselben wie
 bei den Charakterprofilen oben: `models.Snapshot` (gemeinsame Spalten von `run_characters` und
-`characters`), `characters.fill` (Abruf und Fehlerbehandlung), im Web `CharacterProfile.svelte`
-und die Typen aus `modules/logs`.
+`characters`), `characters.fill` (Abruf und Fehlerbehandlung) und die Typen aus `modules/logs`.
+
+Die Ansicht ist die des Spiels (`CharacterSheet.svelte`): links Skills (`SkillGrid`), in der Mitte
+„Werte“ (`StatInfo`) mit den Reitern Hauptwerte (Werte-Kreis `StatWheel`, Lage in `stats.ts`, und die
+zusammengezählten Effekte `StatTotals`), Nebenwerte und Fortschritt (`Progression`: Titel,
+Daevanion-Ringe, ein Klick öffnet das Brett, Arkana), rechts die Ausrüstungsspalte (`EquipmentPanel`,
+Reihenfolge `GAME_ORDER` in `slots.ts`). Ein Klick auf einen Gegenstand öffnet `ItemTooltip`:
+Grundwerte, Durchbruch (`exceed` in `mainStats`), Seelenbindungsrate (`soulBindRate`) mit Rolls,
+Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `grades.ts`.
 
 - Eintragen über die Suche der AION-2-Website (`GET /api/armory/search?name=…&region=eu`, Name und
   Region genügen), dann `POST /api/armory` mit dem Treffer. Jeder Charakter gehört höchstens einem

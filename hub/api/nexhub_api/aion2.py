@@ -123,7 +123,8 @@ def _item_detail(d: dict) -> dict:
     detail = {
         "level": d.get("level"), "category": d.get("categoryName"), "max_enchant": d.get("maxEnchantLevel"),
         "stone_slots": d.get("magicStoneSlotCount"),
-        "main": _stats(d.get("mainStats"), "extra"),
+        "soul_bind_rate": d.get("soulBindRate"),
+        "main": _stats(d.get("mainStats"), "extra", "exceed"),
         "sub": _stats(d.get("subStats")),
         "stones": _stats(d.get("magicStoneStat"), "grade", "icon"),
         "godstones": [{"name": g.get("name"), "desc": g.get("desc"), "grade": g.get("grade"), "icon": g.get("icon")}
@@ -318,7 +319,10 @@ class NC:
                       for s in (info.get("stat") or {}).get("statList") or []],
             "titles": {"owned": titles.get("ownedCount"), "total": titles.get("totalCount"),
                        "equipped": [{"name": t.get("name"), "grade": t.get("grade"),
-                                     "category": t.get("equipCategory"), "effects": _lines(t.get("equipStatList"))}
+                                     "category": t.get("equipCategory"), "effects": _lines(t.get("equipStatList")),
+                                     # Sammlung dieser Titelgruppe: wie viele man hat und was sie immer bringt
+                                     "owned": t.get("ownedCount"), "total": t.get("totalCount"),
+                                     "collection": _lines(t.get("statList"))}
                                     for t in titles.get("titleList") or []]},
             "equipment": equipment,
             "pet": _pick(petwing.get("pet"), name="name", level="level", icon="icon"),

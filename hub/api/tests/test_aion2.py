@@ -59,7 +59,8 @@ def test_momentaufnahme():
     assert data["stats"][1]["effects"] == []
     assert item_level(data) == 2554
     assert data["titles"] == {"owned": 206, "total": 297, "equipped": [
-        {"name": "Goldener Glanz", "grade": "Unique", "category": "Attack", "effects": ["Krit.-Angriffskraft +45"]}]}
+        {"name": "Goldener Glanz", "grade": "Unique", "category": "Attack", "effects": ["Krit.-Angriffskraft +45"],
+         "owned": 74, "total": 103, "collection": ["Krit.-Angriffskraft +3"]}]}
     assert data["equipment"] == [{"id": 110430050, "slot": 1, "slot_name": "MainHand", "name": "Testbogen",
                                   "grade": "Unique", "enchant": 15, "exceed": 1, "icon": ICON}]
     assert data["pet"]["name"] == "Testeule" and data["wing"]["name"] == "Testflügel"
@@ -152,8 +153,10 @@ def test_beide_sprachen_und_werte_je_gegenstand():
     assert {"de-DE", "en-US"} <= set(fake.langs)
     assert item_level(data) == 2554 and combat_power(data) == 123456
     detail = data["de"]["equipment"][0]["detail"]
-    assert detail["main"] == [{"id": "WeaponFixingDamage", "name": "Angriffskraft", "value": "486", "extra": "146"}]
+    assert detail["main"] == [{"id": "WeaponFixingDamage", "name": "Angriffskraft", "value": "486", "extra": "146",
+                              "exceed": False}]
     assert detail["sub"] == [{"id": "AdditionalHitRate", "name": "Mehrfachtreffer-Chance", "value": "9.1%"}]
+    assert detail["soul_bind_rate"] == "100"
     assert detail["stones"][0] == {"id": "Critical", "name": "Kritischer Treffer", "value": "+6", "grade": "Legend",
                                    "icon": ICON}
     assert detail["godstones"][0]["desc"] == "10 % Chance auf Wind-Schaden"
