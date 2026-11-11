@@ -7,7 +7,6 @@ PluginCommands ist der Befehlsteil von PluginHost (plugins.py) und nutzt dessen 
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -18,12 +17,10 @@ from .plugin_files import PluginError
 from .plugin_page import clean_theme
 
 MAX_MESSAGE = 64 * 1024
-MAX_AREAS = 64
 MIN_PANEL_HEIGHT = 60.0
 HIDE_CLOSED_KEY = "dpsMeter.pluginsHideClosed"
 HIDE_UNFOCUSED_KEY = "dpsMeter.pluginsHideUnfocused"
 THEME_KEY = "dpsMeter.pluginTheme"
-WIDGET_NAME = re.compile(r"[a-z0-9-]{1,32}")
 # Was eine Plugin-Seite (Fenster oder Widget) aufrufen darf, wie PLUGIN_SURFACE_COMMANDS im Original
 SURFACE = {
     "meter_shown", "set_meter_shown", "open_settings_at", "open_settings_window", "open_url",
@@ -164,21 +161,22 @@ class PluginCommands:
 
     @host_command("plugin_widgets_state")
     async def _cmd_widgets_state(self, a: dict) -> list[dict]:
-        return self.widgets_state()
+        return self.widgets.state()
 
     @host_command("plugin_overlay_screen")
     async def _cmd_overlay_screen(self, a: dict) -> None:
-        self.screen = {"width": max(320, int(a.get("width") or 1920)), "height": max(240, int(a.get("height") or 1080))}
+        self.widgets.screen = {"width": max(320, int(a.get("width") or 1920)),
+                               "height": max(240, int(a.get("height") or 1080))}
 
     @host_command("plugin_widget_moved")
     async def _cmd_widget_moved(self, a: dict) -> None:
-        await self._widget_moved(str(a.get("label")), int(a.get("x") or 0), int(a.get("y") or 0))
+        await self.widgets.moved(str(a.get("label")), int(a.get("x") or 0), int(a.get("y") or 0))
 
     # ------------------------------------------------------------ Fenster eines Plugins
     @plugin_command("plugin_hello")
     async def _cmd_hello(self, plugin: str, a: dict, window: str | None) -> dict:
         if a.get("fresh"):  # Ein frisch startendes Plugin kennt alte Widgets nicht und schlösse sie nie
-            await self._drop_widgets(plugin)
+            await self.widgets.drop(plugin)
         return self._hello(plugin)
 
     async def _show_window(self, plugin: str, visible: bool) -> None:
@@ -233,15 +231,15 @@ class PluginCommands:
         return False
 
     # ------------------------------------------------------------ Widgets
-    @plugin_command("plugin_widget_open")
+    @plugin_command("plugin_widget_open", permission="widgets")
     async def _cmd_widget_open(self, plugin: str, a: dict, window: str | None) -> None:
-        await self._widget_open(plugin, a)
+        if plugin in self.disabled():
+            raise PluginError("Dieses Plugin ist ausgeschaltet")
+        await self.widgets.open(plugin, a)
 
     @plugin_command("plugin_widget_close", permission="widgets")
     async def _cmd_widget_close(self, plugin: str, a: dict, window: str | None) -> None:
-        if w := self.widgets.get(f"widget:{plugin}:{a.get('name')}"):
-            w.open = False
-            await self._publish_widgets()
+        await self.widgets.close(plugin, a.get("name"))
 
     @plugin_command("plugin_widget_send", permission="widgets")
     async def _cmd_widget_send(self, plugin: str, a: dict, window: str | None) -> None:
@@ -250,40 +248,24 @@ class PluginCommands:
 
     @plugin_command("plugin_widgets_lock", permission="widgets")
     async def _cmd_widgets_lock(self, plugin: str, a: dict, window: str | None) -> None:
-        locked = bool(a.get("locked"))
-        self.save_setting(self._locked_key(plugin), "true" if locked else "false")
-        await self.emit("plugin-event", {"plugin": plugin, "event": "locked", "data": locked})
-        await self._publish_widgets()
+        await self.widgets.lock(plugin, bool(a.get("locked")))
 
     @plugin_command("plugin_widgets_locked", permission="widgets")
     async def _cmd_widgets_locked(self, plugin: str, a: dict, window: str | None) -> bool:
-        return self._locked(plugin)
+        return self.widgets.locked(plugin)
 
     @plugin_command("plugin_widget_where", permission="widgets")
     async def _cmd_widget_where(self, plugin: str, a: dict, window: str | None) -> dict | None:
-        w = self.widgets.get(f"widget:{plugin}:{a.get('name')}")
-        if w is None:
-            return None
-        return {"x": w.x, "y": w.y, "width": int(w.width), "height": int(w.height),
-                "screen": {"x": 0, "y": 0, **self.screen}}
+        return self.widgets.where(plugin, a.get("name"))
 
     @plugin_command("plugin_widget_place", permission="widgets")
     async def _cmd_widget_place(self, plugin: str, a: dict, window: str | None) -> None:
-        name = str(a.get("name"))
-        if not WIDGET_NAME.fullmatch(name):
-            raise PluginError("Ein Widget-Name hat 1 bis 32 Kleinbuchstaben, Ziffern oder '-'")
-        x, y = int(a.get("x") or 0), int(a.get("y") or 0)
-        w = self.widgets.get(f"widget:{plugin}:{name}")
-        x, y = self._on_screen(x, y, w.width if w else 64, w.height if w else 64)
-        self.save_setting(self._place_key(plugin, name), f"{x},{y}")
-        if w:
-            w.x, w.y = x, y
-            await self._publish_widgets()
+        await self.widgets.place(plugin, a.get("name"), int(a.get("x") or 0), int(a.get("y") or 0))
 
     # ------------------------------------------------------------ aus einem Widget-Fenster
     @plugin_command("plugin_widget_hello")
     async def _cmd_widget_hello(self, plugin: str, a: dict, window: str | None) -> dict:
-        return {"plugin": plugin, "name": _widget_name(window), "locked": self._locked(plugin),
+        return {"plugin": plugin, "name": _widget_name(window), "locked": self.widgets.locked(plugin),
                 "language": self.language()}
 
     @plugin_command("plugin_widget_post")
@@ -294,11 +276,4 @@ class PluginCommands:
 
     @plugin_command("plugin_widget_area")
     async def _cmd_widget_area(self, plugin: str, a: dict, window: str | None) -> None:
-        w = self.widgets.get(window or "")
-        if w is None:
-            raise PluginError("kein Widget-Fenster")
-        rects = a.get("rects")
-        if not isinstance(rects, list) or len(rects) > MAX_AREAS:
-            raise PluginError("keine Fläche")
-        w.areas = [[float(r["x"]), float(r["y"]), float(r["width"]), float(r["height"])] for r in rects]
-        await self._publish_widgets()
+        await self.widgets.set_areas(window or "", a.get("rects"))

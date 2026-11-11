@@ -341,10 +341,10 @@ async def test_modul_aus_schliesst_fenster_und_nimmt_die_decoder(host, cdn):
 async def test_widgets(host, cdn):
     cdn.add("ping", permissions=["storage", "widgets", "window"])
     await host.install("ping")
-    host.screen = {"width": 1000, "height": 800}
+    host.widgets.screen = {"width": 1000, "height": 800}
     await host.call("plugin_widget_open", {"name": "a", "width": 100, "height": 50}, "plugin-ping")
     await host.call("plugin_widget_open", {"name": "b", "width": 5000, "height": 1}, "plugin-ping")
-    state = host.widgets_state()
+    state = host.widgets.state()
     assert state[0]["label"] == "widget:ping:a" and state[0]["x"] == 860  # freier Platz rechts
     assert state[1]["width"] == 800 and state[1]["height"] == 24  # Grenzen wie im Original
     with pytest.raises(PluginError, match="Widget-Name"):
@@ -364,15 +364,15 @@ async def test_widgets(host, cdn):
     hello = await host.call("plugin_widget_hello", {}, "widget:ping:a")
     assert hello["name"] == "a" and hello["locked"] is False
     await host.call("plugin_widgets_lock", {"locked": True}, "plugin-ping")
-    assert host.widgets_state()[0]["locked"] is True
+    assert host.widgets.state()[0]["locked"] is True
     await host.call("plugin_widget_area", {"rects": [{"x": 1, "y": 2, "width": 3, "height": 4}], "scale": 1}, "widget:ping:a")
-    assert host.widgets_state()[0]["areas"] == [[1.0, 2.0, 3.0, 4.0]]
+    assert host.widgets.state()[0]["areas"] == [[1.0, 2.0, 3.0, 4.0]]
     where = await host.call("plugin_widget_where", {"name": "a"}, "plugin-ping")
     assert where["x"] == 900 and where["screen"]["width"] == 1000
     await host.call("plugin_widget_close", {"name": "a"}, "plugin-ping")
-    assert host.widgets_state()[0]["open"] is False
+    assert host.widgets.state()[0]["open"] is False
     await host.call("plugin_hello", {"fresh": True}, "plugin-ping")  # frischer Start: alte Widgets weg
-    assert host.widgets_state() == []
+    assert host.widgets.state() == []
 
 
 async def test_fenster_merkt_sichtbarkeit(host, cdn):
@@ -480,6 +480,6 @@ async def test_widget_state_also_goes_to_the_overlay_page(host, cdn):
     async def listener(state: list[dict]) -> None:
         seen.append(state)
 
-    host.widgets_listener = listener
-    await host._publish_widgets()
-    assert seen == [host.widgets_state()]
+    host.widgets.listener = listener
+    await host.widgets.publish()
+    assert seen == [host.widgets.state()]

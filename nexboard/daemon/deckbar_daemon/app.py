@@ -121,7 +121,7 @@ class NexBoard:
         # bekommen eigene Plugin-Ordner, damit sie die installierten Plugins nicht anfassen
         self.a2 = A2Ui(self.dps.capture, c / "a2-settings.json", None if self.real_config else c / "a2")
         self.a2.plugins.overlay = self.overlay.plugin_command
-        self.a2.plugins.widgets_listener = lambda state: self.overlay.publish("plugin-widgets", state)
+        self.a2.plugins.widgets.listener = lambda state: self.overlay.publish("plugin-widgets", state)
         # eine Sprache für alles: die der allgemeinen Einstellungen (System → Allgemein)
         self.a2.on_language = self.set_language
         self.bus.on(LANGUAGE, self.a2.apply_language)

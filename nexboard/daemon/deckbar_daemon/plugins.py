@@ -38,7 +38,6 @@ from .plugin_commands import (
     HIDE_UNFOCUSED_KEY,
     MIN_PANEL_HEIGHT,
     THEME_KEY,
-    WIDGET_NAME,
     PluginCommands,
 )
 from .plugin_feeds import BossFeeds
@@ -50,6 +49,7 @@ from .plugin_files import (
     valid_id,
 )
 from .plugin_page import clean_theme
+from .plugin_widgets import PluginWidgets
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +58,6 @@ CATALOG_MAX_AGE = 300.0
 
 MAX_STORED = 1024 * 1024
 MAX_STORED_KEYS = 256
-MAX_WIDGETS = 16
 SETTLE = 0.5  # Decoder-Ereignisse warten auf den Charakter (beim Login kommt er erst danach)
 BATCH_WAIT = 0.04
 MAX_LOGGED = 20_000
@@ -112,21 +111,6 @@ class EventLog:
     size: int = 0
 
 
-@dataclass
-class WidgetState:
-    plugin: str
-    name: str
-    width: float
-    height: float
-    x: int = 0
-    y: int = 0
-    open: bool = True
-    areas: list[list[float]] | None = None
-
-    @property
-    def label(self) -> str:
-        return f"widget:{self.plugin}:{self.name}"
-
 
 def take_ready(pending: list[Pending], now: float) -> list[Pending]:
     """Was jetzt raus darf, in Reihenfolge: nichts überholt ein wartendes Ereignis seines Plugins."""
@@ -155,20 +139,17 @@ class PluginHost(PluginCommands):
         self.data_folder = data_folder
         self.catalog = PluginCatalog(folder, base_url, key_hex, self._session)
         self.overlay: Callable[[dict], Awaitable[None]] | None = None  # Befehle ans Overlay-Programm
-        # Stand der Plugin-Widgets für die Overlay-Seite (ihre eine Ereignisverbindung)
-        self.widgets_listener: Callable[[list[dict]], Awaitable[None]] | None = None
         self.loaded: dict[str, Loaded] = {}
         self.errors: dict[str, dict] = {}
         self.decoder_errors: dict[str, str] = {}
         self.active = False  # Modul AION 2 · Plugins an: Plugins laufen und bekommen Spieldaten
-        self.widgets: dict[str, WidgetState] = {}
+        self.widgets = PluginWidgets(settings, save_setting, emit)
         self.pending: list[Pending] = []
         self.logs: dict[str, EventLog] = {}
         self.run = str(int(time.time() * 1000))
         # Zählt über Neustarts hinweg weiter: offene Seiten merken sich die letzte Nummer
         self.seq = int(time.time() * 1000)
         self.character: Any = None
-        self.screen = {"width": 1920, "height": 1080}
         self.game = False
         self.feeds = BossFeeds(self._session, lambda event, data: self.tell_permitted("feed:boss-timers", event, data))
         self._http: aiohttp.ClientSession | None = None
@@ -278,7 +259,7 @@ class PluginHost(PluginCommands):
         self.active = False
         for plugin in self.loaded:
             await self._overlay({"action": "close", "id": plugin})
-            await self._drop_widgets(plugin)
+            await self.widgets.drop(plugin)
         await self.stop()
         await self.send_decoders()
 
@@ -421,7 +402,7 @@ class PluginHost(PluginCommands):
     async def uninstall(self, plugin: str) -> dict:
         self._require_id(plugin)
         await self._overlay({"action": "close", "id": plugin})
-        await self._drop_widgets(plugin)
+        await self.widgets.drop(plugin)
         self._remember_window(plugin, None)
         self.logs.pop(plugin, None)
         self._save_list(DISABLED_KEY, [x for x in self.disabled() if x != plugin])
@@ -514,96 +495,12 @@ class PluginHost(PluginCommands):
                 await self._open(plugin, True)
         else:
             await self._overlay({"action": "close", "id": plugin})
-            await self._drop_widgets(plugin)
+            await self.widgets.drop(plugin)
             await self.feeds.forget(plugin)
             self.pending[:] = [p for p in self.pending if p.plugin != plugin]
             self.logs.pop(plugin, None)
         await self.send_decoders()
         return self.view()
-
-    # ------------------------------------------------------------ Widgets
-    def _locked_key(self, plugin: str) -> str:
-        return f"dpsMeter.pluginWidgetsLocked.{plugin}"
-
-    def _locked(self, plugin: str) -> bool:
-        return self.settings().get(self._locked_key(plugin)) == "true"
-
-    def widgets_state(self) -> list[dict]:
-        return [{"label": w.label, "plugin": w.plugin, "name": w.name, "width": w.width, "height": w.height,
-                 "x": w.x, "y": w.y, "open": w.open, "areas": w.areas, "locked": self._locked(w.plugin)}
-                for w in self.widgets.values()]
-
-    async def _publish_widgets(self) -> None:
-        await self.emit("plugin-widgets", self.widgets_state())
-        if self.widgets_listener:
-            await self.widgets_listener(self.widgets_state())
-
-    async def _drop_widgets(self, plugin: str) -> None:
-        gone = [k for k, w in self.widgets.items() if w.plugin == plugin]
-        for key in gone:
-            del self.widgets[key]
-        if gone:
-            await self._publish_widgets()
-
-    def _place_key(self, plugin: str, name: str) -> str:
-        return f"dpsMeter.pluginWidget.{plugin}.{name}"
-
-    def _on_screen(self, x: int, y: int, width: float, height: float) -> tuple[int, int]:
-        return (max(0, min(x, int(self.screen["width"] - min(width, self.screen["width"])))),
-                max(0, min(y, int(self.screen["height"] - min(height, self.screen["height"])))))
-
-    def _first_place(self, plugin: str, name: str, width: float, height: float) -> tuple[int, int]:
-        """Wo es zuletzt lag, sonst neben den anderen des Plugins, sonst ein freier Platz am rechten Rand."""
-        saved = self.settings().get(self._place_key(plugin, name), "")
-        m = re.fullmatch(r"(-?\d+),(-?\d+)", saved)
-        if m:
-            return self._on_screen(int(m[1]), int(m[2]), width, height)
-        others = [w for w in self.widgets.values() if w.plugin == plugin]
-        if others:
-            last = others[-1]
-            return self._on_screen(int(last.x + last.width + 4), last.y, width, height)
-        taken = len({w.plugin for w in self.widgets.values()})
-        return self._on_screen(int(self.screen["width"] - width - 40), 160 + 90 * taken, width, height)
-
-    async def _widget_open(self, plugin: str, a: dict) -> None:
-        self._require(plugin, "widgets")
-        if plugin in self.disabled():
-            raise PluginError("Dieses Plugin ist ausgeschaltet")
-        name = str(a.get("name"))
-        if not WIDGET_NAME.fullmatch(name):
-            raise PluginError("Ein Widget-Name hat 1 bis 32 Kleinbuchstaben, Ziffern oder '-'")
-
-        def size(v: Any) -> float:
-            v = float(v) if isinstance(v, (int, float)) else 64.0
-            return max(24.0, min(v, 800.0))
-
-        width, height = size(a.get("width")), size(a.get("height"))
-        key = f"widget:{plugin}:{name}"
-        w = self.widgets.get(key)
-        if w:
-            w.width, w.height, w.open = width, height, True
-            w.x, w.y = self._on_screen(w.x, w.y, width, height)
-        else:
-            mine = [k for k, x in self.widgets.items() if x.plugin == plugin]
-            if len(mine) >= MAX_WIDGETS:
-                spare = next((k for k in mine if not self.widgets[k].open), None)
-                if spare is None:
-                    raise PluginError(f"höchstens {MAX_WIDGETS} Widgets")
-                del self.widgets[spare]
-            x, y = self._first_place(plugin, name, width, height)
-            self.widgets[key] = WidgetState(plugin, name, width, height, x, y)
-        await self._publish_widgets()
-
-    async def _widget_moved(self, label: str, x: int, y: int) -> None:
-        """Die Overlay-Seite meldet, wohin ein Widget gezogen wurde."""
-        w = self.widgets.get(label)
-        if w is None:
-            return
-        w.x, w.y = self._on_screen(x, y, w.width, w.height)
-        self.save_setting(self._place_key(w.plugin, w.name), f"{w.x},{w.y}")
-        await self.emit("plugin-event", {"plugin": w.plugin, "event": "widget-moved",
-                                         "data": {"name": w.name, "x": w.x, "y": w.y}})
-        await self._publish_widgets()
 
     # ------------------------------------------------------------ Speicher
     def _data_file(self, plugin: str, key: str) -> Path:
