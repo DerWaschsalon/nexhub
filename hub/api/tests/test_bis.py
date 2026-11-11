@@ -48,7 +48,7 @@ def run(database_url, fake, work):
 async def collect_all(collector: BisCollector) -> None:
     """Takte, bis die Warteschlange leer ist."""
     await collector.tick()
-    while await collector._next():
+    while await collector._next(1):
         await collector.tick()
 
 
@@ -67,6 +67,22 @@ def test_sammler_fuellt_bestand_ohne_namen(fake, database_url):
     assert set(samples[0].data) == {"v", "de", "en"}
     assert samples[0].data["en"]["equipment"][0]["detail"]["sub"][0]["name"] == "Mehrfachtreffer-Chance"
     assert "Bogenheld" not in json.dumps([s.data for s in samples])  # keine Namen im Bestand
+
+
+def test_anlauf_parallel_bis_der_bestand_voll_ist(fake, database_url, monkeypatch):
+    with_top_rangers(fake)
+    monkeypatch.setattr(bis_collector, "FILL_BELOW", 5)
+    monkeypatch.setattr(bis_collector, "FILL_PARALLEL", 40)  # alle 45 Namen (9 Klassen × 5) in einem Takt
+
+    async def work(collector, sessionmaker):
+        first = await collector.tick()
+        async with sessionmaker() as db:
+            size = len(await pool(db, "ranger"))
+        await collector.refill()  # neue Ranglisten, der Waldläufer-Bestand ist schon voll
+        return first, size, await collector.tick()
+
+    # erster Takt: Anlauf und alle fünf Waldläufer auf einmal; danach im ruhigen Takt
+    assert run(database_url, fake, work) == (True, 5, False)
 
 
 def test_voller_bestand_ersetzt_den_aeltesten_ohne_doppel(fake, database_url, monkeypatch):

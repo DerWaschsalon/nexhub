@@ -5,6 +5,10 @@ je Klasse POOL_SIZE Namen). Alle TICK_SECONDS holt der Sammler die PER_TICK best
 Klassen: Name → Server über die NC-Suche → Ausrüstung und Skills in beiden Sprachen (NC.gear). Damit fragen
 wir NC über den ganzen Tag verteilt an statt auf einen Schlag, und ein Durchlauf dauert rund anderthalb Tage.
 
+Anlauf: Beim ersten Start und solange eine angefangene Klasse, für die noch Namen warten, weniger als
+FILL_BELOW Spieler hat, holt der Sammler FILL_PARALLEL Spieler gleichzeitig und ohne Pause zwischen den Takten. Das
+sind rund 4 Anfragen je Sekunde an NC; der Bestand ist so nach etwa 7 Stunden voll statt nach Tagen.
+
 Der Bestand hat höchstens POOL_SIZE Spieler je Klasse, jeden genau einmal (Schlüssel aus Server und
 Charakter-ID, kein Name). Wer schon drin ist, wird aktualisiert; ein Neuer ersetzt bei vollem Bestand den
 ältesten. So ergibt sich ein gleitender Durchschnitt statt eines harten Tageswechsels.
@@ -35,6 +39,8 @@ TICK_SECONDS = 300
 PER_TICK = 4
 POOL_SIZE = 200  # Spieler je Klasse (Fabio 10.11.: 50 sind zu wenig)
 MAX_TRIES = 3  # NC-Fehler: so oft versuchen, dann den Namen verwerfen
+FILL_BELOW = 150  # Anlauf, solange eine Klasse weniger hat (ein paar Namen findet die NC-Suche nie)
+FILL_PARALLEL = 5  # Spieler gleichzeitig im Anlauf; je Spieler rund 50 Anfragen in einer Minute
 
 
 def character_key(server_id: int, character_id: str) -> str:
@@ -57,22 +63,42 @@ class BisCollector:
         Neustart geht es beim nächsten Takt einfach weiter."""
         while True:
             started = time.monotonic()
+            filling = False
             try:
-                await self.tick()
+                filling = await self.tick()
             except Exception:  # eine kaputte Quelle hält den Sammler nicht für immer an
                 log.exception("BiS: Takt abgebrochen")
+            if filling:
+                continue
             # Takt von Beginn zu Beginn: ein Spieler braucht rund eine Minute bei NC
             await asyncio.sleep(max(0.0, TICK_SECONDS - (time.monotonic() - started)))
 
-    async def tick(self) -> None:
-        if not await self._next():
+    async def tick(self) -> bool:
+        """Ein Takt. Gibt zurück, ob der Sammler noch im Anlauf ist (dann geht es ohne Pause weiter)."""
+        if not await self._next(1):
             await self.refill()
-        for row in await self._next():
-            await self.collect(row)
+        if not await self._filling():
+            for row in await self._next(PER_TICK):
+                await self.collect(row)
+            return False
+        await asyncio.gather(*(self.collect(row) for row in await self._next(FILL_PARALLEL)))
+        return True
 
-    async def _next(self) -> list[BisQueue]:
+    async def _next(self, count: int) -> list[BisQueue]:
         async with self.sessionmaker() as db:
-            return list((await db.scalars(select(BisQueue).order_by(BisQueue.rank, BisQueue.id).limit(PER_TICK))).all())
+            return list((await db.scalars(select(BisQueue).order_by(BisQueue.rank, BisQueue.id).limit(count))).all())
+
+    async def _filling(self) -> bool:
+        """Anlauf: Der Bestand ist noch ganz leer, oder eine angefangene Klasse, für die noch Namen warten, hat
+        weniger als FILL_BELOW Spieler. Klassen ohne einen einzigen Treffer zählen nicht, sonst liefe der Anlauf
+        ewig; da der Bestand nie schrumpft, endet er sicher."""
+        async with self.sessionmaker() as db:
+            waiting = set((await db.scalars(select(BisQueue.cls).distinct())).all())
+            rows = await db.execute(select(BisSample.cls, func.count()).group_by(BisSample.cls))
+        sizes = {cls: count for cls, count in rows}
+        if not sizes:
+            return bool(waiting)
+        return any(cls in sizes and sizes[cls] < FILL_BELOW for cls in waiting)
 
     async def refill(self) -> None:
         """Neue Ranglisten für alle Klassen. Klassen ohne genug Einträge (z. B. Faustkämpfer) fehlen."""
