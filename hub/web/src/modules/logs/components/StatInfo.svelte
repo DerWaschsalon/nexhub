@@ -1,33 +1,44 @@
-<!-- „Stat Info“ wie im Spiel: Reiter Hauptwerte (Kreis + Summen), Nebenwerte (Summen als Liste) und
-     Fortschritt (Titel, Daevanion, Arkana). -->
+<!-- „Stat Info“ wie im Spiel: Reiter Hauptwerte (Kreis + Summen), Nebenwerte (Summen als Liste),
+     Fortschritt (Titel, Daevanion, Arkana) und mit `ratings` Upgrades (Weg zu S+ je Gegenstand). -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterItem } from '../api.ts';
+	import type { Ratings } from '../rating.ts';
 	import Progression from './Progression.svelte';
 	import StatTotals from './StatTotals.svelte';
 	import StatWheel from './StatWheel.svelte';
+	import UpgradeList from './UpgradeList.svelte';
 
 	let {
 		data,
 		cls,
 		arcana,
+		ratings,
 		onItem
 	}: {
 		data: CharacterData;
 		cls: string | null;
 		arcana: CharacterItem[];
+		ratings?: Ratings | null;
 		onItem: (item: CharacterItem) => void;
 	} = $props();
 
-	const TABS = ['main', 'sub', 'progression'] as const;
-	const LABELS = { main: 'logs.char.mainStat', sub: 'logs.char.subStats', progression: 'logs.char.progression' };
-	let tab: (typeof TABS)[number] = $state('main');
+	type Tab = 'main' | 'sub' | 'progression' | 'upgrades';
+	const LABELS: Record<Tab, string> = {
+		main: 'logs.char.mainStat',
+		sub: 'logs.char.subStats',
+		progression: 'logs.char.progression',
+		upgrades: 'logs.rating.upgrades'
+	};
+	// „Upgrades“ nur, wenn es eine Bewertung gibt
+	const tabs = $derived<Tab[]>(ratings ? ['main', 'sub', 'progression', 'upgrades'] : ['main', 'sub', 'progression']);
+	let tab: Tab = $state('main');
 </script>
 
 <section>
 	<h3>{t('logs.char.statInfo')}</h3>
 	<div class="tab-row" role="tablist">
-		{#each TABS as name (name)}
+		{#each tabs as name (name)}
 			<button role="tab" aria-selected={tab === name} class:active={tab === name} onclick={() => (tab = name)}>
 				{t(LABELS[name])}
 			</button>
@@ -39,8 +50,10 @@
 			<StatTotals stats={data.stats} />
 		{:else if tab === 'sub'}
 			<StatTotals stats={data.stats} columns={1} />
-		{:else}
+		{:else if tab === 'progression'}
 			<Progression {data} {cls} {arcana} {onItem} />
+		{:else if ratings}
+			<UpgradeList {ratings} equipment={data.equipment} {onItem} />
 		{/if}
 	</div>
 </section>
@@ -61,7 +74,8 @@
 	}
 	.tab-row {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-auto-columns: 1fr;
+		grid-auto-flow: column;
 		border-top: 1px solid rgba(255, 255, 255, 0.1);
 		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 	}

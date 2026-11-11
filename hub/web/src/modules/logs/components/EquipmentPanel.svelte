@@ -1,12 +1,19 @@
 <!-- Ausrüstungsspalte wie im Spiel: zwei Spalten in der Reihenfolge des Ausrüstungsfensters, leere
-     Plätze mit ihrem Namen, unten Flügel und Haustier. Ein Klick meldet den Gegenstand nach oben (onItem). -->
+     Plätze mit ihrem Namen, unten Flügel und Haustier. Ein Klick meldet den Gegenstand nach oben (onItem).
+     Mit `ratings` trägt jeder bewertete Platz seine Note in der Ecke. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterItem } from '../api.ts';
+	import type { Rating } from '../rating.ts';
 	import { GAME_ORDER } from '../slots.ts';
 	import ItemIcon from './ItemIcon.svelte';
+	import RatingBadge from './RatingBadge.svelte';
 
-	let { data, onItem }: { data: CharacterData; onItem: (item: CharacterItem) => void } = $props();
+	let {
+		data,
+		ratings,
+		onItem
+	}: { data: CharacterData; ratings?: Map<string, Rating>; onItem: (item: CharacterItem) => void } = $props();
 
 	const bySlot = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
 	// „Brooch1“ → „Brooch“: die Nummer unterscheidet nur die beiden gleichen Plätze
@@ -21,6 +28,7 @@
 			{#if item}
 				<button onclick={() => onItem(item)} aria-label={item.name}>
 					<ItemIcon name={item.name} icon={item.icon} grade={item.grade} enchant={item.enchant} exceed={item.exceed} size={64} filled />
+					{#if ratings?.get(slot)}<span class="note"><RatingBadge letter={ratings.get(slot)!.letter} small /></span>{/if}
 				</button>
 			{:else}
 				<span class="empty">{slotLabel(slot)}</span>
@@ -66,6 +74,7 @@
 		border-top: 1px solid rgba(255, 255, 255, 0.1);
 	}
 	button {
+		position: relative;
 		padding: 0;
 		border: 0;
 		background: none;
@@ -76,6 +85,12 @@
 	button:focus-visible {
 		filter: brightness(1.2);
 		outline: 1px solid #fff;
+	}
+	.note {
+		position: absolute;
+		top: 2px;
+		right: 2px;
+		line-height: 1;
 	}
 	.empty {
 		display: grid;
