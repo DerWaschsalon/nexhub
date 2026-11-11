@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def aware(when: datetime) -> datetime:
+    """SQLite (Tests) gibt Zeitpunkte ohne Zeitzone zurück; gespeichert wird immer UTC."""
+    return when if when.tzinfo else when.replace(tzinfo=UTC)
 
 
 def alembic_config(database_url: str) -> Config:

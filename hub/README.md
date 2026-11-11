@@ -220,8 +220,10 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   und Vergleich.
 - Vergleich (`hub/armory/vergleich?links=<id>&rechts=<Server-ID>/<Name>`): links ein Charakter aus
   der Armory, rechts ein beliebiger, den `GET /api/armory/live?server_id=…&name=…` jetzt von der
-  Website holt und **nicht speichert**. Kampfkraft, Werte, Ausrüstung je Platz und Skills mit
-  Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
+  Website holt und **nicht speichert**. Kampfkraft, Werte samt zusammengezählter Effekte, Ausrüstung
+  und Arkana je Platz mit allem, was darauf ist (`compareItems` in `modules/armory/compare.ts`:
+  Grundwerte samt Verzauberung, Seelenbindung, Manasteine zusammengezählt, verstärkte Skills, Set),
+  und Skills mit Unterschied aus Sicht des linken Charakters, dazu beide Daevanion-Bretter mit derselben Auswahl;
   rot umrandet ist, was der andere schon offen hat. Die Adresse zeigt Angemeldeten denselben Vergleich.
 - Teilen ohne Login: `POST /api/armory/compare/share` (`left`, `server_id`, `name`) speichert nur das
   Paar (`models.Comparison`) und gibt einen Link `/v/<token>`; derselbe Vergleich vom selben Konto
@@ -230,30 +232,37 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   liefert links die Momentaufnahme ohne Besitzer, rechts holt es live (`fetch_live`, wie
   `/api/armory/live`); fehlt der rechte, steht `right_error` da und links trotzdem.
   Kasten mit Link, Kopieren und Zurückziehen: `lib/components/ShareLink.svelte`, wie bei Runs.
-- Zuerst verbessern (`ratgeber.py`, Feld `hints` in `GET /api/armory/{id}` je Sprache): leere
+- Zuerst verbessern (`ratgeber.py`, Feld `hints` in `GET /api/armory/{id}` je Sprache; die Armory
+  zeigt sie derzeit nicht an): leere
   Manastein-Sockel, Gewinn bis zur höchsten Verzauberung (`detail.gain`), bei Schadensklassen
   Manasteine und Nebenwerte ohne Schaden (LP, Verteidigung, Blocken, Ausweichen …, erkannt an der
   Kennung `id` der Werte, die es ab diesem Stand gibt) und Arkana-Sets ohne Bonus. Ohne Vergleich mit
   anderen, Reihenfolge von schnell erledigt bis teuer. Alte Stände ohne `id` zeigen erst nach dem
   nächsten Abruf alles.
-- Echte Skill-Stufe im Profil (Runs und Armory, `modules/logs/skillLevels.ts`): Stufe aus der
-  Skill-Liste plus Daevanion-Boni plus verstärkte Skills der Ausrüstung, farbig, wenn Boni dabei sind;
-  Stigmen ohne Boni.
-- Build-Check (`hub/armory/<id>/check`): der Charakter gegen die 15 besten Spieler seiner Klasse in
-  der EU mit ähnlicher Kampfkraft (±15 %), nur auf Klick (`POST /api/armory/{id}/check`, höchstens
-  alle 10 Minuten). Die Top-Spieler kommen aus der Rangliste von **Abyss Logs** (`abysslogs.py`,
-  `api.abysslogs.com/v1/leaderboards`, inoffiziell und nicht dokumentiert) an den Bossen der
-  höchsten Transzendenz-Stufe, Kämpfe ab 30 s. Die Rangliste nennt keinen Server; `buildcheck.py`
-  sucht ihn über die NC-Suche (Name und Klasse, bei mehreren Treffern die nächstliegende
-  Kampfkraft) und holt die Profile mit Gegenständen, vier gleichzeitig (je Profil rund 40
-  Anfragen). Das dauert etwa sechs Minuten, der Stand steht in `GET …/check` (`progress`). `evaluation.py` vergleicht Feld für Feld: Zahlen gegen den
-  Median, Auswahlen gegen die zwei häufigsten (ohne Mehrheit von einem Drittel keine Empfehlung);
-  Zusatzwerte, Manasteine, Gottsteine und verstärkte Skills erst, wenn zwei Drittel sie haben.
-  Ampel und „Zuerst“ nach „wie viele haben es besser“, „Zuerst“ ohne Kampfkraft und Stufe.
-  Gespeichert wird nur das Ergebnis (`build_checks`, je Charakter der letzte), keine Namen und
-  keine Profile der Top-Spieler. Geht etwas schief, bleibt das vorige Ergebnis mit `error`.
-  Teilen wie beim Vergleich (`POST/DELETE …/check/share`, öffentlich `GET /api/public/check/{token}`,
-  Seite `/c/<token>`).
+- Skill-Stufen zeigt das Profil so, wie NC sie schickt: die Stufe in der Skill-Liste enthält die Boni
+  aus Daevanion und Ausrüstung schon (wie im Spiel und auf shugo.gg, höchstens 20). Früher wurden sie
+  noch einmal aufaddiert (bis 29 statt 20), das ist entfernt.
+- Einen Build-Check gegen die Top-Spieler (Rangliste von Abyss Logs) gab es bis November 2026; Migration
+  0010 entfernt seine Tabelle `build_checks`, der Code steht in der Git-Historie (Stand `bb2a01a`).
+- Bewertung der Ausrüstung (Vorbild kisk.app/scoring), Feld `ratings` in `GET /api/armory/{id}` je Sprache:
+  - **Zählung** (`census.py`, einmal am Tag je Klasse, die in der Armory vorkommt): 30 Top-Spieler aus dem
+    neuesten Raid mit genug Einträgen bei Abyss Logs (`abysslogs.py`, Hard vor Normal), Server über die
+    NC-Suche, Ausrüstung über `NC.gear` (nur Ausrüstung mit Werten, rund 26 Anfragen je Spieler).
+    Gespeichert in `class_census` nur je Platz, wie viele welche Zeile der Seelenbindung tragen, und der
+    größte Wert je Zeile; keine Namen.
+  - **Würfeltabellen** (`metabot.py`, Tabelle `item_rolls`): Bereich und Chance je Zeile und die
+    Skill-Optionen je Klasse von MetaBot.GG, englisch und deutsch (`/de_DE/`, gleiche Reihenfolge), je
+    Gegenstand einmal pro Woche, 3 s Pause zwischen Seiten. MetaBot erlaubt das mit Link auf die Seite
+    (Nutzungsbedingungen, „Data Usage & Attribution“): das Gegenstandsfenster verlinkt sie.
+  - **Rechnung** (`rating.py`, rein): Punkte einer Zeile = Anteil der Top-Spieler × Wert ÷ größter Wert
+    des Platzes, Note = Summe ÷ bestes mögliches Stück, Bänder wie bei kisk (BiS ab 90, S+ ab 55 …).
+    Upgrades: jede Zeile, die nicht zu den idealen gehört, neu würfeln, Ziel sind die fehlenden idealen
+    Zeilen nach Priorität (auch bei S+). Die Chance pro Versuch kommt aus MetaBot; wie oft ein Wurf ein
+    Skill wird, ist geschätzt (Anteil der Skill-Zeilen bei den Top-Spielern). Werte aus dem Durchbruch
+    schickt NC nicht.
+  - **Web**: Note je Platz (`EquipmentPanel`), Rolls mit Höchstwert und Anteil, „Weg zu Best in Slot“
+    im Gegenstandsfenster, Reiter „Upgrades“ in „Stat Info“ (`modules/logs/rating.ts`, `UpgradeList`,
+    `UpgradeSteps`, `RatingBadge`).
 
 ## Bot
 

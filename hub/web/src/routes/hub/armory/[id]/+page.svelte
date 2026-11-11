@@ -3,7 +3,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { api } from '#lib/api.ts';
-	import { t } from '#lib/i18n.svelte.ts';
+	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import History from '#modules/armory/components/History.svelte';
 	import { classColor, classFromName } from '#modules/logs/classes.ts';
 	import CharacterSheet from '#modules/logs/components/CharacterSheet.svelte';
@@ -47,7 +47,6 @@
 	<a class="back" href="/hub/armory">‹ {t('armory.back')}</a>
 	<span class="actions">
 		<a class="btn small" href="/hub/armory/vergleich?links={c.id}">{t('armory.compare')}</a>
-		{#if c.data}<a class="btn small" href="/hub/armory/{c.id}/check">{t('armory.check.title')}</a>{/if}
 		<button class="btn small" onclick={refresh} disabled={c.status === 'offen'}>{t('armory.refresh')}</button>
 		{#if c.can_delete}<button class="btn small danger" onclick={remove}>{t('armory.remove')}</button>{/if}
 	</span>
@@ -61,7 +60,7 @@
 {#if error}<p class="notice error" role="alert">{error}</p>{/if}
 
 {#if c.data}
-	<CharacterSheet character={{ ...c, cls }} data={c.data} source={t('armory.source')}>
+	<CharacterSheet character={{ ...c, cls }} data={c.data} source={t('armory.source')} ratings={c.ratings[i18n.lang] ?? c.ratings.en}>
 		{#snippet aside()}
 			{#if c.days.length}
 				<div class="charts">

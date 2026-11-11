@@ -4,45 +4,34 @@ from __future__ import annotations
 import httpx
 
 HOST = "api.abysslogs.com"
+# zwei Raids: der neuere (höhere dungeonId) hat noch keine Einträge, der ältere schon
+NEW_RAID = [{"mobCode": 9001, "name": "Neuboss", "category": "Raid", "tier": "Hard", "dungeonId": 700},
+            {"mobCode": 9002, "name": "Neuboss", "category": "Raid", "tier": "Normal", "dungeonId": 701}]
+OLD_RAID = [{"mobCode": 8001, "name": "Altboss", "category": "Raid", "tier": "Hard", "dungeonId": 600},
+            {"mobCode": 8002, "name": "Altboss", "category": "Raid", "tier": "Normal", "dungeonId": 601}]
 
 
-def bosses() -> list[dict]:
-    return [{"mobCode": 2350709, "name": "Testboss A", "category": "Transcendence", "tier": "Stage 4"},
-            {"mobCode": 2340601, "name": "Testboss B", "category": "Transcendence", "tier": "Stage 4"},
-            {"mobCode": 2340001, "name": "Testboss C", "category": "Transcendence", "tier": "Stage 2"},
-            {"mobCode": 2300471, "name": "Testboss D", "category": "Dungeon", "tier": "Conquest [Normal]"}]
-
-
-def entry(name: str, cp: int = 123_000, dps: float = 50_000, duration: float = 120) -> dict:
+def entry(name: str, dps: float, duration: float = 120) -> dict:
     return {"rank": 1, "region": "eu", "playerName": name, "classHint": "Ranger", "gearScore": 2600,
-            "combatPower": cp, "dps": dps, "totalDamage": int(dps * duration), "combatDuration": duration,
-            "encounterId": "", "verified": False, "createdAt": "2026-10-20T19:10:49Z"}
+            "combatPower": 123_456, "dps": dps, "totalDamage": int(dps * duration), "combatDuration": duration,
+            "encounterId": "", "verified": False, "createdAt": "2026-11-10T19:10:49Z"}
 
 
 class FakeAbyss:
-    """`routes` je Test überschreibbar (Pfad → dict/list = JSON 200, int = Statuscode, (int, dict) = beides).
-    `size` Einträge in der Rangliste, Namen „Bogenheld“, „Bogenheld2“ …, Kampfkraft passend zu
-    fake_nc.info (123_456)."""
+    """`boards` je Boss die Namen der Rangliste (stärkste zuerst); unbekannte Bosse sind leer."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
-        self.last_query = ""
-        self.size = 20
-        self.routes: dict[str, object] = {}
-
-    def leaderboard(self) -> dict:
-        names = ["Bogenheld"] + [f"Bogenheld{i}" for i in range(2, self.size + 1)]
-        rows = [entry(n, dps=90_000 - i * 1000) for i, n in enumerate(names)]
-        return {"entries": rows, "total": len(rows), "page": 1, "limit": 100}
+        self.boards: dict[int, list[str]] = {8001: [f"Bogenheld{i}" for i in range(1, 6)]}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
-        path = request.url.path
-        self.calls.append(path)
-        self.last_query = request.url.query.decode()
-        default = {"/v1/bosses": bosses(), "/v1/leaderboards": self.leaderboard()}
-        answer = self.routes.get(path, default.get(path, 404))
-        if isinstance(answer, int):
-            return httpx.Response(answer)
-        if isinstance(answer, tuple):
-            return httpx.Response(answer[0], json=answer[1])
-        return httpx.Response(200, json=answer)
+        self.calls.append(f"{request.url.path}?{request.url.query.decode()}")
+        if request.url.path == "/v1/bosses":
+            return httpx.Response(200, json=NEW_RAID + OLD_RAID + [
+                {"mobCode": 1, "name": "Testboss", "category": "Transcendence", "tier": "Stage 4", "dungeonId": 1}])
+        if request.url.path == "/v1/leaderboards":
+            boss = int(request.url.params["boss"])
+            names = self.boards.get(boss, [])
+            rows = [entry(n, 90_000 - i * 1000) for i, n in enumerate(names)]
+            return httpx.Response(200, json={"entries": rows, "total": len(rows), "page": 1, "limit": 100})
+        return httpx.Response(404)

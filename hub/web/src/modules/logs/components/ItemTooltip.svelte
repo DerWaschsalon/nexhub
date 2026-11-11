@@ -1,12 +1,19 @@
 <!-- Gegenstandsfenster wie im Spiel: Kopf im Verlauf der Seltenheit mit großem Bild, darunter
      Grundwerte, Durchbruch (orange), Seelenbindung mit Balken, Manasteine, Gottstein, Skills und bei
-     Arkana das Set (erreichte Stufen hell). -->
+     Arkana das Set (erreichte Stufen hell). Mit `rating` dazu die Note, je Roll Höchstwert und Anteil
+     der Top-Spieler und der Weg zu S+ (rating.ts). -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterItem } from '../api.ts';
 	import { gradeColor } from '../grades.ts';
+	import type { RatedLine, Rating } from '../rating.ts';
+	import RatingBadge from './RatingBadge.svelte';
+	import UpgradeSteps from './UpgradeSteps.svelte';
 
-	let { item, onclose }: { item: CharacterItem; onclose: () => void } = $props();
+	let { item, rating, onclose }: { item: CharacterItem; rating?: Rating; onclose: () => void } = $props();
+
+	// Bewertete Zeile zu einem Roll oder Skill des Gegenstands, verbunden über den Namen
+	const rated = (name: string): RatedLine | undefined => rating?.lines.find((l) => l.name === name);
 
 	const d = $derived(item.detail);
 	const main = $derived(d?.main.filter((s) => !s.exceed) ?? []);
@@ -19,6 +26,14 @@
 	const hide = (e: Event) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden');
 </script>
 
+<!-- Höchstwert dieses Gegenstands und Anteil der Top-Spieler hinter einem Roll -->
+{#snippet ratedTail(line: RatedLine | undefined)}
+	{#if line}
+		{#if line.max}<span class="max"> / {line.kind === 'skill' ? line.max : line.unit === '%' ? `${line.max}%` : line.max}</span>{/if}
+		<span class="share" title={t('logs.rating.shareHint')}><i style:width="{line.share * 100}%"></i>{Math.round(line.share * 100)}%</span>
+	{/if}
+{/snippet}
+
 <div class="frame" style:--grade={gradeColor(item.grade, '#9aa0a6')}>
 	<article>
 		<header class="hero">
@@ -28,6 +43,12 @@
 				{#if d?.level}
 					<span>{t('logs.char.itemLevel')}</span>
 					<strong>{d.level}{item.enchant ? `(+${item.enchant})` : ''}</strong>
+				{/if}
+				{#if rating}
+					<span class="rating">
+						<RatingBadge letter={rating.letter} score={rating.score} />
+						<small>{t('logs.rating.ideal', { n: rating.ideal, of: rating.ideal_of })}</small>
+					</span>
 				{/if}
 			</div>
 			{#if item.icon}<img src={item.icon} alt="" referrerpolicy="no-referrer" onerror={hide} />{/if}
@@ -56,7 +77,10 @@
 						<p class="rate"><span>{t('logs.char.soulBinding')}</span></p>
 					{/if}
 					<dl>
-						{#each d.sub as s, i (i)}<dt>{s.name}</dt><dd>{s.value}</dd>{/each}
+						{#each d.sub as s, i (i)}
+							<dt>{s.name}</dt>
+							<dd>{s.value}{@render ratedTail(rated(s.name))}</dd>
+						{/each}
 					</dl>
 				</div>
 			{/if}
@@ -87,7 +111,7 @@
 					{#each d.skills as s, i (i)}
 						<li>
 							{#if s.icon}<img src={s.icon} alt="" width="26" height="26" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
-							<span>{s.name}</span><b>+{s.level}</b>
+							<span>{s.name}</span><b>+{s.level}{@render ratedTail(rated(s.name))}</b>
 						</li>
 					{/each}
 				</ul>
@@ -104,6 +128,19 @@
 					{/each}
 				</div>
 			{/if}
+		{/if}
+
+		{#if rating?.upgrade}
+			<div class="block upgrade">
+				<p class="up-head">
+					{t('logs.rating.toTarget')}
+					<RatingBadge letter={rating.upgrade.after_letter} score={rating.upgrade.after[0]} />
+				</p>
+				<UpgradeSteps steps={rating.upgrade.steps} />
+			</div>
+		{/if}
+		{#if rating?.source}
+			<p class="block source"><a href={rating.source} target="_blank">{t('logs.rating.source')}</a></p>
 		{/if}
 
 		{#if item.id}<footer><strong>#{item.id}</strong></footer>{/if}
@@ -299,6 +336,52 @@
 	}
 	.set .active {
 		color: #8fd16a;
+	}
+	.rating {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.rating small {
+		color: rgba(255, 255, 255, 0.75);
+		font-size: 12px;
+	}
+	.max {
+		color: rgba(255, 255, 255, 0.45);
+		font-weight: 500;
+	}
+	/* Anteil der Top-Spieler: kleiner Balken mit Zahl hinter dem Wert */
+	.share {
+		position: relative;
+		display: inline-block;
+		width: 46px;
+		margin-left: 8px;
+		text-align: right;
+		font-size: 12px;
+		font-weight: 600;
+		color: #f2c522;
+	}
+	.share i {
+		position: absolute;
+		right: 0;
+		top: 2px;
+		bottom: 2px;
+		background: rgba(242, 197, 34, 0.18);
+	}
+	.up-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0;
+		font-weight: 600;
+	}
+	.source {
+		margin-top: 0;
+		font-size: 12px;
+	}
+	.source a {
+		color: var(--accent);
 	}
 	footer {
 		display: flex;

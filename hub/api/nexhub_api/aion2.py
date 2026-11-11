@@ -246,6 +246,22 @@ class NC:
             detail["gain"] = await self._gain_at(server_id, character_id, lang, item, d, top)
         return detail
 
+    async def gear(self, server_id: int, character_id: str, lang: str = "en") -> list[dict]:
+        """Nur die Ausrüstung samt Werten je Gegenstand, ohne Profil, Daevanion und Verzauberungsgewinn:
+        das Nötigste für die Zählung der Top-Spieler (census.py), rund 26 statt 50 Anfragen."""
+        q = {"lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id, "characterId": character_id}
+        equip = await self._get(f"{SITE}/equipment", q)
+        if not isinstance(equip.get("equipment"), dict):
+            raise NCError("Format unbekannt: Ausrüstung fehlt")
+        gear = []
+        for e in equip["equipment"].get("equipmentList") or []:
+            item = {"id": e.get("id"), "slot": e.get("slotPos"), "slot_name": e.get("slotPosName"),
+                    "name": e.get("name")}
+            d = await self._item(server_id, character_id, lang, item, e.get("enchantLevel") or 0) if item["id"] else {}
+            item["detail"] = _item_detail(d) if d.get("id") else None
+            gear.append(item)
+        return gear
+
     async def _item(self, server_id: int, character_id: str, lang: str, item: dict, enchant: int) -> dict:
         """Ein Gegenstand, wie er bei Verzauberung `enchant` aussähe. {} = nicht (mehr) da."""
         try:

@@ -1,55 +1,36 @@
-"""Abyss-Logs-Rangliste und Auswahl der Vergleichsgruppe. API nachgebaut (fake_abyss.py)."""
+"""Top-Spieler aus den Ranglisten von Abyss Logs (abysslogs.py). API nachgebaut (fake_abyss.py)."""
 import asyncio
 
 import httpx
-import pytest
 
-from nexhub_api.abysslogs import AbyssError, abyss_class, leaderboard, pick_group, top_bosses
+from nexhub_api.abysslogs import best_per_name, raids, top_players
 
 from .fake_abyss import FakeAbyss, entry
 
 
-@pytest.fixture
-def abyss() -> FakeAbyss:
-    return FakeAbyss()
-
-
-def run(abyss: FakeAbyss, work):
+def run(fake: FakeAbyss, work):
     async def go():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(abyss)) as http:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
             return await work(http)
     return asyncio.run(go())
 
 
-def test_auswahl():
-    entries = [entry("A", cp=100_000, dps=90_000), entry("A", cp=100_000, dps=95_000),  # doppelt: bester zählt
-               entry("B", cp=140_000, dps=99_000),                                     # zu stark
-               entry("C", cp=110_000, dps=80_000, duration=0.01),                      # Müll
-               entry("D", cp=90_000, dps=70_000)]
-    group = pick_group(entries, own_cp=100_000)
-    assert [x["playerName"] for x in group] == ["A", "D"]
-    assert group[0]["dps"] == 95_000
+def test_raids_neueste_zuerst_hard_vor_normal():
+    found = run(FakeAbyss(), raids)
+    assert [(name, tier) for name, tier, _ in found] == [("Neuboss", "Hard"), ("Neuboss", "Normal"),
+                                                          ("Altboss", "Hard"), ("Altboss", "Normal")]
 
 
-def test_klasse():
-    assert (abyss_class("ranger"), abyss_class("spiritmaster")) == ("Ranger", "Elementalist")
+def test_neuester_raid_mit_genug_eintraegen():
+    fake = FakeAbyss()
+    label, players = run(fake, lambda http: top_players(http, "ranger", 5))
+    assert label == "Altboss · Hard"
+    assert [p["playerName"] for p in players] == [f"Bogenheld{i}" for i in range(1, 6)]
+    # ohne genug Einträge im Hard der Normal-Modus desselben Raids
+    fake.boards = {8002: [f"Normalheld{i}" for i in range(5)]}
+    assert run(fake, lambda http: top_players(http, "ranger", 5))[0] == "Altboss · Normal"
 
 
-def test_bosse_und_rangliste(abyss):
-    assert run(abyss, top_bosses) == [2350709, 2340601]
-    rows = run(abyss, lambda http: leaderboard(http, "Ranger", 2350709))
-    assert rows[0]["playerName"] == "Bogenheld"
-    assert "class=Ranger" in abyss.last_query and "boss=2350709" in abyss.last_query and "region=eu" in abyss.last_query
-
-
-@pytest.mark.parametrize("answer", [500, {"kaputt": True}])
-def test_fehler_wird_abysserror(abyss, answer):
-    abyss.routes["/v1/leaderboards"] = answer
-    with pytest.raises(AbyssError):
-        run(abyss, lambda http: leaderboard(http, "Ranger", 2350709))
-
-
-def test_boss_ohne_rangliste_ist_leer(abyss):
-    # Abyss Logs führt nicht für jeden Boss eine Rangliste
-    abyss.routes["/v1/leaderboards"] = (400, {"error": "boss is not ranked"})
-    assert run(abyss, lambda http: leaderboard(http, "Ranger", 2356708)) == []
+def test_je_name_der_beste_echte_kampf():
+    rows = [entry("A", 100), entry("A", 300), entry("B", 200), entry("C", 999, duration=5)]
+    assert [(e["playerName"], e["dps"]) for e in best_per_name(rows)] == [("A", 300), ("B", 200)]
