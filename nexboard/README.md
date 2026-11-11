@@ -306,7 +306,7 @@ die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters
 dem Meter). Die Plugin-Seite in den Meter-Einstellungen geht weiterhin. Das eigenständige A2Tools-Programm hat
 einen eigenen Plugin-Ordner, den die NexBoard nicht sieht. Ist das Modul aus, laufen keine Plugins und
 bekommen keine Spieldaten; installiert bleibt alles. Der
-Plugin-Host ist `daemon/deckbar_daemon/plugins.py`, ein Nachbau des Hosts aus dem Submodul; die Seiten
+Plugin-Host ist `daemon/deckbar_daemon/plugins.py` (Dateiprüfung in `plugin_files.py`, Seitenhilfen in `plugin_page.py`), ein Nachbau des Hosts aus dem Submodul; die Seiten
 kommen unverändert von dort. Hauptfenster sind normale Fenster des Overlay-Programms (damit die Tastatur
 geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefern
 `capture/src/decoders.rs` (Decoder je Opcode) und `capture/src/feed.rs` (Charakter, Feldboss-Karte …). Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
@@ -337,7 +337,7 @@ Nach jedem Dungeon-Run postet der Daemon ein Bild mit dem Schaden pro Spieler un
 Discord-Webhook (Modul „AION 2 · Dungeon-Runs“, gespeichert in `~/.config/deckbar/aion2.runs.yaml`).
 Quelle ist die Kampf-History, je nach DPS-Quelle die von `deckbar-capture` oder die des Meters. Ein Run endet, sobald der Endboss liegt, bei einem
 Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
-`daemon/deckbar_daemon/runs.py`). Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
+`daemon/deckbar_daemon/runs.py`, Daten in `run_model.py`, Bild in `run_image.py`). Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
 
 Die History maskiert fremde Namen. Die NexBoard lernt die vollen Namen aus dem Live-Stream und
 speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von Hand korrigieren.
