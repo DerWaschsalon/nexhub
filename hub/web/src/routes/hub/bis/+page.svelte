@@ -11,6 +11,7 @@
 	import { CLASS_KEYS, classInfo } from '#modules/logs/classes.ts';
 	import { ARCANA } from '#modules/logs/slots.ts';
 	import ArcanaRow from '#modules/logs/components/ArcanaRow.svelte';
+	import CharacterLayout from '#modules/logs/components/CharacterLayout.svelte';
 	import EquipmentPanel from '#modules/logs/components/EquipmentPanel.svelte';
 	import ItemTooltip from '#modules/logs/components/ItemTooltip.svelte';
 	import Modal from '#modules/logs/components/Modal.svelte';
@@ -37,13 +38,11 @@
 	});
 
 	const items = $derived(stats?.slots.map((s) => s.item) ?? []);
+	const skills = $derived(stats?.skills ?? []);
 	const equipment = $derived({ equipment: items, wing: null, pet: null });
 	const arcana = $derived(items.filter((i) => ARCANA.includes(i.slot_name)));
 	const pick = (slot: string) => (open = stats?.slots.find((s) => s.item.slot_name === slot) ?? null);
 	const choose = (key: string) => goto(`?k=${key}`, { replaceState: true });
-	const shown = $derived(classInfo(cls));
-	// Für manche Klassen gibt es noch keine Figur (Faustkämpfer): dann bleibt die Mitte leer
-	const hide = (e: Event) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden');
 </script>
 
 <svelte:head><title>{t('bis.title')} · NexHub</title></svelte:head>
@@ -88,19 +87,18 @@
 		{#if !stats.slots.length}
 			<p class="notice">{t('bis.notEnough', { n: stats.size, min: stats.min_sample })}</p>
 		{:else}
-			<div class="layout">
-				<section class="glass pad">
-					<h3>{t('bis.skills')}</h3>
-					<SkillGrid data={{ skills: stats.skills }} />
-					<ArcanaRow {arcana} onItem={(item) => pick(item.slot_name)} />
-				</section>
-				{#if shown}
-					<div class="figure" style:--glow={shown.color} aria-hidden="true">
-						<img src={shown.figure} alt="" onerror={hide} />
-					</div>
-				{/if}
-				<div class="doll"><EquipmentPanel data={equipment} onItem={(item) => pick(item.slot_name)} /></div>
-			</div>
+			<CharacterLayout {cls}>
+				{#snippet main()}
+					<section class="glass pad">
+						<h3>{t('bis.skills')}</h3>
+						<SkillGrid data={{ skills }} />
+						<ArcanaRow {arcana} onItem={(item) => pick(item.slot_name)} />
+					</section>
+				{/snippet}
+				{#snippet doll()}
+					<EquipmentPanel data={equipment} onItem={(item) => pick(item.slot_name)} />
+				{/snippet}
+			</CharacterLayout>
 		{/if}
 	{/if}
 {/if}
@@ -134,42 +132,6 @@
 		align-items: center;
 		gap: 8px 14px;
 		margin: 14px 0 18px;
-	}
-	.layout {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) 380px auto;
-		gap: 18px;
-		align-items: start;
-	}
-	/* Figur über die volle Spaltenbreite, beim Blättern sichtbar; Licht in der Klassenfarbe dahinter */
-	.figure {
-		position: sticky;
-		top: 18px;
-		padding-top: 40px;
-		background: radial-gradient(ellipse 55% 40% at 50% 60%, color-mix(in srgb, var(--glow) 30%, transparent), transparent);
-	}
-	.figure img {
-		display: block;
-		width: 100%;
-		height: auto;
-		filter: drop-shadow(0 0 24px color-mix(in srgb, var(--glow) 40%, transparent));
-	}
-	/* Mittelbreit: ohne Figur; schmal: erst die Ausrüstung, dann Skills und Arkana */
-	@media (max-width: 1400px) {
-		.layout {
-			grid-template-columns: minmax(0, 1fr) auto;
-		}
-		.figure {
-			display: none;
-		}
-	}
-	@media (max-width: 760px) {
-		.layout {
-			grid-template-columns: 1fr;
-		}
-		.doll {
-			order: -1;
-		}
 	}
 	.items {
 		list-style: none;

@@ -32,9 +32,9 @@
 		display: flex;
 		justify-content: space-between;
 		gap: 10px;
-		padding: 9px 14px;
+		padding: 6px 10px;
 		background: rgba(255, 255, 255, 0.06);
-		font-size: 15px;
+		font-size: 13px;
 	}
 	dt {
 		color: #d8dde6;

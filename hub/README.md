@@ -274,9 +274,12 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
     Zeilen nach Priorität (auch bei S+). Die Chance pro Versuch kommt aus MetaBot; wie oft ein Wurf ein
     Skill wird, ist geschätzt (Anteil der Skill-Zeilen bei den Top-Spielern). Werte aus dem Durchbruch
     schickt NC nicht.
-  - **Web**: Note je Platz (`EquipmentPanel`), Rolls mit Höchstwert und Anteil, „Weg zu Best in Slot“
-    im Gegenstandsfenster, Reiter „Upgrades“ in „Stat Info“ (`modules/logs/rating.ts`, `UpgradeList`,
-    `UpgradeSteps`, `RatingBadge`).
+  - **Web**: Note je Platz (`EquipmentPanel`), Rolls mit Höchstwert und Anteil und „Weg zu Best in Slot“
+    im Gegenstandsfenster (`modules/logs/rating.ts`, `UpgradeSteps`, `RatingBadge`).
+- Profil (Armory, Mitspieler eines Runs) und BiS-Listen teilen sich den Aufbau `CharacterLayout` wie das
+  Charakterfenster im Spiel: links „Stat Info“ (Reiter Fortschritt, Hauptwerte, Nebenwerte) bzw. die Skills,
+  in der Mitte die Figur der Klasse (`web/static/klassen/figur/`), rechts die Ausrüstung, im Profil darunter
+  die Skills.
 
 ## Bot
 

@@ -1,59 +1,51 @@
-<!-- „Stat Info“ wie im Spiel: Reiter Hauptwerte (Kreis + Summen), Nebenwerte (Summen als Liste),
-     Fortschritt (Titel, Daevanion, Arkana) und mit `ratings` Upgrades (Weg zu S+ je Gegenstand). -->
+<!-- „Stat Info“ wie im Spiel, kompakt: Reiter Fortschritt (Titel, Daevanion, Arkana), Hauptwerte (Kreis +
+     Summen) und Nebenwerte (Summen als Liste). Den Weg zu Best in Slot zeigt das Gegenstandsfenster. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterItem } from '../api.ts';
-	import type { Ratings } from '../rating.ts';
 	import Progression from './Progression.svelte';
 	import StatTotals from './StatTotals.svelte';
 	import StatWheel from './StatWheel.svelte';
-	import UpgradeList from './UpgradeList.svelte';
 
 	let {
 		data,
 		cls,
 		arcana,
-		ratings,
 		onItem
 	}: {
 		data: CharacterData;
 		cls: string | null;
 		arcana: CharacterItem[];
-		ratings?: Ratings | null;
 		onItem: (item: CharacterItem) => void;
 	} = $props();
 
-	type Tab = 'main' | 'sub' | 'progression' | 'upgrades';
+	type Tab = 'progression' | 'main' | 'sub';
 	const LABELS: Record<Tab, string> = {
-		main: 'logs.char.mainStat',
-		sub: 'logs.char.subStats',
 		progression: 'logs.char.progression',
-		upgrades: 'logs.rating.upgrades'
+		main: 'logs.char.mainStat',
+		sub: 'logs.char.subStats'
 	};
-	// „Upgrades“ nur, wenn es eine Bewertung gibt
-	const tabs = $derived<Tab[]>(ratings ? ['main', 'sub', 'progression', 'upgrades'] : ['main', 'sub', 'progression']);
-	let tab: Tab = $state('main');
+	const TABS = Object.keys(LABELS) as Tab[];
+	let tab: Tab = $state('progression');
 </script>
 
 <section>
 	<h3>{t('logs.char.statInfo')}</h3>
 	<div class="tab-row" role="tablist">
-		{#each tabs as name (name)}
+		{#each TABS as name (name)}
 			<button role="tab" aria-selected={tab === name} class:active={tab === name} onclick={() => (tab = name)}>
 				{t(LABELS[name])}
 			</button>
 		{/each}
 	</div>
 	<div class="body">
-		{#if tab === 'main'}
+		{#if tab === 'progression'}
+			<Progression {data} {cls} {arcana} {onItem} />
+		{:else if tab === 'main'}
 			<StatWheel stats={data.stats} />
 			<StatTotals stats={data.stats} />
-		{:else if tab === 'sub'}
+		{:else}
 			<StatTotals stats={data.stats} columns={1} />
-		{:else if tab === 'progression'}
-			<Progression {data} {cls} {arcana} {onItem} />
-		{:else if ratings}
-			<UpgradeList {ratings} equipment={data.equipment} {onItem} />
 		{/if}
 	</div>
 </section>
@@ -65,10 +57,10 @@
 	}
 	h3 {
 		margin: 0;
-		padding: 14px 0 10px;
+		padding: 10px 0 8px;
 		text-align: center;
 		font-family: Georgia, 'Times New Roman', serif;
-		font-size: 28px;
+		font-size: 20px;
 		font-weight: 400;
 		color: #fff;
 	}
@@ -80,13 +72,13 @@
 		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 	}
 	button {
-		padding: 14px 6px;
+		padding: 8px 6px;
 		border: 0;
-		border-bottom: 3px solid transparent;
+		border-bottom: 2px solid transparent;
 		background: none;
 		color: rgba(255, 255, 255, 0.45);
 		font: inherit;
-		font-size: 16px;
+		font-size: 13px;
 		font-weight: 700;
 		cursor: pointer;
 	}
@@ -95,6 +87,6 @@
 		border-bottom-color: #c9dcf5;
 	}
 	.body {
-		padding: 0 14px 14px;
+		padding: 0 12px 12px;
 	}
 </style>

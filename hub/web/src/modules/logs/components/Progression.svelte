@@ -111,8 +111,8 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 4px;
-		width: 118px;
-		padding: 12px 8px;
+		width: 100px;
+		padding: 10px 6px;
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		text-align: center;
@@ -181,15 +181,15 @@
 	.ring {
 		display: grid;
 		place-items: center;
-		width: 64px;
-		height: 64px;
+		width: 52px;
+		height: 52px;
 		border-radius: 50%;
 		background: conic-gradient(#3fd6e8 var(--progress), rgba(255, 255, 255, 0.1) 0);
 	}
 	.ring img {
-		width: 54px;
-		height: 54px;
-		padding: 8px;
+		width: 44px;
+		height: 44px;
+		padding: 7px;
 		border-radius: 50%;
 		background: #141a24;
 		object-fit: contain;
