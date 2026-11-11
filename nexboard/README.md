@@ -306,7 +306,7 @@ die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters
 dem Meter). Die Plugin-Seite in den Meter-Einstellungen geht weiterhin. Das eigenständige A2Tools-Programm hat
 einen eigenen Plugin-Ordner, den die NexBoard nicht sieht. Ist das Modul aus, laufen keine Plugins und
 bekommen keine Spieldaten; installiert bleibt alles. Der
-Plugin-Host ist `daemon/deckbar_daemon/plugins.py` (Dateiprüfung in `plugin_files.py`, Seitenhilfen in `plugin_page.py`), ein Nachbau des Hosts aus dem Submodul; die Seiten
+Plugin-Host ist `daemon/deckbar_daemon/plugins.py` (daneben `plugin_files.py`, `plugin_catalog.py`, `plugin_commands.py`, `plugin_widgets.py`, `plugin_feeds.py`, `plugin_page.py` mit je einer Aufgabe), ein Nachbau des Hosts aus dem Submodul; die Seiten
 kommen unverändert von dort. Hauptfenster sind normale Fenster des Overlay-Programms (damit die Tastatur
 geht), Widgets liegen auf der Overlay-Fläche (`web/overlay/plugins.js`). Spieldaten liefern
 `capture/src/decoders.rs` (Decoder je Opcode) und `capture/src/feed.rs` (Charakter, Feldboss-Karte …). Installiert wird nach `~/.local/share/deckbar/plugins/`, Plugin-Daten liegen
