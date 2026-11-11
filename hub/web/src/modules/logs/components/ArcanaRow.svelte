@@ -14,7 +14,7 @@
 		<div class="row">
 			{#each arcana as card (card.slot_name)}
 				<button class="arcana" onclick={() => onItem?.(card)}>
-					<ItemIcon name={card.name} icon={card.icon} grade={card.grade} size={64} filled />
+					<ItemIcon name={card.name} icon={card.icon} grade={card.grade} size={52} filled />
 					<strong>+{card.enchant}</strong>
 					<small>{card.name}</small>
 				</button>
@@ -43,8 +43,8 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 4px;
-		width: 118px;
-		padding: 12px 8px;
+		width: 100px;
+		padding: 10px 6px;
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		text-align: center;
