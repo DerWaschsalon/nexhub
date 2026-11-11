@@ -2,8 +2,16 @@
 // Gegenstand und der Weg zu Best in Slot durch Neuwürfeln (fehlende ideale Zeilen nach Priorität).
 // Gerechnet wird im Hub (API), hier nur Typen und Farben.
 
-/** Eine Zeile der Seelenbindung: Wert, Höchstwert dieses Gegenstands, Anteil der Top-Spieler mit ihr */
-export type RatedLine = { kind: 'stat' | 'skill'; name: string; value: number; unit: string; max: number | null; share: number };
+/** Eine Zeile der Seelenbindung: Wert, Höchstwert dieses Gegenstands, Anteil der Top-Spieler mit ihr.
+ *  Manasteine und Göttersteine (stone, godstone) kommen nur von den BiS-Listen. */
+export type RatedLine = {
+	kind: 'stat' | 'skill' | 'stone' | 'godstone';
+	name: string;
+	value: number;
+	unit: string;
+	max: number | null;
+	share: number;
+};
 
 /** Ziel beim Neuwürfeln und was es an Punkten bringt (niedrigster bis höchster Wurf) */
 export type RerollTarget = { name: string; gain_lo: number; gain_hi: number };

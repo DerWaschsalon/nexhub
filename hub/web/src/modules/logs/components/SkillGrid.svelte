@@ -1,14 +1,16 @@
 <!-- Skills wie im Spiel: Symbol mit Stufe, Schloss für nicht gelernte, „E“ für angelegte Stigmen,
      Name darunter. Angelegt, aber nicht gelernt: gestrichelt rot. Die Stufe kommt so von NC: sie enthält
-     die Boni aus Daevanion und Ausrüstung schon (wie im Spiel und auf shugo.gg, höchstens 20). -->
+     die Boni aus Daevanion und Ausrüstung schon (wie im Spiel und auf shugo.gg, höchstens 20). Die
+     BiS-Listen geben je Skill den Anteil der Top-Spieler mit (`share`), er steht unter dem Namen. -->
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData } from '../api.ts';
 
-	let { data }: { data: CharacterData } = $props();
+	type Skill = CharacterData['skills'][number] & { share?: number };
+
+	let { data }: { data: { skills: Skill[] } } = $props();
 	const skills = $derived(data.skills);
 
-	type Skill = CharacterData['skills'][number];
 	function title(s: Skill): string {
 		const parts = [t('logs.char.level', { n: s.level })];
 		if (s.equipped && !s.learned) parts.push(t('logs.char.notLearned'));
@@ -45,6 +47,7 @@
 						{#if g.key === 'stigma' && s.equipped && s.learned}<span class="equip">E</span>{/if}
 					</span>
 					<span class="name">{s.name}</span>
+					{#if s.share !== undefined}<span class="share num">{Math.round(s.share * 100)} %</span>{/if}
 				</li>
 			{/each}
 		</ul>
@@ -67,6 +70,11 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
 		gap: 12px 8px;
+	}
+	.share {
+		font-size: 12px;
+		font-weight: 600;
+		color: #f2c522;
 	}
 	li {
 		display: flex;

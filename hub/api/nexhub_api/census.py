@@ -1,8 +1,8 @@
-"""Zählung der Top-Spieler je Klasse für die Bewertung der Ausrüstung (rating.py), einmal am Tag.
+"""Zählung der Top-Spieler je Klasse für die Bewertung der Ausrüstung (rating.py), einmal je Stunde.
 
-Ablauf je Klasse: Rangliste des neuesten Raids mit genug Einträgen von Abyss Logs (abysslogs.py) →
-Server über die NC-Suche (die Rangliste nennt keinen) → Ausrüstung mit Werten (NC.gear) → Zählung
-(rating.count_players). Gespeichert wird nur die Zählung, keine Namen und keine Profile.
+Gezählt wird der Bestand der BiS-Listen (bis_collector.py): bis zu 200 Top-Spieler je Klasse, rollierend
+über den Tag gesammelt. Armory und BiS-Listen sehen so dieselben Spieler. Gespeichert wird nur die Zählung
+(rating.count_players), keine Namen und keine Profile.
 
 Gezählt werden nur Klassen, die in der Armory vorkommen. Dazu die Würfeltabellen von MetaBot
 (metabot.py) für alle Gegenstände der Gezählten und der Armory-Charaktere, je Gegenstand einmal pro
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -20,16 +21,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from . import metabot
-from .abysslogs import REGION, AbyssError, top_players
-from .aion2 import CLASS_KEYS, NC, NCError, NotFound, combat_power, localized
+from .abysslogs import REGION
+from .aion2 import CLASS_KEYS, localized
+from .bis_collector import pool
+from .bis_stats import MIN_SAMPLE
 from .db import aware
-from .models import Character, ClassCensus, ItemRolls
+from .models import BisSample, Character, ClassCensus, ItemRolls
 from .rating import add_tops, count_players
 
 log = logging.getLogger(__name__)
 
-PLAYERS = 30  # Top-Spieler je Klasse (Wunsch Navonex)
-CENSUS_EVERY = timedelta(days=1)
+CENSUS_EVERY = timedelta(hours=1)  # der Bestand ändert sich alle 5 Minuten, das Zählen kostet kein Netz
 ROLLS_EVERY = timedelta(days=7)
 METABOT_PAUSE = 3.0  # Sekunden zwischen zwei Seiten von MetaBot
 CHECK_EVERY = 3600  # Sekunden zwischen zwei Blicken auf fällige Klassen
@@ -47,11 +49,19 @@ def character_class(row: Character) -> str | None:
     return CLASS_BY_NAME.get(name)
 
 
-class Census:
-    """Zählt Klassen im Hintergrund; jede höchstens einmal am Tag."""
+def group_label(samples: list[BisSample]) -> str:
+    """Woher die Spieler stammen, z. B. „EU · Ludra · Hard 64 · Normal 136“."""
+    raids = Counter(s.raid for s in samples)
+    tiers = Counter(s.tier for s in samples)
+    parts = [REGION.upper(), raids.most_common(1)[0][0]] + [f"{tier} {n}" for tier, n in sorted(tiers.items())]
+    return " · ".join(parts)
 
-    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], nc: NC, http: httpx.AsyncClient) -> None:
-        self.sessionmaker, self.nc, self.http = sessionmaker, nc, http
+
+class Census:
+    """Zählt Klassen im Hintergrund; jede höchstens einmal je Stunde."""
+
+    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], http: httpx.AsyncClient) -> None:
+        self.sessionmaker, self.http = sessionmaker, http
 
     async def daily(self) -> None:
         """Läuft neben dem Webserver, bis der Hub beendet wird."""
@@ -65,7 +75,7 @@ class Census:
             await asyncio.sleep(CHECK_EVERY)
 
     async def due(self, now: datetime | None = None) -> list[str]:
-        """Klassen der Armory ohne Zählung oder mit einer älter als einen Tag."""
+        """Klassen der Armory ohne Zählung oder mit einer älteren als CENSUS_EVERY."""
         limit = (now or datetime.now(UTC)) - CENSUS_EVERY
         async with self.sessionmaker() as db:
             classes = {character_class(row) for row in (await db.scalars(select(Character))).all()}
@@ -73,22 +83,13 @@ class Census:
         return sorted(c for c in classes if c and c not in fresh)
 
     async def count(self, cls: str) -> None:
-        """Eine Klasse zählen und speichern. Fehler lassen die vorige Zählung stehen."""
-        try:
-            label, entries = await top_players(self.http, cls, PLAYERS)
-        except AbyssError as e:
-            log.warning("Zählung %s: %s", cls, e)
+        """Eine Klasse aus dem Bestand zählen und speichern. Zu wenige Spieler: vorige Zählung bleibt."""
+        async with self.sessionmaker() as db:
+            samples = await pool(db, cls)
+        if len(samples) < MIN_SAMPLE:
+            log.info("Zählung %s: erst %d Spieler im Bestand", cls, len(samples))
             return
-        equipments: list[list[dict]] = []
-        for entry in entries:
-            if len(equipments) >= PLAYERS:
-                break
-            gear = await self._gear(entry, cls)
-            if gear:
-                equipments.append(gear)
-        if not equipments:
-            log.warning("Zählung %s: keine Ausrüstung gefunden", cls)
-            return
+        equipments = [localized(s.data, "en").get("equipment") or [] for s in samples]
         items_by_slot: dict[str, set[str]] = {}
         for gear in equipments:
             for item in gear:
@@ -97,27 +98,10 @@ class Census:
         data = add_tops({"slots": count_players(equipments)}, items_by_slot, rolls, cls)
         async with self.sessionmaker() as db:
             row = await db.get(ClassCensus, cls) or ClassCensus(cls=cls)
-            row.group_label, row.data, row.fetched_at = f"{REGION.upper()} · {label}", data, datetime.now(UTC)
+            row.group_label, row.data, row.fetched_at = group_label(samples), data, datetime.now(UTC)
             db.add(row)
             await db.commit()
-        log.info("Zählung %s: %d Spieler (%s)", cls, len(equipments), label)
-
-    async def _gear(self, entry: dict, cls: str) -> list[dict] | None:
-        """Ausrüstung zu einem Namen der Rangliste. Gibt es den Namen mehrfach, gewinnt die Kampfkraft,
-        die der Rangliste am nächsten liegt. Nicht auffindbar: None, der nächste rückt nach."""
-        name = entry["playerName"]
-        try:
-            hits = [h for h in await self.nc.search(name, REGION, cls) if h["name"].casefold() == name.casefold()]
-            if len(hits) > 1:
-                cp = entry.get("combatPower") or 0
-                snaps = [(h, await self.nc.snapshot(h["server_id"], h["character_id"], "en")) for h in hits]
-                hits = [min(snaps, key=lambda hs: abs((combat_power(hs[1]) or 0) - cp))[0]]
-            if not hits:
-                return None
-            return await self.nc.gear(hits[0]["server_id"], hits[0]["character_id"])
-        except (NotFound, NCError) as e:
-            log.info("Zählung: %s übersprungen (%s)", name, e)
-            return None
+        log.info("Zählung %s: %d Spieler", cls, len(samples))
 
     async def armory_items(self) -> set[str]:
         """Englische Namen aller Gegenstände der Armory-Charaktere."""

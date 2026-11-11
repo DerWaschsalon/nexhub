@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from .aion2 import NC
 from .armory import Armory
+from .bis_collector import BisCollector
 from .census import Census
 from .characters import Fetcher
 from .config import Settings
@@ -39,10 +40,13 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
             nc = NC(app.state.http, settings.hub_aion2_pause)
             app.state.characters = Fetcher(app.state.sessionmaker, nc)
             app.state.armory = Armory(app.state.sessionmaker, nc)
-            census = Census(app.state.sessionmaker, nc, app.state.http)
-            # liegengebliebene Abrufe vom letzten Lauf und der tägliche Armory-Abruf; laufen neben dem Webserver
+            census = Census(app.state.sessionmaker, app.state.http)
+            collector = BisCollector(app.state.sessionmaker, nc, app.state.http)
+            # liegengebliebene Abrufe vom letzten Lauf, der tägliche Armory-Abruf, der Sammler der BiS-Listen
+            # und die Zählung daraus; laufen neben dem Webserver
             tasks = [asyncio.create_task(app.state.characters.resume()),
                      asyncio.create_task(app.state.armory.daily()),
+                     asyncio.create_task(collector.run()),
                      asyncio.create_task(census.daily())]
         yield
         for task in tasks:

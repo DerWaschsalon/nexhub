@@ -13,7 +13,11 @@
 		data,
 		ratings,
 		onItem
-	}: { data: CharacterData; ratings?: Map<string, Rating>; onItem: (item: CharacterItem) => void } = $props();
+	}: {
+		data: Pick<CharacterData, 'equipment' | 'wing' | 'pet'>;
+		ratings?: Map<string, Rating>;
+		onItem: (item: CharacterItem) => void;
+	} = $props();
 
 	const bySlot = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
 	// „Brooch1“ → „Brooch“: die Nummer unterscheidet nur die beiden gleichen Plätze

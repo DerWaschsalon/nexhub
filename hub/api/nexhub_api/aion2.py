@@ -141,6 +141,20 @@ def _item_detail(d: dict) -> dict:
     return detail
 
 
+def _equipment_item(e: dict) -> dict:
+    """Ein Platz der Ausrüstungsliste von NC, ohne Werte (die holt NC.item)."""
+    return {"id": e.get("id"), "slot": e.get("slotPos"), "slot_name": e.get("slotPosName"),
+            "name": e.get("name"), "grade": e.get("grade"), "enchant": e.get("enchantLevel") or 0,
+            "exceed": e.get("exceedLevel") or 0, "icon": e.get("icon") or None}
+
+
+def _skills(equip: dict) -> list[dict]:
+    """Skills aus der Antwort von /equipment: aktive, passive und Stigmen (Kategorie „Dp“)."""
+    return [{"name": s.get("name"), "category": s.get("category"), "level": s.get("skillLevel") or 0,
+             "learned": _flag(s.get("acquired")), "equipped": _flag(s.get("equip")), "icon": s.get("icon") or None}
+            for s in (equip.get("skill") or {}).get("skillList") or []]
+
+
 class NC:
     def __init__(self, http: httpx.AsyncClient, pause: float = 0.3) -> None:
         self.http, self.pause = http, pause
@@ -246,21 +260,20 @@ class NC:
             detail["gain"] = await self._gain_at(server_id, character_id, lang, item, d, top)
         return detail
 
-    async def gear(self, server_id: int, character_id: str, lang: str = "en") -> list[dict]:
-        """Nur die Ausrüstung samt Werten je Gegenstand, ohne Profil, Daevanion und Verzauberungsgewinn:
-        das Nötigste für die Zählung der Top-Spieler (census.py), rund 26 statt 50 Anfragen."""
+    async def gear(self, server_id: int, character_id: str, lang: str = "en") -> dict:
+        """Nur Ausrüstung samt Werten je Gegenstand und Skills, ohne Profil, Daevanion und
+        Verzauberungsgewinn: das Nötigste für die BiS-Listen (bis_collector.py), rund 26 statt 50 Anfragen."""
         q = {"lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id, "characterId": character_id}
         equip = await self._get(f"{SITE}/equipment", q)
         if not isinstance(equip.get("equipment"), dict):
             raise NCError("Format unbekannt: Ausrüstung fehlt")
-        gear = []
+        equipment = []
         for e in equip["equipment"].get("equipmentList") or []:
-            item = {"id": e.get("id"), "slot": e.get("slotPos"), "slot_name": e.get("slotPosName"),
-                    "name": e.get("name")}
-            d = await self._item(server_id, character_id, lang, item, e.get("enchantLevel") or 0) if item["id"] else {}
+            item = _equipment_item(e)
+            d = await self._item(server_id, character_id, lang, item, item["enchant"]) if item["id"] else {}
             item["detail"] = _item_detail(d) if d.get("id") else None
-            gear.append(item)
-        return gear
+            equipment.append(item)
+        return {"equipment": equipment, "skills": _skills(equip)}
 
     async def _item(self, server_id: int, character_id: str, lang: str, item: dict, enchant: int) -> dict:
         """Ein Gegenstand, wie er bei Verzauberung `enchant` aussähe. {} = nicht (mehr) da."""
@@ -317,9 +330,7 @@ class NC:
 
         equipment = []
         for e in equip["equipment"].get("equipmentList") or []:
-            item = {"id": e.get("id"), "slot": e.get("slotPos"), "slot_name": e.get("slotPosName"),
-                    "name": e.get("name"), "grade": e.get("grade"), "enchant": e.get("enchantLevel") or 0,
-                    "exceed": e.get("exceedLevel") or 0, "icon": e.get("icon") or None}
+            item = _equipment_item(e)
             if items:
                 item["detail"] = await self.item(server_id, character_id, lang, item)
             equipment.append(item)
@@ -343,9 +354,6 @@ class NC:
             "equipment": equipment,
             "pet": _pick(petwing.get("pet"), name="name", level="level", icon="icon"),
             "wing": _pick(petwing.get("wing"), name="name", grade="grade", enchant="enchantLevel", icon="icon"),
-            "skills": [{"name": s.get("name"), "category": s.get("category"), "level": s.get("skillLevel") or 0,
-                        "learned": _flag(s.get("acquired")), "equipped": _flag(s.get("equip")),
-                        "icon": s.get("icon") or None}
-                       for s in (equip.get("skill") or {}).get("skillList") or []],
+            "skills": _skills(equip),
             "daevanion": boards,
         }

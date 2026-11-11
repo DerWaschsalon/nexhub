@@ -1,8 +1,10 @@
 <!-- Gegenstandsfenster wie im Spiel: Kopf im Verlauf der Seltenheit mit großem Bild, darunter
      Grundwerte, Durchbruch (orange), Seelenbindung mit Balken, Manasteine, Gottstein, Skills und bei
      Arkana das Set (erreichte Stufen hell). Mit `rating` dazu die Note, je Roll Höchstwert und Anteil
-     der Top-Spieler und der Weg zu S+ (rating.ts). -->
+     der Top-Spieler und der Weg zu S+ (rating.ts). Die BiS-Listen geben nur `lines` (Anteile je Zeile,
+     auch Manasteine und Göttersteine) und unter dem Kopf ihren eigenen Teil (`children`). -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterItem } from '../api.ts';
 	import { gradeColor } from '../grades.ts';
@@ -10,10 +12,17 @@
 	import RatingBadge from './RatingBadge.svelte';
 	import UpgradeSteps from './UpgradeSteps.svelte';
 
-	let { item, rating, onclose }: { item: CharacterItem; rating?: Rating; onclose: () => void } = $props();
+	let {
+		item,
+		rating,
+		lines,
+		children,
+		onclose
+	}: { item: CharacterItem; rating?: Rating; lines?: RatedLine[]; children?: Snippet; onclose: () => void } = $props();
 
-	// Bewertete Zeile zu einem Roll oder Skill des Gegenstands, verbunden über den Namen
-	const rated = (name: string): RatedLine | undefined => rating?.lines.find((l) => l.name === name);
+	// Bewertete Zeile zu einem Roll, Skill oder Stein des Gegenstands, verbunden über Art und Namen
+	const rated = (kind: RatedLine['kind'], name: string): RatedLine | undefined =>
+		(lines ?? rating?.lines)?.find((l) => l.kind === kind && l.name === name);
 
 	const d = $derived(item.detail);
 	const main = $derived(d?.main.filter((s) => !s.exceed) ?? []);
@@ -53,6 +62,7 @@
 			</div>
 			{#if item.icon}<img src={item.icon} alt="" referrerpolicy="no-referrer" onerror={hide} />{/if}
 		</header>
+		{#if children}<div class="block">{@render children()}</div>{/if}
 
 		{#if d === null}
 			<p class="block dim">{t('logs.char.notWorn')}</p>
@@ -79,7 +89,7 @@
 					<dl>
 						{#each d.sub as s, i (i)}
 							<dt>{s.name}</dt>
-							<dd>{s.value}{@render ratedTail(rated(s.name))}</dd>
+							<dd>{s.value}{@render ratedTail(rated('stat', s.name))}</dd>
 						{/each}
 					</dl>
 				</div>
@@ -90,7 +100,7 @@
 					{#each d.stones as s, i (i)}
 						<li style:--stone={gradeColor(s.grade, '#d8dde6')}>
 							{#if s.icon}<img src={s.icon} alt="" width="30" height="30" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
-							<span>{s.name}{s.value}</span>
+							<span>{s.name}{s.value}</span>{@render ratedTail(rated('stone', s.name))}
 						</li>
 					{/each}
 				</ul>
@@ -100,7 +110,7 @@
 				<div class="block godstone">
 					{#if g.icon}<img src={g.icon} alt="" width="36" height="36" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
 					<div>
-						<strong style:color={gradeColor(g.grade, 'inherit')}>{g.name}</strong>
+						<strong style:color={gradeColor(g.grade, 'inherit')}>{g.name}</strong>{@render ratedTail(rated('godstone', g.name))}
 						{#if g.desc}<p>{g.desc}</p>{/if}
 					</div>
 				</div>
@@ -111,7 +121,7 @@
 					{#each d.skills as s, i (i)}
 						<li>
 							{#if s.icon}<img src={s.icon} alt="" width="26" height="26" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
-							<span>{s.name}</span><b>+{s.level}{@render ratedTail(rated(s.name))}</b>
+							<span>{s.name}</span><b>+{s.level}{@render ratedTail(rated('skill', s.name))}</b>
 						</li>
 					{/each}
 				</ul>
@@ -275,6 +285,10 @@
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px 14px;
+	}
+	/* mit Anteilen (BiS-Listen) braucht jeder Stein die ganze Breite */
+	.stones:has(.share) {
+		grid-template-columns: 1fr;
 	}
 	.stones li {
 		display: flex;

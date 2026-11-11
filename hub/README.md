@@ -242,14 +242,28 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
 - Skill-Stufen zeigt das Profil so, wie NC sie schickt: die Stufe in der Skill-Liste enthält die Boni
   aus Daevanion und Ausrüstung schon (wie im Spiel und auf shugo.gg, höchstens 20). Früher wurden sie
   noch einmal aufaddiert (bis 29 statt 20), das ist entfernt.
+- BiS-Listen (Vorbild archon.gg), Modul `modules/bis`, Seite `/hub/bis`, API `GET /api/bis` und
+  `GET /api/bis/{cls}?lang=de&tier=Hard`:
+  - **Sammler** (`bis_collector.py`, Takt alle 5 Minuten, 4 Spieler je Takt): Ist die Warteschlange
+    (`bis_queue`) leer, kommen je Klasse 200 Namen aus dem neuesten Raid mit genug Einträgen bei Abyss Logs
+    hinein (`abysslogs.top_players`, Hard zuerst, mit Normal aufgefüllt). Je Takt die besten offenen Namen
+    über alle Klassen: Server über die NC-Suche, Ausrüstung mit Werten und Skills in beiden Sprachen über
+    `NC.gear` (rund 50 Anfragen, gut eine Minute je Spieler). Ein Durchlauf dauert rund anderthalb Tage.
+  - **Bestand** (`bis_samples`): höchstens 200 je Klasse, jeder Spieler einmal (SHA-256 aus Server und
+    Charakter-ID, kein Name); ein Neuer ersetzt bei vollem Bestand den ältesten. Daraus rechnen die
+    BiS-Listen und die Zählung für die Bewertung, Armory und BiS-Listen sehen also dieselben Spieler.
+  - **Auswertung** (`bis_stats.py`, rein): je Platz der typische Gegenstand im Format der Armory
+    (häufigster Gegenstand, Median der Verzauberung, Zusatzwerte mit Median, häufige Manasteine,
+    Göttersteine, Skills), dazu der Anteil je Zeile im Format von `rating.py` und die drei häufigsten
+    Gegenstände; Skills und Stigmen mit Anteil und Median der Stufe. Unter 10 % fällt weg.
+  - **Web**: dieselben Bausteine wie das Profil (`EquipmentPanel`, `ItemTooltip` mit `lines`,
+    `SkillGrid` mit `share`).
 - Einen Build-Check gegen die Top-Spieler (Rangliste von Abyss Logs) gab es bis November 2026; Migration
   0010 entfernt seine Tabelle `build_checks`, der Code steht in der Git-Historie (Stand `bb2a01a`).
 - Bewertung der Ausrüstung (Vorbild kisk.app/scoring), Feld `ratings` in `GET /api/armory/{id}` je Sprache:
-  - **Zählung** (`census.py`, einmal am Tag je Klasse, die in der Armory vorkommt): 30 Top-Spieler aus dem
-    neuesten Raid mit genug Einträgen bei Abyss Logs (`abysslogs.py`, Hard vor Normal), Server über die
-    NC-Suche, Ausrüstung über `NC.gear` (nur Ausrüstung mit Werten, rund 26 Anfragen je Spieler).
-    Gespeichert in `class_census` nur je Platz, wie viele welche Zeile der Seelenbindung tragen, und der
-    größte Wert je Zeile; keine Namen.
+  - **Zählung** (`census.py`, einmal je Stunde je Klasse, die in der Armory vorkommt): zählt den Bestand
+    der BiS-Listen (unten), ab 10 Spielern. Gespeichert in `class_census` nur je Platz, wie viele welche
+    Zeile der Seelenbindung tragen, und der größte Wert je Zeile; keine Namen.
   - **Würfeltabellen** (`metabot.py`, Tabelle `item_rolls`): Bereich und Chance je Zeile und die
     Skill-Optionen je Klasse von MetaBot.GG, englisch und deutsch (`/de_DE/`, gleiche Reihenfolge), je
     Gegenstand einmal pro Woche, 3 s Pause zwischen Seiten. MetaBot erlaubt das mit Link auf die Seite

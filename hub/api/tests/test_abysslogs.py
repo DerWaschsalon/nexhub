@@ -24,11 +24,14 @@ def test_raids_neueste_zuerst_hard_vor_normal():
 def test_neuester_raid_mit_genug_eintraegen():
     fake = FakeAbyss()
     label, players = run(fake, lambda http: top_players(http, "ranger", 5))
-    assert label == "Altboss · Hard"
+    assert label == "Altboss"
     assert [p["playerName"] for p in players] == [f"Bogenheld{i}" for i in range(1, 6)]
-    # ohne genug Einträge im Hard der Normal-Modus desselben Raids
-    fake.boards = {8002: [f"Normalheld{i}" for i in range(5)]}
-    assert run(fake, lambda http: top_players(http, "ranger", 5))[0] == "Altboss · Normal"
+    assert {p["tier"] for p in players} == {"Hard"}
+    # Hard reicht nicht: mit Normal desselben Raids auffüllen, wer in beiden steht, zählt als Hard
+    fake.boards = {8001: ["Bogenheld1", "Bogenheld2"], 8002: ["Bogenheld2", "Normalheld1", "Normalheld2"]}
+    _, players = run(fake, lambda http: top_players(http, "ranger", 4))
+    assert [(p["playerName"], p["tier"]) for p in players] == [
+        ("Bogenheld1", "Hard"), ("Bogenheld2", "Hard"), ("Normalheld1", "Normal"), ("Normalheld2", "Normal")]
 
 
 def test_je_name_der_beste_echte_kampf():

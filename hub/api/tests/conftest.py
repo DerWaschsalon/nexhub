@@ -9,6 +9,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from nexhub_api.bis_collector import BisCollector
 from nexhub_api.config import Settings
 from nexhub_api.db import migrate
 from nexhub_api.main import create_app
@@ -72,6 +73,15 @@ class FakeDiscord:
                 return httpx.Response(404, json={"message": "Unknown Guild"})
             return httpx.Response(200, json={"roles": [str(r) for r in self.roles[self.user]]})
         return httpx.Response(404)
+
+
+@pytest.fixture(autouse=True)
+def no_background_collector(monkeypatch):
+    """Der Sammler der BiS-Listen läuft im Test nicht neben dem Hub her; test_bis.py ruft seine Takte selbst
+    auf. Sonst sammeln zwei Sammler gleichzeitig in dieselbe Datenbank."""
+    async def idle(self: BisCollector) -> None:
+        return None
+    monkeypatch.setattr(BisCollector, "run", idle)
 
 
 @pytest.fixture
