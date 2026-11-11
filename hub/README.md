@@ -249,6 +249,8 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
     hinein (`abysslogs.top_players`, Hard zuerst, mit Normal aufgefüllt). Je Takt die besten offenen Namen
     über alle Klassen: Server über die NC-Suche, Ausrüstung mit Werten und Skills in beiden Sprachen über
     `NC.gear` (rund 50 Anfragen, gut eine Minute je Spieler). Ein Durchlauf dauert rund anderthalb Tage.
+    Anlauf (erster Start, Klasse unter 150 Spielern): 5 Spieler gleichzeitig ohne Pause, rund 3 Anfragen je
+    Sekunde an NC, der Bestand ist nach etwa 8 Stunden voll.
   - **Bestand** (`bis_samples`): höchstens 200 je Klasse, jeder Spieler einmal (SHA-256 aus Server und
     Charakter-ID, kein Name); ein Neuer ersetzt bei vollem Bestand den ältesten. Daraus rechnen die
     BiS-Listen und die Zählung für die Bewertung, Armory und BiS-Listen sehen also dieselben Spieler.
