@@ -110,7 +110,7 @@
 		align-items: center;
 		gap: 6px;
 		padding: 4px 10px 4px 4px;
-		border-radius: 10px;
+		border-radius: var(--radius);
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid var(--edge-soft);
 		font-size: 13px;

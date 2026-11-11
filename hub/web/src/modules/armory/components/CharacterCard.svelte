@@ -53,7 +53,7 @@
 	.portrait {
 		width: 52px;
 		height: 52px;
-		border-radius: 12px;
+		border-radius: var(--radius);
 		object-fit: cover;
 		flex-shrink: 0;
 	}

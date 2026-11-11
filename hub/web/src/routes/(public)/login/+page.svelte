@@ -70,7 +70,7 @@
 		display: block;
 		user-select: all;
 		padding: 8px 10px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: rgba(0, 0, 0, 0.35);
 	}
 	.btn.large {

@@ -176,7 +176,7 @@
 		font-size: 13px;
 		overflow-wrap: anywhere;
 		padding: 3px 8px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		background: rgba(0, 0, 0, 0.35);
 	}
 	code.blur {

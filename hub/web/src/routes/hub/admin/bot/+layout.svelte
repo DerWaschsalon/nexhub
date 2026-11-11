@@ -111,7 +111,7 @@
 	}
 	nav a {
 		padding: 6px 12px;
-		border-radius: 10px;
+		border-radius: var(--radius);
 		border: 1px solid transparent;
 		color: var(--dim);
 		font-size: 14px;
@@ -126,7 +126,6 @@
 		color: var(--text);
 		background: rgba(255, 255, 255, 0.1);
 		border-color: var(--edge-soft);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 	}
 	nav a:focus-visible {
 		outline: 2px solid var(--accent);

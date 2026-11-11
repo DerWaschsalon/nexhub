@@ -20,6 +20,6 @@
 		letter-spacing: -0.01em;
 	}
 	img {
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 </style>

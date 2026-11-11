@@ -34,7 +34,7 @@
 		{#if note?.(p)}<small>{note(p)}</small>{/if}
 	</span>
 	<span class="bar" aria-hidden="true">
-		<span style:width="{(100 * p.damage) / max}%" style:background={color} style:box-shadow="0 0 18px -4px {color}"></span>
+		<span style:width="{(100 * p.damage) / max}%" style:background={color}></span>
 	</span>
 	<span class="value num" title="{formatNumber(p.damage)} {t('logs.skills.col.damage')}">
 		{formatCompact(p.damage)}<small>{Math.round((100 * p.damage) / total)} %</small>

@@ -18,5 +18,5 @@
 </svelte:head>
 
 <LoadingBar />
-<div class="backdrop" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="backdrop" aria-hidden="true"></div>
 {@render children()}

@@ -118,7 +118,6 @@
 	.fights a.active {
 		border-color: rgba(106, 211, 255, 0.55);
 		background: rgba(106, 211, 255, 0.1);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 	}
 	.fights span {
 		display: inline-flex;

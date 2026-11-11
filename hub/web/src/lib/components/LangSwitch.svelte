@@ -16,7 +16,7 @@
 		display: inline-flex;
 		flex-shrink: 0;
 		padding: 3px;
-		border-radius: 999px;
+		border-radius: var(--radius);
 		border: 1px solid var(--edge-soft);
 		background: rgba(255, 255, 255, 0.04);
 	}
@@ -29,7 +29,7 @@
 		font-weight: 650;
 		letter-spacing: 0.04em;
 		padding: 4px 10px;
-		border-radius: 999px;
+		border-radius: var(--radius);
 		cursor: pointer;
 	}
 	button.active {

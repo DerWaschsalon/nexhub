@@ -100,7 +100,7 @@
 		gap: 12px;
 	}
 	.hits img {
-		border-radius: 8px;
+		border-radius: var(--radius);
 		object-fit: cover;
 	}
 	.hit {

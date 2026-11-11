@@ -1,6 +1,8 @@
 /*
- * NexHub-Design: dunkles „Liquid Glass“.
+ * NexHub-Design: dunkle, ruhige Flächen mit engem Radius.
  * Farben und Maße stehen als Variablen oben; Bausteine (.glass, .btn, .chip, .table) darunter.
+ * Nach den Design-Regeln gibt es je Seite höchstens einen großen Effekt; die Bausteine selbst bleiben
+ * ohne Unschärfe, Verlauf und Leuchten. .glass heißt aus Gewohnheit so und ist die normale Karte.
  * Seiten benutzen diese Klassen und bringen nur noch ihr eigenes Layout mit.
  * Schriften wie in den Design-Regeln vom 11.11.2026 („Ban the AI Look“): Unbounded für Überschriften,
  * IBM Plex für Text, lokal eingebunden (Fontsource), keine Anfrage an fremde Server.
@@ -24,9 +26,13 @@
 	--danger: #ff6b6b;
 	--edge: rgba(255, 255, 255, 0.14);
 	--edge-soft: rgba(255, 255, 255, 0.08);
-	--radius: 22px;
-	--radius-sm: 12px;
-	--blur: 28px;
+	/* Flächen: Karte, Fläche in der Karte (.panel, Eingaben), gewählt/gehovert */
+	--surface: #0a0c17;
+	--surface-2: #141829;
+	--surface-3: #1b2036;
+	--on-accent: #03131b;
+	--radius: 6px;
+	--radius-sm: 4px;
 	--font-heading: 'Unbounded Variable', system-ui, sans-serif;
 	--font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -73,92 +79,32 @@ a {
 	color: var(--dim);
 }
 
-/* Hintergrund: langsam treibende Farbflecken, durch das Glas hindurch sichtbar */
+/* Hintergrund: ein ruhiger Schein von unten, keine Bewegung */
 .backdrop {
 	position: fixed;
 	inset: 0;
 	z-index: -1;
-	overflow: hidden;
 	background: radial-gradient(1200px 800px at 50% 120%, #0c1030, transparent 70%), var(--bg);
 }
-.backdrop span {
-	position: absolute;
-	width: 46vmax;
-	height: 46vmax;
-	border-radius: 50%;
-	filter: blur(70px);
-	opacity: 0.55;
-	animation: drift 38s ease-in-out infinite alternate;
-}
-.backdrop span:nth-child(1) {
-	background: radial-gradient(circle, #5b3df5, transparent 65%);
-	top: -18vmax;
-	left: -12vmax;
-}
-.backdrop span:nth-child(2) {
-	background: radial-gradient(circle, #0ea5e9, transparent 65%);
-	bottom: -22vmax;
-	right: -14vmax;
-	animation-delay: -12s;
-}
-.backdrop span:nth-child(3) {
-	background: radial-gradient(circle, #f97316, transparent 65%);
-	top: 30%;
-	right: 25%;
-	width: 26vmax;
-	height: 26vmax;
-	opacity: 0.22;
-	animation-delay: -24s;
-}
-@keyframes drift {
-	to {
-		transform: translate(8vmax, 6vmax) scale(1.12);
-	}
-}
-@media (prefers-reduced-motion: reduce) {
-	.backdrop span {
-		animation: none;
-	}
-}
 
-/* Glas: halbdurchsichtig, unscharfer Hintergrund, helle Oberkante wie eine Lichtkante */
+/* Karte: deckende Fläche mit feiner Kante */
 .glass {
 	position: relative;
-	background: linear-gradient(150deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 55%);
-	backdrop-filter: blur(var(--blur)) saturate(170%);
-	-webkit-backdrop-filter: blur(var(--blur)) saturate(170%);
-	border: 1px solid var(--edge);
+	background: var(--surface);
+	border: 1px solid var(--edge-soft);
 	border-radius: var(--radius);
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.24),
-		inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-		0 24px 60px -24px rgba(0, 0, 0, 0.75);
-}
-.glass::before {
-	content: '';
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	pointer-events: none;
-	background: radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.1), transparent 55%);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-	.glass {
-		background: rgba(20, 22, 40, 0.92);
-	}
 }
 .pad {
 	padding: 24px;
 }
-/* Ruhige Fläche ohne Glas für dichte Inhalte (Charakterfenster: Stat Info, Skills); enger Radius nach den
-   Design-Regeln vom 11.11.2026, der große Effekt der Seite ist die Figur */
+/* Fläche für dichte Inhalte, auch innerhalb einer Karte (Charakterfenster: Stat Info, Skills) */
 .panel {
-	background: linear-gradient(#1c2433, #171e2a);
-	border: 1px solid rgba(255, 255, 255, 0.1);
-	border-radius: 6px;
+	background: var(--surface-2);
+	border: 1px solid var(--edge-soft);
+	border-radius: var(--radius);
 }
 
-/* Knöpfe: Glaspillen; .primary leuchtet im Akzentverlauf */
+/* Knöpfe: flach; .primary in der Akzentfarbe */
 .btn {
 	display: inline-flex;
 	align-items: center;
@@ -171,17 +117,16 @@ a {
 	text-decoration: none;
 	cursor: pointer;
 	padding: 9px 16px;
-	border-radius: 999px;
+	border-radius: var(--radius);
 	border: 1px solid var(--edge);
-	background: rgba(255, 255, 255, 0.07);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	background: var(--surface-2);
 	transition:
 		background 0.15s,
 		transform 0.15s,
 		border-color 0.15s;
 }
 .btn:hover {
-	background: rgba(255, 255, 255, 0.13);
+	background: var(--surface-3);
 }
 .btn:active {
 	transform: scale(0.98);
@@ -191,12 +136,9 @@ a {
 	cursor: default;
 }
 .btn.primary {
-	color: #071019;
-	border-color: rgba(255, 255, 255, 0.35);
-	background: linear-gradient(135deg, var(--accent), var(--accent-2));
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.5),
-		0 8px 28px -8px rgba(106, 211, 255, 0.55);
+	color: var(--on-accent);
+	border-color: transparent;
+	background: var(--accent);
 }
 .btn.primary:hover {
 	filter: brightness(1.08);
@@ -220,8 +162,8 @@ a {
 	display: inline-block;
 	font-size: 12px;
 	font-weight: 600;
-	padding: 2px 10px;
-	border-radius: 999px;
+	padding: 2px 8px;
+	border-radius: var(--radius-sm);
 	background: rgba(255, 255, 255, 0.08);
 	border: 1px solid var(--edge-soft);
 	color: var(--dim);
@@ -247,7 +189,7 @@ a {
 /* Hinweis- und Fehlerkästen */
 .notice {
 	padding: 12px 16px;
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius);
 	border: 1px solid rgba(251, 191, 36, 0.35);
 	background: rgba(251, 191, 36, 0.1);
 }
@@ -312,7 +254,7 @@ a {
 	color: var(--text);
 	background: rgba(0, 0, 0, 0.3);
 	border: 1px solid var(--edge);
-	border-radius: var(--radius-sm);
+	border-radius: var(--radius);
 	padding: 10px 12px;
 }
 textarea.input {
@@ -321,7 +263,7 @@ textarea.input {
 }
 select.input option,
 select.input optgroup {
-	background: #141628;
+	background: var(--surface-2);
 }
 .input:focus {
 	outline: none;
@@ -355,7 +297,7 @@ select.input optgroup {
 	text-align: right;
 }
 
-/* Reiter: Unterseiten (Links) oder Ansichten (Knöpfe) als Pillenreihe; .active = gewählt */
+/* Reiter: Unterseiten (Links) oder Ansichten (Knöpfe) als Reihe; .active = gewählt */
 .tabs {
 	display: flex;
 	align-items: center;
@@ -372,7 +314,7 @@ select.input optgroup {
 	font-size: 14px;
 	font-weight: 550;
 	padding: 7px 14px;
-	border-radius: 999px;
+	border-radius: var(--radius);
 	border: 1px solid transparent;
 	background: none;
 	color: var(--dim);
@@ -387,9 +329,8 @@ select.input optgroup {
 }
 .tabs > .active {
 	color: var(--text);
-	background: rgba(255, 255, 255, 0.1);
+	background: var(--surface-3);
 	border-color: var(--edge-soft);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* Zurück zur übergeordneten Seite, über dem Seitenkopf */
