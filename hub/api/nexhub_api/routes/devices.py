@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 
+from ..db import aware
 from ..deps import DB, CurrentDevice, CurrentUser, SettingsDep, hash_token
 from ..models import Device, DevicePairing, User
 
@@ -96,7 +97,7 @@ class PairResult(BaseModel):
 @router.post("/pair/poll")
 async def pair_poll(body: PairPoll, db: DB) -> PairResult:
     pairing = await db.get(DevicePairing, hash_token(body.device_code))
-    if pairing is None or _aware(pairing.expires_at) < datetime.now(UTC):
+    if pairing is None or aware(pairing.expires_at) < datetime.now(UTC):
         raise HTTPException(410, "Kopplung abgelaufen oder unbekannt")
     if pairing.approved_by is None:
         return PairResult(status="pending")
@@ -107,11 +108,6 @@ async def pair_poll(body: PairPoll, db: DB) -> PairResult:
     await db.delete(pairing)
     await db.commit()
     return PairResult(status="approved", token=token, device_id=device.id, device_name=device.name)
-
-
-def _aware(dt: datetime) -> datetime:
-    # SQLite (Tests) liefert Zeiten ohne Zeitzone zurück
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 # ---------------------------------------------------------------- Mensch: bestätigen, verwalten

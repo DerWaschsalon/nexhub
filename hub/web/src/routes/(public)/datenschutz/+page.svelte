@@ -15,7 +15,7 @@
 <article class="glass pad legal-page">
 	{#if i18n.lang === 'de'}
 		<h1>Datenschutzerklärung</h1>
-		<p class="dim">Stand: Oktober 2026</p>
+		<p class="dim">Stand: November 2026</p>
 
 		<h2>1. Verantwortlich</h2>
 		<OperatorAddress operator={data.info.operator} />
@@ -75,12 +75,7 @@
 			und Name und Server des anderen Charakters. Beim Öffnen zeigt der Link die Momentaufnahme des
 			Armory-Charakters und holt den anderen Charakter neu von der AION-2-Website, ohne ihn zu speichern;
 			wer eingetragen oder geteilt hat, zeigt er nicht. Der Link gilt, bis er zurückgezogen oder der
-			Armory-Charakter ausgetragen wird. Mit dem Build-Check lässt sich ein Armory-Charakter mit den besten
-			Spielern seiner Klasse vergleichen: Auf Knopfdruck holt der Hub die Rangliste von Abyss Logs
-			(abysslogs.com), sucht die Charaktere daraus auf der AION-2-Website und ruft ihre öffentlichen
-			Charakterseiten ab. Gespeichert wird nur die Auswertung (Zählungen und häufigste Werte), nicht die
-			Namen oder Daten dieser Spieler; sie wird ersetzt, wenn der Check neu läuft, und gelöscht, wenn der
-			Charakter ausgetragen wird. Auch ein Build-Check lässt sich per Link teilen, bis er zurückgezogen wird.
+			Armory-Charakter ausgetragen wird.
 			Suchmaschinen werden gebeten, solche Seiten nicht aufzunehmen. Zweck ist die gemeinsame Auswertung der Spielrunden in der
 			Gemeinschaft (Art. 6 Abs. 1 lit. f DSGVO). Runs bleiben gespeichert, bis die Hochladenden oder ein
 			Admin sie löschen; eine automatische Löschfrist gibt es derzeit nicht.
@@ -113,7 +108,7 @@
 		</p>
 	{:else}
 		<h1>Privacy policy</h1>
-		<p class="dim">As of October 2026 · {t('legal.germanOnly')}</p>
+		<p class="dim">As of November 2026 · {t('legal.germanOnly')}</p>
 
 		<h2>1. Controller</h2>
 		<OperatorAddress operator={data.info.operator} />
@@ -165,12 +160,7 @@
 			which armory character is compared and the name and server of the other character. When opened, the
 			link shows the armory character's snapshot and fetches the other character again from the AION 2
 			website without storing it; it does not show who added or shared anything. The link stays valid until
-			it is withdrawn or the armory character is removed. The build check compares an armory character with
-			the best players of its class: on request the hub fetches the Abyss Logs rankings (abysslogs.com),
-			looks those characters up on the AION 2 website and fetches their public character pages. Only the
-			analysis (counts and most common values) is stored, not those players' names or data; it is replaced
-			when the check runs again and deleted when the character is removed. A build check can be shared by
-			link as well, until the link is withdrawn. Search engines are asked not to index such pages. Purpose: analysing the
+			it is withdrawn or the armory character is removed. Search engines are asked not to index such pages. Purpose: analysing the
 			community's runs together (Art. 6(1)(f) GDPR). Runs are kept until the uploader or an admin deletes
 			them; there is currently no automatic deletion.
 		</p>

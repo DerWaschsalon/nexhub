@@ -1,5 +1,5 @@
 """Ratgeber der Armory: was ein Charakter für sich genommen zuerst verbessern kann, ohne Vergleich
-mit anderen (das macht der Build-Check).
+mit anderen.
 
 Rein, ohne Netz: Eingabe ist eine Momentaufnahme in einer Sprache (Format aus aion2.py), Ausgabe eine
 Liste von Hinweisen in fester Reihenfolge, von schnell erledigt bis teuer. Die Idee folgt der
