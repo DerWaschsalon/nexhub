@@ -1,15 +1,15 @@
 <!-- Charakterprofil aus einer Momentaufnahme: Kopf, Ausrüstung, Werte, Titel, Skills, Daevanion.
-     Dieselbe Ansicht für Mitspieler eines Runs und die Armory; `source` sagt, woher der Stand kommt. -->
+     Ansicht für Mitspieler eines Runs (die Armory nutzt CharacterSheet); `source` sagt, woher der Stand kommt. -->
 <script lang="ts">
-	import { formatDateTime, formatNumber } from '#lib/format.ts';
+	import { formatDateTime } from '#lib/format.ts';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import { ARCANA, LEFT, RIGHT } from '../slots.ts';
 	import { localized, type CharacterListItem, type CharacterSnapshot } from '../api.ts';
 	import { CHARACTER_ART } from '../assets.ts';
+	import CharacterHeader from './CharacterHeader.svelte';
 	import DaevanionBoard from './DaevanionBoard.svelte';
 	import ItemCard from './ItemCard.svelte';
 	import ItemIcon from './ItemIcon.svelte';
-	import PlayerName from './PlayerName.svelte';
 	import SkillGrid from './SkillGrid.svelte';
 	import StatPanel from './StatPanel.svelte';
 
@@ -68,35 +68,7 @@
 	</div>
 {/snippet}
 
-<header class="glass pad head">
-	{#if data.profile.image}
-		<img class="portrait" src={data.profile.image} alt="" width="72" height="72" referrerpolicy="no-referrer" />
-	{/if}
-	<div class="who">
-		<h2><PlayerName name={data.profile.name} cls={character.cls} size={26} /></h2>
-		<p class="dim">
-			{[data.profile.class, t('logs.char.level', { n: data.profile.level }), data.profile.server, data.profile.guild]
-				.filter(Boolean)
-				.join(' · ')}
-		</p>
-		{#if data.profile.title}<p class="dim">„{data.profile.title}“</p>{/if}
-	</div>
-	<div class="numbers">
-		<div>
-			<span class="label">{t('logs.char.combatPower')}</span>
-			<strong class="num">{formatNumber(data.profile.combat_power)}</strong>
-		</div>
-		{#if character.item_level}
-			<div>
-				<span class="label">{t('logs.char.itemLevel')}</span>
-				<strong class="num">{formatNumber(character.item_level)}</strong>
-			</div>
-		{/if}
-		{#if character.fetched_at}
-			<span class="dim small">{t('logs.char.asOf', { d: formatDateTime(character.fetched_at) })}</span>
-		{/if}
-	</div>
-</header>
+<CharacterHeader {character} {data} />
 
 <section class="glass pad">
 	<div class="sec-head">
@@ -219,41 +191,12 @@
 <p class="dim small">{source ?? t('logs.char.source')}</p>
 
 <style>
-	section,
-	header {
+	section {
 		margin-bottom: 16px;
 	}
 	h3 {
 		font-size: 17px;
 		margin-bottom: 12px;
-	}
-	.head {
-		display: flex;
-		gap: 16px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-	.who {
-		min-width: 0;
-	}
-	.portrait {
-		border-radius: var(--radius-sm);
-		object-fit: cover;
-	}
-	.numbers {
-		margin-left: auto;
-		display: flex;
-		gap: 20px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-	.numbers > div {
-		display: flex;
-		flex-direction: column;
-	}
-	.label {
-		font-size: 12px;
-		color: var(--dim);
 	}
 	.gear {
 		display: grid;

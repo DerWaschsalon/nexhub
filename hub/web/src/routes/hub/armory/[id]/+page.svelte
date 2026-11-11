@@ -1,4 +1,4 @@
-<!-- Ein Charakter der Armory: Profil wie bei den Mitspielern eines Runs, dazu Verlauf, Aktualisieren
+<!-- Ein Charakter der Armory: Ansicht wie im Spiel (CharacterSheet), dazu Verlauf, Aktualisieren
      und Entfernen. Solange der Abruf läuft, alle 5 s neu laden. -->
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
@@ -7,7 +7,7 @@
 	import Hints from '#modules/armory/components/Hints.svelte';
 	import History from '#modules/armory/components/History.svelte';
 	import { classColor, classFromName } from '#modules/logs/classes.ts';
-	import CharacterProfile from '#modules/logs/components/CharacterProfile.svelte';
+	import CharacterSheet from '#modules/logs/components/CharacterSheet.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -73,7 +73,7 @@
 		</section>
 	{/if}
 	<Hints hints={c.hints} />
-	<CharacterProfile character={{ ...c, cls }} data={c.data} source={t('armory.source')} />
+	<CharacterSheet character={{ ...c, cls }} data={c.data} source={t('armory.source')} />
 {:else if c.status !== 'offen'}
 	<section class="glass pad">
 		<h2>{c.name}</h2>

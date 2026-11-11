@@ -3,29 +3,16 @@
 <script lang="ts">
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData } from '../api.ts';
-	import { CHARACTER_ART } from '../assets.ts';
+	import { BASE, LORDS, pickStats, splitLord, statIcon } from '../stats.ts';
 
 	let { stats }: { stats: CharacterData['stats'] } = $props();
-
-	// Reihenfolge und Symbole wie auf der offiziellen Seite (stat_<typ>.png, stat_lords_<typ>.png)
-	const BASE = ['STR', 'DEX', 'AGI', 'WIS', 'INT', 'CON'];
-	const LORDS = ['Destruction', 'Death', 'Wisdom', 'Destiny', 'Space', 'Time', 'Life', 'Illusion', 'Freedom', 'Justice'];
-
-	const byType = $derived(new Map(stats.map((s) => [s.type, s])));
-	const pick = (types: string[]) => types.map((type) => byType.get(type)).filter((s) => s !== undefined);
-	const icon = (type: string) =>
-		`${CHARACTER_ART}/info/stat_${LORDS.includes(type) ? 'lords_' : ''}${type.toLowerCase()}.png`;
-	// „Zeit [Siel]“ → Name und Lord getrennt, der Lord klein darunter
-	const split = (name: string) => {
-		const m = name.match(/^(.*?)\s*\[(.+)\]$/);
-		return m ? { name: m[1], lord: m[2] } : { name, lord: '' };
-	};
+	const pick = (types: string[]) => pickStats(stats, types);
 </script>
 
 {#snippet tile(s: CharacterData['stats'][number], lord: boolean)}
-	{@const n = split(s.name)}
+	{@const n = splitLord(s.name)}
 	<div class="stat" class:lord class:zero={!s.value}>
-		<img src={icon(s.type)} alt="" width={lord ? 40 : 46} height={lord ? 40 : 46} loading="lazy" referrerpolicy="no-referrer" />
+		<img src={statIcon(s.type)} alt="" width={lord ? 40 : 46} height={lord ? 40 : 46} loading="lazy" referrerpolicy="no-referrer" />
 		<div class="body">
 			<div class="top">
 				<span class="name">{n.name}{#if n.lord}<small>{n.lord}</small>{/if}</span>

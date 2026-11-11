@@ -75,6 +75,7 @@ def item(name: str = "Testbogen") -> dict:
             "mainStats": [{"id": "WeaponFixingDamage", "name": "Angriffskraft", "minValue": "354", "value": "486",
                            "extra": "146", "exceed": False}],
             "subStats": [{"id": "AdditionalHitRate", "name": "Mehrfachtreffer-Chance", "value": "9.1%"}],
+            "soulBindRate": "100",
             "magicStoneStat": [{"id": "Critical", "icon": ICON, "value": "+6", "name": "Kritischer Treffer",
                                 "grade": "Legend", "slotPos": 0}],
             "godStoneStat": [{"icon": ICON, "name": "Gottstein: Test", "desc": "10 % Chance auf Wind-Schaden",
