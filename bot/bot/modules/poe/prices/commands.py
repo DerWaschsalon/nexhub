@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 PRICE_PATH = "/api/internal/poe/price"
 COMPLETE_PATH = "/api/internal/poe/complete"
 NOT_CONNECTED = "NexHub nicht verbunden."
+MAX_CHOICES = 25  # Discords Grenze für Vorschläge
+MAX_CHOICE_TEXT = 100
 DEFAULT_GAME = "poe1"  # solange beim Tippen noch kein Spiel gewählt ist
 GAME_CHOICES = [app_commands.Choice(name=label, value=game) for game, label in GAME_LABELS.items()]
 
@@ -36,10 +38,13 @@ class PoeCog(commands.GroupCog, ModuleCog, group_name="poe", group_description="
     @app_commands.choices(spiel=GAME_CHOICES)
     async def price(self, interaction: discord.Interaction, spiel: app_commands.Choice[str],
                     item: app_commands.Range[str, 1, 100]) -> None:
-        data = await self.hub().get(PRICE_PATH, {"game": spiel.value, "q": item})
+        hub = self.hub()
+        # Discord wartet nur 3 s auf eine Antwort, der Hub darf bis zu 10 s brauchen
+        await interaction.response.defer()
+        data = await hub.get(PRICE_PATH, {"game": spiel.value, "q": item})
         if data is None:
             raise UserError(f"Zu „{item}“ gibt es in {spiel.name} keinen Preis.")
-        await interaction.response.send_message(embed=price_embed(data, spiel.value))
+        await interaction.followup.send(embed=price_embed(data, spiel.value))
 
     @price.autocomplete("item")
     async def price_autocomplete(self, interaction: discord.Interaction,
@@ -49,4 +54,6 @@ class PoeCog(commands.GroupCog, ModuleCog, group_name="poe", group_description="
             names = await self.hub().get(COMPLETE_PATH, {"game": game, "q": current})
         except UserError:
             return []  # Vorschläge sind nur eine Hilfe, ohne Hub bleibt die Liste leer
-        return [app_commands.Choice(name=name, value=name) for name in names or []]
+        # Der Hub hält Discords Grenzen schon ein, hier nur zur Sicherheit
+        shown = [name[:MAX_CHOICE_TEXT] for name in (names or [])[:MAX_CHOICES]]
+        return [app_commands.Choice(name=name, value=name) for name in shown]

@@ -14,6 +14,7 @@ FOOTER = "Preise: poe.ninja"
 GAME_LABELS = {"poe1": "PoE 1", "poe2": "PoE 2"}
 NO_MOVES = "keine"
 NO_CHANGE = "–"
+FIELD_LIMIT = 1024  # Discords Grenze für den Text eines Felds
 SMALL_PRICE = 10  # darunter zählen Nachkommastellen (0,35 divine), darüber nicht mehr
 
 
@@ -26,7 +27,10 @@ def fmt_price(value: float, unit: str) -> str:
 def fmt_change(change: float | None) -> str:
     if change is None:
         return NO_CHANGE
-    return f"{change:+.0f} %"
+    rounded = round(change)
+    if rounded == 0:
+        return "0 %"  # sonst stünde bei kleinen Verlusten „-0 %“ da
+    return f"{rounded:+d} %"
 
 
 def move_text(move: dict[str, Any]) -> str:
@@ -54,6 +58,9 @@ def alert_embed(data: dict[str, Any]) -> discord.Embed:
 
 def move_lines(moves: list[dict[str, Any]]) -> str:
     lines = [f"[{m['name']}]({m['url']}): {move_text(m)}" for m in moves]
+    # Lange Namen: hinten Zeilen weglassen, bis das Feld in Discords Grenze passt
+    while len("\n".join(lines)) > FIELD_LIMIT:
+        lines.pop()
     return "\n".join(lines) or NO_MOVES
 
 

@@ -171,3 +171,84 @@ def test_hub_client_404_is_none() -> None:
                 await hub.close()
 
     asyncio.run(go())
+
+
+def test_change_without_minus_zero() -> None:
+    from bot.modules.poe.prices.embeds import fmt_change
+
+    assert fmt_change(-0.4) == "0 %" and fmt_change(0.0) == "0 %"
+    assert fmt_change(-3.6) == "-4 %" and fmt_change(25.0) == "+25 %"
+
+
+def test_daily_embed_fits_field_limit() -> None:
+    many = [move("X" * 300 + str(i), 1, 2, 100.0) for i in range(5)]
+    embed = daily_embed({"guild_id": GUILD, "game": "poe1", "league": "L", "up": many, "down": many})
+    assert all(field.value is not None and 0 < len(field.value) <= 1024 for field in embed.fields)
+
+
+def test_guild_id_from_core() -> None:
+    from bot.core.web import guild_id_from
+
+    client = SimpleNamespace(get_guild=lambda gid: object() if gid == GUILD else None)
+    assert guild_id_from(client, {"guild_id": GUILD}) == GUILD  # type: ignore[arg-type]
+    with pytest.raises(ApiError):
+        guild_id_from(client, {"guild_id": True})  # type: ignore[arg-type]
+
+
+def interaction(spiel: str | None = None) -> Any:
+    return SimpleNamespace(response=SimpleNamespace(defer=AsyncMock(), send_message=AsyncMock()),
+                           followup=SimpleNamespace(send=AsyncMock()), namespace=SimpleNamespace(spiel=spiel))
+
+
+def test_price_command_defers_before_hub() -> None:
+    from discord import app_commands
+
+    from bot.modules.poe.prices.commands import PoeCog
+
+    async def test(db: Database) -> None:
+        prices = module(db)
+        cog = PoeCog(prices)
+        price: Any = cog.price.callback  # discord.py tippt den Rückruf ohne self
+        with pytest.raises(UserError, match="NexHub nicht verbunden"):
+            await price(cog, interaction(), app_commands.Choice(name="PoE 1", value="poe1"), "Divine")
+        data = {"name": "Divine Orb", "price": 1.0, "unit": "chaos", "change_24h": None, "change_7d": None,
+                "league": "L", "url": "https://poe.ninja/x", "icon": None}
+        prices.hub = SimpleNamespace(get=AsyncMock(return_value=data))  # type: ignore[assignment]
+        fake = interaction()
+        await price(cog, fake, app_commands.Choice(name="PoE 1", value="poe1"), "Divine")
+        fake.response.defer.assert_awaited_once()
+        assert fake.followup.send.await_args.kwargs["embed"].title == "Divine Orb"
+
+    with_db(test)
+
+
+def test_autocomplete_caps_choices() -> None:
+    from bot.modules.poe.prices.commands import PoeCog
+
+    async def test(db: Database) -> None:
+        prices = module(db)
+        prices.hub = SimpleNamespace(get=AsyncMock(return_value=["N" * 150] * 30))  # type: ignore[assignment]
+        cog = PoeCog(prices)
+        suggest: Any = cog.price_autocomplete  # discord.py tippt die Methode ohne self
+        choices = await suggest(interaction("poe2"), "N")
+        assert len(choices) == 25 and all(len(c.name) <= 100 and len(c.value) <= 100 for c in choices)
+
+    with_db(test)
+
+
+def test_hub_client_bad_json_is_unreachable() -> None:
+    async def broken(_request: web.Request) -> web.Response:
+        return web.Response(text="{kaputt", content_type="application/json")
+
+    async def go() -> None:
+        app = web.Application()
+        app.router.add_get("/x", broken)
+        async with TestServer(app) as server:
+            hub = HubClient(str(server.make_url("")), KEY)
+            try:
+                with pytest.raises(UserError, match="NexHub nicht erreichbar"):
+                    await hub.get("/x", {})
+            finally:
+                await hub.close()
+
+    asyncio.run(go())

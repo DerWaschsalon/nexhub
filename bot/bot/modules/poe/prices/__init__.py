@@ -7,7 +7,7 @@ Der Hub (hub/api/nexhub_api/poe_alerts.py) schickt Alarme an `/control/poe/alert
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, TypeGuard
+from typing import Any, ClassVar
 
 import discord
 from aiohttp import web
@@ -15,16 +15,11 @@ from discord.ext import commands
 from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule, GuildSettings, HubClient
-from bot.core.web import RouteTable, json_body
+from bot.core.web import RouteTable, guild_id_from, is_id, json_body
 from bot.hubpages import ApiError
 
 from .embeds import alert_embed, daily_embed
 from .settings import PoeSettings
-
-
-def is_id(value: Any) -> TypeGuard[int]:
-    # bool ist in Python auch ein int, als ID aber Unsinn
-    return isinstance(value, int) and not isinstance(value, bool)
 
 
 class PoePrices(BotModule):
@@ -55,14 +50,15 @@ class PoePrices(BotModule):
 
     def channel_for(self, data: dict[str, Any]) -> discord.TextChannel | None:
         """Kanal für die Posts auf dem Server aus `guild_id`, oder None, wenn keiner eingestellt ist."""
-        guild_id = data.get("guild_id")
-        if not is_id(guild_id) or self.client.get_guild(guild_id) is None:
-            raise ApiError(400, "guild_id fehlt oder der Bot ist auf diesem Server nicht")
+        guild_id = guild_id_from(self.client, data)
         channel_id = self.settings.get(guild_id).poe_channel
         if channel_id is None:
             return None
         channel = self.client.get_channel(channel_id)
-        return channel if isinstance(channel, discord.TextChannel) else None
+        if not isinstance(channel, discord.TextChannel):
+            self.log.warning("Server %s: Kanal %s für PoE-Preise fehlt oder ist kein Textkanal", guild_id, channel_id)
+            return None
+        return channel
 
     async def alert(self, request: web.Request) -> dict[str, Any]:
         data = await json_body(request)

@@ -52,7 +52,7 @@ class HubClient:
                     return None
                 resp.raise_for_status()
                 return await resp.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:  # ValueError: kaputtes JSON
             log.warning("Hub-Abfrage %s: %r", path, e)
             raise UserError(NOT_REACHABLE) from e
 
