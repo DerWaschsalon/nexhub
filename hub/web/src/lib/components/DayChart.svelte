@@ -1,12 +1,29 @@
-<!-- Verlauf einer Kennzahl je Tag (Kampfkraft oder Item-Level), eine Linie in der Klassenfarbe.
+<!-- Verlauf eines Werts je Tag als eine Linie (Armory: Kampfkraft, Item-Level; PoE: Preis).
      Aufbau wie modules/logs/components/DpsChart.svelte: echte Kartenbreite, Fadenkreuz mit Tooltip. -->
+<script lang="ts" module>
+	/** Ein Tag (ISO-Datum) mit Wert; Tage ohne Wert (null) fallen weg. */
+	export type DayValue = { day: string; value: number | null };
+</script>
+
 <script lang="ts">
 	import { formatCompact, formatNumber } from '#lib/format.ts';
 	import { i18n } from '#lib/i18n.svelte.ts';
-	import type { ArmoryDay } from '../api.ts';
 
-	let { title, days, key, color }: { title: string; days: ArmoryDay[]; key: 'combat_power' | 'item_level'; color: string } =
-		$props();
+	let {
+		title,
+		days,
+		color,
+		format = formatNumber,
+		axisFormat = formatCompact
+	}: {
+		title: string;
+		days: DayValue[];
+		color: string;
+		/** Wert im Tooltip */
+		format?: (v: number) => string;
+		/** Wert an der Achse, darf kürzer sein */
+		axisFormat?: (v: number) => string;
+	} = $props();
 
 	const H = 150;
 	const PAD = { l: 56, r: 14, t: 12, b: 26 };
@@ -15,7 +32,7 @@
 	let hover = $state<number | null>(null);
 	const W = $derived(Math.max(240, Math.round(width)));
 
-	const points = $derived(days.filter((d) => d[key] !== null).map((d) => ({ day: d.day, v: d[key] as number })));
+	const points = $derived(days.filter((d) => d.value !== null).map((d) => ({ day: d.day, v: d.value as number })));
 	const n = $derived(points.length);
 	// Keine Null-Linie: die Werte ändern sich von Tag zu Tag um wenige Prozent, ab 0 wäre alles flach
 	const lo = $derived(Math.min(...points.map((p) => p.v)));
@@ -44,11 +61,11 @@
 {#if n}
 	<figure class="chart" bind:clientWidth={width}>
 		<figcaption>{title}</figcaption>
-		<svg viewBox="0 0 {W} {H}" role="img" aria-label="{title}: {formatNumber(points[0].v)} → {formatNumber(points[n - 1].v)}"
+		<svg viewBox="0 0 {W} {H}" role="img" aria-label="{title}: {format(points[0].v)} → {format(points[n - 1].v)}"
 			onpointermove={move} onpointerleave={() => (hover = null)}>
 			{#each yTicks as v (v)}
 				<line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)} class="grid" />
-				<text x={PAD.l - 8} y={y(v) + 4} text-anchor="end" class="axis">{formatCompact(v)}</text>
+				<text x={PAD.l - 8} y={y(v) + 4} text-anchor="end" class="axis">{axisFormat(v)}</text>
 			{/each}
 			{#each xTicks as i (i)}
 				<text x={x(i)} y={H - 6} class="axis"
@@ -70,7 +87,7 @@
 		{#if hover !== null}
 			<div class="tip glass" style:left="{(x(hover) / W) * 100}%">
 				<span class="dim">{dayLabel(points[hover].day)}</span>
-				<b class="num">{formatNumber(points[hover].v)}</b>
+				<b class="num">{format(points[hover].v)}</b>
 			</div>
 		{/if}
 	</figure>

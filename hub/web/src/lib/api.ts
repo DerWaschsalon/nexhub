@@ -35,15 +35,18 @@ export async function apiLoad<T>(path: string, f: Fetch): Promise<T> {
 	}
 }
 
-/** Wie api(), aber 401 heißt „nicht angemeldet“ statt Fehler. */
-export async function loadMe(f: Fetch = fetch): Promise<Me | null> {
+/** Wie api(), aber der Status `absent` heißt „gibt es nicht“ und ergibt null statt eines Fehlers. */
+export async function apiOrNull<T>(path: string, absent: number, f: Fetch = fetch): Promise<T | null> {
 	try {
-		return await api<Me>('/api/me', undefined, f);
+		return await api<T>(path, undefined, f);
 	} catch (e) {
-		if (e instanceof ApiError && e.status === 401) return null;
+		if (e instanceof ApiError && e.status === absent) return null;
 		throw e;
 	}
 }
+
+/** Das eigene Konto; null heißt „nicht angemeldet“ (401). */
+export const loadMe = (f: Fetch = fetch): Promise<Me | null> => apiOrNull<Me>('/api/me', 401, f);
 
 // Antworten der API (Pydantic-Modelle in hub/api/nexhub_api/routes/)
 

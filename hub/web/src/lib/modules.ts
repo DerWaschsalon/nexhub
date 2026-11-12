@@ -8,8 +8,9 @@ import bis from '#modules/bis/module.ts';
 import bot from '#modules/bot/module.ts';
 import devices from '#modules/devices/module.ts';
 import logs from '#modules/logs/module.ts';
+import poe from '#modules/poe/module.ts';
 
-export const MODULES: HubModule[] = [logs, armory, bis, devices, bot];
+export const MODULES: HubModule[] = [logs, armory, bis, poe, devices, bot];
 
 addTexts(CORE_TEXTS);
 for (const m of MODULES) if (m.texts) addTexts(m.texts);

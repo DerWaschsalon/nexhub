@@ -3,8 +3,8 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { api } from '#lib/api.ts';
+	import DayChart from '#lib/components/DayChart.svelte';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
-	import History from '#modules/armory/components/History.svelte';
 	import { classColor, classFromName } from '#modules/logs/classes.ts';
 	import CharacterSheet from '#modules/logs/components/CharacterSheet.svelte';
 	import type { PageProps } from './$types';
@@ -64,8 +64,8 @@
 		{#snippet aside()}
 			{#if c.days.length}
 				<div class="charts">
-					<History title={t('logs.char.combatPower')} days={c.days} key="combat_power" color={classColor(cls)} />
-					<History title={t('logs.char.itemLevel')} days={c.days} key="item_level" color={classColor(cls)} />
+					<DayChart title={t('logs.char.combatPower')} days={c.days.map((d) => ({ day: d.day, value: d.combat_power }))} color={classColor(cls)} />
+					<DayChart title={t('logs.char.itemLevel')} days={c.days.map((d) => ({ day: d.day, value: d.item_level }))} color={classColor(cls)} />
 				</div>
 				{#if c.days.length === 1}<p class="dim small">{t('armory.historyStart')}</p>{/if}
 			{/if}
