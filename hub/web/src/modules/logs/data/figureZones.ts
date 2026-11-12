@@ -2,7 +2,8 @@
 // Rechtecke in Prozent der Bildbreite und -höhe, von Hand an den Bildern ausgemessen. Rechts und links wie
 // im Bild (die rechte Hand der Figur ist im Bild links). Ringe sitzen an den Fingern (Ring1 an der Hand links
 // im Bild), Amulett, Broschen und Runen haben keine Stelle. Hände, Schultern und Füße haben je zwei Rechtecke,
-// die Waffe genau eins. Kleine Stellen liegen beim Zeigen über großen (ClassFigure).
+// die Waffe genau eins (bis auf Plätze mit eigener Ebene, s. u.). Kleine Stellen liegen beim Zeigen über großen
+// (ClassFigure).
 
 export type Zone = { slot: string; x: number; y: number; w: number; h: number };
 
@@ -38,14 +39,15 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Torso', x: 37, y: 19, w: 14, h: 17 },
 		{ slot: 'Belt', x: 36, y: 36, w: 17, h: 5 },
 		{ slot: 'Pants', x: 31, y: 42, w: 21, h: 18 },
-		{ slot: 'Boots', x: 26, y: 63, w: 12, h: 37 },
-		{ slot: 'Boots', x: 42, y: 60, w: 9, h: 40 },
+		{ slot: 'Boots', x: 20, y: 62, w: 19, h: 38 },
+		{ slot: 'Boots', x: 42, y: 60, w: 11, h: 40 },
 		{ slot: 'Gloves', x: 26, y: 47, w: 7, h: 8 },
 		{ slot: 'Gloves', x: 54, y: 43, w: 6, h: 7 },
 		{ slot: 'Bracelet1', x: 29, y: 42, w: 4, h: 4 },
 		{ slot: 'Bracelet2', x: 52, y: 40, w: 4, h: 4 },
 		{ slot: 'Cape', x: 14, y: 30, w: 15, h: 50 },
-		{ slot: 'MainHand', x: 60, y: 10, w: 38, h: 42 },
+		{ slot: 'MainHand', x: 56, y: 9, w: 44, h: 45 },
+		{ slot: 'MainHand', x: 0, y: 59, w: 27, h: 13 },
 		{ slot: 'Ring1', x: 27, y: 51, w: 5, h: 4 },
 		{ slot: 'Ring2', x: 55, y: 45, w: 4, h: 4 }
 	],
@@ -179,4 +181,11 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Ring1', x: 7, y: 47, w: 5, h: 4 },
 		{ slot: 'Ring2', x: 59, y: 41, w: 5, h: 4 }
 	]
+};
+
+// Plätze mit eigener Ebene (classes.ts, figureLayer; ohne Überschneidung): Statt der Rechtecke leuchtet beim
+// Zeigen der Gegenstand selbst, und die Maus trifft ihn pixelgenau; die Rechtecke oben bleiben für die Tastatur.
+// Erzeugt mit hub/tools/figure_layers.py.
+export const SLOT_LAYERS: Record<string, string[]> = {
+	ranger: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Helmet', 'Cape']
 };

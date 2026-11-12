@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Ebenen einer Klassenfigur: je Ausrüstungsplatz ein Bild gleich groß wie die Figur, in dem nur dieser Platz
+sichtbar ist (hub/web/static/klassen/figur/<klasse>-<platz>.webp, eingetragen in SLOT_LAYERS in
+hub/web/src/modules/logs/data/figureZones.ts). Die Armory lässt damit beim Zeigen den Gegenstand selbst
+leuchten und trifft ihn pixelgenau.
+
+Die Umrisse kommen von Segment Anything (Meta, Apache-2.0): je Platz ein paar Punkte im Bild, „gehört dazu“
+oder „gehört nicht dazu“. Haut wird vorher bestimmt und keinem Platz zugeschlagen (außer den Händen als
+Handschuhe), der Umhang ist der Rest hinter der Figur. Was das Modell nicht sauber trennt (der dünne, dunkle
+Bogen, der Arm vor der Spitze des Umhangs), kommt aus Farbe und Handumriss.
+
+Einrichtung (einmalig, nur zum Erzeugen der Bilder, der Hub braucht nichts davon):
+    uv venv -p 3.12 ~/.cache/figur-sam
+    uv pip install -p ~/.cache/figur-sam/bin/python --index-url https://download.pytorch.org/whl/cpu torch torchvision
+    uv pip install -p ~/.cache/figur-sam/bin/python segment-anything pillow numpy scipy
+    curl -L -o ~/.cache/figur-sam/sam_vit_b_01ec64.pth \\
+        https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth
+Aufruf:
+    ~/.cache/figur-sam/bin/python hub/tools/figure_layers.py ranger [vorschau.png]
+"""
+from __future__ import annotations
+
+import sys
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+from numpy.typing import NDArray
+from PIL import Image, ImageDraw, ImageFilter
+
+Mask = NDArray[np.bool_]
+Point = tuple[int, int]
+Box = tuple[int, int, int, int]
+
+FIGURE_DIR = Path(__file__).resolve().parent.parent / "web" / "static" / "klassen" / "figur"
+MODEL = Path.home() / ".cache" / "figur-sam" / "sam_vit_b_01ec64.pth"
+MIN_ALPHA = 40  # ab dieser Deckkraft zählt ein Pixel zur Figur (wie in der Armory beim Treffen)
+EDGE_BLUR = 0.7  # weiche Kante statt Treppen
+ISLAND_SHARE = 0.08  # kleinere abgetrennte Stücke einer Maske sind Splitter (Bänder, Spitze)
+
+
+@dataclass
+class Query:
+    """Eine Abfrage an das Modell: Punkte (x, y, 1 = dazu, 0 = nicht dazu), Rahmen und optional ein harter Rand"""
+
+    points: list[tuple[int, int, int]]
+    box: Box
+    clip: Box | None = None
+
+
+@dataclass
+class ClassSpec:
+    """Was für eine Klasse ausgeschnitten wird; `parts` in der Reihenfolge, in der die Plätze Pixel bekommen"""
+
+    skin: list[Query]
+    arm: list[Point]
+    hands: list[Box]
+    parts: dict[str, list[Query]]
+    cape: list[Point]
+    drawn: dict[str, Callable[[Figure], Mask]] = field(default_factory=dict)
+
+
+class Figure:
+    """Die Figur als Bild und Zahlen, mit den Hilfen zum Ausschneiden"""
+
+    def __init__(self, cls: str) -> None:
+        self.cls = cls
+        self.image = Image.open(FIGURE_DIR / f"{cls}.webp").convert("RGBA")
+        rgba = np.asarray(self.image).astype(int)
+        self.r, self.g, self.b, self.alpha = (rgba[..., i] for i in range(4))
+        self.lum = 0.3 * self.r + 0.59 * self.g + 0.11 * self.b
+        self.sat = rgba[..., :3].max(-1) - rgba[..., :3].min(-1)
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.alpha.shape[0], self.alpha.shape[1]
+
+    def polygon(self, points: list[Point]) -> Mask:
+        m = Image.new("L", self.image.size, 0)
+        ImageDraw.Draw(m).polygon(points, fill=255)
+        return np.asarray(m) > 0
+
+    def lines(self, segments: list[tuple[Point, Point]], width: int) -> Mask:
+        m = Image.new("L", self.image.size, 0)
+        draw = ImageDraw.Draw(m)
+        for start, end in segments:
+            draw.line([start, end], fill=255, width=width)
+        return np.asarray(m) > 0
+
+    def boxes(self, boxes: list[Box]) -> Mask:
+        m = np.zeros(self.shape, bool)
+        for x0, y0, x1, y1 in boxes:
+            m[y0:y1, x0:x1] = True
+        return m
+
+    def color_skin(self) -> Mask:
+        """Haut auch im Schatten: Rot vor Grün klar vor Blau (Farbton 12-18 Grad; rosa Metall hat Grün = Blau),
+        nur zusammenhängende Flächen, damit dünne Verzierungen nicht mitzählen"""
+        raw = (self.alpha > MIN_ALPHA) & (self.r > 55) & (self.r - self.g >= 8) & (self.g - self.b >= 5)
+        raw &= (self.r - self.b >= 18) & (self.r - self.b <= 90)
+        m = Image.fromarray((raw * 255).astype("uint8"))
+        m = m.filter(ImageFilter.MinFilter(7)).filter(ImageFilter.MaxFilter(7)).filter(ImageFilter.MaxFilter(5))
+        return np.asarray(m) > 0
+
+    def save_layer(self, slot: str, mask: Mask) -> Image.Image:
+        """Speichert die Ebene eines Platzes und gibt ihre Deckkraft zurück"""
+        soft = Image.fromarray((mask * 255).astype("uint8")).filter(ImageFilter.GaussianBlur(EDGE_BLUR))
+        alpha = Image.fromarray(np.minimum(np.asarray(soft), self.alpha).astype("uint8"))
+        layer = self.image.copy()
+        layer.putalpha(alpha)
+        layer.save(FIGURE_DIR / f"{self.cls}-{slot.lower()}.webp", "WEBP", quality=90, method=6)
+        return alpha
+
+
+class Segmenter:
+    """Segment Anything auf einer Figur: das Bild wird einmal eingelesen, dann beliebig viele Abfragen"""
+
+    def __init__(self, figure: Figure) -> None:
+        from segment_anything import SamPredictor, sam_model_registry
+
+        # Hintergrund neutral grau, damit die Kante zum Durchsichtigen klar ist
+        rgb = Image.new("RGB", figure.image.size, (128, 128, 128))
+        rgb.paste(figure.image, mask=figure.image.split()[3])
+        self.predictor = SamPredictor(sam_model_registry["vit_b"](checkpoint=str(MODEL)))
+        self.predictor.set_image(np.asarray(rgb))
+        self.figure = figure
+
+    def mask(self, query: Query) -> Mask:
+        coords = np.array([(x, y) for x, y, _ in query.points], float)
+        labels = np.array([label for _, _, label in query.points])
+        masks, scores, _ = self.predictor.predict(
+            point_coords=coords, point_labels=labels, box=np.array(query.box, float), multimask_output=True
+        )
+        best: Mask = masks[int(np.argmax(scores))]
+        if query.clip:
+            best &= self.figure.boxes([query.clip])
+        return without_islands(best)
+
+    def union(self, queries: list[Query]) -> Mask:
+        result = np.zeros(self.figure.shape, bool)
+        for query in queries:
+            result |= self.mask(query)
+        return result
+
+
+def without_islands(mask: Mask) -> Mask:
+    """Kleine abgetrennte Stücke einer Maske entfernen"""
+    from scipy import ndimage
+
+    labels, count = ndimage.label(mask)
+    if count <= 1:
+        return mask
+    sizes = ndimage.sum(mask, labels, range(1, count + 1))
+    keep = [i + 1 for i, size in enumerate(sizes) if size >= max(sizes) * ISLAND_SHARE]
+    kept: Mask = np.isin(labels, keep)
+    return kept
+
+
+def ranger_bow(fig: Figure) -> Mask:
+    """Bogen: oberer Arm (heller, bronze verziert), unterer Arm (dunkel) und die frei liegende Sehne"""
+    upper = fig.polygon([(565, 385), (640, 330), (860, 105), (1000, 85), (1000, 200), (950, 150), (905, 240),
+                         (870, 420), (700, 505), (600, 475), (565, 455)])
+    lower = fig.polygon([(0, 640), (30, 600), (100, 572), (118, 566), (130, 588), (200, 603), (266, 612),
+                         (266, 652), (200, 642), (100, 622), (40, 632), (12, 672), (0, 675)])
+    opaque = fig.alpha > MIN_ALPHA
+    wood = upper & opaque & (fig.lum < 170) & (fig.sat < 90)
+    dark = lower & opaque & (fig.lum < 95)
+    string = fig.lines([((875, 160), (560, 345)), ((110, 575), (255, 505))], 7)
+    string &= (fig.alpha > 20) & (fig.sat < 60) & (fig.lum > 110)
+    bow: Mask = wood | dark | string
+    return bow
+
+
+CLASSES: dict[str, ClassSpec] = {
+    "ranger": ClassSpec(
+        skin=[
+            Query([(430, 100, 1), (440, 150, 1), (470, 195, 1), (400, 40, 0), (480, 240, 0)], (395, 55, 520, 235)),
+            Query([(295, 455, 1), (285, 480, 1), (250, 470, 0)], (258, 425, 335, 505)),
+            Query([(556, 445, 1)], (535, 420, 578, 472)),
+            Query([(370, 480, 1), (360, 580, 1), (360, 532, 0), (440, 520, 0)], (325, 445, 410, 610)),
+            Query([(475, 490, 1), (475, 575, 1), (475, 535, 0), (420, 520, 0)], (435, 460, 520, 600)),
+        ],
+        arm=[(340, 215), (398, 212), (396, 330), (360, 370), (335, 410), (295, 410), (318, 345), (332, 280)],
+        hands=[(258, 425, 335, 505), (535, 420, 578, 472)],
+        drawn={"MainHand": ranger_bow},
+        parts={
+            "MainHand": [],
+            "Boots": [
+                Query([(320, 650, 1), (270, 840, 1), (290, 760, 1), (350, 560, 0), (200, 800, 0), (190, 720, 0)],
+                      (195, 570, 395, 942)),
+                Query([(475, 650, 1), (470, 880, 1), (470, 760, 1), (480, 560, 0), (400, 760, 0), (410, 820, 0),
+                       (385, 690, 0)], (425, 560, 540, 942)),
+            ],
+            "Gloves": [],
+            "Belt": [
+                Query([(440, 352, 1), (425, 335, 1), (458, 338, 1), (440, 380, 1), (440, 300, 0), (420, 420, 0)],
+                      (398, 312, 485, 398)),
+                Query([(482, 370, 1), (510, 345, 1), (520, 390, 1), (500, 400, 0)], (455, 315, 548, 448)),
+            ],
+            "Shoulder": [
+                Query([(380, 180, 1), (360, 205, 1), (410, 175, 1), (430, 100, 0), (450, 250, 0)],
+                      (335, 135, 450, 242)),
+                Query([(487, 180, 1), (470, 230, 0)], (460, 145, 515, 215)),
+            ],
+            # links des Kleids liegt der dunkle Umhang, das Modell trennt die beiden dunklen Flächen nicht
+            "Torso": [
+                Query([(450, 260, 1), (500, 235, 1), (420, 290, 1), (480, 205, 0), (440, 352, 0), (450, 420, 0),
+                       (320, 300, 0), (375, 280, 0), (385, 230, 0), (370, 250, 0), (382, 310, 0), (390, 335, 0),
+                       (362, 210, 0)], (398, 160, 565, 345), clip=(398, 150, 570, 345)),
+            ],
+            "Pants": [
+                Query([(450, 420, 1), (380, 410, 1), (530, 400, 1), (500, 440, 1), (380, 480, 0), (470, 490, 0),
+                       (440, 352, 0)], (330, 335, 580, 482)),
+                Query([(360, 532, 1), (340, 525, 1), (370, 510, 0), (370, 570, 0)], (322, 508, 402, 566)),
+                Query([(475, 535, 1), (500, 532, 1), (470, 510, 0), (470, 570, 0)], (440, 505, 520, 566)),
+            ],
+            # kein Helm an der Figur: gemeint ist der Schmuck im Haar
+            "Helmet": [
+                Query([(478, 40, 1), (470, 62, 1), (488, 15, 1), (420, 40, 0), (430, 100, 0)], (452, 0, 502, 85)),
+            ],
+            "Cape": [],
+        },
+        cape=[(140, 150), (348, 148), (356, 240), (396, 214), (396, 336), (336, 402), (336, 470), (446, 468),
+              (446, 662), (434, 874), (396, 874), (346, 762), (334, 662), (272, 942), (140, 942)],
+    ),
+}
+
+
+def slot_mask(slot: str, spec: ClassSpec, fig: Figure, sam: Segmenter, skin: Mask) -> Mask:
+    """Maske eines Platzes vor dem Abzug dessen, was frühere Plätze schon haben"""
+    if slot in spec.drawn:
+        return spec.drawn[slot](fig)
+    if slot == "Gloves":
+        return skin & fig.boxes(spec.hands)  # die Figur trägt keine sichtbaren Handschuhe: die Hände
+    if slot == "Cape":
+        return fig.polygon(spec.cape) & ~skin
+    return sam.union(spec.parts[slot]) & ~skin
+
+
+def main(cls: str, preview: str | None = None) -> None:
+    spec = CLASSES[cls]
+    fig = Figure(cls)
+    sam = Segmenter(fig)
+    skin = sam.union(spec.skin) | (fig.polygon(spec.arm) & fig.color_skin())
+    taken = np.zeros(fig.shape, bool)
+    shown = Image.new("RGBA", fig.image.size, (40, 40, 60, 255))
+    shown.alpha_composite(fig.image)
+    for i, slot in enumerate(spec.parts):
+        own = slot_mask(slot, spec, fig, sam, skin) & ~taken & (fig.alpha > MIN_ALPHA)
+        taken |= own
+        alpha = fig.save_layer(slot, own)
+        print(f"{slot}: {int(own.sum())} Pixel")
+        tint = Image.new("RGBA", fig.image.size, PREVIEW_COLORS[i % len(PREVIEW_COLORS)])
+        tint.putalpha(alpha.point(lambda v: 130 if v > MIN_ALPHA else 0))
+        shown.alpha_composite(tint)
+    if preview:
+        shown.save(preview)
+
+
+# Vorschau: jeder Platz in eigener Farbe über der Figur
+PREVIEW_COLORS = [(255, 0, 80, 0), (0, 200, 255, 0), (255, 200, 0, 0), (120, 255, 0, 0), (255, 0, 255, 0),
+                  (255, 120, 0, 0), (0, 255, 160, 0), (160, 80, 255, 0), (255, 255, 255, 0)]
+
+if __name__ == "__main__":
+    main(*sys.argv[1:3])
