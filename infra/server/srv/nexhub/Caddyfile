@@ -26,6 +26,11 @@
 	handle @bot {
 		reverse_proxy bot:8789
 	}
+	# Bot-Abfragen des Hubs (Schlüssel, nur im Docker-Netz von bot -> api): von außen nicht erreichbar
+	@internal path /api/internal/*
+	handle @internal {
+		respond 404
+	}
 	handle {
 		reverse_proxy api:8000
 	}
