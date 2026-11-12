@@ -317,6 +317,22 @@ Web-Dashboard. Der Bot läuft als eigener Dienst; der Hub fragt seine Steuer-API
   Ankündigungen, eigene Befehle, Benachrichtigungen, Sichtbarkeit (Rolle × Kanal).
 - Discord-IDs sind überall Strings, als Zahl verlöre JavaScript die letzten Stellen.
 
+## Path of Exile
+
+Der Bereich „Path of Exile“ (`/hub/poe`, Modul `modules/poe`) zeigt Preise von poe.ninja für PoE 1 und 2
+und eine persönliche Merkliste mit Preisverlauf (`lib/components/DayChart.svelte`). Abgerufen wird nur im
+Hub (`poe_ninja.py`, `poe_prices.py`), höchstens stündlich und mit ETag, mit User-Agent samt Kontakt wie
+von poe.ninja verlangt. Die Preise liegen in `poe_items` und `poe_prices` (Migration `0013`).
+
+- Einstellungen (Umgebung): `HUB_POE_ENABLED` (Standard `false`, ohne Abruf und ohne Alarme),
+  `HUB_POE1_LEAGUE` und `HUB_POE2_LEAGUE` (Liga; leer = aktuelle Challenge-Liga von poe.ninja).
+- `routes/poe.py`: Seiten-API für Angemeldete (Suche, Merkliste, Verlauf) und `/api/internal/poe/*` für
+  den Bot (Bearer `BOT_CONTROL_KEY`). Der Caddy sperrt `/api/internal/*` nach außen.
+- `poe_alerts.py` prüft nach jedem Abruf die Merklisten und meldet Sprünge über der Schwelle an den Bot
+  (`bot_client.py`, `/control/poe/alert`); die Tagespost geht an `/control/poe/daily`.
+- Tests: `tests/test_poe_*.py` mit aufgezeichneten Antworten unter `tests/data/poe_ninja/` (kein
+  Netzzugriff).
+
 ## Login und Rollen
 
 Discord-OAuth2 mit PKCE. Der Hub fragt nur `identify` ab und, wenn eine Mitgliedsrolle eingestellt
