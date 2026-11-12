@@ -145,7 +145,11 @@ export default {
       return [(e * (u - c) - b * (v - f)) / det, (a * (v - f) - d * (u - c)) / det];
     }
 
-    const mapId = () => Object.keys(PET_MAPS).find((id) => PET_MAPS[id].name === radar.karte) || null;
+    /** Die Karte, auf der du stehst (Zonen-ID = Karten-ID), sonst die auf der NexBoard-Seite eingestellte. */
+    function mapId() {
+      if (PET_MAPS[radar.zone]) return String(radar.zone);
+      return Object.keys(PET_MAPS).find((id) => PET_MAPS[id].name === radar.karte) || null;
+    }
 
     function update() {
       if (!radar.aktiv || !ctx.cfg()?.enabled) return;
@@ -160,8 +164,9 @@ export default {
         map.follow = !!follow;
       }
       me = radar.position ? { pos: radar.position, at: Date.now() - (radar.position_alter || 0) * 1000 } : null;
-      map.set({ mapId: mapId(), you: null });
-      ui.name.textContent = radar.karte || "";
+      const id = mapId();
+      map.set({ mapId: id, you: null });
+      ui.name.textContent = PET_MAPS[id]?.name || "";
       ui.status.textContent = data?.punkte?.length ? `${data.punkte.length} Spawnpunkte` : "";
     }
 

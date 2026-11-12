@@ -526,6 +526,7 @@ class RadarZustand:
                 "kurs": self.kurs,
                 "cubes": list(self.cubes.values()),
                 "dungeon": self.dungeon,
+                "zone": self.zone,
                 "feldbosse": [b for b in self.feldbosse.values()
                               if b["lebt"] and b["pos"] and b["karte"] == self.zone],
                 "gruppe": [(self.charnamen.get(cid, ""), *g) for cid, g in self.gruppe.items()
