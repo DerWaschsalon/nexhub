@@ -1,5 +1,6 @@
 // Antworten und Abrufe der Hub-API für Path of Exile (hub/api/nexhub_api/routes/poe.py). Ist das
-// Modul im Hub ausgeschaltet (hub_poe_enabled), antwortet jeder Endpunkt mit 404.
+// Modul im Hub ausgeschaltet (hub_poe_enabled), antwortet jeder Endpunkt mit 404; solange der Hub nach
+// dem Start die Liga noch nicht kennt, mit 503 und einer Meldung.
 import { api, apiOrNull, send } from '#lib/api.ts';
 
 export const GAMES = ['poe1', 'poe2'] as const;

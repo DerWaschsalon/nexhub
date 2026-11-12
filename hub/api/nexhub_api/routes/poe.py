@@ -8,7 +8,9 @@
     GET    /api/internal/poe/price?game=&q=    bester Treffer mit Preis (nur Bot, Schlüssel)
     GET    /api/internal/poe/complete?game=&q= Namensvorschläge für die Autovervollständigung (nur Bot)
 
-/api/internal/… ist im Caddy gesperrt und nur im Docker-Netz erreichbar. Ohne hub_poe_enabled antwortet alles 404.
+/api/internal/… ist im Caddy gesperrt und nur im Docker-Netz erreichbar. Ohne hub_poe_enabled antwortet die
+Web-API 404, die Bot-API 503: dort heißt 404 nur „nichts gefunden“. Solange die Liga noch nicht feststeht
+(nach dem Start, ohne festgelegte Liga), antwortet alles 503. Anfragen fragen nie selbst poe.ninja.
 Preise, Liga und Tagesverlauf kommen aus poe_prices.py.
 """
 from __future__ import annotations
@@ -31,6 +33,9 @@ SEARCH_LIMIT = 20
 COMPLETE_LIMIT = 25
 
 
+LOADING = "Preise werden noch geladen."
+
+
 def prices_service(request: Request) -> PoePrices:
     prices = request.app.state.poe_prices
     if prices is None:
@@ -38,13 +43,23 @@ def prices_service(request: Request) -> PoePrices:
     return prices
 
 
+def prices_for_bot(request: Request) -> PoePrices:
+    if request.app.state.poe_prices is None:
+        raise HTTPException(503, "Path of Exile ist im NexHub nicht eingeschaltet.")
+    return request.app.state.poe_prices
+
+
 Prices = Annotated[PoePrices, Depends(prices_service)]
+BotPrices = Annotated[PoePrices, Depends(prices_for_bot)]
 router = APIRouter(prefix="/api/poe", tags=["poe"], dependencies=[Depends(prices_service)])
-internal = APIRouter(prefix="/api/internal/poe", tags=["poe-internal"], dependencies=[Depends(prices_service)])
+internal = APIRouter(prefix="/api/internal/poe", tags=["poe-internal"], dependencies=[Depends(prices_for_bot)])
 
 
-async def current_league(prices: PoePrices, game: Game) -> str:
-    return prices.last_league(game) or await prices.league(game)
+def current_league(prices: PoePrices, game: Game) -> str:
+    league = prices.known_league(game)
+    if league is None:
+        raise HTTPException(503, LOADING)
+    return league
 
 
 def like(text: str) -> str:
@@ -82,7 +97,7 @@ class Found(BaseModel):
 @router.get("/search")
 async def search(game: Game, user: CurrentUser, db: DB, prices: Prices,
                  q: Annotated[str, Query(min_length=1, max_length=100)]) -> list[Found]:
-    league = await current_league(prices, game)
+    league = current_league(prices, game)
     items = await db.scalars(select(PoeItem).where(*named(game, league, q)).order_by(*best_first(q))
                              .limit(SEARCH_LIMIT))
     return [Found.model_validate(i, from_attributes=True) for i in items]
@@ -113,7 +128,7 @@ class WatchList(BaseModel):
 
 
 async def watch_list(db: DB, prices: PoePrices, game: Game, user_id: int, only: int | None = None) -> WatchList:
-    league = await current_league(prices, game)
+    league = current_league(prices, game)
     query = select(PoeWatch).where(PoeWatch.user_id == user_id, PoeWatch.game == game).order_by(PoeWatch.name)
     if only is not None:
         query = query.where(PoeWatch.id == only)
@@ -161,7 +176,7 @@ class ThresholdIn(BaseModel):
 
 @router.post("/watches", status_code=201)
 async def add_watch(body: WatchIn, user: CurrentUser, db: DB, prices: Prices) -> WatchOut:
-    league = await current_league(prices, body.game)
+    league = current_league(prices, body.game)
     item = await db.scalar(select(PoeItem).where(PoeItem.game == body.game, PoeItem.league == league,
                                                  PoeItem.key == body.key))
     if item is None:
@@ -214,9 +229,9 @@ class PriceOut(BaseModel):
 
 
 @internal.get("/price")
-async def price(game: Game, key: BotKey, db: DB, prices: Prices,
+async def price(game: Game, key: BotKey, db: DB, prices: BotPrices,
                 q: Annotated[str, Query(min_length=1, max_length=100)]) -> PriceOut:
-    league = await current_league(prices, game)
+    league = current_league(prices, game)
     item = await db.scalar(select(PoeItem).where(*named(game, league, q)).order_by(*best_first(q)).limit(1))
     if item is None:
         raise HTTPException(404, "Nichts gefunden")
@@ -228,10 +243,10 @@ async def price(game: Game, key: BotKey, db: DB, prices: Prices,
 
 
 @internal.get("/complete")
-async def complete(game: Game, key: BotKey, db: DB, prices: Prices,
+async def complete(game: Game, key: BotKey, db: DB, prices: BotPrices,
                    q: Annotated[str, Query(max_length=100)] = "") -> list[str]:
     # Ohne q (leeres Discord-Eingabefeld) kommen absichtlich die 25 teuersten Namen
-    league = await current_league(prices, game)
+    league = current_league(prices, game)
     names = await db.scalars(select(PoeItem.name).where(*named(game, league, q)).order_by(*best_first(q))
                              .limit(COMPLETE_LIMIT))
     return [name[:100] for name in names]

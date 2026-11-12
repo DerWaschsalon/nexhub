@@ -62,12 +62,13 @@ def check_watch(watch: PoeWatch, item: PoeItem | None, league: str, today: date)
     """Prüft einen beobachteten Gegenstand und passt seinen Bezugspreis an; gibt den Alarm oder None."""
     if item is None:
         return None
-    if watch.ref_league != league:  # neue Liga: andere Preise, kein Vergleich mit der alten
+    old = watch.ref_price
+    # neue Liga (andere Preise) oder kein brauchbarer Bezugspreis: heutigen Preis merken, nicht vergleichen
+    if watch.ref_league != league or old is None or old <= 0:
         watch.ref_price, watch.ref_league = item.price, league
         return None
-    old = watch.ref_price
     change = change_pct(old, item.price)
-    if old is None or change is None or abs(change) < watch.threshold or watch.alerted_on == today:
+    if change is None or abs(change) < watch.threshold or watch.alerted_on == today:
         return None
     watch.ref_price, watch.alerted_on = item.price, today
     return move(item, old, change)
@@ -102,7 +103,8 @@ async def send_alerts(sessionmaker: Sessionmaker, http: httpx.AsyncClient, setti
     today = datetime.now(TZ).date()
     alerts: list[tuple[int, Move]] = []
     async with sessionmaker() as db:
-        rows = (await db.execute(select(PoeWatch, User.discord_id).join(User).where(PoeWatch.game == game))).all()
+        rows = (await db.execute(select(PoeWatch, User.discord_id).join(User)
+                                .where(PoeWatch.game == game, User.blocked_at.is_(None)))).all()
         items = await existing(db, PoeItem, {watch.key for watch, _ in rows}, PoeItem.game == game,
                                PoeItem.league == league)
         for watch, discord_id in rows:

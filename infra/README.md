@@ -65,8 +65,8 @@ Erst nach dem Merge nach `main`, jeweils mit Sperre:
 
 1. `infra/deploy.sh <wer> --anwenden`: überträgt die geänderte `Caddyfile` (sperrt `/api/internal/*`
    nach außen) und `compose.yml`.
-2. `/srv/nexhub/.env`: `HUB_POE_ENABLED=true`, `HUB_POE1_LEAGUE=<Liga>`, `HUB_POE2_LEAGUE=<Liga>`
-   (PoE 1 hat zurzeit nur Standard und Hardcore).
+2. `/srv/nexhub/.env`: `HUB_POE_ENABLED=true`, bei Bedarf `HUB_POE1_LEAGUE=<Liga>` und
+   `HUB_POE2_LEAGUE=<Liga>` (leer = aktuelle Challenge-Liga von poe.ninja).
 3. `/srv/nexhub/bot.env`: `HUB_INTERNAL_URL=http://api:8000` (Vorlage `bot.env.beispiel`).
 4. `ssh waschsalon nexhub-update <wer> main` (baut Hub und Bot, Migration `0013`), danach
    `cd /srv/nexhub && docker compose up -d`.

@@ -6,19 +6,19 @@ import copy
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from nexhub_api.config import Settings
 from nexhub_api.models import PoeItem, PoePrice
 from nexhub_api.poe_ninja import (EXCHANGE_TYPES, GAMES, STASH_TYPES, PoeNinja, ninja_url, parse_exchange,
                                   parse_stash)
-from nexhub_api.poe_prices import PoePrices
+from nexhub_api.poe_prices import REFRESH_EVERY_S, PoePrices
 
 from .fake_poe_ninja import FakePoeNinja, sample
 
@@ -84,7 +84,8 @@ def test_overview_uses_etag():
         second = await client.overview("poe2", "exchange", LEAGUE2, "Currency")
         return first, second
     first, second = asyncio.run(go())
-    assert first == second == sample("poe2_exchange_Currency")
+    assert first == sample("poe2_exchange_Currency")
+    assert second is None  # 304: unverändert, die Antwort selbst merkt sich der Client nicht
     assert "if-none-match" not in fake.requests[0].headers
     assert fake.requests[1].headers["if-none-match"].startswith('W/"')  # Fake antwortet darauf mit 304
     assert fake.requests[1].url.params["league"] == LEAGUE2
@@ -217,3 +218,90 @@ def test_user_agent(make_client, fake):
             time.sleep(0.05)
     assert len(fake.poe_ninja.requests) == expected
     assert all(r.headers["user-agent"].startswith("NexHub/") for r in fake.poe_ninja.requests)
+
+
+def test_league_known_before_categories(database_url):
+    """Die Liga steht gleich nach ihrem Abruf fest, nicht erst nach allen Kategorien."""
+    fake = FakePoeNinja()
+    seen: list[str | None] = []
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            def spy(request: httpx.Request) -> httpx.Response:
+                seen.append(service.last_league("poe2"))
+                return fake(request)
+            service.ninja.http = httpx.AsyncClient(transport=httpx.MockTransport(spy))
+            await service.refresh("poe2")
+    asyncio.run(go())
+    assert seen[0] is None and set(seen[1:]) == {LEAGUE2}
+
+
+@pytest.mark.parametrize(("status", "headers", "wait"), [(429, {"Retry-After": "7200"}, 7200),
+                                                         (403, {}, REFRESH_EVERY_S)])
+def test_blocked_stops_game(database_url, caplog, status, headers, wait):
+    """429/403: poe.ninja will weniger Last. Der Rest des Spiels fällt aus, frühestens nach Retry-After wieder."""
+    fake = FakePoeNinja()
+    fake.overviews["poe2/exchange/Currency"] = httpx.Response(status, headers=headers)
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            with caplog.at_level("WARNING"):
+                assert await service.refresh("poe2") == LEAGUE2
+            return service.due["poe2"]
+    due = asyncio.run(go())
+    assert [r.url.path for r in fake.requests] == ["/poe2/api/economy/leagues",
+                                                   "/poe2/api/economy/exchange/current/overview"]
+    assert due >= time.time() + wait - 60
+    assert any(str(status) in r.getMessage() for r in caplog.records if r.levelname == "WARNING")
+
+
+def test_unchanged_category_only_adds_missing_days(database_url):
+    """304: Preise nicht neu schreiben, nur fehlende Tagespreise von heute aus dem aktuellen Preis anlegen."""
+    fake = FakePoeNinja()
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe2")
+            before = await items(service)
+            async with service.sessionmaker() as db:
+                await db.execute(delete(PoePrice))
+                await db.commit()
+            first = len(fake.requests)
+            await service.refresh("poe2")
+            after = await items(service)
+            async with service.sessionmaker() as db:
+                days = {row.key: row.price for row in await db.scalars(select(PoePrice))}
+            return before, after, days, fake.requests[first:]
+    before, after, days, again = asyncio.run(go())
+    assert all("if-none-match" in r.headers for r in again)
+    assert after["orb-of-alchemy"].updated_at == before["orb-of-alchemy"].updated_at
+    assert days == {key: row.price for key, row in before.items()}
+
+
+def test_resume_from_database(database_url):
+    """Nach einem Neustart: Liga aus der Datenbank, erster Abruf erst eine Stunde nach dem letzten."""
+    fake = FakePoeNinja()
+    fresh = datetime.now(UTC) - timedelta(minutes=10)
+
+    def row(game: str, league: str, key: str, updated_at: datetime) -> PoeItem:
+        return PoeItem(game=game, league=league, key=key, name=key, category="Currency", price=1.0,
+                       unit="divine", updated_at=updated_at)
+
+    async def idle(game: str, league: str) -> None:
+        return None
+
+    async def go():
+        async with prices(database_url, fake, hub_poe1_league="Neu") as service:
+            async with service.sessionmaker() as db:
+                db.add_all([row("poe2", "Alt", "a", fresh - timedelta(days=1)), row("poe2", LEAGUE2, "b", fresh),
+                            row("poe1", "Standard", "c", fresh)])
+                await db.commit()
+            await service.resume()
+            known = service.last_league("poe1"), service.last_league("poe2"), dict(service.due)
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(service.run(idle), 1)
+            return known
+    poe1, poe2, due = asyncio.run(go())
+    assert poe2 == LEAGUE2 and abs(due["poe2"] - (fresh.timestamp() + REFRESH_EVERY_S)) < 1
+    assert poe1 is None and due.get("poe1", 0) == 0  # festgelegte Liga geändert: gleich abrufen
+    assert fake.requests and all(r.url.path.startswith("/poe1/") for r in fake.requests)

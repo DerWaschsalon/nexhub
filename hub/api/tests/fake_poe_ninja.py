@@ -22,7 +22,8 @@ def sample(name: str) -> Any:
 
 
 class FakePoeNinja:
-    """`overviews` je „<spiel>/<art>/<kategorie>“ eine Antwort oder ein Statuscode; `requests` alle Anfragen."""
+    """`overviews` je „<spiel>/<art>/<kategorie>“ eine Antwort, ein Statuscode oder eine fertige
+    httpx.Response (z. B. 429 mit Retry-After); `requests` alle Anfragen."""
 
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
@@ -40,6 +41,8 @@ class FakePoeNinja:
         found = self.overviews.get(f"{game}/{kind}/{request.url.params['type']}")
         if isinstance(found, int):
             return httpx.Response(found)
+        if isinstance(found, httpx.Response):
+            return found
         empty = {"core": {"items": [], "rates": {}, "primary": PRIMARY[game]}, "lines": [], "items": []}
         return self.reply(request, empty if found is None else found)
 

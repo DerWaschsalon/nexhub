@@ -53,8 +53,28 @@ EXCHANGE_TYPES: dict[Game, tuple[str, ...]] = {game: tuple(pages) for game, page
 STASH_TYPES: dict[Game, tuple[str, ...]] = {game: tuple(pages) for game, pages in STASH_PAGES.items()}
 
 
+BLOCKED = (403, 429)  # poe.ninja will weniger Last
+CATEGORIES: dict[Game, list[tuple[Literal["exchange", "stash"], str]]] = {
+    game: [("exchange", c) for c in EXCHANGE_TYPES[game]] + [("stash", c) for c in STASH_TYPES[game]]
+    for game in GAMES}
+
+
 class PoeNinjaError(Exception):
     """poe.ninja nicht erreichbar oder Antwort kein 200/304."""
+
+
+class PoeNinjaBlocked(PoeNinjaError):
+    """403/429: poe.ninja will weniger Last. `retry_after` in Sekunden aus dem Header, sonst 0."""
+
+    def __init__(self, message: str, retry_after: float) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def retry_after(response: httpx.Response) -> float:
+    """Retry-After in Sekunden; die Form als Datum kommt bei poe.ninja nicht vor und zählt als 0."""
+    value = response.headers.get("retry-after", "")
+    return float(value) if value.isdigit() else 0.0
 
 
 @dataclass(frozen=True)
@@ -131,39 +151,49 @@ def ninja_url(game: Game, league: str, category: str, key: str) -> str:
 
 
 class PoeNinja:
-    """Zugriff auf poe.ninja. Merkt sich je Adresse ETag und Antwort; bei 304 kommt die gemerkte Antwort."""
+    """Zugriff auf poe.ninja. Merkt sich je Adresse nur das ETag; 304 (unverändert) gibt None zurück."""
 
     def __init__(self, http: httpx.AsyncClient, user_agent: str) -> None:
         self.http, self.user_agent = http, user_agent
-        self.cache: dict[str, tuple[str, Any]] = {}
+        self.etags: dict[str, str] = {}
 
-    async def leagues(self, game: Game) -> list[str]:
-        """Aktive Ligen, die erste ist die aktuelle Challenge-Liga."""
-        return [league["id"] for league in await self.get(f"{BASE}/{game}/api/economy/leagues", {})]
+    async def leagues(self, game: Game) -> list[str] | None:
+        """Aktive Ligen, die erste ist die aktuelle Challenge-Liga; None, wenn unverändert."""
+        data = await self.get(f"{BASE}/{game}/api/economy/leagues")
+        return None if data is None else [league["id"] for league in data]
+
+    def overview_address(self, game: Game, kind: Literal["exchange", "stash"], league: str, category: str) -> str:
+        params = {"league": league, "type": category}
+        return str(httpx.URL(f"{BASE}/{game}/api/economy/{OVERVIEW_PATHS[kind]}", params=params))
 
     async def overview(self, game: Game, kind: Literal["exchange", "stash"], league: str,
-                       category: str) -> dict[str, Any]:
-        data = await self.get(f"{BASE}/{game}/api/economy/{OVERVIEW_PATHS[kind]}",
-                              {"league": league, "type": category})
-        if not isinstance(data, dict):
+                       category: str) -> dict[str, Any] | None:
+        """Übersicht einer Kategorie; None, wenn sie seit dem letzten Abruf unverändert ist."""
+        data = await self.get(self.overview_address(game, kind, league, category))
+        if data is not None and not isinstance(data, dict):
             raise PoeNinjaError(f"{game} {kind} {category}: unerwartete Antwort")
         return data
 
-    async def get(self, url: str, params: dict[str, str]) -> Any:
-        address = str(httpx.URL(url, params=params))
+    def forget(self, game: Game, kind: Literal["exchange", "stash"], league: str, category: str) -> None:
+        """ETag verwerfen, wenn die Antwort nicht gespeichert werden konnte: sonst käme nur noch 304."""
+        self.etags.pop(self.overview_address(game, kind, league, category), None)
+
+    async def get(self, address: str) -> Any:
         headers = {"User-Agent": self.user_agent}
-        cached = self.cache.get(address)
-        if cached:
-            headers["If-None-Match"] = cached[0]
+        etag = self.etags.get(address)
+        if etag:
+            headers["If-None-Match"] = etag
         try:
             response = await self.http.get(address, headers=headers)
         except httpx.HTTPError as error:
             raise PoeNinjaError(f"{address}: {error!r}") from error
-        if response.status_code == 304 and cached:
-            return cached[1]
+        if response.status_code == 304 and etag:
+            return None
+        if response.status_code in BLOCKED:
+            raise PoeNinjaBlocked(f"{address}: HTTP {response.status_code}", retry_after(response))
         if response.status_code != 200:
             raise PoeNinjaError(f"{address}: HTTP {response.status_code}")
         data = response.json()
-        if etag := response.headers.get("etag"):
-            self.cache[address] = (etag, data)
+        if new_etag := response.headers.get("etag"):
+            self.etags[address] = new_etag
         return data

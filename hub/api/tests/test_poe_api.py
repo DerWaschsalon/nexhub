@@ -148,10 +148,25 @@ def test_internal_price_best_match(database_url, make_client):
         assert "Divine Orb" in names and all(isinstance(n, str) for n in names)
 
 
-def test_disabled_is_404(make_client, fake):
+def test_disabled_is_404_for_web_503_for_bot(make_client, fake):
+    """Für den Bot heißt 404 nur „nichts gefunden“; ausgeschaltet ist 503 wie „lädt noch“."""
     fake.user = MEMBER
     with make_client(bot_control_key=KEY) as c:
         sign_in(c)
         assert c.get("/api/poe/search", params={"game": "poe1", "q": "a"}).status_code == 404
         assert c.get("/api/poe/watches", params={"game": "poe1"}).status_code == 404
-        assert c.get("/api/internal/poe/price", params={"game": "poe1", "q": "a"}, headers=AUTH).status_code == 404
+        r = c.get("/api/internal/poe/price", params={"game": "poe1", "q": "a"}, headers=AUTH)
+        assert r.status_code == 503 and "nicht eingeschaltet" in r.json()["detail"]
+        assert c.get("/api/internal/poe/complete", params={"game": "poe1"}, headers=AUTH).status_code == 503
+
+
+def test_loading_is_503_without_network(make_client, fake):
+    """Ohne Abruf seit dem Start und ohne festgelegte Liga fragt keine Anfrage poe.ninja, sondern sagt 503."""
+    fake.user = MEMBER
+    with make_client(hub_poe_enabled=True, bot_control_key=KEY) as c:
+        sign_in(c)
+        for url, headers in (("/api/poe/search", {}), ("/api/poe/watches", {}),
+                             ("/api/internal/poe/price", AUTH), ("/api/internal/poe/complete", AUTH)):
+            r = c.get(url, params={"game": "poe2", "q": "a"}, headers=headers)
+            assert r.status_code == 503 and r.json()["detail"] == "Preise werden noch geladen.", url
+    assert fake.poe_ninja.requests == []

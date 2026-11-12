@@ -6,6 +6,7 @@ import json
 from datetime import UTC, date, datetime, timedelta
 
 import httpx
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -53,6 +54,14 @@ def test_no_alert_on_league_change():
     assert entry.ref_price == 1.0 and entry.ref_league == "Neu"
 
 
+@pytest.mark.parametrize("ref_price", [None, 0.0, -1.0])
+def test_reset_without_ref_price(ref_price):
+    """Ohne brauchbaren Bezugspreis wie bei einer neuen Liga: heutigen Preis merken, kein Alarm."""
+    entry = watch(ref_price=ref_price)
+    assert check_watch(entry, item(), LEAGUE, TODAY) is None
+    assert entry.ref_price == 125.0 and entry.alerted_on is None
+
+
 def test_no_alert_without_price():
     entry = watch()
     assert check_watch(entry, None, LEAGUE, TODAY) is None
@@ -67,7 +76,8 @@ def test_movers_skip_thin_items():
     assert down == []
 
 
-def bot_calls(database_url: str, send, rows, **settings) -> tuple[list[httpx.Request], list[PoeWatch]]:
+def bot_calls(database_url: str, send, rows, blocked_at: datetime | None = None,
+              **settings) -> tuple[list[httpx.Request], list[PoeWatch]]:
     """Legt einen Nutzer mit `rows` an (Funktion Nutzer-ID → Zeilen), ruft `send` für poe1/Standard und
     gibt die Anfragen an die gefälschte Bot-API und die Merkliste danach zurück."""
     fake = FakeDiscord()
@@ -79,7 +89,7 @@ def bot_calls(database_url: str, send, rows, **settings) -> tuple[list[httpx.Req
         engine = create_async_engine(database_url)
         sessionmaker: async_sessionmaker[AsyncSession] = async_sessionmaker(engine, expire_on_commit=False)
         async with sessionmaker() as db:
-            user = User(discord_id=4711, username="u", role="member")
+            user = User(discord_id=4711, username="u", role="member", blocked_at=blocked_at)
             db.add(user)
             await db.flush()
             db.add_all(rows(user.id))
@@ -101,6 +111,12 @@ def test_tell_bot_payload(database_url):
     assert seen[0].headers["authorization"] == f"Bearer {BOT['bot_control_key']}"
     body = json.loads(seen[0].content)
     assert body["guild_id"] == GUILD and body["discord_id"] == 4711 and body["change"] == 25.0
+
+
+def test_no_alert_for_blocked_user(database_url):
+    seen, _ = bot_calls(database_url, send_alerts, lambda user_id: [item(), watch(user_id=user_id)],
+                        blocked_at=datetime.now(UTC))
+    assert seen == []
 
 
 def test_no_alert_without_guild(database_url):
