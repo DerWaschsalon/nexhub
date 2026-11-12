@@ -96,7 +96,9 @@ def test_refresh_keeps_missing_item(database_url):
 
     async def go():
         async with prices(database_url, fake) as service:
+            assert service.last_league("poe2") is None
             assert await service.refresh("poe2") == LEAGUE2
+            assert service.last_league("poe2") == LEAGUE2  # für die Tagespost, ohne neuen Abruf
             before = await items(service)
             # zweiter Abruf: Chaos Orb fehlt, Alchemy hat einen neuen Preis
             currency["lines"] = [line for line in currency["lines"] if line["id"] != "chaos"]

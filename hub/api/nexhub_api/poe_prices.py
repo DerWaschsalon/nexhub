@@ -46,6 +46,11 @@ async def existing(db: AsyncSession, model: type[Row], keys: Iterable[str],
 class PoePrices:
     def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], ninja: PoeNinja, settings: Settings) -> None:
         self.sessionmaker, self.ninja, self.settings = sessionmaker, ninja, settings
+        self.leagues: dict[Game, str] = {}  # Liga des letzten Abrufs je Spiel
+
+    def last_league(self, game: Game) -> str | None:
+        """Liga des letzten Abrufs; None, solange das Spiel noch nicht abgerufen wurde."""
+        return self.leagues.get(game)
 
     async def league(self, game: Game) -> str:
         """Festgelegte Liga aus den Einstellungen, sonst die aktuelle Challenge-Liga von poe.ninja."""
@@ -69,6 +74,7 @@ class PoePrices:
                     log.warning("poe.ninja: %s %s %s übersprungen: %s", game, kind, category, error)
                 except Exception:
                     log.exception("poe.ninja: %s %s %s übersprungen", game, kind, category)
+        self.leagues[game] = league
         return league
 
     async def store(self, game: Game, league: str, lines: list[PriceLine]) -> None:

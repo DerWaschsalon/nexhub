@@ -79,7 +79,7 @@ def is_liquid(item: PoeItem, game: Game) -> bool:
 
 def movers(today: list[PoeItem], yesterday: dict[str, float], game: Game) -> tuple[list[Move], list[Move]]:
     """Die TOP_N Gewinner und Verlierer gegenüber dem Vortag, nur Gegenstände mit genug Handel."""
-    moves = []
+    moves: list[Move] = []
     for item in today:
         change = change_pct(yesterday.get(item.key), item.price)
         if change is not None and is_liquid(item, game):

@@ -5,7 +5,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
 
 import httpx
@@ -31,24 +31,30 @@ log = logging.getLogger(__name__)
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def seconds_until_daily_post(now: datetime) -> float:
-    """Sekunden bis zur nächsten Tagespost (DAILY_POST_AT in Deutschland)."""
+def seconds_until_daily_post(now: datetime, posted_on: date | None) -> float:
+    """Sekunden bis zur nächsten Tagespost (DAILY_POST_AT in Deutschland). Ist heute schon gepostet, erst
+    morgen: der Schlaf kann ein paar Millisekunden zu früh enden, sonst käme die Post doppelt."""
     local = now.astimezone(TZ)
     target = datetime.combine(local.date(), DAILY_POST_AT, TZ)
-    if target <= local:
+    if target <= local or local.date() == posted_on:
         target += timedelta(days=1)  # bleibt 18:00 Ortszeit, auch über die Zeitumstellung
     # in UTC rechnen: zwischen zwei Zeiten derselben Zone ignoriert Python die Zeitumstellung
     return (target.astimezone(UTC) - now.astimezone(UTC)).total_seconds()
 
 
 async def poe_daily_posts(prices: PoePrices, post: Callable[[Game, str], Awaitable[None]]) -> None:
-    """Läuft neben dem Webserver: täglich die Tagespost je Spiel."""
+    """Läuft neben dem Webserver: täglich die Tagespost je Spiel, für die Liga des letzten Preisabrufs."""
+    posted_on: date | None = None
     while True:
-        await asyncio.sleep(seconds_until_daily_post(datetime.now(UTC)))
+        await asyncio.sleep(seconds_until_daily_post(datetime.now(UTC), posted_on))
+        posted_on = datetime.now(TZ).date()
         for game in GAMES:
+            league = prices.last_league(game)
+            if league is None:  # noch kein Preisabruf seit dem Start
+                continue
             try:
-                await post(game, await prices.league(game))
-            except Exception:  # z. B. poe.ninja nicht erreichbar; das andere Spiel kommt trotzdem
+                await post(game, league)
+            except Exception:  # z. B. Datenbank nicht erreichbar; das andere Spiel kommt trotzdem
                 log.exception("Tagespost für %s abgebrochen", game)
 
 
