@@ -84,9 +84,9 @@ async def require_device(request: Request, db: DB) -> Device:
 
 async def require_bot_key(request: Request, settings: SettingsDep) -> None:
     """Der Bot ruft /api/internal/… mit `Authorization: Bearer <BOT_CONTROL_KEY>`; ohne eingestellten Schlüssel nie."""
-    _, _, token = request.headers.get("authorization", "").partition(" ")
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
     key = settings.bot_control_key
-    if not key or not hmac.compare_digest(token.encode(), key.encode()):
+    if not key or scheme.lower() != "bearer" or not hmac.compare_digest(token.encode(), key.encode()):
         raise HTTPException(401, "Schlüssel fehlt oder falsch", headers={"WWW-Authenticate": "Bearer"})
 
 

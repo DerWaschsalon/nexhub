@@ -76,6 +76,7 @@ def test_watch_changes_and_days(database_url, make_client, fake):
     seed(database_url, item(price=150.0),
          PoePrice(game="poe1", league=LEAGUE, key="divine-orb", day=today - timedelta(days=1), price=100.0),
          PoePrice(game="poe1", league=LEAGUE, key="divine-orb", day=today - timedelta(days=7), price=300.0),
+         PoePrice(game="poe1", league=LEAGUE, key="divine-orb", day=today - timedelta(days=60), price=500.0),
          PoePrice(game="poe1", league="Alt", key="divine-orb", day=today, price=1.0))
     fake.user = MEMBER
     with make_client(**POE) as c:
@@ -83,7 +84,7 @@ def test_watch_changes_and_days(database_url, make_client, fake):
         c.post("/api/poe/watches", json={"game": "poe1", "key": "divine-orb"})
         (entry,) = c.get("/api/poe/watches", params={"game": "poe1"}).json()["watches"]
         assert entry["change_24h"] == 50.0 and entry["change_7d"] == -50.0
-        assert [d["price"] for d in entry["days"]] == [300.0, 100.0]
+        assert [d["price"] for d in entry["days"]] == [500.0, 300.0, 100.0]
 
 
 def test_watches_are_private(database_url, make_client, fake):
@@ -126,6 +127,8 @@ def test_internal_needs_key(make_client):
         url, params = "/api/internal/poe/price", {"game": "poe1", "q": "x"}
         assert c.get(url, params=params).status_code == 401
         assert c.get(url, params=params, headers={"Authorization": "Bearer falsch"}).status_code == 401
+        assert c.get(url, params=params, headers={"Authorization": f"Basic {KEY}"}).status_code == 401
+        assert c.get(url, params=params, headers={"Authorization": f"bearer {KEY}"}).status_code == 404
         assert c.get(url, params=params, headers=AUTH).status_code == 404  # Schlüssel stimmt, nichts gefunden
         assert c.get("/api/internal/poe/complete", params=params, headers=AUTH).status_code == 200
     with make_client(**{**POE, "bot_control_key": ""}) as c:

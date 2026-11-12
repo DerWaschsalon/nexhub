@@ -29,7 +29,6 @@ from ..poe_prices import TZ, PoePrices
 
 SEARCH_LIMIT = 20
 COMPLETE_LIMIT = 25
-CHART_DAYS = 30
 
 
 def prices_service(request: Request) -> PoePrices:
@@ -128,8 +127,8 @@ async def watch_list(db: DB, prices: PoePrices, game: Game, user_id: int, only: 
     history: dict[str, list[Day]] = {}
     for key, day, price in await db.execute(
             select(PoePrice.key, PoePrice.day, PoePrice.price)
-            .where(PoePrice.game == game, PoePrice.league == league, PoePrice.key.in_(keys),
-                   PoePrice.day >= today - timedelta(days=CHART_DAYS)).order_by(PoePrice.day)):
+            .where(PoePrice.game == game, PoePrice.league == league, PoePrice.key.in_(keys))
+            .order_by(PoePrice.day)):
         history.setdefault(key, []).append(Day(day=day, price=price))
     out = []
     for w in watches:
@@ -231,6 +230,7 @@ async def price(game: Game, key: BotKey, db: DB, prices: Prices,
 @internal.get("/complete")
 async def complete(game: Game, key: BotKey, db: DB, prices: Prices,
                    q: Annotated[str, Query(max_length=100)] = "") -> list[str]:
+    # Ohne q (leeres Discord-Eingabefeld) kommen absichtlich die 25 teuersten Namen
     league = await current_league(prices, game)
     names = await db.scalars(select(PoeItem.name).where(*named(game, league, q)).order_by(*best_first(q))
                              .limit(COMPLETE_LIMIT))
