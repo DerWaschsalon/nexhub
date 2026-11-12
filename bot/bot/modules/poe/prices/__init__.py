@@ -15,11 +15,15 @@ from discord.ext import commands
 from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule, GuildSettings, HubClient
-from bot.core.web import RouteTable, guild_id_from, is_id, json_body
+from bot.core.web import RouteTable, guild_id_from, is_id, json_body, require_fields
 from bot.hubpages import ApiError
 
 from .embeds import alert_embed, daily_embed
 from .settings import PoeSettings
+
+# Felder einer Preisänderung (`Move` in hub/api/nexhub_api/poe_alerts.py)
+MOVE_FIELDS = ("key", "name", "icon", "old", "new", "unit", "change", "url")
+SIDES = ("up", "down")
 
 
 class PoePrices(BotModule):
@@ -65,6 +69,7 @@ class PoePrices(BotModule):
         channel = self.channel_for(data)
         if not is_id(data.get("discord_id")):
             raise ApiError(400, "discord_id fehlt")
+        require_fields(data, ("game", "league", *MOVE_FIELDS))
         if channel is None:
             return {"posted": False}
         await channel.send(content=f"<@{data['discord_id']}>", embed=alert_embed(data),
@@ -74,6 +79,12 @@ class PoePrices(BotModule):
     async def daily(self, request: web.Request) -> dict[str, Any]:
         data = await json_body(request)
         channel = self.channel_for(data)
+        require_fields(data, ("game", "league", *SIDES))
+        for side in SIDES:
+            if not isinstance(data[side], list):
+                raise ApiError(400, f"{side}: Liste erwartet")
+            for move in data[side]:
+                require_fields(move, MOVE_FIELDS)
         if channel is None:
             return {"posted": False}
         await channel.send(embed=daily_embed(data))

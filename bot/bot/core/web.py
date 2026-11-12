@@ -99,6 +99,15 @@ async def json_body(request: web.Request) -> dict[str, Any]:
     return data
 
 
+def require_fields(data: Any, fields: tuple[str, ...]) -> None:
+    """Pflichtfelder im JSON des Hubs; fehlt eins, ist das ein Fehler des Aufrufers (400), kein Absturz (500)."""
+    if not isinstance(data, dict):
+        raise ApiError(400, "JSON-Objekt erwartet")
+    missing = [field for field in fields if field not in data]
+    if missing:
+        raise ApiError(400, f"Felder fehlen: {', '.join(missing)}")
+
+
 def is_id(value: Any) -> TypeGuard[int]:
     # bool ist in Python auch ein int, als ID aber Unsinn
     return isinstance(value, int) and not isinstance(value, bool)

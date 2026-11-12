@@ -6,7 +6,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import discord
@@ -152,6 +152,10 @@ def test_hub_client_404_is_none() -> None:
             return web.json_response({"detail": "Schlüssel"}, status=401)
         if request.query["q"] == "kaputt":
             return web.json_response({"detail": "Fehler"}, status=500)
+        if request.query["q"] == "lädt":
+            return web.json_response({"detail": "Preise werden noch geladen."}, status=503)
+        if request.query["q"] == "503":
+            return web.Response(status=503)
         if request.query["q"] != "Divine":
             return web.json_response({"detail": "Nichts gefunden"}, status=404)
         return web.json_response({"name": "Divine Orb"})
@@ -167,6 +171,11 @@ def test_hub_client_404_is_none() -> None:
                     {"name": "Divine Orb"}
                 with pytest.raises(UserError, match="NexHub nicht erreichbar"):
                     await hub.get("/api/internal/poe/price", {"game": "poe1", "q": "kaputt"})
+                # 503: Funktion im Hub aus oder lädt noch, nicht „nichts gefunden“; die Meldung kommt vom Hub
+                with pytest.raises(UserError, match="Preise werden noch geladen"):
+                    await hub.get("/api/internal/poe/price", {"game": "poe1", "q": "lädt"})
+                with pytest.raises(UserError, match="NexHub nicht erreichbar"):
+                    await hub.get("/api/internal/poe/price", {"game": "poe1", "q": "503"})
             finally:
                 await hub.close()
 
@@ -229,7 +238,7 @@ def test_autocomplete_caps_choices() -> None:
         prices = module(db)
         prices.hub = SimpleNamespace(get=AsyncMock(return_value=["N" * 150] * 30))  # type: ignore[assignment]
         cog = PoeCog(prices)
-        suggest: Any = cog.price_autocomplete  # discord.py tippt die Methode ohne self
+        suggest: Any = cast(Any, cog).price_autocomplete  # discord.py tippt die Methode ohne self
         choices = await suggest(interaction("poe2"), "N")
         assert len(choices) == 25 and all(len(c.name) <= 100 and len(c.value) <= 100 for c in choices)
 
@@ -252,3 +261,41 @@ def test_hub_client_bad_json_is_unreachable() -> None:
                 await hub.close()
 
     asyncio.run(go())
+
+
+@pytest.mark.parametrize("missing", ["name", "url", "old", "game"])
+def test_control_alert_missing_field_is_400(missing: str) -> None:
+    channel = MagicMock(spec=discord.TextChannel)
+    channel.send = AsyncMock()
+
+    async def test(db: Database) -> None:
+        prices = module(db, channel)
+        await prices.settings.update(GUILD, {"poe_channel": 77})
+        data = alert()
+        del data[missing]
+        request = SimpleNamespace(json=AsyncMock(return_value=data))
+        with pytest.raises(ApiError) as caught:
+            await prices.alert(request)  # type: ignore[arg-type]
+        assert caught.value.status == 400 and missing in str(caught.value)
+        channel.send.assert_not_awaited()
+
+    with_db(test)
+
+
+@pytest.mark.parametrize("change", [{"up": None}, {"league": None}, {"down": [{"name": "X"}]}])
+def test_control_daily_bad_body_is_400(change: dict[str, Any]) -> None:
+    channel = MagicMock(spec=discord.TextChannel)
+    channel.send = AsyncMock()
+
+    async def test(db: Database) -> None:
+        prices = module(db, channel)
+        await prices.settings.update(GUILD, {"poe_channel": 77})
+        data = {"guild_id": GUILD, "game": "poe1", "league": "L", "up": [], "down": [], **change}
+        data = {key: value for key, value in data.items() if value is not None}
+        request = SimpleNamespace(json=AsyncMock(return_value=data))
+        with pytest.raises(ApiError) as caught:
+            await prices.daily(request)  # type: ignore[arg-type]
+        assert caught.value.status == 400
+        channel.send.assert_not_awaited()
+
+    with_db(test)

@@ -22,6 +22,12 @@ TIMEOUT_S = 10
 NOT_REACHABLE = "NexHub nicht erreichbar"
 
 
+def unavailable(body: Any) -> str:
+    """Meldung aus der 503-Antwort des Hubs (`detail`), sonst „nicht erreichbar“."""
+    detail = body.get("detail") if isinstance(body, dict) else None
+    return detail if isinstance(detail, str) else NOT_REACHABLE
+
+
 class HubClient:
     def __init__(self, base_url: str, key: str) -> None:
         self.base_url = base_url.rstrip("/")
@@ -45,11 +51,14 @@ class HubClient:
         return self._session
 
     async def get(self, path: str, params: dict[str, str]) -> Any | None:
-        """JSON-Antwort des Hubs; 404 heißt „nichts gefunden“ (None), alles andere Unerwartete UserError."""
+        """JSON-Antwort des Hubs; 404 heißt „nichts gefunden“ (None), alles andere Unerwartete UserError.
+        503 heißt: die Funktion ist im Hub aus oder lädt noch; dann zeigt der Bot die Meldung des Hubs."""
         try:
             async with self._s().get(self.base_url + path, params=params) as resp:
                 if resp.status == 404:
                     return None
+                if resp.status == 503:
+                    raise UserError(unavailable(await resp.json()))
                 resp.raise_for_status()
                 return await resp.json()
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:  # ValueError: kaputtes JSON
