@@ -1,0 +1,107 @@
+{
+ "core": {
+  "items": [
+   {
+    "id": "chaos",
+    "name": "Chaos Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjF9XQ/46a2347805/CurrencyRerollRare.png",
+    "category": "Currency",
+    "detailsId": "chaos-orb"
+   },
+   {
+    "id": "divine",
+    "name": "Divine Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MX1d/ec48896769/CurrencyModValues.png",
+    "category": "Currency",
+    "detailsId": "divine-orb"
+   }
+  ],
+  "rates": {
+   "divine": 0.001201
+  },
+  "primary": "chaos",
+  "secondary": "divine"
+ },
+ "lines": [
+  {
+   "id": "accelerating-catalyst",
+   "primaryValue": 17.08,
+   "volumePrimaryValue": 1110,
+   "maxVolumeCurrency": "divine",
+   "maxVolumeRate": 48.75,
+   "sparkline": {
+    "totalChange": 23.08,
+    "data": [
+     0,
+     -20.0,
+     0,
+     0,
+     0,
+     0,
+     23.08
+    ]
+   }
+  },
+  {
+   "id": "divine",
+   "primaryValue": 832.6,
+   "volumePrimaryValue": 591708,
+   "maxVolumeCurrency": "chaos",
+   "maxVolumeRate": 0.001201,
+   "sparkline": {
+    "totalChange": 21.41,
+    "data": [
+     3.17,
+     1.61,
+     -5.61,
+     -9.76,
+     -7.62,
+     17.95,
+     21.41
+    ]
+   }
+  },
+  {
+   "id": "blessed",
+   "primaryValue": 7.57,
+   "volumePrimaryValue": 14571,
+   "maxVolumeCurrency": "divine",
+   "maxVolumeRate": 110.0,
+   "sparkline": {
+    "totalChange": 173.6,
+    "data": [
+     0,
+     -55.78,
+     -4.78,
+     83.73,
+     297.0,
+     190.5,
+     173.6
+    ]
+   }
+  }
+ ],
+ "items": [
+  {
+   "id": "accelerating-catalyst",
+   "name": "Accelerating Catalyst",
+   "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ2F0YWx5c3RzL1NwZWVkTW9kaWZpZXJDYXRhbHlzdCIsInNjYWxlIjoxfV0/6493f34e78/SpeedModifierCatalyst.png",
+   "category": "Catalysts",
+   "detailsId": "accelerating-catalyst"
+  },
+  {
+   "id": "divine",
+   "name": "Divine Orb",
+   "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MX1d/ec48896769/CurrencyModValues.png",
+   "category": "Currency",
+   "detailsId": "divine-orb"
+  },
+  {
+   "id": "blessed",
+   "name": "Blessed Orb",
+   "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lJbXBsaWNpdE1vZCIsInNjYWxlIjoxfV0/48e700cc20/CurrencyImplicitMod.png",
+   "category": "Currency",
+   "detailsId": "blessed-orb"
+  }
+ ]
+}

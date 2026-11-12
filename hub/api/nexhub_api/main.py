@@ -18,11 +18,17 @@ from .census import Census
 from .characters import Fetcher
 from .config import Settings
 from .deps import DB, SESSION_COOKIE
+from .poe_ninja import Game, PoeNinja
+from .poe_prices import PoePrices
 from .routes import ROUTERS
 
 log = logging.getLogger(__name__)
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+async def after_poe_refresh(game: Game, league: str) -> None:
+    """Nach jedem Preisabruf eines Spiels; Alarme und Tagespost kommen hier später dazu."""
 
 
 def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None = None) -> FastAPI:
@@ -48,6 +54,12 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
                      asyncio.create_task(app.state.armory.daily()),
                      asyncio.create_task(collector.run()),
                      asyncio.create_task(census.daily())]
+        app.state.poe_prices = None
+        if settings.hub_poe_enabled:
+            agent = f"NexHub/{settings.hub_version} (+https://github.com/DerWaschsalon/nexhub)"
+            ninja = PoeNinja(app.state.http, agent)
+            app.state.poe_prices = PoePrices(app.state.sessionmaker, ninja, settings)
+            tasks.append(asyncio.create_task(app.state.poe_prices.run(after_poe_refresh)))
         yield
         for task in tasks:
             task.cancel()  # ein Neustart soll nicht auf NC warten; der Rest kommt beim nächsten Start

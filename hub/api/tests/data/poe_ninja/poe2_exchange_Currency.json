@@ -1,0 +1,115 @@
+{
+ "core": {
+  "items": [
+   {
+    "id": "divine",
+    "name": "Divine Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lNb2RWYWx1ZXMiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/2986e220b3/CurrencyModValues.png",
+    "category": "Currency",
+    "detailsId": "divine-orb"
+   },
+   {
+    "id": "exalted",
+    "name": "Exalted Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lBZGRNb2RUb1JhcmUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/ad7c366789/CurrencyAddModToRare.png",
+    "category": "Currency",
+    "detailsId": "exalted-orb"
+   },
+   {
+    "id": "chaos",
+    "name": "Chaos Orb",
+    "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/c0ca392a78/CurrencyRerollRare.png",
+    "category": "Currency",
+    "detailsId": "chaos-orb"
+   }
+  ],
+  "rates": {
+   "exalted": 537.7,
+   "chaos": 8.77
+  },
+  "primary": "divine",
+  "secondary": "chaos"
+ },
+ "lines": [
+  {
+   "id": "alch",
+   "primaryValue": 0.005,
+   "volumePrimaryValue": 1.33,
+   "maxVolumeCurrency": "divine",
+   "maxVolumeRate": 200,
+   "sparkline": {
+    "totalChange": 36.66,
+    "data": [
+     -6.69,
+     -2.45,
+     -8.99,
+     -29.47,
+     -7.0,
+     -30.29,
+     36.66
+    ]
+   }
+  },
+  {
+   "id": "exalted",
+   "primaryValue": 0.00186,
+   "volumePrimaryValue": 46.5,
+   "maxVolumeCurrency": "divine",
+   "maxVolumeRate": 537.7,
+   "sparkline": {
+    "totalChange": -0.17,
+    "data": [
+     -0.96,
+     -5.42,
+     -4.16,
+     -1.39,
+     -2.4,
+     0.86,
+     -0.17
+    ]
+   }
+  },
+  {
+   "id": "chaos",
+   "primaryValue": 0.114,
+   "volumePrimaryValue": 549.0,
+   "maxVolumeCurrency": "divine",
+   "maxVolumeRate": 8.77,
+   "sparkline": {
+    "totalChange": 2.75,
+    "data": [
+     1.44,
+     1.28,
+     -0.5,
+     -0.15,
+     2.82,
+     1.96,
+     2.75
+    ]
+   }
+  }
+ ],
+ "items": [
+  {
+   "id": "alch",
+   "name": "Orb of Alchemy",
+   "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lVcGdyYWRlVG9SYXJlIiwic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/9b80b44821/CurrencyUpgradeToRare.png",
+   "category": "Currency",
+   "detailsId": "orb-of-alchemy"
+  },
+  {
+   "id": "exalted",
+   "name": "Exalted Orb",
+   "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lBZGRNb2RUb1JhcmUiLCJzY2FsZSI6MSwicmVhbG0iOiJwb2UyIn1d/ad7c366789/CurrencyAddModToRare.png",
+   "category": "Currency",
+   "detailsId": "exalted-orb"
+  },
+  {
+   "id": "chaos",
+   "name": "Chaos Orb",
+   "image": "/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvQ3VycmVuY3kvQ3VycmVuY3lSZXJvbGxSYXJlIiwic2NhbGUiOjEsInJlYWxtIjoicG9lMiJ9XQ/c0ca392a78/CurrencyRerollRare.png",
+   "category": "Currency",
+   "detailsId": "chaos-orb"
+  }
+ ]
+}
