@@ -274,6 +274,9 @@ class PoePrice(Base):
     price: Mapped[float] = mapped_column(Float)
 
 
+DEFAULT_THRESHOLD = 20.0  # Prozent Abweichung, ab der ein Preisalarm kommt (poe_alerts.py)
+
+
 class PoeWatch(Base):
     """Beobachteter Gegenstand eines Kontos. Alarm bei Abweichung um `threshold` Prozent vom `ref_price`
     (Preis der Liga `ref_league`); `alerted_on` verhindert mehrere Meldungen am Tag."""
@@ -286,7 +289,7 @@ class PoeWatch(Base):
     game: Mapped[str] = mapped_column(String(8))
     key: Mapped[str] = mapped_column(String(128))
     name: Mapped[str] = mapped_column(String(128))
-    threshold: Mapped[float] = mapped_column(Float, default=20)
+    threshold: Mapped[float] = mapped_column(Float, default=DEFAULT_THRESHOLD)
     ref_price: Mapped[float | None] = mapped_column(Float)
     ref_league: Mapped[str | None] = mapped_column(String(64))
     alerted_on: Mapped[date | None] = mapped_column(Date)

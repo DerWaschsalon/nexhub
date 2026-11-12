@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
+from functools import partial
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -18,8 +21,9 @@ from .census import Census
 from .characters import Fetcher
 from .config import Settings
 from .deps import DB, SESSION_COOKIE
-from .poe_ninja import Game, PoeNinja
-from .poe_prices import PoePrices
+from .poe_alerts import DAILY_POST_AT, send_alerts, send_daily
+from .poe_ninja import GAMES, Game, PoeNinja
+from .poe_prices import TZ, PoePrices
 from .routes import ROUTERS
 
 log = logging.getLogger(__name__)
@@ -27,8 +31,25 @@ log = logging.getLogger(__name__)
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-async def after_poe_refresh(game: Game, league: str) -> None:
-    """Nach jedem Preisabruf eines Spiels; Alarme und Tagespost kommen hier später dazu."""
+def seconds_until_daily_post(now: datetime) -> float:
+    """Sekunden bis zur nächsten Tagespost (DAILY_POST_AT in Deutschland)."""
+    local = now.astimezone(TZ)
+    target = datetime.combine(local.date(), DAILY_POST_AT, TZ)
+    if target <= local:
+        target += timedelta(days=1)  # bleibt 18:00 Ortszeit, auch über die Zeitumstellung
+    # in UTC rechnen: zwischen zwei Zeiten derselben Zone ignoriert Python die Zeitumstellung
+    return (target.astimezone(UTC) - now.astimezone(UTC)).total_seconds()
+
+
+async def poe_daily_posts(prices: PoePrices, post: Callable[[Game, str], Awaitable[None]]) -> None:
+    """Läuft neben dem Webserver: täglich die Tagespost je Spiel."""
+    while True:
+        await asyncio.sleep(seconds_until_daily_post(datetime.now(UTC)))
+        for game in GAMES:
+            try:
+                await post(game, await prices.league(game))
+            except Exception:  # z. B. poe.ninja nicht erreichbar; das andere Spiel kommt trotzdem
+                log.exception("Tagespost für %s abgebrochen", game)
 
 
 def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None = None) -> FastAPI:
@@ -59,7 +80,9 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
             agent = f"NexHub/{settings.hub_version} (+https://github.com/DerWaschsalon/nexhub)"
             ninja = PoeNinja(app.state.http, agent)
             app.state.poe_prices = PoePrices(app.state.sessionmaker, ninja, settings)
-            tasks.append(asyncio.create_task(app.state.poe_prices.run(after_poe_refresh)))
+            bot = (app.state.sessionmaker, app.state.http, settings)
+            tasks += [asyncio.create_task(app.state.poe_prices.run(partial(send_alerts, *bot))),
+                      asyncio.create_task(poe_daily_posts(app.state.poe_prices, partial(send_daily, *bot)))]
         yield
         for task in tasks:
             task.cancel()  # ein Neustart soll nicht auf NC warten; der Rest kommt beim nächsten Start
