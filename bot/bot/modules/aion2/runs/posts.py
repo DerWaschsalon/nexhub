@@ -44,7 +44,7 @@ from discord.ext import commands
 from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule
-from bot.core.web import RouteTable, json_body
+from bot.core.web import RouteTable, guild_id_from, json_body
 from bot.hubpages import ApiError
 
 from .format import fmt_dps, fmt_time, records_text
@@ -452,9 +452,8 @@ class RunPosts(BotModule):
         """Der Hub leitet den Run-Bericht eines NexBoards weiter (nexproto RunReport, im Hub geprüft), mit Link
         zum Run im Hub: wie die Run-API, aber für den Discord-Server des Hubs."""
         data = await json_body(request)
-        guild_id, report, url = data.get("guild_id"), data.get("report"), data.get("url")
-        if not isinstance(guild_id, int) or isinstance(guild_id, bool) or self.client.get_guild(guild_id) is None:
-            raise ApiError(400, "guild_id fehlt oder der Bot ist auf diesem Server nicht")
+        guild_id = guild_id_from(self.client, data)
+        report, url = data.get("report"), data.get("url")
         if not isinstance(report, dict):
             raise ApiError(400, "report fehlt")
         if url is not None and not (isinstance(url, str) and url.startswith(("https://", "http://"))

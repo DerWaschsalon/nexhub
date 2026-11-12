@@ -1,0 +1,187 @@
+{
+ "lines": [
+  {
+   "id": 1600,
+   "name": "The Searing Touch",
+   "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9Ud29IYW5kV2VhcG9ucy9TdGF2ZXMvU3RhZmY0dW5pcXVlIiwidyI6MiwiaCI6NCwic2NhbGUiOjF9XQ/5c7ddd5550/Staff4unique.png",
+   "levelRequired": 18,
+   "baseType": "Long Staff",
+   "itemClass": 3,
+   "sparkLine": {
+    "totalChange": 30.47,
+    "data": [
+     0,
+     5.56,
+     2.25,
+     -6.41,
+     -8.91,
+     23.92,
+     30.47
+    ]
+   },
+   "implicitModifiers": [
+    {
+     "text": "+(12-18)% Chance to Block Attack Damage",
+     "optional": false
+    },
+    {
+     "text": "+(12-18)% Chance to Block Attack Damage while wielding a Staff",
+     "optional": true
+    }
+   ],
+   "explicitModifiers": [
+    {
+     "text": "(30-50)% increased Spell Damage",
+     "optional": true
+    },
+    {
+     "text": "(20-89)% increased Fire Damage",
+     "optional": false
+    },
+    {
+     "text": "10% increased Cast Speed",
+     "optional": false
+    },
+    {
+     "text": "+2 to Level of all Fire Spell Skill Gems",
+     "optional": false
+    },
+    {
+     "text": "70% increased Burning Damage",
+     "optional": false
+    }
+   ],
+   "flavourText": "Burn to cinders, scar and maim,\nRule a world, bathed in flame.",
+   "itemType": "Staff",
+   "chaosValue": 5890980,
+   "exaltedValue": 434759,
+   "divineValue": 7044,
+   "count": 10,
+   "detailsId": "the-searing-touch-long-staff",
+   "listingCount": 30
+  },
+  {
+   "id": 1697,
+   "name": "Tipua Kaikohuru",
+   "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9PbmVIYW5kV2VhcG9ucy9SYXBpZXJzL1VuaXF1ZVJhcGllcjYiLCJ3IjoxLCJoIjo0LCJzY2FsZSI6MX1d/b9f0cc5e60/UniqueRapier6.png",
+   "levelRequired": 7,
+   "baseType": "Whalebone Rapier",
+   "itemClass": 3,
+   "sparkLine": {
+    "totalChange": 0,
+    "data": []
+   },
+   "implicitModifiers": [
+    {
+     "text": "+(20-25)% to Global Critical Strike Multiplier",
+     "optional": false
+    }
+   ],
+   "explicitModifiers": [
+    {
+     "text": "+1 to Level of Socketed Melee Gems",
+     "optional": false
+    },
+    {
+     "text": "Uses both hand slots",
+     "optional": false
+    },
+    {
+     "text": "(254-299)% increased Physical Damage",
+     "optional": false
+    },
+    {
+     "text": "Adds 3 to 7 Fire Damage",
+     "optional": false
+    },
+    {
+     "text": "20% increased Attack Speed",
+     "optional": false
+    },
+    {
+     "text": "30% increased Global Critical Strike Chance",
+     "optional": false
+    },
+    {
+     "text": "+(20-40) to Evasion Rating",
+     "optional": false
+    },
+    {
+     "text": "20% reduced Rarity of Items found",
+     "optional": false
+    },
+    {
+     "text": "30% increased Movement Speed when on Low Life",
+     "optional": false
+    }
+   ],
+   "flavourText": "She paints her offer in wicked hues\nAn off-white grin, an elegant bruise.\nTo the nascent scourge she sings the ruse:\n\"With me in hand, what else need you use?\"",
+   "itemType": "One Handed Sword",
+   "chaosValue": 4712784,
+   "exaltedValue": 347807,
+   "divineValue": 5635,
+   "count": 2,
+   "detailsId": "tipua-kaikohuru-whalebone-rapier",
+   "listingCount": 3
+  },
+  {
+   "id": 140702,
+   "name": "Foulborn The Flame of Hope",
+   "icon": "https://web.poecdn.com/gen/image/WzI1LDE0LHsiZiI6IjJESXRlbXMvV2VhcG9ucy9Ud29IYW5kV2VhcG9ucy9Cb3dzL1Jlc2VudG1lbnQiLCJ3IjoyLCJoIjo0LCJzY2FsZSI6MSwibXV0YXRlZCI6dHJ1ZX1d/e1ea561ca3/Resentment.png",
+   "levelRequired": 71,
+   "baseType": "Maraketh Bow",
+   "variant": "Crit Chance",
+   "links": 6,
+   "itemClass": 3,
+   "sparkLine": {
+    "totalChange": 0,
+    "data": []
+   },
+   "implicitModifiers": [
+    {
+     "text": "10% increased Movement Speed",
+     "optional": false
+    }
+   ],
+   "explicitModifiers": [
+    {
+     "text": "(91-108)% increased Fire Damage",
+     "optional": false
+    },
+    {
+     "text": "Adds (183-228) to (318-354) Fire Damage",
+     "optional": false
+    },
+    {
+     "text": "Inflict Fire Exposure on Hit against Enemies with\n5 Cinderflame, applying -25% to Fire Resistance",
+     "optional": false
+    },
+    {
+     "text": "Trigger Level 20 Cinders when Equipped",
+     "optional": false
+    }
+   ],
+   "mutatedModifiers": [
+    {
+     "text": "(30-34)% increased Critical Strike Chance",
+     "optional": false
+    }
+   ],
+   "flavourText": "\"So long as a single flame flickers, our akhara lives.\nAnd when there is nothing left to give to the fire,\nwe shall burn the enemy for warmth!\"\n- Varashta, the Winter Sekhema",
+   "itemType": "Bow",
+   "chaosValue": 1472745,
+   "exaltedValue": 108690,
+   "divineValue": 1761,
+   "count": 1,
+   "detailsId": "foulborn-the-flame-of-hope-crit-chance-maraketh-bow-6l",
+   "tradeInfo": [
+    {
+     "mod": "explicit.stat_2375316951",
+     "min": 0,
+     "max": 0
+    }
+   ],
+   "listingCount": 4
+  }
+ ]
+}

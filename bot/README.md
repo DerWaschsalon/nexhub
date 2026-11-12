@@ -228,6 +228,19 @@ Hub daraus selbst, dort ist nichts zu ändern. `UserError` wird zur Fehlermeldun
 Braucht eine Seite eigene Endpunkte (eigene Oberfläche im Hub), meldet das Modul sie in
 `routes(r)` mit `r.control(...)` an, öffentliche Endpunkte mit `r.open(...)`.
 
+## Path of Exile: Preise
+
+Das Modul `modules/poe/prices` zeigt Preise aus dem NexHub (der holt sie von poe.ninja):
+
+- `/poe preis spiel: item:` zeigt den aktuellen Preis, Vorschläge beim Tippen. Der Bot fragt dafür
+  `HUB_INTERNAL_URL` (im Docker-Netz `http://api:8000`) mit `BOT_CONTROL_KEY` an (`core/hub.py`,
+  `HubClient`). Ohne `HUB_INTERNAL_URL` antwortet der Befehl „NexHub nicht verbunden.“. 404 vom Hub heißt
+  „kein Preis“; 503 heißt, PoE ist im Hub aus oder lädt noch, dann zeigt der Bot die Meldung des Hubs.
+- Der Hub schickt Preisalarme der Merkliste an `/control/poe/alert` und die Tagespost an
+  `/control/poe/daily`. Beides landet im Kanal der Einstellung `poe_channel` („Path of Exile“ im Bereich
+  „Bot“); ohne Kanal wird nichts gepostet.
+- Tests: `tests/modules/test_poe.py`, laufen wie alle anderen (siehe „Entwickeln und testen“).
+
 ## Server-Status einrichten
 
 `/server` (Status, laufende Container), `/server-neustart container:` (ein anderer Container neu

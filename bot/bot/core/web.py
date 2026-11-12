@@ -20,7 +20,7 @@ import os
 import urllib.parse
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeGuard
 
 import discord
 from aiohttp import web
@@ -97,6 +97,28 @@ async def json_body(request: web.Request) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ApiError(400, "JSON-Objekt erwartet")
     return data
+
+
+def require_fields(data: Any, fields: tuple[str, ...]) -> None:
+    """Pflichtfelder im JSON des Hubs; fehlt eins, ist das ein Fehler des Aufrufers (400), kein Absturz (500)."""
+    if not isinstance(data, dict):
+        raise ApiError(400, "JSON-Objekt erwartet")
+    missing = [field for field in fields if field not in data]
+    if missing:
+        raise ApiError(400, f"Felder fehlen: {', '.join(missing)}")
+
+
+def is_id(value: Any) -> TypeGuard[int]:
+    # bool ist in Python auch ein int, als ID aber Unsinn
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def guild_id_from(client: discord.Client, data: dict[str, Any]) -> int:
+    """`guild_id` aus dem JSON des Hubs, nur für einen Server, auf dem der Bot ist."""
+    guild_id = data.get("guild_id")
+    if not is_id(guild_id) or client.get_guild(guild_id) is None:
+        raise ApiError(400, "guild_id fehlt oder der Bot ist auf diesem Server nicht")
+    return guild_id
 
 
 def hub_user(request: web.Request) -> str:

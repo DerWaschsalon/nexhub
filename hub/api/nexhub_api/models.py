@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # SQLite (Tests) vergibt automatische IDs nur für INTEGER PRIMARY KEY
@@ -237,3 +237,60 @@ class BisSample(Base):
     combat_power: Mapped[int | None] = mapped_column(BigInteger)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     data: Mapped[dict] = mapped_column(JSON)
+
+
+class PoeItem(Base):
+    """Aktueller Preis eines Gegenstands einer Liga (poe.ninja). `unit` ist die Währung des Preises,
+    `key` die poe.ninja-ID des Gegenstands."""
+
+    __tablename__ = "poe_items"
+    __table_args__ = (UniqueConstraint("game", "league", "key"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    game: Mapped[str] = mapped_column(String(8))  # „poe1“ oder „poe2“
+    league: Mapped[str] = mapped_column(String(64))
+    key: Mapped[str] = mapped_column(String(128))
+    name: Mapped[str] = mapped_column(String(128))
+    category: Mapped[str] = mapped_column(String(48))
+    icon: Mapped[str | None] = mapped_column(String(512))
+    price: Mapped[float] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(16))
+    listings: Mapped[int | None] = mapped_column(Integer)
+    trade_volume: Mapped[float | None] = mapped_column(Float)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PoePrice(Base):
+    """Tagespreis eines Gegenstands, Verlauf für Diagramm und Alarm."""
+
+    __tablename__ = "poe_prices"
+    __table_args__ = (UniqueConstraint("game", "league", "key", "day"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    game: Mapped[str] = mapped_column(String(8))
+    league: Mapped[str] = mapped_column(String(64))
+    key: Mapped[str] = mapped_column(String(128))
+    day: Mapped[date] = mapped_column(Date)
+    price: Mapped[float] = mapped_column(Float)
+
+
+DEFAULT_THRESHOLD = 20.0  # Prozent Abweichung, ab der ein Preisalarm kommt (poe_alerts.py)
+
+
+class PoeWatch(Base):
+    """Beobachteter Gegenstand eines Kontos. Alarm bei Abweichung um `threshold` Prozent vom `ref_price`
+    (Preis der Liga `ref_league`); `alerted_on` verhindert mehrere Meldungen am Tag."""
+
+    __tablename__ = "poe_watches"
+    __table_args__ = (UniqueConstraint("user_id", "game", "key"),)
+
+    id: Mapped[int] = mapped_column(BigID, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    game: Mapped[str] = mapped_column(String(8))
+    key: Mapped[str] = mapped_column(String(128))
+    name: Mapped[str] = mapped_column(String(128))
+    threshold: Mapped[float] = mapped_column(Float, default=DEFAULT_THRESHOLD)
+    ref_price: Mapped[float | None] = mapped_column(Float)
+    ref_league: Mapped[str | None] = mapped_column(String(64))
+    alerted_on: Mapped[date | None] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

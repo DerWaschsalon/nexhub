@@ -24,26 +24,33 @@ export async function api<T>(path: string, init?: RequestInit, f: Fetch = fetch)
 
 export const post = (path: string) => api<void>(path, { method: 'POST' });
 
-/** Für load-Funktionen: Fehler der API werden zu einer Fehlerseite mit Status und Meldung
+/** Für load-Funktionen: ein Fehler der API wird zu einer Fehlerseite mit Status und Meldung
  *  (sonst zeigt SvelteKit nur „500 Internal Error“). */
+export function pageError(e: unknown): never {
+	if (e instanceof ApiError) error(e.status, e.message);
+	throw e;
+}
+
 export async function apiLoad<T>(path: string, f: Fetch): Promise<T> {
 	try {
 		return await api<T>(path, undefined, f);
 	} catch (e) {
-		if (e instanceof ApiError) error(e.status, e.message);
+		pageError(e);
+	}
+}
+
+/** Wie api(), aber der Status `absent` heißt „gibt es nicht“ und ergibt null statt eines Fehlers. */
+export async function apiOrNull<T>(path: string, absent: number, f: Fetch = fetch): Promise<T | null> {
+	try {
+		return await api<T>(path, undefined, f);
+	} catch (e) {
+		if (e instanceof ApiError && e.status === absent) return null;
 		throw e;
 	}
 }
 
-/** Wie api(), aber 401 heißt „nicht angemeldet“ statt Fehler. */
-export async function loadMe(f: Fetch = fetch): Promise<Me | null> {
-	try {
-		return await api<Me>('/api/me', undefined, f);
-	} catch (e) {
-		if (e instanceof ApiError && e.status === 401) return null;
-		throw e;
-	}
-}
+/** Das eigene Konto; null heißt „nicht angemeldet“ (401). */
+export const loadMe = (f: Fetch = fetch): Promise<Me | null> => apiOrNull<Me>('/api/me', 401, f);
 
 // Antworten der API (Pydantic-Modelle in hub/api/nexhub_api/routes/)
 

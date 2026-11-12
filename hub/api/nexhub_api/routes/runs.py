@@ -24,7 +24,6 @@ import secrets
 from datetime import UTC, datetime
 from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -36,6 +35,7 @@ from nexproto.runreport import RunReport
 
 from .. import characters
 from ..analysis import fight_detail, summarize
+from ..bot_client import tell_bot
 from ..config import Settings
 from ..deps import DB, CurrentDevice, CurrentUser, SettingsDep
 from ..models import Run, RunCharacter, User
@@ -65,19 +65,6 @@ class Uploaded(BaseModel):
     id: int
     url: str
     duplicate: bool
-
-
-async def tell_bot(http: httpx.AsyncClient, settings: Settings, action: str, payload: dict) -> None:
-    """An die Steuer-API von TheWashBot (Modul aion2.runs im Bot): `run-link` hängt den Link an einen
-    Post, `run` postet einen Run. Läuft nach der Antwort; ein Fehler hier darf den Upload nicht stören."""
-    try:
-        r = await http.post(f"{settings.bot_control_url}/control/{action}", json=payload, timeout=10,
-                            headers={"Authorization": f"Bearer {settings.bot_control_key}"})
-    except httpx.HTTPError as e:
-        log.warning("Bot nicht erreichbar (%s): %s", action, e)
-        return
-    if r.status_code != 200:
-        log.warning("Bot lehnt %s ab (%d): %s", action, r.status_code, r.text[:200])
 
 
 @router.post("", status_code=201)

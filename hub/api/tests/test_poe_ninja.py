@@ -1,0 +1,307 @@
+"""Preise von poe.ninja: Umwandeln der Antworten, ETag, Speichern, Liga und Fehler einzelner Kategorien."""
+from __future__ import annotations
+
+import asyncio
+import copy
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import httpx
+import pytest
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from nexhub_api.config import Settings
+from nexhub_api.models import PoeItem, PoePrice
+from nexhub_api.poe_ninja import (EXCHANGE_TYPES, GAMES, STASH_TYPES, PoeNinja, ninja_url, parse_exchange,
+                                  parse_stash)
+from nexhub_api.poe_prices import REFRESH_EVERY_S, PoePrices
+
+from .fake_poe_ninja import FakePoeNinja, sample
+
+LEAGUE2 = "Runes of Aldur"  # erste Liga in data/poe_ninja/poe2_leagues.json
+
+
+def ninja(fake: FakePoeNinja) -> PoeNinja:
+    return PoeNinja(httpx.AsyncClient(transport=httpx.MockTransport(fake)), "NexHub/test (+https://example.org)")
+
+
+@asynccontextmanager
+async def prices(database_url: str, fake: FakePoeNinja, **settings: str) -> AsyncIterator[PoePrices]:
+    engine = create_async_engine(database_url)
+    try:
+        yield PoePrices(async_sessionmaker(engine, expire_on_commit=False), ninja(fake),
+                        Settings(hub_secret_key="test", **settings))
+    finally:
+        await engine.dispose()
+
+
+async def items(service: PoePrices) -> dict[str, PoeItem]:
+    async with service.sessionmaker() as db:
+        return {row.key: row for row in await db.scalars(select(PoeItem))}
+
+
+def test_parse_exchange_poe2():
+    lines = parse_exchange("poe2", LEAGUE2, "Currency", sample("poe2_exchange_Currency"))
+    alch = next(line for line in lines if line.key == "orb-of-alchemy")
+    assert (alch.name, alch.unit, alch.price, alch.trade_volume) == ("Orb of Alchemy", "divine", 0.005, 1.33)
+    assert (alch.game, alch.league, alch.category, alch.listings) == ("poe2", LEAGUE2, "Currency", None)
+    assert alch.icon and alch.icon.startswith("https://poe.ninja/gen/image/")
+
+
+def test_parse_stash_poe1():
+    lines = parse_stash("poe1", "Standard", "UniqueWeapon", sample("poe1_stash_UniqueWeapon"))
+    staff = next(line for line in lines if line.key == "the-searing-touch-long-staff")
+    assert (staff.name, staff.unit, staff.price, staff.listings) == ("The Searing Touch", "chaos", 5890980, 30)
+    assert staff.icon and staff.icon.startswith("https://web.poecdn.com/")
+
+
+def test_parse_stash_poe2_unit():
+    data = sample("poe2_stash_UniqueWeapons")
+    lines = parse_stash("poe2", LEAGUE2, "UniqueWeapons", data)
+    bite = next(line for line in lines if line.key == "winters-bite-glass-shank")
+    assert bite.unit == data["core"]["primary"] == "divine"
+    assert (bite.name, bite.price, bite.listings) == ("Winter's Bite", 3470, 10)
+
+
+def test_ninja_url():
+    # Pfade auf der Website am 12.11.2026 nachgesehen
+    assert (ninja_url("poe1", "Standard", "UniqueWeapon", "the-searing-touch-long-staff")
+            == "https://poe.ninja/poe1/economy/standard/unique-weapons/the-searing-touch-long-staff")
+    assert (ninja_url("poe2", "HC Runes of Aldur", "Breach", "x")
+            == "https://poe.ninja/poe2/economy/runesofaldurhc/breach-catalyst/x")
+
+
+def test_overview_uses_etag():
+    fake = FakePoeNinja()
+
+    async def go():
+        client = ninja(fake)
+        first = await client.overview("poe2", "exchange", LEAGUE2, "Currency")
+        second = await client.overview("poe2", "exchange", LEAGUE2, "Currency")
+        return first, second
+    first, second = asyncio.run(go())
+    assert first == sample("poe2_exchange_Currency")
+    assert second is None  # 304: unverändert, die Antwort selbst merkt sich der Client nicht
+    assert "if-none-match" not in fake.requests[0].headers
+    assert fake.requests[1].headers["if-none-match"].startswith('W/"')  # Fake antwortet darauf mit 304
+    assert fake.requests[1].url.params["league"] == LEAGUE2
+
+
+def test_refresh_keeps_missing_item(database_url):
+    fake = FakePoeNinja()
+    currency = copy.deepcopy(fake.overviews["poe2/exchange/Currency"])
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            assert service.last_league("poe2") is None
+            assert await service.refresh("poe2") == LEAGUE2
+            assert service.last_league("poe2") == LEAGUE2  # für die Tagespost, ohne neuen Abruf
+            before = await items(service)
+            # zweiter Abruf: Chaos Orb fehlt, Alchemy hat einen neuen Preis
+            currency["lines"] = [line for line in currency["lines"] if line["id"] != "chaos"]
+            currency["lines"][0]["primaryValue"] = 0.007
+            fake.overviews["poe2/exchange/Currency"] = currency
+            await service.refresh("poe2")
+            after = await items(service)
+            async with service.sessionmaker() as db:
+                days = list(await db.scalars(select(PoePrice).where(PoePrice.key == "orb-of-alchemy")))
+            return before, after, days
+    before, after, days = asyncio.run(go())
+    assert {"chaos-orb", "orb-of-alchemy", "winters-bite-glass-shank"} <= before.keys()
+    assert after["chaos-orb"].price == before["chaos-orb"].price
+    assert after["chaos-orb"].updated_at == before["chaos-orb"].updated_at
+    assert after["orb-of-alchemy"].price == 0.007
+    assert [(d.league, d.day, d.price) for d in days] == [(LEAGUE2, datetime.now(ZoneInfo("Europe/Berlin")).date(),
+                                                           0.007)]
+
+
+def test_refresh_survives_broken_category(database_url):
+    fake = FakePoeNinja()
+    weapons = fake.overviews["poe2/stash/UniqueWeapons"]
+    armour = copy.deepcopy(weapons)
+    armour["lines"] = [{**armour["lines"][0], "detailsId": "test-armour", "name": "Testrüstung", "primaryValue": 7}]
+    broken = {"core": weapons["core"], "zeilen": weapons["lines"]}  # Format geändert: kein `lines` mehr
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe2")
+            fake.overviews.update({"poe2/exchange/Currency": 500, "poe2/stash/UniqueWeapons": broken,
+                                   "poe2/stash/UniqueArmours": armour})
+            await service.refresh("poe2")
+            return await items(service)
+    rows = asyncio.run(go())
+    assert rows["test-armour"].price == 7 and rows["test-armour"].category == "UniqueArmours"
+    assert rows["orb-of-alchemy"].price == 0.005
+    assert rows["winters-bite-glass-shank"].price == 3470
+
+
+def test_parse_skips_bad_rows(caplog):
+    data = copy.deepcopy(sample("poe2_exchange_Currency"))
+    data["lines"][1]["primaryValue"] = None
+    data["lines"].append({"id": "unbekannt", "primaryValue": 1, "volumePrimaryValue": 1})
+    with caplog.at_level("WARNING"):
+        lines = parse_exchange("poe2", LEAGUE2, "Currency", data)
+    assert [line.key for line in lines] == ["orb-of-alchemy", "chaos-orb"]
+    assert [r.getMessage() for r in caplog.records] == ["poe.ninja: poe2 Currency: 2 Zeilen übersprungen"]
+    stash = copy.deepcopy(sample("poe1_stash_UniqueWeapon"))
+    del stash["lines"][0]["chaosValue"]
+    assert len(parse_stash("poe1", "Standard", "UniqueWeapon", stash)) == 2
+
+
+def test_refresh_stores_good_rows_of_category(database_url):
+    fake = FakePoeNinja()
+    weapons = copy.deepcopy(fake.overviews["poe2/stash/UniqueWeapons"])
+    weapons["lines"][0]["primaryValue"] = 1
+    weapons["lines"].append({"unbekannt": True})
+    fake.overviews["poe2/stash/UniqueWeapons"] = weapons
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe2")
+            return await items(service)
+    rows = asyncio.run(go())
+    assert rows["winters-bite-glass-shank"].price == 1
+    assert {"redbeak-shortsword", "bluetongue-shortsword"} <= rows.keys()
+
+
+def test_refresh_many_items(database_url):
+    """Große Kategorien (PoE 1 BaseType, SkillGem) haben Tausende Zeilen; Postgres erlaubt höchstens
+    32767 Parameter je Abfrage."""
+    fake = FakePoeNinja()
+    stash = copy.deepcopy(fake.overviews["poe1/stash/UniqueWeapon"])
+    stash["lines"] = [{**stash["lines"][0], "detailsId": f"base-{i}", "chaosValue": i} for i in range(1500)]
+    fake.overviews["poe1/stash/BaseType"] = stash
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe1")
+            stash["lines"][0]["chaosValue"] = 99
+            await service.refresh("poe1")  # zweiter Abruf aktualisiert die vorhandenen Zeilen
+            async with service.sessionmaker() as db:
+                days = len(list(await db.scalars(select(PoePrice).where(PoePrice.key.like("base-%")))))
+            return await items(service), days
+    rows, days = asyncio.run(go())
+    assert sum(key.startswith("base-") for key in rows) == 1500 == days
+    assert rows["base-0"].price == 99 and rows["base-1499"].price == 1499
+
+
+def test_ninja_url_unknown_category():
+    with pytest.raises(KeyError):
+        ninja_url("poe1", "Standard", "Unbekannt", "x")
+
+
+def test_league_setting_wins(database_url):
+    fake = FakePoeNinja()
+
+    async def go():
+        async with prices(database_url, fake, hub_poe1_league="Standard") as service:
+            fixed = await service.league("poe1")
+            assert fake.requests == []
+            return fixed, await service.league("poe2")
+    assert asyncio.run(go()) == ("Standard", LEAGUE2)
+
+
+def test_user_agent(make_client, fake):
+    """Der Hintergrundauftrag läuft nur mit hub_poe_enabled; jede Anfrage nennt den Hub."""
+    with make_client() as c:
+        assert c.app.state.poe_prices is None
+    assert fake.poe_ninja.requests == []
+    expected = sum(1 + len(EXCHANGE_TYPES[game]) + len(STASH_TYPES[game]) for game in GAMES)
+    with make_client(hub_poe_enabled=True) as c:
+        assert c.app.state.poe_prices is not None
+        deadline = time.monotonic() + 10
+        while len(fake.poe_ninja.requests) < expected and time.monotonic() < deadline:
+            time.sleep(0.05)
+    assert len(fake.poe_ninja.requests) == expected
+    assert all(r.headers["user-agent"].startswith("NexHub/") for r in fake.poe_ninja.requests)
+
+
+def test_league_known_before_categories(database_url):
+    """Die Liga steht gleich nach ihrem Abruf fest, nicht erst nach allen Kategorien."""
+    fake = FakePoeNinja()
+    seen: list[str | None] = []
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            def spy(request: httpx.Request) -> httpx.Response:
+                seen.append(service.last_league("poe2"))
+                return fake(request)
+            service.ninja.http = httpx.AsyncClient(transport=httpx.MockTransport(spy))
+            await service.refresh("poe2")
+    asyncio.run(go())
+    assert seen[0] is None and set(seen[1:]) == {LEAGUE2}
+
+
+@pytest.mark.parametrize(("status", "headers", "wait"), [(429, {"Retry-After": "7200"}, 7200),
+                                                         (403, {}, REFRESH_EVERY_S)])
+def test_blocked_stops_game(database_url, caplog, status, headers, wait):
+    """429/403: poe.ninja will weniger Last. Der Rest des Spiels fällt aus, frühestens nach Retry-After wieder."""
+    fake = FakePoeNinja()
+    fake.overviews["poe2/exchange/Currency"] = httpx.Response(status, headers=headers)
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            with caplog.at_level("WARNING"):
+                assert await service.refresh("poe2") == LEAGUE2
+            return service.due["poe2"]
+    due = asyncio.run(go())
+    assert [r.url.path for r in fake.requests] == ["/poe2/api/economy/leagues",
+                                                   "/poe2/api/economy/exchange/current/overview"]
+    assert due >= time.time() + wait - 60
+    assert any(str(status) in r.getMessage() for r in caplog.records if r.levelname == "WARNING")
+
+
+def test_unchanged_category_only_adds_missing_days(database_url):
+    """304: Preise nicht neu schreiben, nur fehlende Tagespreise von heute aus dem aktuellen Preis anlegen."""
+    fake = FakePoeNinja()
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe2")
+            before = await items(service)
+            async with service.sessionmaker() as db:
+                await db.execute(delete(PoePrice))
+                await db.commit()
+            first = len(fake.requests)
+            await service.refresh("poe2")
+            after = await items(service)
+            async with service.sessionmaker() as db:
+                days = {row.key: row.price for row in await db.scalars(select(PoePrice))}
+            return before, after, days, fake.requests[first:]
+    before, after, days, again = asyncio.run(go())
+    assert all("if-none-match" in r.headers for r in again)
+    assert after["orb-of-alchemy"].updated_at == before["orb-of-alchemy"].updated_at
+    assert days == {key: row.price for key, row in before.items()}
+
+
+def test_resume_from_database(database_url):
+    """Nach einem Neustart: Liga aus der Datenbank, erster Abruf erst eine Stunde nach dem letzten."""
+    fake = FakePoeNinja()
+    fresh = datetime.now(UTC) - timedelta(minutes=10)
+
+    def row(game: str, league: str, key: str, updated_at: datetime) -> PoeItem:
+        return PoeItem(game=game, league=league, key=key, name=key, category="Currency", price=1.0,
+                       unit="divine", updated_at=updated_at)
+
+    async def idle(game: str, league: str) -> None:
+        return None
+
+    async def go():
+        async with prices(database_url, fake, hub_poe1_league="Neu") as service:
+            async with service.sessionmaker() as db:
+                db.add_all([row("poe2", "Alt", "a", fresh - timedelta(days=1)), row("poe2", LEAGUE2, "b", fresh),
+                            row("poe1", "Standard", "c", fresh)])
+                await db.commit()
+            await service.resume()
+            known = service.last_league("poe1"), service.last_league("poe2"), dict(service.due)
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(service.run(idle), 1)
+            return known
+    poe1, poe2, due = asyncio.run(go())
+    assert poe2 == LEAGUE2 and abs(due["poe2"] - (fresh.timestamp() + REFRESH_EVERY_S)) < 1
+    assert poe1 is None and due.get("poe1", 0) == 0  # festgelegte Liga geändert: gleich abrufen
+    assert fake.requests and all(r.url.path.startswith("/poe1/") for r in fake.requests)

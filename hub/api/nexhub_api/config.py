@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     hub_aion2_enabled: bool = True
     hub_aion2_pause: float = 0.3
 
+    # Path of Exile: Preise von poe.ninja. Aus, bis eine Liga eingetragen ist; Liga je Spiel (poe1/poe2).
+    hub_poe_enabled: bool = False
+    hub_poe1_league: str = ""
+    hub_poe2_league: str = ""
+
     @field_validator("hub_admin_ids", mode="before")
     @classmethod
     def _split_ids(cls, v: object) -> object:

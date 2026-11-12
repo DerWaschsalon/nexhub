@@ -20,6 +20,8 @@ from .fake_metabot import HOST as METABOT_HOST
 from .fake_metabot import FakeMetaBot
 from .fake_nc import HOSTS as NC_HOSTS
 from .fake_nc import FakeNC
+from .fake_poe_ninja import HOST as POE_NINJA_HOST
+from .fake_poe_ninja import FakePoeNinja
 
 ADMIN = 111111111111111111
 MEMBER = 222222222222222222
@@ -44,6 +46,8 @@ class FakeDiscord:
         # Ranglisten und Würfeltabellen für die Zählung (census.py), siehe fake_abyss.py, fake_metabot.py
         self.abyss = FakeAbyss()
         self.metabot = FakeMetaBot()
+        # Preise für Path of Exile, siehe fake_poe_ninja.py und test_poe_ninja.py
+        self.poe_ninja = FakePoeNinja()
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.host in NC_HOSTS:
@@ -52,6 +56,8 @@ class FakeDiscord:
             return self.abyss(request)
         if request.url.host == METABOT_HOST:
             return self.metabot(request)
+        if request.url.host == POE_NINJA_HOST:
+            return self.poe_ninja(request)
         if request.url.host == "bot":
             return self.bot(request)
         path = request.url.path.removeprefix("/api/v10")
@@ -97,7 +103,7 @@ def database_url(tmp_path):
         async def _clean() -> None:
             engine = create_async_engine(url)
             async with engine.begin() as conn:
-                await conn.execute(text("DROP TABLE IF EXISTS comparisons, character_days, characters, run_characters, runs, device_pairings, devices, sessions, users, alembic_version"))
+                await conn.execute(text("DROP TABLE IF EXISTS poe_watches, poe_prices, poe_items, comparisons, character_days, characters, run_characters, runs, device_pairings, devices, sessions, users, alembic_version"))
             await engine.dispose()
         asyncio.run(_clean())
 
