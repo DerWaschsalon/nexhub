@@ -41,6 +41,7 @@ web/src/
   modules/       ein Ordner je Modul: logs/ (Runs), devices/ (Geräte), bot/ (TheWashBot)
   routes/        (public)/ öffentlich, hub/ mit Login, hub/admin/ nur Admins
 Dockerfile       baut web/ und packt es mit der API in ein Image (Kontext: Repo-Wurzel, wegen proto/)
+tools/           figure_layers.py: Ebenen je Ausrüstungsplatz zu den Klassenfiguren (nur zum Erzeugen der Bilder)
 ```
 
 ## Kern und Module
