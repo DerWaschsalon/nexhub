@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime
+from itertools import batched
+from typing import TypeVar
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .config import Settings
@@ -22,10 +24,23 @@ from .poe_ninja import (EXCHANGE_TYPES, GAMES, STASH_TYPES, Game, PoeNinja, PoeN
                         parse_exchange, parse_stash)
 
 log = logging.getLogger(__name__)
+Row = TypeVar("Row", PoeItem, PoePrice)
 
 REFRESH_EVERY_S = 3600  # poe.ninja erneuert PoE 2 etwa stündlich; öfter bringt keine frischeren Daten
 TZ = ZoneInfo("Europe/Berlin")  # der Tagespreis gilt für den Kalendertag in Deutschland
+KEYS_PER_QUERY = 1000
 PARSERS = {"exchange": parse_exchange, "stash": parse_stash}
+
+
+async def existing(db: AsyncSession, model: type[Row], keys: Iterable[str],
+                   *where: ColumnElement[bool]) -> dict[str, Row]:
+    """Vorhandene Zeilen je Kennung, in Blöcken: große Kategorien (PoE 1 BaseType, SkillGem) sprengen als
+    eine IN-Liste sonst die Parametergrenze von Postgres (32767)."""
+    rows: dict[str, Row] = {}
+    for chunk in batched(keys, KEYS_PER_QUERY):
+        found = await db.scalars(select(model).where(*where, model.key.in_(chunk)))
+        rows.update((row.key, row) for row in found)
+    return rows
 
 
 class PoePrices:
@@ -50,7 +65,9 @@ class PoePrices:
                 try:
                     data = await self.ninja.overview(game, kind, league, category)
                     await self.store(game, league, PARSERS[kind](game, league, category, data))
-                except Exception:  # eine kaputte Kategorie hält die übrigen nicht auf
+                except PoeNinjaError as error:  # eine kaputte Kategorie hält die übrigen nicht auf
+                    log.warning("poe.ninja: %s %s %s übersprungen: %s", game, kind, category, error)
+                except Exception:
                     log.exception("poe.ninja: %s %s %s übersprungen", game, kind, category)
         return league
 
@@ -60,11 +77,9 @@ class PoePrices:
         now = datetime.now(UTC)
         today = now.astimezone(TZ).date()
         async with self.sessionmaker() as db:
-            items = {row.key: row for row in await db.scalars(select(PoeItem).where(
-                PoeItem.game == game, PoeItem.league == league, PoeItem.key.in_(by_key)))}
-            days = {row.key: row for row in await db.scalars(select(PoePrice).where(
-                PoePrice.game == game, PoePrice.league == league, PoePrice.day == today,
-                PoePrice.key.in_(by_key)))}
+            items = await existing(db, PoeItem, by_key, PoeItem.game == game, PoeItem.league == league)
+            days = await existing(db, PoePrice, by_key, PoePrice.game == game, PoePrice.league == league,
+                                  PoePrice.day == today)
             for key, line in by_key.items():
                 item = items.get(key) or PoeItem(game=game, league=league, key=key)
                 item.name, item.category, item.icon, item.price = line.name, line.category, line.icon, line.price

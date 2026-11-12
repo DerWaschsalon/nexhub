@@ -5,10 +5,14 @@ bedingte Abrufe (ETag) und wenig Last. Abgerufen wird nur im Hub (poe_prices.py)
 """
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 Game = Literal["poe1", "poe2"]
 GAMES: tuple[Game, ...] = ("poe1", "poe2")
@@ -73,14 +77,13 @@ def parse_exchange(game: Game, league: str, category: str, data: dict[str, Any])
     """Exchange-Übersicht (beide Spiele gleich): Namen und Symbole stehen in `items`, über `id` verknüpft."""
     meta = {item["id"]: item for item in data["items"]}
     unit = data["core"]["primary"]
-    lines = []
-    for line in data["lines"]:
+
+    def convert(line: dict[str, Any]) -> PriceLine:
         item = meta[line["id"]]
         image = item.get("image")
-        lines.append(PriceLine(game, league, item["detailsId"], item["name"], category,
-                               BASE + image if image else None, float(line["primaryValue"]), unit, None,
-                               float(line["volumePrimaryValue"])))
-    return lines
+        return PriceLine(game, league, item["detailsId"], item["name"], category, BASE + image if image else None,
+                         float(line["primaryValue"]), unit, None, float(line["volumePrimaryValue"]))
+    return convert_rows(game, category, data["lines"], convert)
 
 
 def parse_stash(game: Game, league: str, category: str, data: dict[str, Any]) -> list[PriceLine]:
@@ -89,8 +92,28 @@ def parse_stash(game: Game, league: str, category: str, data: dict[str, Any]) ->
         unit, value = "chaos", "chaosValue"
     else:
         unit, value = data["core"]["primary"], "primaryValue"
-    return [PriceLine(game, league, line["detailsId"], line["name"], category, line.get("icon"),
-                      float(line[value]), unit, int(line["listingCount"]), None) for line in data["lines"]]
+
+    def convert(line: dict[str, Any]) -> PriceLine:
+        return PriceLine(game, league, line["detailsId"], line["name"], category, line.get("icon"),
+                         float(line[value]), unit, int(line["listingCount"]), None)
+    return convert_rows(game, category, data["lines"], convert)
+
+
+def convert_rows(game: Game, category: str, rows: Any,
+                 convert: Callable[[dict[str, Any]], PriceLine]) -> list[PriceLine]:
+    """Einzelne kaputte Zeilen (Preis fehlt, unbekannte ID) überspringen, den Rest behalten.
+    Ist `lines` selbst keine Liste, hat poe.ninja das Format geändert: dann scheitert die Kategorie."""
+    if not isinstance(rows, list):
+        raise ValueError(f"{game} {category}: `lines` ist keine Liste")
+    lines, skipped = [], 0
+    for row in rows:
+        try:
+            lines.append(convert(row))
+        except (KeyError, TypeError, ValueError):
+            skipped += 1
+    if skipped:
+        log.warning("poe.ninja: %s %s: %d Zeilen übersprungen", game, category, skipped)
+    return lines
 
 
 def league_slug(league: str) -> str:
@@ -103,7 +126,7 @@ def league_slug(league: str) -> str:
 
 def ninja_url(game: Game, league: str, category: str, key: str) -> str:
     """Seite des Gegenstands auf poe.ninja; Format am 12.11.2026 auf der Website nachgesehen."""
-    page = (EXCHANGE_PAGES[game] | STASH_PAGES[game]).get(category, category.lower())
+    page = (EXCHANGE_PAGES[game] | STASH_PAGES[game])[category]
     return f"{BASE}/{game}/economy/{league_slug(league)}/{page}/{key}"
 
 

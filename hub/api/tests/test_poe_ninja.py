@@ -10,6 +10,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import httpx
+import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -120,9 +121,7 @@ def test_refresh_survives_broken_category(database_url):
     weapons = fake.overviews["poe2/stash/UniqueWeapons"]
     armour = copy.deepcopy(weapons)
     armour["lines"] = [{**armour["lines"][0], "detailsId": "test-armour", "name": "Testrüstung", "primaryValue": 7}]
-    broken = copy.deepcopy(weapons)
-    broken["lines"][0]["primaryValue"] = 1  # gültige Zeile vor der kaputten wird auch nicht gespeichert
-    broken["lines"].append({"unbekannt": True})
+    broken = {"core": weapons["core"], "zeilen": weapons["lines"]}  # Format geändert: kein `lines` mehr
 
     async def go():
         async with prices(database_url, fake) as service:
@@ -135,6 +134,61 @@ def test_refresh_survives_broken_category(database_url):
     assert rows["test-armour"].price == 7 and rows["test-armour"].category == "UniqueArmours"
     assert rows["orb-of-alchemy"].price == 0.005
     assert rows["winters-bite-glass-shank"].price == 3470
+
+
+def test_parse_skips_bad_rows(caplog):
+    data = copy.deepcopy(sample("poe2_exchange_Currency"))
+    data["lines"][1]["primaryValue"] = None
+    data["lines"].append({"id": "unbekannt", "primaryValue": 1, "volumePrimaryValue": 1})
+    with caplog.at_level("WARNING"):
+        lines = parse_exchange("poe2", LEAGUE2, "Currency", data)
+    assert [line.key for line in lines] == ["orb-of-alchemy", "chaos-orb"]
+    assert [r.getMessage() for r in caplog.records] == ["poe.ninja: poe2 Currency: 2 Zeilen übersprungen"]
+    stash = copy.deepcopy(sample("poe1_stash_UniqueWeapon"))
+    del stash["lines"][0]["chaosValue"]
+    assert len(parse_stash("poe1", "Standard", "UniqueWeapon", stash)) == 2
+
+
+def test_refresh_stores_good_rows_of_category(database_url):
+    fake = FakePoeNinja()
+    weapons = copy.deepcopy(fake.overviews["poe2/stash/UniqueWeapons"])
+    weapons["lines"][0]["primaryValue"] = 1
+    weapons["lines"].append({"unbekannt": True})
+    fake.overviews["poe2/stash/UniqueWeapons"] = weapons
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe2")
+            return await items(service)
+    rows = asyncio.run(go())
+    assert rows["winters-bite-glass-shank"].price == 1
+    assert {"redbeak-shortsword", "bluetongue-shortsword"} <= rows.keys()
+
+
+def test_refresh_many_items(database_url):
+    """Große Kategorien (PoE 1 BaseType, SkillGem) haben Tausende Zeilen; Postgres erlaubt höchstens
+    32767 Parameter je Abfrage."""
+    fake = FakePoeNinja()
+    stash = copy.deepcopy(fake.overviews["poe1/stash/UniqueWeapon"])
+    stash["lines"] = [{**stash["lines"][0], "detailsId": f"base-{i}", "chaosValue": i} for i in range(1500)]
+    fake.overviews["poe1/stash/BaseType"] = stash
+
+    async def go():
+        async with prices(database_url, fake) as service:
+            await service.refresh("poe1")
+            stash["lines"][0]["chaosValue"] = 99
+            await service.refresh("poe1")  # zweiter Abruf aktualisiert die vorhandenen Zeilen
+            async with service.sessionmaker() as db:
+                days = len(list(await db.scalars(select(PoePrice).where(PoePrice.key.like("base-%")))))
+            return await items(service), days
+    rows, days = asyncio.run(go())
+    assert sum(key.startswith("base-") for key in rows) == 1500 == days
+    assert rows["base-0"].price == 99 and rows["base-1499"].price == 1499
+
+
+def test_ninja_url_unknown_category():
+    with pytest.raises(KeyError):
+        ninja_url("poe1", "Standard", "Unbekannt", "x")
 
 
 def test_league_setting_wins(database_url):
