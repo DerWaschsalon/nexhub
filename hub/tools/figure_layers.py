@@ -52,8 +52,8 @@ class Query:
 @dataclass
 class ClassSpec:
     """Was für eine Klasse ausgeschnitten wird; `parts` in der Reihenfolge, in der die Plätze Pixel bekommen.
-    Ohne Abfragen für Handschuhe zählen die Hände (`hands`) als Handschuhe, ohne Abfragen für den Umhang der
-    Umriss `cape` (beides, wenn die Figur keine sichtbaren Handschuhe trägt oder das Modell den Umhang nicht
+    Ohne Abfragen für Handschuhe zählen die Hände (`hands`) als Handschuhe (Figur ohne sichtbare Handschuhe).
+    Zum Umhang kommt zu seinen Abfragen der Rest im Umriss `cape` (dunkle Flächen, die das Modell nicht
     trennt). `arm` ist ein Umriss, in dem Haut nur nach Farbe gesucht wird."""
 
     skin: list[Query]
@@ -227,6 +227,50 @@ CLASSES: dict[str, ClassSpec] = {
         cape=[(140, 150), (348, 148), (356, 240), (396, 214), (396, 336), (336, 402), (336, 470), (446, 468),
               (446, 662), (434, 874), (396, 874), (346, 762), (334, 662), (272, 942), (140, 942)],
     ),
+    "gladiator": ClassSpec(
+        skin=[
+            Query([(560, 95, 1), (560, 150, 1), (555, 205, 1), (540, 20, 0), (600, 290, 0)], (505, 40, 620, 245)),
+            Query([(390, 330, 1), (430, 300, 1), (330, 370, 0), (480, 220, 0)], (330, 265, 470, 400)),
+            Query([(720, 320, 1), (790, 335, 1), (840, 400, 0), (680, 250, 0)], (675, 275, 870, 365)),
+            Query([(420, 750, 1), (430, 860, 1), (400, 690, 1), (420, 960, 0), (535, 800, 0)], (365, 640, 485, 935)),
+            Query([(565, 750, 1), (575, 860, 1), (560, 690, 1), (600, 960, 0), (535, 800, 0)], (505, 640, 635, 935)),
+        ],
+        parts={
+            "MainHand": [
+                Query([(150, 900, 1), (150, 700, 1), (110, 250, 1), (40, 515, 1), (220, 505, 1), (80, 130, 1),
+                       (120, 375, 0)], (0, 100, 252, 1385)),
+            ],
+            "Boots": [
+                Query([(400, 955, 1), (340, 1100, 1), (330, 1200, 1), (320, 1290, 1), (420, 860, 0), (365, 1150, 0),
+                       (460, 1130, 0)], (290, 900, 470, 1345)),
+                Query([(620, 955, 1), (625, 1100, 1), (615, 1250, 1), (580, 860, 0)], (570, 900, 670, 1345)),
+            ],
+            "Gloves": [
+                Query([(250, 375, 1), (300, 360, 1), (130, 375, 1), (390, 330, 0), (110, 300, 0)], (80, 330, 345, 410)),
+                Query([(760, 430, 1), (840, 370, 1), (720, 460, 1), (760, 320, 0)], (690, 345, 870, 500)),
+            ],
+            "Belt": [
+                Query([(520, 470, 1), (600, 470, 1), (550, 570, 0), (560, 380, 0)], (450, 430, 680, 520)),
+            ],
+            "Shoulder": [
+                Query([(480, 180, 1), (460, 230, 1), (560, 150, 0)], (430, 120, 530, 290)),
+                Query([(700, 200, 1), (720, 160, 1), (760, 330, 0)], (640, 120, 790, 300)),
+            ],
+            "Torso": [
+                Query([(560, 330, 1), (520, 400, 1), (620, 380, 1), (560, 245, 0), (560, 560, 0)], (460, 200, 690, 470)),
+                # Kragen
+                Query([(535, 190, 1), (610, 180, 1), (570, 180, 0), (570, 130, 0)], (505, 130, 640, 230)),
+            ],
+            "Pants": [
+                Query([(500, 580, 1), (600, 600, 1), (450, 620, 1), (430, 700, 0), (560, 470, 0)], (390, 500, 700, 670)),
+            ],
+            "Cape": [
+                Query([(300, 1000, 1), (800, 1000, 1), (720, 700, 1), (860, 1200, 1), (420, 800, 0), (560, 800, 0)],
+                      (240, 400, 926, 1375)),
+            ],
+        },
+        cape=[(240, 460), (926, 460), (926, 1385), (240, 1385)],
+    ),
 }
 
 
@@ -236,8 +280,9 @@ def slot_mask(slot: str, spec: ClassSpec, fig: Figure, sam: Segmenter, skin: Mas
         return spec.drawn[slot](fig)
     if slot == "Gloves" and not spec.parts[slot]:
         return skin & fig.boxes(spec.hands)  # die Figur trägt keine sichtbaren Handschuhe: die Hände
-    if slot == "Cape" and not spec.parts[slot]:
-        return fig.polygon(spec.cape) & ~skin
+    if slot == "Cape":
+        rest = fig.polygon(spec.cape) if spec.cape else np.zeros(fig.shape, bool)
+        return (sam.union(spec.parts[slot]) | rest) & ~skin
     return sam.union(spec.parts[slot]) & ~skin
 
 

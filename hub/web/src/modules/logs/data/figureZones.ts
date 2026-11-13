@@ -65,12 +65,12 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 60, y: 65, w: 14, h: 31 },
 		{ slot: 'Gloves', x: 14, y: 23, w: 12, h: 7 },
 		{ slot: 'Gloves', x: 82, y: 24, w: 10, h: 8 },
-		{ slot: 'Bracelet1', x: 26, y: 24, w: 8, h: 5 },
-		{ slot: 'Bracelet2', x: 78, y: 27, w: 6, h: 6 },
+		{ slot: 'Bracelet1', x: 16, y: 26, w: 4, h: 3 },
+		{ slot: 'Bracelet2', x: 77, y: 32, w: 3, h: 3 },
 		{ slot: 'Cape', x: 78, y: 35, w: 18, h: 50 },
 		{ slot: 'MainHand', x: 0, y: 7, w: 25, h: 93 },
-		{ slot: 'Ring1', x: 14, y: 25, w: 5, h: 4 },
-		{ slot: 'Ring2', x: 86, y: 28, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 10, y: 27, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 75, y: 35, w: 3, h: 3 }
 	],
 	templar: [
 		{ slot: 'Helmet', x: 38, y: 1, w: 14, h: 11 },
@@ -187,5 +187,6 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 // Zeigen der Gegenstand selbst, und die Maus trifft ihn pixelgenau; die Rechtecke oben bleiben für die Tastatur.
 // Erzeugt mit hub/tools/figure_layers.py.
 export const SLOT_LAYERS: Record<string, string[]> = {
-	ranger: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Helmet', 'Cape']
+	ranger: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Helmet', 'Cape'],
+	gladiator: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Cape']
 };
