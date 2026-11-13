@@ -3,7 +3,8 @@
      Platzspalten), ein Klick meldet den Platz (onPick). Stellen gibt es nur für Plätze mit Gegenstand
      (`names`: Platz → Name des Gegenstands, für Screenreader); kleine liegen über großen.
      Hat ein Platz eine eigene Ebene (SLOT_LAYERS), leuchtet der Gegenstand selbst statt eines Rechtecks, und
-     die Maus trifft ihn pixelgenau (Deckkraft der Ebene); seine Rechtecke bleiben nur für die Tastatur. -->
+     die Maus trifft ihn pixelgenau (Deckkraft der Ebene); seine Rechtecke bleiben nur für die Tastatur.
+     Plätze ohne Ebene (Schmuck: im Bild nur ein paar Pixel groß) leuchten als Lichtpunkt an ihrer Stelle. -->
 <script lang="ts">
 	import { classInfo, figureLayer } from '../classes.ts';
 	import { FIGURE_ZONES, SLOT_LAYERS } from '../data/figureZones.ts';
@@ -67,7 +68,7 @@
 		seen = now;
 	});
 	const lit = (slot: string) => show && active === slot;
-	const focus = $derived(show && !!active && hasLayer(active));
+	const focus = $derived(show && !!active);
 
 	function leave() {
 		hover = null;
@@ -168,12 +169,44 @@
 	.zone.own {
 		pointer-events: none;
 	}
-	.zone:not(.own):hover,
-	.zone.lit:not(.own),
+	/* Plätze ohne Ebene: Lichtpunkt statt Rechteck, etwas größer als die Stelle, damit auch ein Ring zu sehen
+	   ist; wie beim Schein der Ebenen zieht er sich aus weitem Licht auf die Stelle zusammen */
+	.zone:not(.own)::before {
+		content: '';
+		position: absolute;
+		inset: -14px;
+		border-radius: 50%;
+		/* nur Licht: die Maus trifft weiter die kleine Stelle, nicht den größeren Schein */
+		pointer-events: none;
+		background: radial-gradient(
+			closest-side,
+			#fff,
+			color-mix(in srgb, var(--glow) 70%, #fff) 25%,
+			color-mix(in srgb, var(--glow) 45%, transparent) 55%,
+			transparent
+		);
+		mix-blend-mode: screen;
+		opacity: 0;
+		transform: scale(2.5);
+		transition:
+			opacity 0.35s ease-out,
+			transform 0.5s ease-out;
+	}
+	.zone:not(.own):hover::before,
+	.zone.lit:not(.own)::before {
+		opacity: 1;
+		transform: scale(1);
+		animation: sparkle 1.6s ease-in-out 0.5s infinite;
+	}
+	/* sanftes Funkeln, solange der Schmuck gezeigt wird */
+	@keyframes sparkle {
+		50% {
+			transform: scale(0.85);
+			opacity: 0.75;
+		}
+	}
 	.zone:not(.own):focus-visible {
-		background: color-mix(in srgb, var(--glow) 18%, transparent);
 		outline: 1px solid color-mix(in srgb, var(--glow) 70%, #fff);
-		box-shadow: 0 0 14px color-mix(in srgb, var(--glow) 60%, transparent);
 	}
 	.base {
 		position: relative;
@@ -225,8 +258,10 @@
 		.base,
 		.halo,
 		.layer,
-		.tint {
+		.tint,
+		.zone::before {
 			transition: none;
+			animation: none;
 		}
 	}
 </style>
