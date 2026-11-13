@@ -9,10 +9,10 @@ export type Zone = { slot: string; x: number; y: number; w: number; h: number };
 
 export const FIGURE_ZONES: Record<string, Zone[]> = {
 	chanter: [
-		{ slot: 'Helmet', x: 45, y: 7, w: 15, h: 12 },
-		{ slot: 'Earring1', x: 44, y: 11, w: 4, h: 5 },
-		{ slot: 'Earring2', x: 57, y: 11, w: 4, h: 5 },
-		{ slot: 'Necklace', x: 48, y: 19, w: 10, h: 5 },
+		{ slot: 'Helmet', x: 47, y: 7, w: 14, h: 9 },
+		{ slot: 'Earring1', x: 48, y: 15, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 57, y: 14, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 50, y: 19, w: 7, h: 3 },
 		{ slot: 'Shoulder', x: 26, y: 18, w: 16, h: 10 },
 		{ slot: 'Shoulder', x: 58, y: 18, w: 12, h: 9 },
 		{ slot: 'Torso', x: 40, y: 24, w: 26, h: 20 },
@@ -22,12 +22,12 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 64, y: 88, w: 16, h: 10 },
 		{ slot: 'Gloves', x: 22, y: 47, w: 12, h: 10 },
 		{ slot: 'Gloves', x: 84, y: 30, w: 12, h: 10 },
-		{ slot: 'Bracelet1', x: 24, y: 43, w: 8, h: 4 },
-		{ slot: 'Bracelet2', x: 80, y: 32, w: 5, h: 5 },
+		{ slot: 'Bracelet1', x: 25, y: 48, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 86, y: 33, w: 3, h: 3 },
 		{ slot: 'Cape', x: 8, y: 55, w: 17, h: 40 },
 		{ slot: 'MainHand', x: 80, y: 1, w: 18, h: 92 },
-		{ slot: 'Ring1', x: 24, y: 53, w: 6, h: 4 },
-		{ slot: 'Ring2', x: 89, y: 35, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 25, y: 53, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 92, y: 33, w: 3, h: 3 }
 	],
 	ranger: [
 		{ slot: 'Helmet', x: 38, y: 2, w: 11, h: 13 },
@@ -193,5 +193,6 @@ export const SLOT_LAYERS: Record<string, string[]> = {
 	assassin: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
 	sorcerer: ['MainHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape'],
 	spiritmaster: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
-	cleric: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape']
+	cleric: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
+	chanter: ['MainHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape']
 };
