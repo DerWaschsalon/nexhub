@@ -9,10 +9,10 @@ export type Zone = { slot: string; x: number; y: number; w: number; h: number };
 
 export const FIGURE_ZONES: Record<string, Zone[]> = {
 	chanter: [
-		{ slot: 'Helmet', x: 45, y: 7, w: 15, h: 12 },
-		{ slot: 'Earring1', x: 44, y: 11, w: 4, h: 5 },
-		{ slot: 'Earring2', x: 57, y: 11, w: 4, h: 5 },
-		{ slot: 'Necklace', x: 48, y: 19, w: 10, h: 5 },
+		{ slot: 'Helmet', x: 47, y: 7, w: 14, h: 9 },
+		{ slot: 'Earring1', x: 48, y: 15, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 57, y: 14, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 50, y: 19, w: 7, h: 3 },
 		{ slot: 'Shoulder', x: 26, y: 18, w: 16, h: 10 },
 		{ slot: 'Shoulder', x: 58, y: 18, w: 12, h: 9 },
 		{ slot: 'Torso', x: 40, y: 24, w: 26, h: 20 },
@@ -22,12 +22,12 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 64, y: 88, w: 16, h: 10 },
 		{ slot: 'Gloves', x: 22, y: 47, w: 12, h: 10 },
 		{ slot: 'Gloves', x: 84, y: 30, w: 12, h: 10 },
-		{ slot: 'Bracelet1', x: 24, y: 43, w: 8, h: 4 },
-		{ slot: 'Bracelet2', x: 80, y: 32, w: 5, h: 5 },
+		{ slot: 'Bracelet1', x: 25, y: 48, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 86, y: 33, w: 3, h: 3 },
 		{ slot: 'Cape', x: 8, y: 55, w: 17, h: 40 },
 		{ slot: 'MainHand', x: 80, y: 1, w: 18, h: 92 },
-		{ slot: 'Ring1', x: 24, y: 53, w: 6, h: 4 },
-		{ slot: 'Ring2', x: 89, y: 35, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 25, y: 53, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 92, y: 33, w: 3, h: 3 }
 	],
 	ranger: [
 		{ slot: 'Helmet', x: 38, y: 2, w: 11, h: 13 },
@@ -65,18 +65,18 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 60, y: 65, w: 14, h: 31 },
 		{ slot: 'Gloves', x: 14, y: 23, w: 12, h: 7 },
 		{ slot: 'Gloves', x: 82, y: 24, w: 10, h: 8 },
-		{ slot: 'Bracelet1', x: 26, y: 24, w: 8, h: 5 },
-		{ slot: 'Bracelet2', x: 78, y: 27, w: 6, h: 6 },
+		{ slot: 'Bracelet1', x: 16, y: 26, w: 4, h: 3 },
+		{ slot: 'Bracelet2', x: 77, y: 32, w: 3, h: 3 },
 		{ slot: 'Cape', x: 78, y: 35, w: 18, h: 50 },
 		{ slot: 'MainHand', x: 0, y: 7, w: 25, h: 93 },
-		{ slot: 'Ring1', x: 14, y: 25, w: 5, h: 4 },
-		{ slot: 'Ring2', x: 86, y: 28, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 10, y: 27, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 75, y: 35, w: 3, h: 3 }
 	],
 	templar: [
 		{ slot: 'Helmet', x: 38, y: 1, w: 14, h: 11 },
-		{ slot: 'Earring1', x: 36, y: 6, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 50, y: 6, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 40, y: 12, w: 10, h: 4 },
+		{ slot: 'Earring1', x: 38, y: 10, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 49, y: 10, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 42, y: 13, w: 9, h: 4 },
 		{ slot: 'SubHand', x: 62, y: 18, w: 26, h: 44 },
 		{ slot: 'Shoulder', x: 20, y: 8, w: 16, h: 18 },
 		{ slot: 'Shoulder', x: 52, y: 9, w: 14, h: 17 },
@@ -87,18 +87,18 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 46, y: 88, w: 18, h: 10 },
 		{ slot: 'Gloves', x: 14, y: 45, w: 14, h: 10 },
 		{ slot: 'Gloves', x: 64, y: 44, w: 10, h: 8 },
-		{ slot: 'Bracelet1', x: 14, y: 38, w: 10, h: 6 },
-		{ slot: 'Bracelet2', x: 64, y: 38, w: 8, h: 5 },
+		{ slot: 'Bracelet1', x: 17, y: 45, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 68, y: 44, w: 3, h: 3 },
 		{ slot: 'Cape', x: 6, y: 55, w: 16, h: 35 },
 		{ slot: 'MainHand', x: 4, y: 40, w: 86, h: 52 },
-		{ slot: 'Ring1', x: 15, y: 50, w: 6, h: 5 },
-		{ slot: 'Ring2', x: 67, y: 49, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 19, y: 48, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 69, y: 49, w: 3, h: 3 }
 	],
 	assassin: [
 		{ slot: 'Helmet', x: 46, y: 1, w: 14, h: 13 },
-		{ slot: 'Earring1', x: 45, y: 7, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 58, y: 7, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 48, y: 14, w: 10, h: 4 },
+		{ slot: 'Earring1', x: 46, y: 8, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 58, y: 8, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 50, y: 13, w: 7, h: 4 },
 		{ slot: 'Shoulder', x: 32, y: 13, w: 14, h: 10 },
 		{ slot: 'Shoulder', x: 62, y: 16, w: 13, h: 12 },
 		{ slot: 'Torso', x: 44, y: 22, w: 24, h: 15 },
@@ -111,16 +111,16 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'SubHand', x: 80, y: 33, w: 14, h: 23 },
 		{ slot: 'Gloves', x: 42, y: 18, w: 14, h: 7 },
 		{ slot: 'Gloves', x: 76, y: 46, w: 10, h: 9 },
-		{ slot: 'Bracelet1', x: 34, y: 20, w: 8, h: 6 },
-		{ slot: 'Bracelet2', x: 76, y: 40, w: 6, h: 6 },
-		{ slot: 'Ring1', x: 47, y: 21, w: 6, h: 3 },
-		{ slot: 'Ring2', x: 77, y: 51, w: 6, h: 4 }
+		{ slot: 'Bracelet1', x: 43, y: 21, w: 4, h: 3 },
+		{ slot: 'Bracelet2', x: 75, y: 46, w: 3, h: 3 },
+		{ slot: 'Ring1', x: 51, y: 22, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 78, y: 50, w: 3, h: 3 }
 	],
 	sorcerer: [
 		{ slot: 'Helmet', x: 40, y: 1, w: 16, h: 12 },
-		{ slot: 'Earring1', x: 39, y: 8, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 54, y: 8, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 43, y: 13, w: 11, h: 5 },
+		{ slot: 'Earring1', x: 41, y: 8, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 52, y: 7, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 44, y: 14, w: 6, h: 3 },
 		{ slot: 'Shoulder', x: 30, y: 13, w: 12, h: 11 },
 		{ slot: 'Shoulder', x: 55, y: 13, w: 13, h: 11 },
 		{ slot: 'Torso', x: 38, y: 18, w: 24, h: 20 },
@@ -132,16 +132,16 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'MainHand', x: 2, y: 17, w: 30, h: 20 },
 		{ slot: 'Gloves', x: 12, y: 10, w: 12, h: 10 },
 		{ slot: 'Gloves', x: 72, y: 35, w: 10, h: 7 },
-		{ slot: 'Bracelet1', x: 20, y: 18, w: 8, h: 4 },
-		{ slot: 'Bracelet2', x: 66, y: 34, w: 7, h: 6 },
-		{ slot: 'Ring1', x: 14, y: 11, w: 6, h: 4 },
-		{ slot: 'Ring2', x: 74, y: 37, w: 6, h: 4 }
+		{ slot: 'Bracelet1', x: 19, y: 16, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 72, y: 38, w: 3, h: 3 },
+		{ slot: 'Ring1', x: 15, y: 14, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 78, y: 37, w: 3, h: 3 }
 	],
 	spiritmaster: [
 		{ slot: 'Helmet', x: 40, y: 1, w: 14, h: 11 },
-		{ slot: 'Earring1', x: 38, y: 7, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 52, y: 7, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 42, y: 12, w: 10, h: 5 },
+		{ slot: 'Earring1', x: 39, y: 9, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 51, y: 8, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 45, y: 13, w: 6, h: 3 },
 		{ slot: 'Cape', x: 66, y: 30, w: 32, h: 65 },
 		{ slot: 'Shoulder', x: 22, y: 11, w: 16, h: 13 },
 		{ slot: 'Shoulder', x: 52, y: 11, w: 14, h: 13 },
@@ -154,16 +154,16 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'SubHand', x: 79, y: 19, w: 13, h: 12 },
 		{ slot: 'Gloves', x: 4, y: 38, w: 14, h: 8 },
 		{ slot: 'Gloves', x: 76, y: 38, w: 12, h: 8 },
-		{ slot: 'Bracelet1', x: 14, y: 37, w: 6, h: 5 },
-		{ slot: 'Bracelet2', x: 70, y: 37, w: 6, h: 5 },
-		{ slot: 'Ring1', x: 6, y: 42, w: 8, h: 4 },
-		{ slot: 'Ring2', x: 78, y: 41, w: 8, h: 4 }
+		{ slot: 'Bracelet1', x: 13, y: 41, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 77, y: 38, w: 3, h: 3 },
+		{ slot: 'Ring1', x: 8, y: 43, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 82, y: 41, w: 3, h: 3 }
 	],
 	cleric: [
 		{ slot: 'Helmet', x: 30, y: 1, w: 12, h: 11 },
-		{ slot: 'Earring1', x: 29, y: 7, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 40, y: 7, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 32, y: 11, w: 8, h: 4 },
+		{ slot: 'Earring1', x: 29, y: 8, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 39, y: 7, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 33, y: 12, w: 6, h: 3 },
 		{ slot: 'Shoulder', x: 22, y: 14, w: 8, h: 8 },
 		{ slot: 'Shoulder', x: 41, y: 13, w: 9, h: 8 },
 		{ slot: 'Torso', x: 24, y: 15, w: 24, h: 15 },
@@ -173,13 +173,13 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 52, y: 86, w: 10, h: 14 },
 		{ slot: 'Gloves', x: 4, y: 42, w: 10, h: 9 },
 		{ slot: 'Gloves', x: 58, y: 40, w: 7, h: 7 },
-		{ slot: 'Bracelet1', x: 12, y: 40, w: 6, h: 5 },
-		{ slot: 'Bracelet2', x: 57, y: 36, w: 6, h: 4 },
+		{ slot: 'Bracelet1', x: 12, y: 42, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 59, y: 39, w: 3, h: 3 },
 		{ slot: 'MainHand', x: 48, y: 18, w: 52, h: 37 },
 		{ slot: 'SubHand', x: 0, y: 20, w: 20, h: 40 },
 		{ slot: 'Cape', x: 40, y: 45, w: 36, h: 47 },
-		{ slot: 'Ring1', x: 7, y: 47, w: 5, h: 4 },
-		{ slot: 'Ring2', x: 59, y: 41, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 8, y: 45, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 61, y: 42, w: 3, h: 3 }
 	]
 };
 
@@ -187,5 +187,12 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 // Zeigen der Gegenstand selbst, und die Maus trifft ihn pixelgenau; die Rechtecke oben bleiben für die Tastatur.
 // Erzeugt mit hub/tools/figure_layers.py.
 export const SLOT_LAYERS: Record<string, string[]> = {
-	ranger: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Helmet', 'Cape']
+	ranger: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Helmet', 'Cape'],
+	gladiator: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Cape'],
+	templar: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape'],
+	assassin: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
+	sorcerer: ['MainHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape'],
+	spiritmaster: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
+	cleric: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
+	chanter: ['MainHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape']
 };
