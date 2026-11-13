@@ -185,7 +185,10 @@
 		border-left: 1px solid var(--fill-strong);
 		background: var(--surface-2);
 	}
+	/* bleibt beim Scrollen oben stehen, damit man das Fenster auch am Handy schließen kann */
 	.close {
+		position: sticky;
+		top: 0;
 		width: 100%;
 		height: 56px;
 		border: 0;
@@ -422,5 +425,52 @@
 		padding: 12px 16px;
 		background: var(--surface-2);
 		font-size: 15px;
+	}
+	/* Handy: kleinerer Kopf, kleinere Schrift, schmalere Leiste zum Schließen */
+	@media (max-width: 600px) {
+		nav {
+			width: 40px;
+		}
+		.close {
+			height: 44px;
+			font-size: 28px;
+		}
+		.hero {
+			min-height: 0;
+			padding: 10px 12px;
+		}
+		h3,
+		.heading strong {
+			font-size: 18px;
+		}
+		.kind {
+			font-size: 13px;
+		}
+		.hero img {
+			width: 64px;
+			height: 64px;
+		}
+		.block {
+			margin: 0 12px;
+			padding: 8px 0;
+		}
+		dl,
+		.binding {
+			font-size: 14px;
+		}
+		.rate {
+			font-size: 15px;
+		}
+		.stones li {
+			font-size: 13px;
+		}
+		.godstone,
+		.set p {
+			font-size: 13px;
+		}
+		footer {
+			padding: 8px 12px;
+			font-size: 13px;
+		}
 	}
 </style>

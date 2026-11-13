@@ -34,6 +34,9 @@
 		color: inherit;
 		width: min(var(--width), calc(100vw - 32px));
 		max-height: calc(100vh - 48px);
+		max-height: calc(100dvh - 24px);
+		overflow: auto;
+		overscroll-behavior: contain;
 	}
 	dialog::backdrop {
 		background: rgba(0, 0, 0, 0.45);
