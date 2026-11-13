@@ -1,11 +1,13 @@
 # Regeln für Claude-Instanzen in diesem Repo
 
-An NexHub arbeiten zwei Claude-Instanzen: die von Fabio (gamunex) und die von Navonex.
-Diese Regeln gelten für beide.
+An NexHub arbeiten Claude-Instanzen von Fabio (gamunex) und Navonex. Navonex hat zwei: eine auf
+dem PC und eine auf seinem Heimserver. Diese Regeln gelten für alle.
 
 ## Wer bist du?
-Kürzel für Sperre, Protokoll und Commits: `claude-gamunex` oder `claude-navonex`. Weißt du nicht,
-wessen Instanz du bist, frag nach, bevor du am Server etwas machst.
+Kürzel für Sperre, Protokoll und Commits: `claude-gamunex` (Fabio), `claude-navonex` (Navonex, PC) oder
+`claude-navoserver` (Navonex, Heimserver). Jede Instanz nutzt nur ihr eigenes Kürzel, sonst hält die
+Sperre sie nicht auseinander. Weißt du nicht, welche Instanz du bist, frag nach, bevor du am Server
+etwas machst.
 
 ## VPS waschsalon
 - Zugang: `ssh waschsalon` als root, nur mit Schlüssel. Die Adresse steht nicht im Repo, sondern
