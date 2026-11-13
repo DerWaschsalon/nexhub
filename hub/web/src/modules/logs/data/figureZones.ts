@@ -139,9 +139,9 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 	],
 	spiritmaster: [
 		{ slot: 'Helmet', x: 40, y: 1, w: 14, h: 11 },
-		{ slot: 'Earring1', x: 38, y: 7, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 52, y: 7, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 42, y: 12, w: 10, h: 5 },
+		{ slot: 'Earring1', x: 39, y: 9, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 51, y: 8, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 45, y: 13, w: 6, h: 3 },
 		{ slot: 'Cape', x: 66, y: 30, w: 32, h: 65 },
 		{ slot: 'Shoulder', x: 22, y: 11, w: 16, h: 13 },
 		{ slot: 'Shoulder', x: 52, y: 11, w: 14, h: 13 },
@@ -154,10 +154,10 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'SubHand', x: 79, y: 19, w: 13, h: 12 },
 		{ slot: 'Gloves', x: 4, y: 38, w: 14, h: 8 },
 		{ slot: 'Gloves', x: 76, y: 38, w: 12, h: 8 },
-		{ slot: 'Bracelet1', x: 14, y: 37, w: 6, h: 5 },
-		{ slot: 'Bracelet2', x: 70, y: 37, w: 6, h: 5 },
-		{ slot: 'Ring1', x: 6, y: 42, w: 8, h: 4 },
-		{ slot: 'Ring2', x: 78, y: 41, w: 8, h: 4 }
+		{ slot: 'Bracelet1', x: 13, y: 41, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 77, y: 38, w: 3, h: 3 },
+		{ slot: 'Ring1', x: 8, y: 43, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 82, y: 41, w: 3, h: 3 }
 	],
 	cleric: [
 		{ slot: 'Helmet', x: 30, y: 1, w: 12, h: 11 },
@@ -191,5 +191,6 @@ export const SLOT_LAYERS: Record<string, string[]> = {
 	gladiator: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Cape'],
 	templar: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape'],
 	assassin: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape'],
-	sorcerer: ['MainHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape']
+	sorcerer: ['MainHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape'],
+	spiritmaster: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Belt', 'Torso', 'Pants', 'Cape']
 };
