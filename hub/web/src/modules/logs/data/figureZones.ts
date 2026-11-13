@@ -74,9 +74,9 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 	],
 	templar: [
 		{ slot: 'Helmet', x: 38, y: 1, w: 14, h: 11 },
-		{ slot: 'Earring1', x: 36, y: 6, w: 3, h: 4 },
-		{ slot: 'Earring2', x: 50, y: 6, w: 3, h: 4 },
-		{ slot: 'Necklace', x: 40, y: 12, w: 10, h: 4 },
+		{ slot: 'Earring1', x: 38, y: 10, w: 3, h: 3 },
+		{ slot: 'Earring2', x: 49, y: 10, w: 3, h: 3 },
+		{ slot: 'Necklace', x: 42, y: 13, w: 9, h: 4 },
 		{ slot: 'SubHand', x: 62, y: 18, w: 26, h: 44 },
 		{ slot: 'Shoulder', x: 20, y: 8, w: 16, h: 18 },
 		{ slot: 'Shoulder', x: 52, y: 9, w: 14, h: 17 },
@@ -87,12 +87,12 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 		{ slot: 'Boots', x: 46, y: 88, w: 18, h: 10 },
 		{ slot: 'Gloves', x: 14, y: 45, w: 14, h: 10 },
 		{ slot: 'Gloves', x: 64, y: 44, w: 10, h: 8 },
-		{ slot: 'Bracelet1', x: 14, y: 38, w: 10, h: 6 },
-		{ slot: 'Bracelet2', x: 64, y: 38, w: 8, h: 5 },
+		{ slot: 'Bracelet1', x: 17, y: 45, w: 3, h: 3 },
+		{ slot: 'Bracelet2', x: 68, y: 44, w: 3, h: 3 },
 		{ slot: 'Cape', x: 6, y: 55, w: 16, h: 35 },
 		{ slot: 'MainHand', x: 4, y: 40, w: 86, h: 52 },
-		{ slot: 'Ring1', x: 15, y: 50, w: 6, h: 5 },
-		{ slot: 'Ring2', x: 67, y: 49, w: 5, h: 4 }
+		{ slot: 'Ring1', x: 19, y: 48, w: 3, h: 3 },
+		{ slot: 'Ring2', x: 69, y: 49, w: 3, h: 3 }
 	],
 	assassin: [
 		{ slot: 'Helmet', x: 46, y: 1, w: 14, h: 13 },
@@ -188,5 +188,6 @@ export const FIGURE_ZONES: Record<string, Zone[]> = {
 // Erzeugt mit hub/tools/figure_layers.py.
 export const SLOT_LAYERS: Record<string, string[]> = {
 	ranger: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Helmet', 'Cape'],
-	gladiator: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Cape']
+	gladiator: ['MainHand', 'Boots', 'Gloves', 'Belt', 'Shoulder', 'Torso', 'Pants', 'Cape'],
+	templar: ['MainHand', 'SubHand', 'Boots', 'Gloves', 'Shoulder', 'Torso', 'Pants', 'Cape']
 };
