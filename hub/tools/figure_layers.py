@@ -51,13 +51,16 @@ class Query:
 
 @dataclass
 class ClassSpec:
-    """Was für eine Klasse ausgeschnitten wird; `parts` in der Reihenfolge, in der die Plätze Pixel bekommen"""
+    """Was für eine Klasse ausgeschnitten wird; `parts` in der Reihenfolge, in der die Plätze Pixel bekommen.
+    Ohne Abfragen für Handschuhe zählen die Hände (`hands`) als Handschuhe, ohne Abfragen für den Umhang der
+    Umriss `cape` (beides, wenn die Figur keine sichtbaren Handschuhe trägt oder das Modell den Umhang nicht
+    trennt). `arm` ist ein Umriss, in dem Haut nur nach Farbe gesucht wird."""
 
     skin: list[Query]
-    arm: list[Point]
-    hands: list[Box]
     parts: dict[str, list[Query]]
-    cape: list[Point]
+    arm: list[Point] = field(default_factory=list)
+    hands: list[Box] = field(default_factory=list)
+    cape: list[Point] = field(default_factory=list)
     drawn: dict[str, Callable[[Figure], Mask]] = field(default_factory=dict)
 
 
@@ -231,9 +234,9 @@ def slot_mask(slot: str, spec: ClassSpec, fig: Figure, sam: Segmenter, skin: Mas
     """Maske eines Platzes vor dem Abzug dessen, was frühere Plätze schon haben"""
     if slot in spec.drawn:
         return spec.drawn[slot](fig)
-    if slot == "Gloves":
+    if slot == "Gloves" and not spec.parts[slot]:
         return skin & fig.boxes(spec.hands)  # die Figur trägt keine sichtbaren Handschuhe: die Hände
-    if slot == "Cape":
+    if slot == "Cape" and not spec.parts[slot]:
         return fig.polygon(spec.cape) & ~skin
     return sam.union(spec.parts[slot]) & ~skin
 
@@ -242,7 +245,9 @@ def main(cls: str, preview: str | None = None) -> None:
     spec = CLASSES[cls]
     fig = Figure(cls)
     sam = Segmenter(fig)
-    skin = sam.union(spec.skin) | (fig.polygon(spec.arm) & fig.color_skin())
+    skin = sam.union(spec.skin)
+    if spec.arm:
+        skin |= fig.polygon(spec.arm) & fig.color_skin()
     taken = np.zeros(fig.shape, bool)
     shown = Image.new("RGBA", fig.image.size, (40, 40, 60, 255))
     shown.alpha_composite(fig.image)
