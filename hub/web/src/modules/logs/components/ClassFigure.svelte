@@ -70,11 +70,23 @@
 	const lit = (slot: string) => show && active === slot;
 	const focus = $derived(show && !!active);
 
+	// Die Figur kippt leicht mit der Maus (Grad je halber Bildbreite bzw. -höhe), wie ein Sammelbild in der Hand
+	const TILT_DEG = 5;
+	let tilt = $state({ x: 0, y: 0 });
+	function tiltTo(e: PointerEvent) {
+		const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const fx = (e.clientX - box.left) / box.width - 0.5;
+		const fy = (e.clientY - box.top) / box.height - 0.5;
+		tilt = { x: -fy * 2 * TILT_DEG, y: fx * 2 * TILT_DEG };
+	}
+
 	function leave() {
 		hover = null;
 		show = false;
+		tilt = { x: 0, y: 0 };
 	}
 	function move(e: PointerEvent) {
+		tiltTo(e);
 		hover = onRect(e) ? null : slotAt(e);
 		if (hover) active = hover;
 	}
@@ -93,6 +105,8 @@
 		class:focus
 		class:pointing={hover}
 		style:--glow={info.color}
+		style:--tilt-x="{tilt.x}deg"
+		style:--tilt-y="{tilt.y}deg"
 		onpointermove={move}
 		onpointerleave={leave}
 		onclick={click}
@@ -130,6 +144,14 @@
 	   Licht in der Klassenfarbe dahinter */
 	.figure {
 		position: relative;
+		transform: perspective(1200px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+		transition: transform 0.25s ease-out;
+	}
+	/* ohne Maus (Handy) und bei reduzierter Bewegung bleibt die Figur gerade */
+	@media (hover: none), (prefers-reduced-motion: reduce) {
+		.figure {
+			transform: none;
+		}
 	}
 	.figure::before {
 		content: '';
