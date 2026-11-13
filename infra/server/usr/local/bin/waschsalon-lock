@@ -9,7 +9,7 @@
 #   waschsalon-lock freigeben <wer> --erzwingen  fremde Sperre lösen – nur auf Anweisung von Fabio
 #                                               oder Navonex, wird protokolliert
 #
-# <wer>: claude-gamunex, claude-navonex, gamunex, navonex
+# <wer>: claude-gamunex, claude-navonex, claude-navoserver, gamunex, navonex
 set -eu
 DIR=${WASCHSALON_DIR:-/srv/waschsalon}  # überschreibbar nur für Tests
 LOCK=$DIR/LOCK
