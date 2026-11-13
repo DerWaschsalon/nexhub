@@ -2,7 +2,8 @@
      rechts der Schmuck, daneben das Fenster des gewählten Gegenstands (`detail`). Gewählt wird durch Zeigen
      oder Fokus an Figur oder Platz; zu Beginn die Waffe. Darunter der Inhalt der Seite (`children`, z. B.
      Stat Info und Skills) nebeneinander. Umbrüche nach der Breite des Inhalts, nicht des Fensters: mittelbreit
-     ohne Detailfenster (ein Klick öffnet es dann als Dialog, onOpen), schmal ohne Figur.
+     ohne Detailfenster (ein Klick öffnet es dann als Dialog, onOpen), schmal (Handy) mit kleineren Kacheln
+     links und rechts der Figur wie im Spiel.
      Profil der Armory, Mitspieler eines Runs und BiS-Listen nutzen ihn. -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
@@ -92,12 +93,15 @@
 			display: none;
 		}
 	}
+	/* Handy: Kacheln auf 70 % verkleinert (45 statt 64 px, zoom verkleinert Symbol und Stufe gemeinsam),
+	   damit die Figur dazwischen Platz hat */
 	@container (max-width: 480px) {
 		.doll {
-			grid-template-columns: 64px 64px;
+			grid-template-columns: 45px minmax(0, 1fr) 45px;
+			gap: 8px;
 		}
-		.figure {
-			display: none;
+		.doll > :global(.column) {
+			zoom: 0.7;
 		}
 	}
 </style>
