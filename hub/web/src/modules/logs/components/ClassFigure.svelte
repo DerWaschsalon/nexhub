@@ -4,7 +4,8 @@
      (`names`: Platz → Name des Gegenstands, für Screenreader); kleine liegen über großen.
      Hat ein Platz eine eigene Ebene (SLOT_LAYERS), leuchtet der Gegenstand selbst statt eines Rechtecks, und
      die Maus trifft ihn pixelgenau (Deckkraft der Ebene); seine Rechtecke bleiben nur für die Tastatur.
-     Plätze ohne Ebene (Schmuck: im Bild nur ein paar Pixel groß) leuchten als Lichtpunkt an ihrer Stelle. -->
+     Plätze ohne Ebene (Schmuck: im Bild nur ein paar Pixel groß) leuchten als Lichtpunkt an ihrer Stelle.
+     Beide funkeln beim Zeigen im selben Takt. -->
 <script lang="ts">
 	import { classInfo, figureLayer } from '../classes.ts';
 	import { FIGURE_ZONES, SLOT_LAYERS } from '../data/figureZones.ts';
@@ -253,13 +254,43 @@
 	.layer.lit {
 		filter: brightness(1.3) saturate(1.1);
 	}
+	/* sanftes Funkeln wie beim Schmuck (gleicher Takt), solange das Teil gezeigt wird */
+	.halo.lit {
+		animation: pulse-halo 1.6s ease-in-out 0.5s infinite;
+	}
+	.layer.lit {
+		animation: pulse-layer 1.6s ease-in-out 0.5s infinite;
+	}
+	.tint.lit {
+		animation: pulse-tint 1.6s ease-in-out 0.5s infinite;
+	}
+	@keyframes pulse-halo {
+		50% {
+			opacity: 0.6;
+		}
+	}
+	@keyframes pulse-layer {
+		50% {
+			filter: brightness(1.12) saturate(1.05);
+		}
+	}
+	@keyframes pulse-tint {
+		50% {
+			opacity: 0.16;
+		}
+	}
 	@media (prefers-reduced-motion: reduce) {
 		.figure::before,
 		.base,
 		.halo,
 		.layer,
 		.tint,
-		.zone::before {
+		.zone::before,
+		.halo.lit,
+		.layer.lit,
+		.tint.lit,
+		.zone.lit:not(.own)::before,
+		.zone:not(.own):hover::before {
 			transition: none;
 			animation: none;
 		}
