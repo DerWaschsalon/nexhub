@@ -164,6 +164,15 @@ class MusicCog(ModuleCog):
         await interaction.response.send_message(f"🔁 Wiederholen: {modus.name}", delete_after=SHORT)
         await player.refresh_np()
 
+    @app_commands.command(name="autoplay", description="Bei leerer Warteschlange ähnliche Titel weiterspielen")
+    @app_commands.describe(an="Ein- oder ausschalten")
+    @app_commands.guild_only()
+    async def autoplay(self, interaction: discord.Interaction, an: bool) -> None:
+        player = self.module.require_player(interaction, control=True)
+        await self.module.settings.update(player.guild.id, {"autoplay": an})
+        await interaction.response.send_message(f"♾️ Autoplay {'an' if an else 'aus'}.", delete_after=SHORT)
+        await player.refresh_np()
+
     @app_commands.command(name="mischen", description="Warteschlange mischen")
     @app_commands.guild_only()
     async def shuffle(self, interaction: discord.Interaction) -> None:

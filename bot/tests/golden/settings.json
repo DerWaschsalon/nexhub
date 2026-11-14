@@ -27,6 +27,10 @@
   "empty": null,
   "stored": "323456789012345678"
  },
+ "allgemein.autoplay": {
+  "empty": false,
+  "stored": true
+ },
  "allgemein.tempvoice_hub": {
   "empty": null,
   "stored": "223456789012345678"
