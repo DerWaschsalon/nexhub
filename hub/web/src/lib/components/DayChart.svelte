@@ -1,4 +1,4 @@
-<!-- Verlauf eines Werts je Tag als eine Linie (Armory: Kampfkraft, Item-Level; PoE: Preis).
+<!-- Verlauf eines Werts je Tag als eine Linie (Armory: Kampfkraft, Item-Level).
      Aufbau wie modules/logs/components/DpsChart.svelte: echte Kartenbreite, Fadenkreuz mit Tooltip. -->
 <script lang="ts" module>
 	/** Ein Tag (ISO-Datum) mit Wert; Tage ohne Wert (null) fallen weg. */

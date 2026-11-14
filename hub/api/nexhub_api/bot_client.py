@@ -1,4 +1,4 @@
-"""Steuer-API von TheWashBot: der Hub meldet Runs und Preisalarme, der Bot postet sie in Discord."""
+"""Steuer-API von TheWashBot: der Hub meldet Runs, der Bot postet sie in Discord."""
 from __future__ import annotations
 
 import logging
@@ -12,8 +12,8 @@ log = logging.getLogger(__name__)
 
 
 async def tell_bot(http: httpx.AsyncClient, settings: Settings, action: str, payload: dict[str, Any]) -> None:
-    """An die Steuer-API von TheWashBot, z. B. `run-link` (Link an einen Post hängen), `run` (Run posten),
-    `poe/alert` und `poe/daily`. Ein Fehler hier darf den Aufrufer nicht stören, er wird nur geloggt."""
+    """An die Steuer-API von TheWashBot, z. B. `run-link` (Link an einen Post hängen), `run` (Run posten).
+    Ein Fehler hier darf den Aufrufer nicht stören, er wird nur geloggt."""
     try:
         r = await http.post(f"{settings.bot_control_url}/control/{action}", json=payload, timeout=10,
                             headers={"Authorization": f"Bearer {settings.bot_control_key}"})

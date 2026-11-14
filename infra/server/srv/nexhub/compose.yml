@@ -55,10 +55,6 @@ services:
       HUB_OPERATOR_ADDRESS: ${HUB_OPERATOR_ADDRESS:-}
       HUB_OPERATOR_EMAIL: ${HUB_OPERATOR_EMAIL:-}
       HUB_HOSTER: ${HUB_HOSTER:-}
-      # Path of Exile: Preise von poe.ninja (aus, bis eine Liga gesetzt ist)
-      HUB_POE_ENABLED: ${HUB_POE_ENABLED:-false}
-      HUB_POE1_LEAGUE: ${HUB_POE1_LEAGUE:-}
-      HUB_POE2_LEAGUE: ${HUB_POE2_LEAGUE:-}
     volumes:
       # Hochgeladene Runs (NexLog-Dateien); gehört dem Container-Nutzer 10001
       - ./daten/hub:/data
