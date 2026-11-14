@@ -58,21 +58,6 @@ zurück. Vorher in einer neuen Verbindung den Login testen.
   `/srv/nexhub/sicherung` (zstd, 14 Tage). Liegt noch auf demselben Server – Abholen nach
   außen fehlt.
 
-## Path of Exile ausrollen
-
-Preise von poe.ninja im Hub, Befehl `/poe preis` im Bot (siehe `hub/README.md`, `bot/README.md`).
-Erst nach dem Merge nach `main`, jeweils mit Sperre:
-
-1. `infra/deploy.sh <wer> --anwenden`: überträgt die geänderte `Caddyfile` (sperrt `/api/internal/*`
-   nach außen) und `compose.yml`.
-2. `/srv/nexhub/.env`: `HUB_POE_ENABLED=true`, bei Bedarf `HUB_POE1_LEAGUE=<Liga>` und
-   `HUB_POE2_LEAGUE=<Liga>` (leer = aktuelle Challenge-Liga von poe.ninja).
-3. `/srv/nexhub/bot.env`: `HUB_INTERNAL_URL=http://api:8000` (Vorlage `bot.env.beispiel`).
-4. `ssh waschsalon nexhub-update <wer> main` (baut Hub und Bot, Migration `0013`), danach
-   `cd /srv/nexhub && docker compose up -d`.
-5. Im Hub-Log den ersten Abruf prüfen, im Bereich „Bot“ den Kanal „Path of Exile“ setzen, in Discord
-   `/poe preis` und einen Test-Alarm ausprobieren.
-
 ## Bot-Umzug vom alten Server
 
 Erledigt am 21.10.2026 (claude-navonex, siehe `/srv/waschsalon/CHANGELOG.md`): Bot läuft im Stack,

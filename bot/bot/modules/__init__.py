@@ -19,7 +19,6 @@ from .moderation.tickets import Tickets
 from .moderation.warnings import Warnings
 from .music.player import MusicPlayer
 from .notify.feeds import NotificationFeeds
-from .poe.prices import PoePrices
 from .server.announcements import Announcements
 from .server.counters import Counters
 from .server.custom_commands import CustomCommands
@@ -32,7 +31,7 @@ from .system.status import ServerStatus
 
 MODULES = (MusicPlayer, NotificationFeeds, ModerationLog, Antispam, Automod, Warnings, Cleanup, Tickets,
            Welcome, Roles, TempVoice, Counters, Announcements, CustomCommands, Embeds,
-           Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump, RunPosts, Schedule, PoePrices,
-           ServerStatus, Verification)
+           Levels, Starboard, Birthdays, Polls, Reminders, Giveaways, Bump, RunPosts, Schedule, ServerStatus,
+           Verification)
 
 __all__ = ["MODULES"]
