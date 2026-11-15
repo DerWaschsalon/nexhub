@@ -1,4 +1,5 @@
-"""Musikquellen: YouTube/SoundCloud über yt-dlp, Spotify-Links, Internetradio (radio-browser.info).
+"""Musikquellen: YouTube/SoundCloud über yt-dlp, Spotify-Links, Internetradio (radio-browser.info),
+ähnliche Titel für Autoplay (YouTube-Mix).
 
 Ein `Track` merkt sich nur, *was* gespielt werden soll. Die eigentliche Stream-Adresse holt
 `stream_url()` erst kurz vor dem Abspielen, weil YouTube-Adressen nach einigen Stunden ablaufen.
@@ -141,6 +142,43 @@ async def stream_url(track: Track) -> str:
     if wait > 0:
         await asyncio.sleep(min(wait + 0.5, 30))
     return str(info["url"])
+
+
+# ---- Autoplay ----------------------------------------------------------------------------
+
+YOUTUBE_ID_RE = re.compile(r"(?:youtube\.com/watch\?(?:.*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{11})")
+MIX_LENGTH = 25  # so viele Titel des Mixes ansehen, um nach Abzug der schon gespielten genug übrig zu haben
+
+
+def youtube_id(url: str | None) -> str | None:
+    """Video-ID aus einem YouTube-Link; None bei anderen Quellen (SoundCloud, Radio)."""
+    m = YOUTUBE_ID_RE.search(url or "")
+    return m.group(1) if m else None
+
+
+async def related(track: Track, played: set[str], count: int, requester_id: int) -> list[Track]:
+    """Bis zu `count` ähnliche Titel aus dem YouTube-Mix zu `track`, ohne die schon gespielten.
+    Leer, wenn der Titel nicht von YouTube ist oder YouTube nichts liefert."""
+    video = youtube_id(track.page_url)
+    if video is None:
+        return []
+    mix = f"https://www.youtube.com/watch?v={video}&list=RD{video}"
+    opts = {**_ytdl_base(), "extract_flat": "in_playlist", "playlistend": MIX_LENGTH}
+    try:
+        info = await asyncio.to_thread(_extract, mix, opts)
+    except yt_dlp.utils.DownloadError as e:
+        log.warning("Autoplay-Mix zu %s: %s", video, _short_error(e))
+        return []
+    tracks = []
+    for entry in (info or {}).get("entries") or []:
+        candidate = _track_from_info(entry, requester_id) if entry else None
+        candidate_id = youtube_id(candidate.page_url) if candidate else None
+        if candidate is None or candidate_id is None or candidate_id == video or candidate_id in played:
+            continue
+        tracks.append(candidate)
+        if len(tracks) == count:
+            break
+    return tracks
 
 
 def _short_error(e: Exception) -> str:

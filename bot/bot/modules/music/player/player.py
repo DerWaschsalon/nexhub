@@ -1,7 +1,8 @@
 """Warteschlange und Abspiel-Schleife eines Servers, dazu die „Läuft gerade“-Nachricht.
 
 Damit der Kanal sauber bleibt, gibt es je Server nur eine „Läuft gerade“-Nachricht: beim nächsten Titel
-wird die alte gelöscht. Bei leerer Warteschlange verlässt der Bot den Kanal nach IDLE_TIMEOUT_S.
+wird die alte gelöscht. Bei leerer Warteschlange verlässt der Bot den Kanal nach IDLE_TIMEOUT_S, mit
+Autoplay reiht er vorher ähnliche Titel zum letzten Song ein.
 """
 
 from __future__ import annotations
@@ -9,11 +10,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import shlex
+from collections import deque
 from typing import TYPE_CHECKING
 
 import discord
 
-from .sources import Track, stream_url
+from .sources import Track, related, stream_url, youtube_id
 
 if TYPE_CHECKING:
     from . import MusicPlayer
@@ -26,6 +28,8 @@ SAY_SECONDS = 30
 FFMPEG_BEFORE = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin"
 LOOP_LABELS = {"aus": "aus", "song": "Song", "liste": "Warteschlange"}
 HOUR_S, MINUTE_S = 3600, 60
+AUTOPLAY_BATCH = 5    # so viele ähnliche Titel auf einmal einreihen, damit „Als Nächstes“ etwas zeigt
+PLAYED_MEMORY = 50    # zuletzt gespielte Videos, die Autoplay nicht noch einmal bringt
 
 
 def fmt_time(seconds: int | None) -> str:
@@ -59,6 +63,7 @@ class Player:
         self.volume = DEFAULT_VOLUME
         self.text_channel: discord.abc.Messageable | None = None
         self.np_message: discord.Message | None = None
+        self.played: deque[str] = deque(maxlen=PLAYED_MEMORY)  # YouTube-IDs, für Autoplay
         self._wakeup = asyncio.Event()
         self._skipped = False
         self.task = asyncio.create_task(self._run(), name=f"player-{guild.id}")
@@ -88,7 +93,7 @@ class Player:
 
     async def _play_next(self) -> bool:
         """Einen Titel spielen oder auf neue warten; False beendet die Schleife."""
-        track = self._next()
+        track = self._next() or await self._autoplay()
         if track is None:
             return await self._wait_idle()
         vc = self.voice()
@@ -102,8 +107,29 @@ class Player:
             await self.say(f"⚠️ **{discord.utils.escape_markdown(track.title)}** lässt sich nicht abspielen: {e}")
             self.current = None
             return True
+        self._remember(track)
         await self._play(vc, track, url)
         return True
+
+    def autoplay_on(self) -> bool:
+        return self.module.settings.get(self.guild.id).autoplay
+
+    async def _autoplay(self) -> Track | None:
+        """Warteschlange leer: mit Autoplay ähnliche Titel zum letzten Song einreihen und den ersten liefern.
+        Als Wünscher steht der Bot selbst da, so sieht man in Discord, dass es Autoplay war."""
+        last = self.current
+        if last is None or not self.autoplay_on():
+            return None
+        tracks = await related(last, set(self.played), AUTOPLAY_BATCH, self.guild.me.id)
+        if not tracks:
+            return None
+        self.queue.extend(tracks)
+        return self.queue.pop(0)
+
+    def _remember(self, track: Track) -> None:
+        video = youtube_id(track.page_url)  # erst nach stream_url sicher bekannt (Spotify, Suche)
+        if video:
+            self.played.append(video)
 
     async def _wait_idle(self) -> bool:
         self.current = None
@@ -167,7 +193,8 @@ class Player:
                         inline=False)
         if t.thumbnail:
             e.set_thumbnail(url=t.thumbnail)
-        e.set_footer(text=f"Lautstärke {round(self.volume * 100)} %")
+        autoplay = " · Autoplay an" if self.autoplay_on() else ""
+        e.set_footer(text=f"Lautstärke {round(self.volume * 100)} %{autoplay}")
         return e
 
     async def send_np(self) -> None:

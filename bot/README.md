@@ -7,7 +7,7 @@ Ein Bot für alles, was ihr bisher mit mehreren Bots macht. Alle Befehle sind Sl
 
 | Bereich | Befehle | Was passiert |
 |---|---|---|
-| **Musik** | `/play`, `/skip`, `/stop`, `/pause`, `/weiter`, `/warteschlange`, `/jetzt`, `/lautstaerke`, `/wiederholen`, `/mischen`, `/entfernen` | YouTube-Links und -Suche, SoundCloud, Spotify-Links (Titel, Alben, Playlists, gesucht auf YouTube). Eine „Läuft gerade“-Nachricht mit Buttons, die alte wird gelöscht. Allein im Kanal geht der Bot nach 1 Min., bei leerer Warteschlange nach 5 Min. |
+| **Musik** | `/play`, `/skip`, `/stop`, `/pause`, `/weiter`, `/warteschlange`, `/jetzt`, `/lautstaerke`, `/wiederholen`, `/mischen`, `/entfernen`, `/autoplay` | YouTube-Links und -Suche, SoundCloud, Spotify-Links (Titel, Alben, Playlists, gesucht auf YouTube). Eine „Läuft gerade“-Nachricht mit Buttons, die alte wird gelöscht. Autoplay (`/autoplay` oder Einstellung „Musik & Voice“, Standard aus): bei leerer Warteschlange 5 ähnliche Titel aus dem YouTube-Mix zum letzten Song, ohne die letzten 50 gespielten. Allein im Kanal geht der Bot nach 1 Min., bei leerer Warteschlange nach 5 Min. |
 | **Radio** | `/radio sender:` oder `/radio url:` | Zehntausende Sender aus radio-browser.info, Vorschläge beim Tippen. Oder direkt eine Stream-Adresse. |
 | **Rollen** | `/rollen-panel` | Nachricht mit Buttons, über die man sich Rollen selbst nimmt oder abgibt. Funktioniert auch nach Neustarts. |
 | **Willkommen** | Klick-Panel oder `/setup aendern` | Begrüßung mit Platzhaltern `{user}`, `{name}`, `{server}`, `{anzahl}`, Rolle für Neue |
