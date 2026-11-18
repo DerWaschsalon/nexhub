@@ -22,7 +22,7 @@ from ..config import ID, Layout, Settings, _Strict
 from ..core.devices import CLOSE_MODULE_OFF, DeviceHub
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
-from ..core.topics import DPS_RESET
+from ..core.topics import DECK_PAGE, TILE_EVENT, TileEvent
 from ..deck_layout import DeckLayout, error_text
 from ..mdns import Announcer
 from ..media import Media
@@ -37,6 +37,7 @@ WEB_DIR_DEFAULT_BG = "bg.png"
 BACKGROUND_POLL_S = 5
 LAYOUT_POLL_S = 1
 STATE_KEY_MAX = 32
+MODULE_TILES = ("dps", "guide")  # Kacheltypen, deren Tippen ein Modul über TILE_EVENT bekommt
 SETTINGS_FILE = "deck.yaml"  # im Konfig-Ordner, benannt nach dem Modul
 SETTINGS_HEADER = "Touch-Leiste – wird von der Web-UI überschrieben. Layout steht in layout.yaml."
 
@@ -75,6 +76,7 @@ class DeckModule(WebModule):
                                  enabled=lambda: self.active, on_event=self.handle_event,
                                  auto_page=lambda: self._store.value.auto_page)
         state.subscribe(self.devices.on_state)
+        ctx.bus.on(DECK_PAGE, self.devices.on_module_page)  # schon vor dem Start: Module melden sich beim Hochfahren
         live.section("layout", self.layout.json)
         live.section("error", lambda: self.layout.error)
         live.handle_events(self.handle_event)
@@ -173,8 +175,8 @@ class DeckModule(WebModule):
             return "value muss eine Ganzzahl sein"
         part = msg.get("part")
         log.debug("%s: %s %s value=%s part=%s", source, event, item_id, value, part)
-        if item.type == "dps" and event == "button_press" and part == "reset":
-            await self.ctx.bus.emit(DPS_RESET)
+        if item.type in MODULE_TILES:  # Kacheln mit eigenem Typ gehören ihrem Modul
+            await self.ctx.bus.emit(TILE_EVENT, TileEvent(item.type, item.id, str(event), part))
             return None
         await self.executor.on_event(item, event, value, part)
         return None

@@ -101,6 +101,7 @@ class DeviceHub:
         self.enabled = enabled
         self.on_event = on_event
         self.auto_page = auto_page  # DPS-Seite, zu der die Leiste im Kampf wechselt
+        self.module_page: str | None = None  # Seite, die ein Modul gerade zeigen möchte (DECK_PAGE)
         self.devices: set[Device] = set()
         live.section("devices", self.info)
 
@@ -246,6 +247,26 @@ class DeviceHub:
         log.info("%s wechselt zu Seite '%s'", dev.id, target)
         await send_text(dev.ws, device_message("goto", page=target))
 
+    # ---------------------------------------------------------------- Seite eines Moduls
+    async def on_module_page(self, page: str | None) -> None:
+        """Ein Modul bittet um seine Seite (z. B. Leveling-Guide, solange PoE läuft) oder gibt sie frei.
+        Nur beim Wechsel umschalten: wer danach selbst wegwischt, bleibt, wo er ist."""
+        previous, self.module_page = self.module_page, page
+        for dev in list(self.devices):
+            await self.follow_module_page(dev, previous)
+
+    async def follow_module_page(self, dev: Device, previous: str | None = None) -> None:
+        page_ids = [p.id for p in self.layout.layout.pages]
+        if self.module_page in page_ids:
+            target = self.module_page
+        elif previous and dev.page == previous:
+            target = page_ids[0]  # freigegeben: zurück zur ersten Seite
+        else:
+            return
+        if target and dev.page != target:
+            log.info("%s wechselt zu Seite '%s'", dev.id, target)
+            await send_text(dev.ws, device_message("goto", page=target))
+
     async def _return_later(self, dev: Device, delay: float) -> None:
         await asyncio.sleep(delay)
         await self.follow_combat(dev)
@@ -318,6 +339,7 @@ class DeviceHub:
         await send_text(ws, device_message("state", full=True, values=values))
         asyncio.ensure_future(self.send_bg(dev))
         await self.follow_combat(dev)
+        await self.follow_module_page(dev)
         return True
 
     async def _heartbeat(self, dev: Device) -> None:

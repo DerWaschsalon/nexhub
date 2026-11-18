@@ -1,7 +1,7 @@
 #pragma once
 /* Einstellungen der NexBoard-Firmware. Zugangsdaten stehen in secrets.h (gitignored). */
 
-#define DECKBAR_FW_VERSION "0.7.1"
+#define DECKBAR_FW_VERSION "0.8.0"
 
 /*
  * Ausrichtung im Querformat. 270 entspricht der Drehung aus dem Waveshare-Beispiel

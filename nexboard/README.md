@@ -122,6 +122,8 @@ umschalten, die Seite passt sich auch an schmale Fenster an.
 | AION 2 · Plugins | Plugins: installiert, Katalog, Updates mit Zustimmung, ein/aus, Fenster öffnen | Overlay |
 | Touch-Leiste | Editor (Seiten, Kacheln, Aktionen, Live-Vorschau), Design, Geräte (mit „Im Kampf zur Seite“) | – |
 | AION 2 · Dungeon-Runs | Discord-Webhook, Vorschau, Namen der Mitspieler | Kampfdaten |
+| PoE 1 · Spiel | Path of Exile: läuft das Spiel, welches Client.txt gelesen wird | – |
+| PoE 1 · Leveling-Guide | Leveling-Guide: aktueller Schritt mit Layout-Bildern, Bedienung, PoB-Import, Händler-Suchtexte | PoE 1 · Spiel |
 | NexHub | Dieses NexBoard mit einem Konto im NexHub koppeln | – |
 | Updates | Stand von Repo und A2Tools-Kern, Aktualisieren | – |
 
@@ -342,6 +344,27 @@ Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
 Die History maskiert fremde Namen. Die NexBoard lernt die vollen Namen aus dem Live-Stream und
 speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von Hand korrigieren.
 
+## Path of Exile
+
+Zwei Module, beide für PoE 1; PoE 2 ist vorbereitet (`poe/games.py` kennt beide Spiele, ein PoE-2-Modul ist
+eine Unterklasse mit `game = POE2`).
+
+- **PoE 1 · Spiel** (`modules/poe_client.py`, `poe/session.py`): erkennt das laufende Spiel am Installationsordner
+  in der Befehlszeile (PoE 1 und 2 heißen beide `PathOfExile…exe`), liest daraus `logs/Client.txt` (sonst die
+  Steam-Bibliotheken oder ein eigener Pfad) und meldet Zonenwechsel und Aufstiege auf dem Bus (`poe.log`).
+  Weitere PoE-Module abonnieren das, statt selbst zu lesen.
+- **PoE 1 · Leveling-Guide** (`modules/poe_leveling.py`, `poe/leveling/`): der Act Tracker von
+  [Exile-UI](https://github.com/Lailloken/Exile-UI) mit denselben Regeln (Seitenbau mit Gems aus dem PoB-Build,
+  weiter beim Betreten der Zielzone, Schnellvorlauf, XP-Abzug). Auf der Leiste zeigt die Kachel `guide` den
+  Schritt; solange PoE läuft und der Guide nicht zu Ende ist, springt die Leiste auf ihre Seite (Einstellung
+  „Seite auf der Leiste“, Standard `poe`). Links zurück, rechts weiter, rechts lange halten = zur Zone, in der
+  man steht. Die Web-Seite zeigt denselben Schritt mit Symbolen und Layout-Bildern, Suchtexte für Händler
+  (Strg+F im Spiel) und nimmt PoB-Code, pobb.in-Link oder einen eigenen Guide (Exile-UI-JSON) an.
+  Stand: `~/.local/share/deckbar/poe1/leveling.json`, Einstellungen: `poe1.leveling.yaml`.
+
+Seiten anfordern dürfen alle Module über das Bus-Thema `deck.page` (`core/devices.py`, `follow_module_page`):
+die Leiste wechselt nur beim Anfordern und Freigeben, wer selbst wegwischt, bleibt dort.
+
 ## Runs in Discord
 
 Ein Weg für alles (Umbau-Konzept): NexBoard → NexHub → TheWashBot. Unter NexHub → „Runs teilen“ erst
@@ -502,3 +525,5 @@ Weitere Fremdbestandteile:
 - Inter (OFL 1.1)
 - cJSON (MIT)
 - Treiber in `firmware/src/drivers` und `firmware/src/touch`: Espressif, Apache 2.0
+- Leveling-Guide: Regeln, Guide, Zonen-/Gem-Daten und Bilder aus [Exile-UI](https://github.com/Lailloken/Exile-UI)
+  (Lailloken, MIT), `daemon/deckbar_daemon/poe/leveling/data/LICENSE-Exile-UI.md`

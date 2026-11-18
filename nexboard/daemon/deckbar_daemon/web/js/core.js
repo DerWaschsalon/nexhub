@@ -98,7 +98,7 @@ export function connectLive() {
       case "hello":
         Object.assign(S, {
           online: true, modules: msg.modules, state: msg.state, devices: msg.devices, status: msg.status,
-          dps: msg.dps, runs: msg.runs, updates: msg.updates, bot: msg.bot, hub: msg.hub, overlay: msg.overlay, settings: msg.settings,
+          dps: msg.dps, runs: msg.runs, updates: msg.updates, bot: msg.bot, hub: msg.hub, overlay: msg.overlay, settings: msg.settings, leveling: msg.leveling,
           layout: msg.layout, layoutError: msg.error,
         });
         emit("hello", msg);
@@ -118,6 +118,7 @@ export function connectLive() {
       case "bot": S.bot = msg.bot; emit("bot", msg.bot); break;
       case "hub": S.hub = msg.hub; emit("hub", msg.hub); break;
       case "overlay": S.overlay = msg.overlay; emit("overlay", msg.overlay); break;
+      case "leveling": S.leveling = msg.leveling; emit("leveling", msg.leveling); break;
       case "modules": S.modules = msg.modules; emit("modules", msg.modules); break;
       case "settings": S.settings = msg.settings; emit("settings", msg.settings); break;
       case "background": emit("background", msg.id); break;
@@ -155,6 +156,8 @@ const COLORS = {
   "aion2.dps": ["#ff7a45", "#ff3d6e"],
   "aion2.overlay": ["#8f7cff", "#4f6bff"],
   "aion2.runs": ["#ffc93d", "#ff8a1f"],
+  "poe1.client": ["#c8a25a", "#8a5a2b"],
+  "poe1.leveling": ["#fec076", "#c8642b"],
   updates: ["#34d17a", "#13a3a0"],
   system: ["#9aa4bf", "#5d6782"],
 };

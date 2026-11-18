@@ -318,3 +318,21 @@ dialog .dlg { padding: 18px; border-radius: var(--radius-xl); background: var(--
   .save-state { display: none; }
   .card { padding: 16px; }
 }
+
+/* Leveling-Guide (PoE): Zeilen wie auf der Leiste, Symbole aus Exile-UI. Grund bewusst dunkel, auch im hellen
+   Design: die Farben des Guides (Exile-UI) sind für dunklen Grund gemacht. */
+.guide-lines { list-style: none; margin: 12px 0 0; padding: 12px 14px; border-radius: var(--radius-m); background: #0d0f14; color: #fff; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; line-height: 1.5; }
+.guide-lines li { position: relative; padding-left: 16px; }
+.guide-lines li.step::before { content: "•"; position: absolute; left: 2px; color: rgba(255, 255, 255, .6); }
+.guide-lines li.optional::before { content: "+"; position: absolute; left: 2px; color: rgba(255, 255, 255, .6); }
+.guide-lines li.hint { padding-left: 28px; font-size: 13.5px; }
+.guide-lines li.plain { padding-left: 0; }
+.guide-lines .gi { height: 18px; vertical-align: -4px; margin: 0 3px; }
+.guide-lines .layout-term { cursor: pointer; text-decoration: underline dotted; }
+.guide-layout { margin: 12px 0 0; }
+.guide-layout img { max-width: 100%; border-radius: var(--radius-m); display: block; }
+.gem-groups { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.gem-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 8px; border-radius: var(--radius-m); background: var(--inset); }
+.gem { font-size: 12.5px; padding: 2px 8px; border-radius: 999px; background: var(--inset); }
+.gem.support { color: var(--text-2); }
+code.grow { overflow-wrap: anywhere; font-size: 12px; }

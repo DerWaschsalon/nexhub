@@ -587,6 +587,40 @@
       "title": "Goto",
       "type": "object"
     },
+    "Guide": {
+      "description": "Aktueller Schritt eines Leveling-Guides. Zeilen tragen Farbbefehle von LVGL („#FEC076 Zone#“),\nder Daemon färbt, die Kachel zeigt nur an.",
+      "properties": {
+        "head": {
+          "default": "",
+          "maxLength": 72,
+          "title": "Head",
+          "type": "string"
+        },
+        "step": {
+          "default": "",
+          "maxLength": 24,
+          "title": "Step",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "maxLength": 240,
+            "type": "string"
+          },
+          "maxItems": 6,
+          "title": "Lines",
+          "type": "array"
+        },
+        "msg": {
+          "default": "",
+          "maxLength": 48,
+          "title": "Msg",
+          "type": "string"
+        }
+      },
+      "title": "Guide",
+      "type": "object"
+    },
     "Heartbeat": {
       "properties": {
         "v": {
@@ -708,7 +742,8 @@
             "slider",
             "media",
             "dps",
-            "claude"
+            "claude",
+            "guide"
           ],
           "title": "Type",
           "type": "string"
@@ -1123,6 +1158,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/ClaudeUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "guide": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Guide"
             },
             {
               "type": "null"
