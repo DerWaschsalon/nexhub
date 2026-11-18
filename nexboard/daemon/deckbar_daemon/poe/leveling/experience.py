@@ -17,9 +17,11 @@ class Experience:
     percent: float  # XP in % der vollen XP
     low: int  # sichere Zone: niedrigste …
     high: int  # … und höchste Zonenstufe ohne Abzug
+    beyond: int = 0  # so viele Stufen liegt die Zone über (+) bzw. unter (−) der sicheren Zone
 
     def text(self) -> str:
-        return f"{self.percent:.0f} %" if self.percent >= 99.5 else f"{self.percent:.1f} %"
+        """Wie im Original: ganze Prozent, dahinter die Stufen außerhalb der sicheren Zone („71 % (+2)“)."""
+        return f"{self.percent:.0f} %" + (f" ({self.beyond:+d})" if self.beyond else "")
 
 
 def effective_area_level(area_level: int) -> float:
@@ -34,8 +36,10 @@ def experience(level: int, area_level: int, in_town: bool = False) -> Experience
     low, high = max(level - safe, 1), level + safe
     if in_town:
         return Experience(100.0, low, high)
-    difference = max(abs(level - effective_area_level(area_level)) - safe, 0) ** 2.5
+    area = effective_area_level(area_level)
+    beyond = round(area - (high if area > level else level - safe)) if not low <= area <= high else 0
+    difference = max(abs(level - area) - safe, 0) ** 2.5
     multiplier = ((level + 5) / (level + 5 + difference)) ** 1.5
     if level > 94:
         multiplier *= 1 / (1 + 0.1 * (level - 94)) / HIGH_LEVEL_PENALTY.get(level, 1)
-    return Experience(max(multiplier, MIN_MULTIPLIER) * 100, low, high)
+    return Experience(max(multiplier, MIN_MULTIPLIER) * 100, low, high, beyond)

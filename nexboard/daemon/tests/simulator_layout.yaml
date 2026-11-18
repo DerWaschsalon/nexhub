@@ -47,5 +47,8 @@ pages:
       - {id: c2, type: claude, w: 2}
 
   - id: guide
+    cols: 8
+    rows: 3
     items:
-      - {id: g1, type: guide, w: 6, h: 2}
+      - {id: gm, type: toggle, label: Mikro, icon: microphone, icon_on: microphone-off, style: danger, bind: mic_muted}
+      - {id: g1, type: guide, w: 7, h: 3}

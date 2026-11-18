@@ -1,6 +1,6 @@
 /* Modul PoE 1 · Leveling-Guide: der aktuelle Schritt wie auf der Leiste, hier mit Symbolen und Layout-Bildern,
    dazu Bedienung, PoB-Import, Suchtexte für Händler und Einstellungen. */
-import { fill, el, api, S, on, button, chip, callout, card, select, toast, collapsible } from "../core.js";
+import { fill, el, api, S, on, button, chip, callout, card, select, field, toast, collapsible } from "../core.js";
 import { moduleSettings } from "../form.js";
 
 const BASE = "/api/poe1/leveling";
@@ -42,7 +42,7 @@ function stepCard(v, view, draw) {
   const chips = [
     S.leveling.running ? chip("PoE läuft", "ok") : chip("PoE nicht gestartet"),
     v.zone ? chip(`${v.act} · ${v.zone}`) : null,
-    v.level ? chip(`Stufe ${v.level}${v.character ? ` · ${v.character}` : ""}`) : null,
+    v.character ? chip(v.level ? `${v.character} · Stufe ${v.level}` : v.character) : chip("Charakter unbekannt", "warn"),
     v.xp ? chip(`XP ${v.xp.text} · ohne Abzug ${v.xp.low}–${v.xp.high}`, v.xp.text === "100 %" ? "ok" : "warn") : null,
   ];
   const lines = el("ul", { class: "guide-lines" }, v.lines.map((line) =>
@@ -78,6 +78,16 @@ function gemSources(v) {
 
 const gemKey = (g) => (g.support && !g.name.includes("support") ? `${g.name} support` : g.name);
 
+/** Eigener Charakter: Build und Fortschritt gelten je Charakter (wie die Profile in Exile-UI). */
+function characterField(v) {
+  const options = { "": "noch keiner – wird in Twilight Strand erkannt", ...Object.fromEntries(v.characters.map((c) => [c, c])) };
+  const pick = async (character) => {
+    try { await api("PUT", "/api/m/poe1.leveling/settings", { character }); } catch (e) { toast(e.message, true); }
+  };
+  return field("Charakter", select(options, v.character, pick),
+    "Build und Fortschritt gelten je Charakter. Steigt ein Charakter mit eigenem Stand auf, wechselt der Guide von selbst; Mitspieler zählen nicht.");
+}
+
 function buildCard(v, view) {
   const area = el("textarea", { rows: 3, placeholder: "PoB-Code, pobb.in-Link oder Guide (JSON aus Exile-UI)", spellcheck: "false" });
   const b = v.build;
@@ -95,7 +105,8 @@ function buildCard(v, view) {
         v.build_search.map((text) => el("div", { class: "row" }, el("code", { class: "grow", text }), copyButton(text)))) : null,
       collapsible("Kaufort je Gem", view.sources, el("p", { class: "hint small", text: "Ohne Wahl kauft der Guide jedes Gem beim ersten Händler, der es hat." }), gemSources(v)))
     : el("p", { class: "hint", text: "Noch kein Build: ohne ihn zeigt der Guide keine Gem-Belohnungen und Käufe." });
-  return card("Build", "Aus Path of Building; Klasse, Banditen und Gems bestimmen die Belohnungen im Guide", null, info,
+  return card("Charakter und Build", "Aus Path of Building; Klasse, Banditen und Gems bestimmen die Belohnungen im Guide", null,
+    characterField(v), info,
     el("div", { class: "stack", style: "gap:8px;margin-top:14px" }, area,
       el("div", { class: "row wrap" },
         button("Übernehmen", async () => {

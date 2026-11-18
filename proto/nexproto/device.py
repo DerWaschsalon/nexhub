@@ -33,7 +33,7 @@ BIN_HEADER_BYTES = 27  # "DB", Art, id (16), w, h, y, rows
 DPS_MAX_ROWS = 8
 DPS_DEFAULT_PLAYERS = 5
 # Guide-Kachel (Leveling-Guide): so viele Zeilen zeigt sie, so lang darf eine Zeile samt Farbbefehlen sein
-GUIDE_MAX_LINES = 6
+GUIDE_MAX_LINES = 5  # mehr passen in großer Schrift nicht auf die Kachel
 GUIDE_LINE_MAX = 240
 LONG_PRESS_MS = 600
 SLIDER_EVENTS_PER_S = 20

@@ -18,7 +18,7 @@ from nexcore.settings import SettingsStore
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
 from ..core.topics import DECK_PAGE, GAME_STARTED, GAME_STOPPED, POE_LOG, TILE_EVENT, TileEvent
-from ..poe.client_log import LevelUp, ZoneEntered
+from ..poe.client_log import LevelUp, LoginScreen, ZoneEntered
 from ..poe.games import POE1
 from ..poe.leveling import pob
 from ..poe.leveling.data import DATA_DIR
@@ -91,6 +91,8 @@ class PoeLevelingModule(WebModule):
             self.leveling.on_zone(message.event)
         elif isinstance(message.event, LevelUp):
             self.leveling.on_level(message.event)
+        elif isinstance(message.event, LoginScreen):
+            self.leveling.on_login()
         await self.push()
 
     async def on_game(self, name: str) -> None:

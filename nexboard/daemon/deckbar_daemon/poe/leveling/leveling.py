@@ -23,6 +23,7 @@ from .settings import LevelingSettings, StateFile
 from .terms import ACT_NAMES, AREA, BANDITS, Guide
 from .tracker import Tracker
 
+TWILIGHT_STRAND = "1_1_1"  # wer hier aufsteigt, ist ein neuer eigener Charakter (Autotrack im Original)
 MESSAGES = {
     "end": "Ende des Guides",
     "start": "Schon am Anfang",
@@ -47,9 +48,9 @@ class Leveling:
         self.state = StateFile(state_file)
         self.data = load()
         self.layouts = layout_names()
-        self.zone: ZoneEntered | None = None
-        self.levels: dict[str, LevelUp] = {}
-        self.last_up: LevelUp | None = None  # wer zuletzt aufgestiegen ist
+        self.zone: ZoneEntered | None = None  # None = Login-Bildschirm oder unbekannt
+        self.act = 0  # letzter Kampagnen-Akt: bleibt in Versteck, Labyrinth und Liga-Zonen stehen (wie im Original)
+        self.levels: dict[str, LevelUp] = {}  # letzte Stufe je Charakter, auch von Mitspielern
         self.message = ""
         self.guide = Guide()
         self.tracker = Tracker([], self.settings.options())
@@ -60,19 +61,29 @@ class Leveling:
         value: LevelingSettings = self.store.value
         return value
 
+    @property
+    def character(self) -> str:
+        return self.settings.character
+
     def rebuild(self) -> None:
-        """Seiten neu bauen (nach Build-Import, neuem Guide oder geänderten Einstellungen)."""
-        state = self.state.value
+        """Seiten neu bauen (nach Build-Import, Charakterwechsel, neuem Guide oder geänderten Einstellungen)."""
+        self.state.adopt_unnamed(self.character)
+        profile = self.state.character(self.character)
         options = self.settings.options()
-        raw = [page for act in state.custom_guide for page in act] if state.custom_guide else default_guide()
-        self.guide = GuideBuilder(self.data, options, state.build, state.gem_sources).build(raw)
-        self.tracker = Tracker(self.guide.pages, options, state.progress)
+        custom = self.state.value.custom_guide
+        raw = [page for act in custom for page in act] if custom else default_guide()
+        self.guide = GuideBuilder(self.data, options, profile.build, profile.gem_sources).build(raw)
+        self.tracker = Tracker(self.guide.pages, options, profile.progress)
 
     # ------------------------------------------------------------ aus Client.txt
     def on_zone(self, zone: ZoneEntered) -> None:
         self.zone = zone
+        self.act = self.data.act_of(zone.area_id) or self.act
         if zone.live:
             self.check_zone()
+
+    def on_login(self) -> None:
+        self.zone = None
 
     def check_zone(self) -> bool:
         """Steht man in der Zielzone des Schritts, eine Seite weiter. Das Original prüft das in jeder Runde
@@ -84,12 +95,23 @@ class Leveling:
         return True
 
     def on_level(self, up: LevelUp) -> None:
+        """Aufstiege kommen auch für Mitspieler. Eigener Charakter ist der eingestellte; ohne Einstellung der
+        erste, der in Twilight Strand aufsteigt. Steigt ein Charakter auf, für den es schon einen Stand gibt,
+        spielt man offenbar ihn: dann wird gewechselt."""
         self.levels[up.character] = up
-        self.last_up = up
+        if up.character == self.character:
+            return
+        new_here = not self.character and up.live and self.zone and self.zone.area_id == TWILIGHT_STRAND
+        if new_here or up.character in self.state.value.characters:
+            self.select(up.character)
+
+    def select(self, character: str) -> None:
+        self.store.save(self.settings.model_copy(update={"character": character}))
+        self.rebuild()
 
     def level(self) -> LevelUp | None:
-        name = self.settings.character
-        return self.levels.get(name) if name else self.last_up
+        """Stufe des eigenen Charakters; ohne bekannten Charakter keine (lieber keine als die eines Mitspielers)."""
+        return self.levels.get(self.character) if self.character else None
 
     # ------------------------------------------------------------ Bedienung
     def command(self, name: str) -> None:
@@ -116,8 +138,8 @@ class Leveling:
             self.message = MESSAGES["not_ahead"]
 
     def _moved(self) -> None:
-        if self.tracker.progress != self.state.value.progress:
-            self.state.save(progress=self.tracker.progress)
+        if self.tracker.progress != self.state.character(self.character).progress:
+            self.state.save_character(self.character, progress=self.tracker.progress)
 
     def import_code(self, code: str) -> str:
         """PoB-Code oder Guide (JSON im Exile-UI-Format) übernehmen; zurück kommt, was es war."""
@@ -125,7 +147,7 @@ class Leveling:
         if text.startswith("["):
             return self._import_guide(text)
         build = pob.parse(pob.decode(text), set(self.data.gems))
-        self.state.save(build=build)
+        self.state.save_character(self.character, build=build)
         bandit = build.bandit if build.bandit in BANDITS else "none"
         self.store.save(self.settings.model_copy(update={"bandit": bandit}))
         self.rebuild()
@@ -138,16 +160,19 @@ class Leveling:
             raise pob.PobError("Guide ist kein gültiges JSON") from e
         if not isinstance(acts, list) or not any(AREA in json.dumps(act) for act in acts):
             raise pob.PobError("Das sieht nicht nach einem Exile-UI-Guide aus")
-        self.state.save(custom_guide=acts, progress=0)
+        self.state.save(custom_guide=acts)
+        self.state.save_character(self.character, progress=0)
         self.rebuild()
         return "guide"
 
     def use_default_guide(self) -> None:
-        self.state.save(custom_guide=None, progress=0)
+        self.state.save(custom_guide=None)
+        self.state.save_character(self.character, progress=0)
         self.rebuild()
 
     def set_gem_sources(self, sources: dict[str, int]) -> None:
-        self.state.save(gem_sources={gem: act for gem, act in sources.items() if 1 <= act <= 10})
+        self.state.save_character(self.character,
+                                  gem_sources={gem: act for gem, act in sources.items() if 1 <= act <= 10})
         self.rebuild()
 
     # ------------------------------------------------------------ Anzeige
@@ -155,16 +180,14 @@ class Leveling:
         return self.tracker.at_end()
 
     def _rendered(self) -> Rendered:
-        area = self.zone.area_id if self.zone else ""
-        where = Where(self.data.act_of(area), area.lower().startswith("hideout"))
+        hideout = bool(self.zone and self.zone.area_id.lower().startswith("hideout"))
         renderer = PageRenderer(self.data, self.settings.options(), set(self.layouts))
-        return renderer.render(self.tracker.lines, where)
+        return renderer.render(self.tracker.lines, Where(self.act, hideout))
 
     def _header(self) -> dict[str, Any]:
         up, zone = self.level(), self.zone
-        act = self.data.act_of(zone.area_id) if zone else 0
-        out: dict[str, Any] = {"act": ACT_NAMES.get(act, ""), "zone": "", "level": up.level if up else None,
-                               "character": up.character if up else "", "xp": None}
+        out: dict[str, Any] = {"act": ACT_NAMES.get(self.act, ""), "zone": "", "level": up.level if up else None,
+                               "character": self.character, "xp": None}
         if zone:
             area = self.data.areas.get(zone.area_id.lower())
             out["zone"] = area.name if area else zone.area_id
@@ -186,7 +209,7 @@ class Leveling:
         rendered = self._rendered()
         head = self._header()
         xp = head.pop("xp")
-        state = self.state.value
+        profile = self.state.character(self.character)
         return {
             **head,
             "xp": {"text": xp.text(), "low": xp.low, "high": xp.high} if xp else None,
@@ -194,12 +217,14 @@ class Leveling:
             "lines": [{"bullet": line.bullet, "segments": [vars(s) for s in line.segments]}
                       for line in rendered.lines],
             "search": gem_search(rendered.buy_gems, self.data) + item_search(rendered.buy_items),
-            "build": state.build.model_dump() if state.build else None,
+            "build": profile.build.model_dump() if profile.build else None,
             "build_search": gem_search(self._build_gems(), self.data),
-            "gems_left": self.guide.gems_left, "gem_sources": state.gem_sources,
-            "custom_guide": state.custom_guide is not None, "finished": self.finished(),
+            "gems_left": self.guide.gems_left, "gem_sources": profile.gem_sources,
+            "custom_guide": self.state.value.custom_guide is not None, "finished": self.finished(),
+            # zur Auswahl in der Web-UI: Charaktere mit Stand und die zuletzt im Log aufgestiegenen
+            "characters": sorted({*self.state.value.characters, *self.levels} - {""}),
         }
 
     def _build_gems(self) -> list[str]:
-        build = self.state.value.build
+        build = self.state.character(self.character).build
         return sorted(gem for gem in buyable_gems(build) if gem in self.data.gems) if build else []

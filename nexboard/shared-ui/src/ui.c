@@ -1394,7 +1394,8 @@ static void build_guide(tile_t *t, int32_t w, int32_t h)
     if (!v) return;
     t->guide = v;
 
-    const int32_t px = 10, btn = 34, gap = 6, head_h = btn + 6, step_w = 64;
+    /* große Schrift: auf der Leiste muss man den Schritt im Spiel aus dem Augenwinkel lesen können */
+    const int32_t px = 10, btn = 30, gap = 6, head_h = btn + 6, step_w = 70;
     lv_obj_t *next = mini_button(o, t, deckbar_icon_glyph("chevron-right"), "next", btn);
     lv_obj_t *next_btn = lv_obj_get_parent(next);
     lv_obj_align(next_btn, LV_ALIGN_TOP_RIGHT, -px + 4, 4);
@@ -1403,22 +1404,22 @@ static void build_guide(tile_t *t, int32_t w, int32_t h)
     lv_obj_align_to(lv_obj_get_parent(back), next_btn, LV_ALIGN_OUT_LEFT_MID, -gap, 0);
 
     /* feste Breite: ausgerichtet wird beim Aufbau, der Text („12/231“) kommt erst danach */
-    v->step = text_label(o, &db_font_small, "");
+    v->step = text_label(o, &db_font_label, "");
     lv_obj_add_style(v->step, &db_theme.text_dim, 0);
     lv_obj_set_width(v->step, step_w);
     lv_obj_set_style_text_align(v->step, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_align_to(v->step, lv_obj_get_parent(back), LV_ALIGN_OUT_LEFT_MID, -gap, 0);
 
-    v->head = text_label(o, &db_font_small, "");
+    v->head = text_label(o, &db_font_label, "");
     lv_obj_add_style(v->head, &db_theme.text_dim, 0);
     lv_label_set_long_mode(v->head, LV_LABEL_LONG_DOT);
     lv_obj_set_width(v->head, LV_MAX(w - 2 * px - 2 * btn - step_w - 3 * gap, 40));
-    lv_obj_set_pos(v->head, px, (head_h - lv_font_get_line_height(&db_font_small)) / 2);
+    lv_obj_set_pos(v->head, px, (head_h - lv_font_get_line_height(&db_font_label)) / 2);
 
-    v->body = text_label(o, &db_font_label, "");
+    v->body = text_label(o, &db_font_title, "");
     lv_label_set_recolor(v->body, true);
     lv_label_set_long_mode(v->body, LV_LABEL_LONG_CLIP);
-    lv_obj_set_size(v->body, w - 2 * px, LV_MAX(h - head_h - 6, 20));
+    lv_obj_set_size(v->body, w - 2 * px, LV_MAX(h - head_h - 2, 20));
     lv_obj_set_pos(v->body, px, head_h);
 
     v->msg = text_label(o, &db_font_small, "");
