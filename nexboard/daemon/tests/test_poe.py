@@ -6,7 +6,7 @@ from pathlib import Path, PureWindowsPath
 from nexcore.settings import SettingsStore
 
 from deckbar_daemon.poe.client_log import ClientLog, LevelUp, LoginScreen, ZoneEntered, parse_line
-from deckbar_daemon.poe.games import POE1, POE2, linux_path, steam_libraries
+from deckbar_daemon.poe.games import POE1, POE2, RunningGame, linux_path, steam_libraries
 from deckbar_daemon.poe.leveling import pob
 from deckbar_daemon.poe.leveling.data import default_guide, load
 from deckbar_daemon.poe.leveling.device_view import device_line
@@ -36,21 +36,28 @@ def build(char_class: str, *gems: tuple[str, bool]) -> pob.PobBuild:
 
 
 # ---------------------------------------------------------------- Spiel und Client.txt
-def test_games_told_apart_by_install_folder():
-    assert POE1.install_of(POE1_EXE).install == Path("/home/x/.local/share/Steam/steamapps/common/Path of Exile")
-    assert POE2.install_of(POE1_EXE) is None
-    assert POE2.install_of(POE2_EXE).install == Path("/games/Path of Exile 2")
-    assert POE1.install_of(rb"C:\Path of Exile\PathOfExile.exe").install is None  # im Prefix: Pfad unbekannt
-    assert POE1.install_of(rb"Z:\Path of Exile\launcher.exe") is None
+def test_find_game_like_proton_starts_it(tmp_path):
+    """Unter Proton: Prozess „Main“, Laufwerk S:, Arbeitsordner = Installationsordner (so am 18.11. gesehen)."""
+    proc = tmp_path / "proc"
+    install = tmp_path / "steamapps/common/Path of Exile"
+    install.mkdir(parents=True)
+    starters = {
+        "10": b"c:\\windows\\system32\\steam.exe\0" + str(install).encode() + b"/PathOfExileSteam.exe\0",
+        "11": b"python3\0proton\0waitforexitandrun\0" + str(install).encode() + b"/PathOfExileSteam.exe\0",
+        "12": rb"S:\steamapps\common\Path of Exile\PathOfExileSteam.exe" + b"\0--nopatch\0\0",
+    }
+    for pid, cmdline in starters.items():
+        (proc / pid).mkdir(parents=True)
+        (proc / pid / "comm").write_text("Main\n")
+        (proc / pid / "cmdline").write_bytes(cmdline)
+    (proc / "12" / "cwd").symlink_to(install)
+    assert POE1.find(proc) == RunningGame(install) and POE2.find(proc) is None
+    assert POE1.is_game(POE1_EXE) and not POE2.is_game(POE1_EXE) and POE2.is_game(POE2_EXE)
+    assert not POE1.is_game(rb"Z:\Path of Exile\launcher.exe")
     assert linux_path(PureWindowsPath(r"Z:\a\b")) == Path("/a/b")
 
 
-def test_find_in_proc_and_steam_libraries(tmp_path):
-    proc = tmp_path / "proc"
-    (proc / "42").mkdir(parents=True)
-    (proc / "42" / "comm").write_text("PathOfExileStea\n")
-    (proc / "42" / "cmdline").write_bytes(POE1_EXE)
-    assert POE1.find(proc) is not None and POE2.find(proc) is None
+def test_steam_libraries(tmp_path):
     steam = tmp_path / ".local/share/Steam/steamapps"
     steam.mkdir(parents=True)
     (steam / "libraryfolders.vdf").write_text(f'"0" {{ "path" "{tmp_path}/lib" }}')
