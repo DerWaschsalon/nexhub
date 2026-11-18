@@ -1,8 +1,9 @@
 """Die Spiele der Reihe: woran man sie im Prozessbaum erkennt und wo ihr Client.txt liegt.
 
 Unter Proton heißen PoE 1 und PoE 2 beide „PathOfExile…exe“. Unterscheiden lassen sie sich nur am
-Installationsordner in der Befehlszeile („…\\Path of Exile\\“ gegen „…\\Path of Exile 2\\“). Liegt er auf
-dem Wine-Laufwerk Z:, ist das zugleich der Linux-Pfad, und Client.txt findet sich ohne Einstellung.
+Installationsordner in der Befehlszeile („…\\Path of Exile\\“ gegen „…\\Path of Exile 2\\“). Der Prozessname
+(comm) hilft nicht: unter Proton heißt das Spiel „Main“. Das Laufwerk ist je nach Start S: (Steam-Bibliothek)
+oder Z:; den Linux-Ordner liefert deshalb der Arbeitsordner des Prozesses (/proc/<pid>/cwd).
 """
 from __future__ import annotations
 
@@ -30,28 +31,32 @@ class PoeGame:
     def client_txt(self, install: Path) -> Path:
         return install / "logs" / "Client.txt"
 
-    def install_of(self, cmdline: bytes) -> RunningGame | None:
-        """Ist das ein Prozess dieses Spiels? Dann mit Installationsordner, falls ablesbar."""
-        exe = cmdline.split(b"\0", 1)[0].decode(errors="replace")
-        path = PureWindowsPath(exe)
-        name = path.name.lower()
-        if not (name.startswith(EXE_PREFIX) and name.endswith(".exe")) or path.parent.name != self.folder:
-            return None
-        return RunningGame(linux_path(path.parent))
+    def is_game(self, cmdline: bytes) -> bool:
+        """Startet die Befehlszeile das Spiel selbst (nicht Steam oder Proton, die es nur als Argument tragen)?"""
+        exe = PureWindowsPath(cmdline.split(b"\0", 1)[0].decode(errors="replace"))
+        name = exe.name.lower()
+        return name.startswith(EXE_PREFIX) and name.endswith(".exe") and exe.parent.name == self.folder
 
     def find(self, proc: Path = Path("/proc")) -> RunningGame | None:
         """Den laufenden Spielprozess suchen (ein Blick in /proc)."""
         for pid in _pids(proc):
             try:
-                comm = (proc / pid / "comm").read_text().strip().lower()
-                if not comm.startswith(EXE_PREFIX[:15]):  # comm ist auf 15 Zeichen gekürzt
-                    continue
-                game = self.install_of((proc / pid / "cmdline").read_bytes())
+                cmdline = (proc / pid / "cmdline").read_bytes()
             except OSError:
                 continue
-            if game:
-                return game
+            if self.is_game(cmdline):
+                return RunningGame(self._install(proc / pid, cmdline))
         return None
+
+    def _install(self, process: Path, cmdline: bytes) -> Path | None:
+        """Installationsordner: Arbeitsordner des Spiels, sonst der Pfad auf Z: aus der Befehlszeile."""
+        try:
+            cwd = (process / "cwd").readlink()
+        except OSError:
+            cwd = None
+        if cwd and cwd.name == self.folder:
+            return cwd
+        return linux_path(PureWindowsPath(cmdline.split(b"\0", 1)[0].decode(errors="replace")).parent)
 
     def steam_client_txt(self, home: Path | None = None) -> Path | None:
         """Client.txt aus den Steam-Bibliotheken, wenn das Spiel gerade nicht läuft."""
