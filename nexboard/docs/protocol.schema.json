@@ -607,7 +607,7 @@
             "maxLength": 240,
             "type": "string"
           },
-          "maxItems": 6,
+          "maxItems": 5,
           "title": "Lines",
           "type": "array"
         },

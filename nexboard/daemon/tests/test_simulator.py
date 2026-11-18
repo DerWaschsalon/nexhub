@@ -37,7 +37,6 @@ STATE = {
         "• follow wall, #ff00ff find 2# #CC99FF exits:#",
         "  - if #CC99FF cavern of wrath #first: #8AB3FF in/out# for #8AB3FF WP#",
         "  - else: set #8AB3FF TP# || enter #CC99FF cavern#, #8AB3FF WP# to #8AB3FF town#",
-        "• #FF00FF buy gems:# frostblink, holy flame totem",
         "• (enter #8AB3FF TP#,) enter #FEC076 Ship Graveyard Cave#"]},
 }
 
