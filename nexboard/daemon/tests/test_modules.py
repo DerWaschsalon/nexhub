@@ -20,7 +20,8 @@ def test_dependency_graph(tmp_path):
     assert m.requirements("aion2.radar") == {"aion2.schedule"}  # Feldbosse stehen unter Termine
     assert m.requirements("aion2.plugins") == {"aion2.overlay", "aion2.dps"}
     assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.plugins", "aion2.runs", "aion2.schedule",
-                       "aion2.radar", "hub", "updates"]
+                       "aion2.radar", "poe1.client", "poe1.leveling", "hub", "updates"]
+    assert m.requirements("poe1.leveling") == {"poe1.client"}
     for mid, info in m.infos.items():
         assert all(r in m.infos for r in info.requires), mid
 

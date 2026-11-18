@@ -10,10 +10,10 @@ import { LABEL_MAX, SCREEN_H, SCREEN_W } from "../nexproto.js";
 const W = SCREEN_W, H = SCREEN_H, PAD = 8, GAP = 8;
 const STYLES = { default: "#ffffff", accent: null, danger: "#ff453a", success: "#30d158", warning: "#ff9f0a" };
 const STYLE_NAMES = { default: "Standard", accent: "Akzent", danger: "Rot", success: "Grün", warning: "Orange" };
-const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter", claude: "Claude-Nutzung" };
+const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter", claude: "Claude-Nutzung", guide: "Leveling-Guide" };
 // Icon für Kacheln ohne eigenes Icon (Liste im Editor)
-const TYPE_ICONS = { media: "music", dps: "flash", claude: "chart-bar" };
-const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active", "claude"];
+const TYPE_ICONS = { media: "music", dps: "flash", claude: "chart-bar", guide: "format-list-bulleted" };
+const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active", "claude", "guide"];
 const EXTRA_NAMES = { pct: "Anteil in %", dmg: "Gesamtschaden", none: "nichts" };
 // Vorschau im Bearbeiten-Modus, solange das Meter nichts liefert
 const DPS_DEMO = { target: "Beispiel-Boss", time: 92, hp: 37.4, rows: [
@@ -41,6 +41,7 @@ const TEMPLATES = [
   { name: "Seite wechseln", icon: "chevron-right", item: { label: "Mehr", icon: "chevron-right", nav: "" } },
   { name: "AION 2 DPS-Meter", icon: "flash", item: { type: "dps" }, needs: "aion2.dps" },
   { name: "Claude-Nutzung", icon: "chart-bar", item: { type: "claude", w: 2 } },
+  { name: "PoE Leveling-Guide", icon: "gamepad-variant", item: { type: "guide" }, needs: "poe1.leveling" },
 ];
 
 const ACTION_FIELDS = {
@@ -184,6 +185,9 @@ function renderTile(it, b, idx) {
     }
     t.append(m);
     t.addEventListener("click", () => onTileClick(it, idx));
+  } else if (type === "guide") {
+    t.append(renderGuide(it));
+    t.addEventListener("click", () => D.mode === "edit" && select(idx));
   } else if (type === "dps" || type === "claude") {
     t.append(type === "dps" ? renderDps(it, b) : renderClaude(b));
     t.addEventListener("click", () => D.mode === "edit" && select(idx));
@@ -240,6 +244,34 @@ function renderClaude(b) {
       b.w >= 260 ? el("span", { class: "x", text: r?.reset || "" }) : null));
   });
   return box;
+}
+
+/** LVGL-Farbbefehle („#FEC076 Zone#“) als farbige Stücke, wie die Guide-Kachel sie zeichnet. */
+function recolor(text) {
+  const out = [];
+  const re = /#([0-9a-fA-F]{6}) ([^#]*)#/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    out.push(el("span", { style: `color:#${m[1]}`, text: m[2] }));
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+// wie build_guide in shared-ui/src/ui.c
+function renderGuide(it) {
+  const gd = S.state.guide;
+  const part = (name, gl) => el("span", { class: "mini", text: g(gl), onclick: (e) => {
+    if (D.mode === "test") { e.stopPropagation(); sendEvent({ event: "button_press", item: it.id, part: name }); }
+  } });
+  const msg = !gd ? (modOn("poe1.leveling") ? "Warte auf den Guide …" : "Modul „Leveling-Guide“ ist aus") : gd.msg;
+  return el("div", { class: "guide" },
+    el("div", { class: "hd" }, el("span", { class: "h", text: gd?.head || "Leveling-Guide" }), el("span", { class: "st", text: gd?.step || "" }),
+      part("back", "chevron-left"), part("next", "chevron-right")),
+    el("div", { class: "body" }, (gd?.lines || []).map((line) => el("div", {}, recolor(line)))),
+    msg ? el("div", { class: "msg", text: msg }) : null);
 }
 
 function onTileClick(it, idx) {
@@ -412,7 +444,7 @@ function renderItemList() {
 function addItem(template) {
   const item = structuredClone(template);
   item.id = uniqueId((item.label || item.type || "item").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "item", allItemIds());
-  if (item.type === "dps") {
+  if (item.type === "dps" || item.type === "guide") {
     // ganze Seite; w/h werden ohnehin auf das Raster begrenzt
     const p = curPage();
     if ((p.cols || 6) > 1) item.w = p.cols || 6;
@@ -478,6 +510,11 @@ function renderProps() {
     fill(box, ...parts);
     return;
   }
+  if (type === "guide") {
+    parts.push(el("p", { class: "hint small", style: "margin-top:14px", text: "Zeigt den aktuellen Schritt des Leveling-Guides (Modul „PoE 1 · Leveling-Guide“): links zurück, rechts weiter, rechts lange halten springt zur Zone, in der du gerade stehst." }));
+    fill(box, ...parts);
+    return;
+  }
   if (type === "claude") {
     parts.push(el("p", { class: "hint small", style: "margin-top:14px", text: "Zeigt die Auslastung deines Claude-Abos (5-Stunden-Sitzung und Woche) wie /usage in Claude Code. Der Daemon liest dafür die Anmeldung von Claude Code auf diesem Rechner und fragt alle 5 Minuten nach." }));
     fill(box, ...parts);
@@ -536,7 +573,7 @@ function changeType(it, v) {
   if (v !== "slider") { delete it.mute_bind; delete it.min; delete it.max; }
   if (v !== "button") delete it.nav;
   if (v === "media") { delete it.icon; delete it.label; if (!it.h) it.h = 2; if (!it.w) it.w = 2; }
-  if (v === "dps" || v === "claude") { delete it.icon; delete it.label; delete it.style; delete it.action; delete it.long_action; }
+  if (v === "dps" || v === "claude" || v === "guide") { delete it.icon; delete it.label; delete it.style; delete it.action; delete it.long_action; }
   if (v !== "dps") { delete it.players; delete it.extra; }
 }
 

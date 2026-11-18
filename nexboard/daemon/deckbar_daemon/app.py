@@ -36,6 +36,8 @@ from .modules.dps import DpsModule
 from .modules.hub import HubModule
 from .modules.overlay import OverlayModule
 from .modules.plugins import PluginsModule
+from .modules.poe_client import PoeClientModule
+from .modules.poe_leveling import PoeLevelingModule
 from .modules.radar import RadarModule
 from .modules.runs import RunsModule
 from .modules.schedule import ScheduleModule
@@ -73,6 +75,7 @@ class NexBoard:
         self.bar = DeckModule(ctx, self.live, lambda: self.settings, self.state, config_dir, WEB_DIR,
                               mdns and settings.mdns)
         self.radar_module = RadarModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture))
+        poe1 = PoeClientModule(ctx, self.live, config_dir)
         # Reihenfolge = Start- und Anzeigereihenfolge
         self.web_modules: list[WebModule] = [
             self.bar,
@@ -82,6 +85,8 @@ class NexBoard:
             RunsModule(ctx, self.live, self.runs, self.state),
             ScheduleModule(ctx, self.live, Schedule(config_dir)),
             self.radar_module,
+            poe1,
+            PoeLevelingModule(ctx, self.live, self.state, poe1.session, config_dir),
             HubModule(ctx, self.live, self.hub),
             UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json")),
         ]

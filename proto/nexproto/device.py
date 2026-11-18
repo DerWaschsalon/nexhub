@@ -32,13 +32,16 @@ BIN_CHUNK_BYTES = 12000  # Rohdaten je Binärframe
 BIN_HEADER_BYTES = 27  # "DB", Art, id (16), w, h, y, rows
 DPS_MAX_ROWS = 8
 DPS_DEFAULT_PLAYERS = 5
+# Guide-Kachel (Leveling-Guide): so viele Zeilen zeigt sie, so lang darf eine Zeile samt Farbbefehlen sein
+GUIDE_MAX_LINES = 6
+GUIDE_LINE_MAX = 240
 LONG_PRESS_MS = 600
 SLIDER_EVENTS_PER_S = 20
 
 Id = Annotated[str, Field(pattern=rf"^[A-Za-z0-9_-]{{1,{ID_MAX}}}$")]
 ImageId = Annotated[str, Field(max_length=IMAGE_ID_MAX)]
 Style = Literal["default", "accent", "danger", "success", "warning"]
-ItemType = Literal["button", "toggle", "slider", "media", "dps", "claude"]
+ItemType = Literal["button", "toggle", "slider", "media", "dps", "claude", "guide"]
 ClassKey = Literal[CLASS_KEYS]  # type: ignore[valid-type]
 
 
@@ -220,6 +223,16 @@ class ClaudeUsage(BaseModel):
     week: UsageLimit | None = None
 
 
+class Guide(BaseModel):
+    """Aktueller Schritt eines Leveling-Guides. Zeilen tragen Farbbefehle von LVGL („#FEC076 Zone#“),
+    der Daemon färbt, die Kachel zeigt nur an."""
+    head: str = Field("", max_length=LABEL_MAX * 3)  # Akt · Stufe · XP
+    step: str = Field("", max_length=LABEL_MAX)  # z. B. „12/222“
+    lines: list[Annotated[str, Field(max_length=GUIDE_LINE_MAX)]] = Field(default_factory=list,
+                                                                           max_length=GUIDE_MAX_LINES)
+    msg: str = Field("", max_length=LABEL_MAX * 2)  # kurzer Hinweis, z. B. „Ende des Guides“
+
+
 class StateValues(BaseModel):
     """Bekannte Schlüssel; eigene (z. B. aus Shell-Statusbefehlen) sind erlaubt."""
     model_config = ConfigDict(extra="allow")
@@ -232,6 +245,7 @@ class StateValues(BaseModel):
     dps: Dps | None = None
     dps_active: bool | None = None
     claude: ClaudeUsage | None = None
+    guide: Guide | None = None
 
 
 class State(_Message):

@@ -13,6 +13,8 @@ import runs from "./modules/aion2-runs.js";
 import radar from "./modules/aion2-radar.js";
 import schedule from "./modules/aion2-schedule.js";
 import plugins from "./modules/aion2-plugins.js";
+import poe1Client from "./modules/poe1-client.js";
+import poe1Leveling from "./modules/poe1-leveling.js";
 import hub from "./modules/hub.js";
 import updates from "./modules/updates.js";
 
@@ -21,7 +23,7 @@ export const BRAND = "NexBoard";
 // Kampfdaten, Plugins)
 const UI = {
   "aion2.overlay": overlay, "aion2.radar": radar, "aion2.schedule": schedule, "aion2.dps": dps, "aion2.plugins": plugins,
-  deck, "aion2.runs": runs, hub, updates,
+  "poe1.leveling": poe1Leveling, "poe1.client": poe1Client, deck, "aion2.runs": runs, hub, updates,
 };
 // Seiten-ID → { page, mid }; die erste Seite eines Moduls trägt meist seine ID
 const PAGES = new Map(Object.entries(UI).flatMap(([mid, ui]) => ui.pages.map((page) => [page.id, { page, mid }])));

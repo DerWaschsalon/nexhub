@@ -19,6 +19,7 @@ DEFAULTS: dict[str, Any] = {
     "dps": None,  # AION 2, siehe dps.py
     "dps_active": False,
     "claude": None,  # Claude-Nutzung, siehe claude.py
+    "guide": None,  # Leveling-Guide (PoE), siehe poe/leveling
 }
 
 

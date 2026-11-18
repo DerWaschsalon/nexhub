@@ -143,6 +143,7 @@ Items, die nicht mehr passen, werden nicht angezeigt.
 | `media`  | Titel/Interpret aus `state.track`, ab h ≥ 2 mit ⏮ ⏯ ⏭ | `button_press` (+ `part`)    |
 | `dps`    | DPS-Rangliste aus `state.dps` (AION 2), Balken in Klassenfarbe, ab h ≥ 2 Reset-Knopf mittig in der Kopfzeile | `button_press` (`part: reset`) |
 | `claude` | Auslastung des Claude-Abos aus `state.claude`: Balken „5 h“ und „Woche“, ab h ≥ 2 mit Zeit bis zum Zurücksetzen | –                     |
+| `guide`  | Schritt eines Leveling-Guides aus `state.guide`: Kopfzeile, Schritt, Knöpfe ‹ ›, darunter die farbigen Zeilen | `button_press` (`part: back`/`next`), `long_press` (`part: next`) |
 
 **Felder**
 
@@ -190,6 +191,7 @@ Eigene Schlüssel sind erlaubt (z. B. aus Shell-Statusbefehlen) und lassen sich 
 | `dps`         | object\|null | A2Tools DPS Meter (Stream-Overlay), siehe unten |
 | `dps_active`  | bool         | gerade Schaden im Kampf                 |
 | `claude`      | object\|null | Claude-Nutzung, nur solange das Layout eine `claude`-Kachel hat |
+| `guide`       | object\|null | Leveling-Guide (PoE), `null` = Modul aus |
 
 `dps` ist `null`, solange keine Verbindung zum Meter besteht, sonst:
 
@@ -209,6 +211,15 @@ schon als Text für die Anzeige.
 
 ```json
 {"session":{"pct":42,"reset":"14:00"},"week":{"pct":91,"reset":"Fr 02:00"}}
+```
+
+`guide`: `head` = Akt · Stufe · XP, `step` = „12/231“, `msg` = kurzer Hinweis (leer = keiner), `lines` =
+höchstens `GUIDE_MAX_LINES` Zeilen à `GUIDE_LINE_MAX` Zeichen mit Farbbefehlen von LVGL (`#RRGGBB Text#`).
+Die Kachel zeigt sie nur an; Farben und Kürzel für Symbole („WP“, „NE“) setzt der Daemon.
+
+```json
+{"head":"A1 · Lv 6 · XP 100 %","step":"4/231","msg":"",
+ "lines":["• follow streams for #00FF00 3 glyphs#","• enter #FEC076 Submerged Passage#"]}
 ```
 
 ### `art`

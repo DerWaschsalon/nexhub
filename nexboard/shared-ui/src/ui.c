@@ -30,7 +30,7 @@
  * aufgefüllt), w, h, y, rows (je uint16 little endian), dann rows*w*2 Byte RGB565 */
 #define IMAGE_ID_LEN (DECKBAR_IMAGE_ID_MAX + 1)
 
-typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS, IT_CLAUDE } it_type_t;
+typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS, IT_CLAUDE, IT_GUIDE } it_type_t;
 
 
 typedef struct {
@@ -74,6 +74,14 @@ typedef struct {
     usage_row_t rows[2];
 } claude_view_t;
 
+/* Guide-Kachel: Kopfzeile (Akt · Stufe · XP, Schritt, Knöpfe) und die Zeilen des aktuellen Schritts */
+typedef struct {
+    lv_obj_t *head;
+    lv_obj_t *step;
+    lv_obj_t *body; /* eine Beschriftung mit Farbbefehlen („#FEC076 Zone#“), Zeilen durch \n getrennt */
+    lv_obj_t *msg;
+} guide_view_t;
+
 typedef struct {
     char id[ID_LEN];
     it_type_t type;
@@ -98,6 +106,7 @@ typedef struct {
     bool flat;         /* Media: einzeiliges Layout, Text wird vertikal zentriert */
     dps_view_t *dps;   /* DPS-Kachel */
     claude_view_t *claude;
+    guide_view_t *guide;
 
     bool checked;
     bool muted;
@@ -660,6 +669,7 @@ static void media_update(tile_t *t)
 
 static void dps_update(tile_t *t);
 static void claude_update(tile_t *t);
+static void guide_update(tile_t *t);
 
 static void apply_state_key(const char *key, const cJSON *val)
 {
@@ -677,6 +687,10 @@ static void apply_state_key(const char *key, const cJSON *val)
         }
         if (t->type == IT_CLAUDE) {
             if (!strcmp(key, "claude")) claude_update(t);
+            continue;
+        }
+        if (t->type == IT_GUIDE) {
+            if (!strcmp(key, "guide")) guide_update(t);
             continue;
         }
         if (t->bind[0] && !strcmp(t->bind, key)) {
@@ -704,6 +718,7 @@ static void apply_full_state(void)
         if (ui.tiles[i].type == IT_MEDIA) media_update(&ui.tiles[i]);
         if (ui.tiles[i].type == IT_DPS) dps_update(&ui.tiles[i]);
         if (ui.tiles[i].type == IT_CLAUDE) claude_update(&ui.tiles[i]);
+        if (ui.tiles[i].type == IT_GUIDE) guide_update(&ui.tiles[i]);
     }
 }
 
@@ -1325,6 +1340,93 @@ static void build_claude(tile_t *t, int32_t w, int32_t h)
     claude_update(t);
 }
 
+/* Lange auf „weiter“: Schnellvorlauf zur Zone, in der man gerade steht (Daemon: long_press, part next) */
+static void guide_long_cb(lv_event_t *e)
+{
+    tile_t *t = lv_event_get_user_data(e);
+    send_event("long_press", t->id, "next", NULL, -1);
+}
+
+static void guide_update(tile_t *t)
+{
+    guide_view_t *v = t->guide;
+    if (!v) return;
+    const cJSON *g = cJSON_GetObjectItemCaseSensitive(ui.state, "guide");
+    if (!cJSON_IsObject(g)) {
+        set_text(v->head, "Leveling-Guide");
+        set_text(v->step, "");
+        set_text(v->body, "");
+        set_text(v->msg, "Modul „Leveling-Guide“ ist aus");
+        set_hidden(v->msg, false);
+        return;
+    }
+    const char *head = jstr(g, "head");
+    const char *step = jstr(g, "step");
+    const char *msg = jstr(g, "msg");
+    set_text(v->head, head && *head ? head : "Path of Exile");
+    set_text(v->step, step ? step : "");
+    /* Zeilen hintereinander; die Kachel kennt keine Zeilenobjekte, nur eine Beschriftung */
+    static char body[DECKBAR_GUIDE_MAX_LINES * (DECKBAR_GUIDE_LINE_MAX + 1) + 1];
+    size_t n = 0;
+    const cJSON *lines = cJSON_GetObjectItemCaseSensitive(g, "lines");
+    const cJSON *line;
+    body[0] = 0;
+    cJSON_ArrayForEach(line, lines) {
+        if (!cJSON_IsString(line)) continue;
+        n += (size_t)snprintf(body + n, sizeof body - n, "%s%s", n ? "\n" : "", line->valuestring);
+        if (n >= sizeof body - 1) break;
+    }
+    set_text(v->body, body);
+    set_text(v->msg, msg ? msg : "");
+    set_hidden(v->msg, !(msg && *msg));
+}
+
+/*
+ * Guide-Kachel (Leveling-Guide für PoE)
+ *   Kopfzeile: [Akt · Stufe · XP ........ 12/231  <  >]
+ *   darunter die Zeilen des Schritts, Farben vom Daemon; lange auf > = zur aktuellen Zone springen
+ */
+static void build_guide(tile_t *t, int32_t w, int32_t h)
+{
+    lv_obj_t *o = t->obj;
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    guide_view_t *v = lv_malloc_zeroed(sizeof *v);
+    if (!v) return;
+    t->guide = v;
+
+    const int32_t px = 10, btn = 34, gap = 6, head_h = btn + 6, step_w = 64;
+    lv_obj_t *next = mini_button(o, t, deckbar_icon_glyph("chevron-right"), "next", btn);
+    lv_obj_t *next_btn = lv_obj_get_parent(next);
+    lv_obj_align(next_btn, LV_ALIGN_TOP_RIGHT, -px + 4, 4);
+    lv_obj_add_event_cb(next_btn, guide_long_cb, LV_EVENT_LONG_PRESSED, t);
+    lv_obj_t *back = mini_button(o, t, deckbar_icon_glyph("chevron-left"), "back", btn);
+    lv_obj_align_to(lv_obj_get_parent(back), next_btn, LV_ALIGN_OUT_LEFT_MID, -gap, 0);
+
+    /* feste Breite: ausgerichtet wird beim Aufbau, der Text („12/231“) kommt erst danach */
+    v->step = text_label(o, &db_font_small, "");
+    lv_obj_add_style(v->step, &db_theme.text_dim, 0);
+    lv_obj_set_width(v->step, step_w);
+    lv_obj_set_style_text_align(v->step, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_align_to(v->step, lv_obj_get_parent(back), LV_ALIGN_OUT_LEFT_MID, -gap, 0);
+
+    v->head = text_label(o, &db_font_small, "");
+    lv_obj_add_style(v->head, &db_theme.text_dim, 0);
+    lv_label_set_long_mode(v->head, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(v->head, LV_MAX(w - 2 * px - 2 * btn - step_w - 3 * gap, 40));
+    lv_obj_set_pos(v->head, px, (head_h - lv_font_get_line_height(&db_font_small)) / 2);
+
+    v->body = text_label(o, &db_font_label, "");
+    lv_label_set_recolor(v->body, true);
+    lv_label_set_long_mode(v->body, LV_LABEL_LONG_CLIP);
+    lv_obj_set_size(v->body, w - 2 * px, LV_MAX(h - head_h - 6, 20));
+    lv_obj_set_pos(v->body, px, head_h);
+
+    v->msg = text_label(o, &db_font_small, "");
+    lv_obj_set_style_text_color(v->msg, db_theme_color(DB_STYLE_WARNING), 0);
+    lv_obj_align(v->msg, LV_ALIGN_BOTTOM_RIGHT, -px, -6);
+    guide_update(t);
+}
+
 /* ======================================================================= Seiten */
 
 static void update_dots(void)
@@ -1406,6 +1508,7 @@ static void free_tiles(void)
         if (t->timer) lv_timer_delete(t->timer);
         lv_free(t->dps);
         lv_free(t->claude);
+        lv_free(t->guide);
     }
     lv_free(ui.tiles);
     ui.tiles = NULL;
@@ -1419,6 +1522,7 @@ static it_type_t parse_type(const char *s)
     if (s && !strcmp(s, "media")) return IT_MEDIA;
     if (s && !strcmp(s, "dps")) return IT_DPS;
     if (s && !strcmp(s, "claude")) return IT_CLAUDE;
+    if (s && !strcmp(s, "guide")) return IT_GUIDE;
     return IT_BUTTON;
 }
 
@@ -1490,6 +1594,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         case IT_MEDIA: build_media(t, pw, ph); break;
         case IT_DPS: build_dps(t, pw, ph, jint(ji, "players", DECKBAR_DPS_DEFAULT_PLAYERS), jstr(ji, "extra")); break;
         case IT_CLAUDE: build_claude(t, pw, ph); break;
+        case IT_GUIDE: build_guide(t, pw, ph); break;
         default: build_button(t, pw, ph, jstr(ji, "label")); break;
         }
     }

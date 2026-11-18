@@ -45,3 +45,7 @@ pages:
     items:
       - {id: c1, type: claude, w: 3, h: 2}
       - {id: c2, type: claude, w: 2}
+
+  - id: guide
+    items:
+      - {id: g1, type: guide, w: 6, h: 2}

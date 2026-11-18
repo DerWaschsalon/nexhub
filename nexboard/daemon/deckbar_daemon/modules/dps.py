@@ -9,7 +9,7 @@ from nexcore.settings import SettingsStore
 
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
-from ..core.topics import DPS_RESET
+from ..core.topics import TILE_EVENT, TileEvent
 from ..dps import STATUS_TEXT, DpsFeed
 from ..overlay_layout import WidgetOption, WidgetSpec
 from ..state import State
@@ -37,7 +37,7 @@ class DpsModule(WebModule):
         self.dps = dps
         self.state = state
         dps.status_listeners.append(self.changed)
-        ctx.bus.on(DPS_RESET, self.reset)  # auch ausgeschaltet: dann warnt reset() nur
+        ctx.bus.on(TILE_EVENT, self.on_tile)  # auch ausgeschaltet: dann warnt reset() nur
 
     def ui_info(self) -> dict[str, Any]:
         return self.dps.info()
@@ -59,7 +59,11 @@ class DpsModule(WebModule):
         self.state.update(dps=None, dps_active=False)
         await self.changed()
 
-    async def reset(self, _: object = None) -> None:
+    async def on_tile(self, event: TileEvent) -> None:
+        if event.item_type == "dps" and event.event == "button_press" and event.part == "reset":
+            await self.reset()
+
+    async def reset(self) -> None:
         """Reset-Knopf der DPS-Kachel: wie der Reset im Meter (Kampf speichern, neu zählen)."""
         if self.dps.settings.source != "capture":
             self.log.warning("DPS-Reset geht nur mit eigenem Mitschnitt (Quelle %s)", self.dps.settings.source)
