@@ -16,7 +16,7 @@ from nexcore import EventBus
 from nexcore.gamewatch import GameWatch
 
 from ..core.topics import POE_LOG
-from .client_log import ClientLog, LevelUp, LogEvent, ZoneEntered
+from .client_log import ClientLog, LevelUp, LogEvent, LoginScreen, ZoneEntered
 from .games import PoeGame, RunningGame
 
 log = logging.getLogger("nexboard.poe")
@@ -86,7 +86,7 @@ class PoeSession:
                 return
             log.info("%s: lese %s", self.game.name, path)
             self.log = ClientLog(path)
-            events = self.log.open()
+            events = await asyncio.to_thread(self.log.open)  # bis 32 MB: nicht im Ereignis-Takt lesen
         else:
             events = self.log.read_new()
         for event in events:
@@ -95,6 +95,8 @@ class PoeSession:
     async def _publish(self, event: LogEvent) -> None:
         if isinstance(event, ZoneEntered):
             self.zone = event
+        elif isinstance(event, LoginScreen):
+            self.zone = None
         else:
             self.levels.pop(event.character, None)  # ans Ende: die Reihenfolge sagt, wer zuletzt aufstieg
             self.levels[event.character] = event

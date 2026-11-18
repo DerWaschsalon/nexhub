@@ -39,10 +39,11 @@ def _read(name: str) -> Any:
 
 
 def _areas(acts: list[list[dict[str, Any]]]) -> dict[str, Area]:
-    out = {}
+    out: dict[str, Area] = {}
     for act, areas in enumerate(acts, start=1):
         for area in areas:
-            out[area["id"].lower()] = Area(area["name"], act, area.get("map_name", ""))
+            # erster Treffer gilt wie im Original: Labyrinth_Airlock steht in Akt 3, 4, 7 und 10 und zählt als Akt 3
+            out.setdefault(area["id"].lower(), Area(area["name"], act, area.get("map_name", "")))
     return out
 
 

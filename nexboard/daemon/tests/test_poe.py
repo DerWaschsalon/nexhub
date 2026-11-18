@@ -3,15 +3,19 @@ import base64
 import zlib
 from pathlib import Path, PureWindowsPath
 
-from deckbar_daemon.poe.client_log import ClientLog, LevelUp, ZoneEntered, parse_line
+from nexcore.settings import SettingsStore
+
+from deckbar_daemon.poe.client_log import ClientLog, LevelUp, LoginScreen, ZoneEntered, parse_line
 from deckbar_daemon.poe.games import POE1, POE2, linux_path, steam_libraries
 from deckbar_daemon.poe.leveling import pob
 from deckbar_daemon.poe.leveling.data import default_guide, load
 from deckbar_daemon.poe.leveling.device_view import device_line
 from deckbar_daemon.poe.leveling.experience import experience
 from deckbar_daemon.poe.leveling.guide import GuideBuilder
+from deckbar_daemon.poe.leveling.leveling import Leveling
 from deckbar_daemon.poe.leveling.markup import AREA_COLOR, KILL_COLOR, PageRenderer, Where
 from deckbar_daemon.poe.leveling.search import gem_search
+from deckbar_daemon.poe.leveling.settings import LevelingSettings
 from deckbar_daemon.poe.leveling.terms import Options, Page
 from deckbar_daemon.poe.leveling.tracker import Tracker
 
@@ -19,6 +23,11 @@ POE1_EXE = rb"Z:\home\x\.local\share\Steam\steamapps\common\Path of Exile\PathOf
 POE2_EXE = rb"Z:\games\Path of Exile 2\PathOfExileSteam.exe" + b"\0"
 ZONE = '2026/11/18 20:49:39 4433661 1186a803 [DEBUG Client 308] Generating level 2 area "1_1_2" with seed 27'
 LEVEL = "2026/11/18 20:52:28 4602289 cffb06be [INFO Client 308] : Hero (Marauder) is now level 3"
+
+
+def leveling(tmp_path: Path, state: Path | None = None) -> Leveling:
+    store = SettingsStore(tmp_path / "poe1.leveling.yaml", LevelingSettings)
+    return Leveling(store, state or tmp_path / "leveling.json")
 
 
 def build(char_class: str, *gems: tuple[str, bool]) -> pob.PobBuild:
@@ -161,3 +170,53 @@ async def test_session_reads_last_state_without_game(tmp_path):
     await session._follow()
     assert session.zone == ZoneEntered("1_1_2", 2, live=False) and "Hero" in session.levels
     assert [m.event for m in seen] == [LevelUp("Hero", "Marauder", 3, live=False), session.zone]
+
+
+# ---------------------------------------------------------------- Abgleich mit Exile-UI (Prüfung 18.11.)
+def test_only_game_lines_count():
+    assert parse_line("2026/11/18 1 a [INFO Client 308] @From Joe: Hero (Witch) is now level 90") is None
+    assert parse_line("2026/11/18 1 a [INFO Client 308] Connected to ams.login.pathofexile.com in 34ms.") \
+        == LoginScreen()
+    assert parse_line("2026/11/18 1 a [INFO Client 308] Async connecting to ams.login.pathofexile.com") is None
+    assert parse_line("2026/11/18 1 a [INFO Client 308] : Hero is a level 84 Berserker in the Standard league.") \
+        == LevelUp("Hero", "Berserker", 84)
+
+
+def test_act_first_match_and_sticky(tmp_path):
+    assert load().act_of("Labyrinth_Airlock") == 3  # steht in Akt 3, 4, 7 und 10; das Original nimmt den ersten
+    lv = leveling(tmp_path)
+    lv.on_zone(ZoneEntered("1_3_town", 30, live=False))
+    lv.on_zone(ZoneEntered("HideoutForest", 60, live=False))
+    assert lv.act == 3 and lv.device()["head"].startswith("A3")
+    lv.on_login()
+    assert lv.zone is None and lv.act == 3
+
+
+def test_party_level_ups_do_not_count_and_new_character_is_tracked(tmp_path):
+    lv = leveling(tmp_path)
+    lv.on_level(LevelUp("Mate", "Ranger", 40))
+    assert lv.level() is None and lv.character == ""  # Mitspieler: lieber keine Stufe als eine falsche
+    lv.command("next")
+    lv.on_zone(ZoneEntered("1_1_1", 1))
+    lv.on_level(LevelUp("Neu", "Witch", 2))
+    assert lv.character == "Neu" and lv.level().level == 2
+    assert lv.tracker.progress == 1  # Stand ohne Charakter gehört jetzt „Neu“
+    lv.on_level(LevelUp("Mate", "Ranger", 41))
+    assert lv.character == "Neu"
+
+
+def test_switch_to_known_character_and_old_state_file(tmp_path):
+    state = tmp_path / "leveling.json"
+    state.write_text('{"progress": 2}')  # Format vom 18.11. (ein Fortschritt für alle)
+    lv = leveling(tmp_path, state)
+    assert lv.tracker.progress == 2
+    lv.select("Main")
+    lv.select("Twink")
+    assert lv.tracker.progress == 0
+    lv.command("next")
+    lv.on_level(LevelUp("Main", "Witch", 30, live=False))  # Main steigt auf: man spielt Main
+    assert lv.character == "Main" and lv.tracker.progress == 2
+
+
+def test_experience_shows_levels_outside_safe_zone():
+    assert experience(10, 16).text() == "34 % (+3)" and experience(10, 4).text() == "34 % (-3)"

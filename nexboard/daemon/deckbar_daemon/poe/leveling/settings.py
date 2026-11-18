@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from nexcore.paths import atomic_write
-from nexcore.settings import ADVANCED
-from pydantic import BaseModel, Field, ValidationError
+from nexcore.settings import ADVANCED, HIDDEN
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from ...config import ID, _Strict
 from .pob import PobBuild
@@ -28,8 +28,9 @@ class LevelingSettings(_Strict):
     page: ID | None = Field("poe", title="Seite auf der Leiste",
                             description="Läuft PoE und ist der Guide nicht zu Ende, zeigt die Leiste diese Seite",
                             json_schema_extra={"choices": "pages"})
-    character: str = Field("", max_length=32, title="Charakter",
-                           description="Leer = wer zuletzt aufgestiegen ist (laut Client.txt)")
+    # Auswahl steht in der Build-Karte (Liste aus dem Log); leer = der nächste neue Charakter, der in
+    # Twilight Strand aufsteigt (Mitspieler zählen nicht)
+    character: str = Field("", max_length=32, json_schema_extra=HIDDEN)
     league_start: bool = Field(False, title="Ligastart",
                                description="Schritte für einen frischen Start ohne Ausrüstung (Quicksilver, Wegpunkte)")
     bandit: Literal["none", "alira", "kraityn", "oak"] = Field(
@@ -50,11 +51,26 @@ class LevelingSettings(_Strict):
                        level_hints=self.level_hints)
 
 
-class LevelingState(BaseModel):
+class CharacterState(BaseModel):
+    """Stand eines Charakters (wie ein Profil im Original): wo im Guide, welcher Build."""
     progress: int = Field(0, ge=0)
     build: PobBuild | None = None
     gem_sources: dict[str, int] = Field(default_factory=dict)  # Gem → Akt, in dem es gekauft wird
+
+
+class LevelingState(BaseModel):
+    characters: dict[str, CharacterState] = Field(default_factory=dict)  # "" = noch kein Charakter bekannt
     custom_guide: list[Any] | None = None  # eigener Guide (Exile-UI-Format: Liste der Akte), None = mitgelieferter
+
+    @model_validator(mode="before")
+    @classmethod
+    def _one_character(cls, data: Any) -> Any:
+        """Stand vom 18.11.2026 (ein Fortschritt für alle) wird zum Stand ohne Charakter."""
+        if isinstance(data, dict) and "progress" in data:
+            data = dict(data)
+            old = {key: data.pop(key) for key in ("progress", "build", "gem_sources") if key in data}
+            data.setdefault("characters", {})[""] = old
+        return data
 
 
 class StateFile:
@@ -74,3 +90,18 @@ class StateFile:
     def save(self, **changes: Any) -> None:
         self.value = self.value.model_copy(update=changes)
         atomic_write(self.path, self.value.model_dump_json(exclude_none=True))
+
+    def character(self, name: str) -> CharacterState:
+        return self.value.characters.get(name) or CharacterState.model_validate({})
+
+    def save_character(self, name: str, **changes: Any) -> None:
+        characters = dict(self.value.characters)
+        characters[name] = self.character(name).model_copy(update=changes)
+        self.save(characters=characters)
+
+    def adopt_unnamed(self, name: str) -> None:
+        """Der erste Charakter übernimmt, was ohne Charakter eingerichtet wurde (Build, Fortschritt)."""
+        characters = dict(self.value.characters)
+        if name and name not in characters and "" in characters:
+            characters[name] = characters.pop("")
+            self.save(characters=characters)
