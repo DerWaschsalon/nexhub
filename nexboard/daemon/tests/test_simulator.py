@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 from aiohttp import WSMsgType, web
+from nexproto.device import guide_icon
 from PIL import Image
 
 from deckbar_daemon.config import Layout, device_message, load_layout
@@ -34,10 +35,10 @@ STATE = {
                                  "cleric", "spiritmaster"])]},
     "claude": {"session": {"pct": 42, "reset": "in 2 h"}, "week": {"pct": 91, "reset": "Fr 02:00"}},
     "guide": {"head": "A1 · Lv 9 · XP 100 %", "step": "18/231", "msg": "", "lines": [
-        "• follow wall, #ff00ff find 2# #CC99FF exits:#",
-        "  - if #CC99FF cavern of wrath #first: #8AB3FF in/out# for #8AB3FF WP#",
-        "  - else: set #8AB3FF TP# || enter #CC99FF cavern#, #8AB3FF WP# to #8AB3FF town#",
-        "• (enter #8AB3FF TP#,) enter #FEC076 Ship Graveyard Cave#"]},
+        f"• follow wall {guide_icon('1')}, #ff00ff find 2# #CC99FF exits:#",
+        f"  - if #CC99FF cavern of wrath #first: {guide_icon('in-out2')} for {guide_icon('waypoint')}",
+        f"  - else: set {guide_icon('portal')} || enter #CC99FF cavern#, {guide_icon('waypoint')} to {guide_icon('town')}",
+        f"• (enter {guide_icon('portal')},) enter #FEC076 Ship Graveyard Cave# {guide_icon('quest')}"]},
 }
 
 

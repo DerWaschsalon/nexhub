@@ -1381,6 +1381,28 @@ static void guide_update(tile_t *t)
     set_hidden(v->msg, !(msg && *msg));
 }
 
+/* Guide-Symbole (Zeichen ab U+E000) als Bilder; Schrift einmal anlegen, alle Guide-Kacheln teilen sie */
+static const void *guide_icon_cb(const lv_font_t *font, uint32_t unicode, uint32_t unicode_next,
+                                 int32_t *offset_y, void *user_data)
+{
+    LV_UNUSED(font); LV_UNUSED(unicode_next); LV_UNUSED(user_data);
+    uint32_t i = unicode - DECKBAR_GUIDE_ICON_FIRST;  /* darunter läuft es über und fällt raus */
+    if (i >= DECKBAR_GUIDE_ICON_COUNT) return NULL;
+    /* mittig in der Zeile statt mit der Unterkante auf der Grundlinie */
+    *offset_y = (lv_font_get_line_height(&db_font_title) - DECKBAR_GUIDE_ICON_HEIGHT) / 2 - db_font_title.base_line;
+    return deckbar_guide_icons[i];
+}
+
+static const lv_font_t *guide_font(void)
+{
+    static lv_font_t font;
+    if (!font.get_glyph_dsc) {
+        font = db_font_title;
+        font.fallback = lv_imgfont_create(DECKBAR_GUIDE_ICON_HEIGHT, guide_icon_cb, NULL);
+    }
+    return &font;
+}
+
 /*
  * Guide-Kachel (Leveling-Guide für PoE)
  *   Kopfzeile: [Akt · Stufe · XP ........ 12/231  <  >]
@@ -1416,7 +1438,7 @@ static void build_guide(tile_t *t, int32_t w, int32_t h)
     lv_obj_set_width(v->head, LV_MAX(w - 2 * px - 2 * btn - step_w - 3 * gap, 40));
     lv_obj_set_pos(v->head, px, (head_h - lv_font_get_line_height(&db_font_label)) / 2);
 
-    v->body = text_label(o, &db_font_title, "");
+    v->body = text_label(o, guide_font(), "");
     lv_label_set_recolor(v->body, true);
     lv_label_set_long_mode(v->body, LV_LABEL_LONG_CLIP);
     lv_obj_set_size(v->body, w - 2 * px, LV_MAX(h - head_h - 2, 20));

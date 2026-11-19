@@ -12,6 +12,7 @@ add_library(deckbar_ui STATIC
     fonts/db_icons_28.c
     fonts/db_icons_40.c
     assets/bg_default.c
+    assets/guide_icons.c
     third_party/cJSON.c
 )
 target_include_directories(deckbar_ui PUBLIC include third_party)
