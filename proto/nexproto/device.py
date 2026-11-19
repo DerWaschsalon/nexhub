@@ -35,8 +35,20 @@ DPS_DEFAULT_PLAYERS = 5
 # Guide-Kachel (Leveling-Guide): so viele Zeilen zeigt sie, so lang darf eine Zeile samt Farbbefehlen sein
 GUIDE_MAX_LINES = 5  # mehr passen in großer Schrift nicht auf die Kachel
 GUIDE_LINE_MAX = 240
+# Symbole im Guide-Text: Zeichen ab U+E000 (privater Bereich), die Kachel zeichnet dafür das Bild
+# gleichen Namens aus nexboard/daemon/deckbar_daemon/poe/leveling/data/icons (tools/gen_assets.py)
+GUIDE_ICONS = ("0", "1", "2", "3", "4", "5", "6", "7", "waypoint", "portal", "town", "hideout", "lab", "craft",
+               "in-out2", "skip", "quest", "arena", "help")
+GUIDE_ICON_FIRST = 0xE000
+GUIDE_ICON_HEIGHT = 20  # px, passend zur Schrift der Kachel (Inter 17)
 LONG_PRESS_MS = 600
 SLIDER_EVENTS_PER_S = 20
+
+
+def guide_icon(name: str) -> str:
+    """Das Zeichen für ein Guide-Symbol; leer, wenn es keins gibt."""
+    return chr(GUIDE_ICON_FIRST + GUIDE_ICONS.index(name)) if name in GUIDE_ICONS else ""
+
 
 Id = Annotated[str, Field(pattern=rf"^[A-Za-z0-9_-]{{1,{ID_MAX}}}$")]
 ImageId = Annotated[str, Field(max_length=IMAGE_ID_MAX)]

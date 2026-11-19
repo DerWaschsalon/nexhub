@@ -20,6 +20,9 @@ export const DPS_MAX_ROWS = 8;
 export const DPS_DEFAULT_PLAYERS = 5;
 export const GUIDE_MAX_LINES = 5;
 export const GUIDE_LINE_MAX = 240;
+export const GUIDE_ICON_FIRST = 57344;
+export const GUIDE_ICON_COUNT = 19;
+export const GUIDE_ICON_HEIGHT = 20;
 export const LONG_PRESS_MS = 600;
 export const SLIDER_EVENTS_PER_S = 20;
 

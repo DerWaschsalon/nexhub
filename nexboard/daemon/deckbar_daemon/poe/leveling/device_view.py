@@ -1,24 +1,17 @@
 """Der aktuelle Schritt als Inhalt der Guide-Kachel (nexproto.device.Guide).
 
-Die Kachel kann keine Bilder im Text; Symbole werden zu kurzen Marken („WP“, „NE“). Farben gehen als
-Farbbefehle von LVGL mit („#FEC076 The Coast#“), weiße Stücke ohne Befehl, das spart Platz.
+Symbole gehen als Zeichen ab U+E000 mit (nexproto.device.guide_icon), die Kachel zeichnet dafür das Bild.
+Farben gehen als Farbbefehle von LVGL mit („#FEC076 The Coast#“), weiße Stücke ohne Befehl, das spart Platz.
 """
 from __future__ import annotations
 
 import re
 
-from nexproto.device import GUIDE_LINE_MAX, GUIDE_MAX_LINES
+from nexproto.device import GUIDE_LINE_MAX, GUIDE_MAX_LINES, guide_icon
 
 from .markup import WHITE, Line, Rendered, Segment
 
-SYMBOL_COLOR = "8AB3FF"
 HINT_COLOR = "9AA0AA"
-# (img:…) → Marke; leer = Symbol entfällt (Text danach sagt schon genug)
-SYMBOLS = {
-    "0": "N", "1": "NE", "2": "E", "3": "SE", "4": "S", "5": "SW", "6": "W", "7": "NW",
-    "waypoint": "WP", "portal": "TP", "town": "town", "hideout": "HO", "lab": "lab", "craft": "craft",
-    "in-out2": "in/out", "skip": "skip", "quest": "", "arena": "", "help": "",
-}
 BULLETS = {"step": "• ", "optional": "+ ", "hint": "    "}  # Unterpunkte bringen ihren Strich selbst mit
 EXTRA_SPACES = re.compile(r"(?<=\S) {2,}")
 
@@ -33,11 +26,11 @@ def _colored(text: str, color: str) -> str:
 def _segment(segment: Segment, following: Segment | None) -> str:
     if not segment.image:
         return _colored(segment.text, segment.color)
-    mark = SYMBOLS.get(segment.image, "")
-    if not mark:
+    icon = guide_icon(segment.image)
+    if not icon:
         return " "  # vor einem Symbol steht kein Leerzeichen; entfällt es, braucht es eins
     space = " " if following is None or not following.text.startswith((",", ".", ":", ")")) else ""
-    return _colored(mark, SYMBOL_COLOR) + space
+    return icon + space
 
 
 def device_line(line: Line) -> str:

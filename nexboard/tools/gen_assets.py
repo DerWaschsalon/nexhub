@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Erzeugt alle generierten Assets für NexBoard.
 
-    uv run --with pillow tools/gen_assets.py            # alles
-    uv run --with pillow tools/gen_assets.py --bg foto.jpg   # eigenes Hintergrundbild
+    uv run --with pillow --with pydantic tools/gen_assets.py            # alles
+    uv run --with pillow --with pydantic tools/gen_assets.py --bg foto.jpg   # eigenes Hintergrundbild
 
 Ausgaben (alle eingecheckt, damit Firmware/Simulator ohne Node bauen):
   shared-ui/fonts/*.c            LVGL-Schriften (lv_font_conv, via npx)
   shared-ui/src/icons_table.c    Icon-Name -> UTF-8-Glyph
   shared-ui/assets/bg_default.c  vorgeblurrter Hintergrund, RGB565 mit Dithering
+  shared-ui/assets/guide_icons.c Symbole des Leveling-Guides (nexproto GUIDE_ICONS), RGB565A8
   daemon/deckbar_daemon/web/icons.json + mdi.woff   für die Web-UI (Kachel-Icons)
   daemon/deckbar_daemon/web/ui-icons.json            Icons der Web-UI selbst (tools/ui-icons.txt)
   docs/icons.md
@@ -34,6 +35,9 @@ INTER_URL = "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip"
 LV_FONT_CONV = "lv_font_conv@1.5.3"
 
 W, H = 640, 172
+GUIDE_ICON_DIR = ROOT / "daemon" / "deckbar_daemon" / "poe" / "leveling" / "data" / "icons"
+sys.path.insert(0, str(ROOT.parent / "proto"))
+from nexproto.device import GUIDE_ICON_HEIGHT, GUIDE_ICONS
 
 # Latin-1 + Latin Extended-A + typografische Zeichen (– — ‘ ’ ‚ “ ” „ • … €)
 TEXT_RANGES = "0x20-0x7E,0xA0-0x17F,0x2013-0x2014,0x2018-0x201E,0x2022,0x2026,0x20AC"
@@ -208,6 +212,10 @@ def load_background(path: Path):
 BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
 
+def c_bytes(data: bytes) -> str:
+    return ",\n".join("    " + ", ".join(f"0x{b:02X}" for b in data[i : i + 24]) for i in range(0, len(data), 24))
+
+
 def to_rgb565_dithered(img) -> bytes:
     """Geordnetes Dithering gegen Banding in den weichen Verläufen."""
     px = img.load()
@@ -230,15 +238,12 @@ def gen_background(src: Path | None) -> None:
     (CACHE).mkdir(parents=True, exist_ok=True)
     img.save(CACHE / "bg_preview.png")
     data = to_rgb565_dithered(img)
-    body = ",\n".join(
-        "    " + ", ".join(f"0x{b:02X}" for b in data[i : i + 24]) for i in range(0, len(data), 24)
-    )
     (ROOT / "shared-ui" / "assets").mkdir(parents=True, exist_ok=True)
     (ROOT / "shared-ui" / "assets" / "bg_default.c").write_text(
         "/* generiert von tools/gen_assets.py – vorgeblurrter Hintergrund 640x172 RGB565 */\n"
         '#include "lvgl.h"\n\n'
         "#ifndef LV_ATTRIBUTE_LARGE_CONST\n#define LV_ATTRIBUTE_LARGE_CONST\n#endif\n\n"
-        f"static const LV_ATTRIBUTE_LARGE_CONST uint8_t bg_map[{len(data)}] = {{\n{body}\n}};\n\n"
+        f"static const LV_ATTRIBUTE_LARGE_CONST uint8_t bg_map[{len(data)}] = {{\n{c_bytes(data)}\n}};\n\n"
         "const lv_image_dsc_t deckbar_bg_default = {\n"
         "    .header = {\n"
         "        .magic = LV_IMAGE_HEADER_MAGIC,\n"
@@ -254,11 +259,44 @@ def gen_background(src: Path | None) -> None:
     img.save(ROOT / "daemon" / "deckbar_daemon" / "web" / "bg.png")
 
 
+def gen_guide_icons() -> None:
+    """Guide-Symbole auf Zeilenhöhe der Kachel, RGB565 + Alphaebene; Reihenfolge = Zeichen ab U+E000."""
+    from PIL import Image
+
+    parts, table = [], []
+    for index, name in enumerate(GUIDE_ICONS):
+        img = Image.open(GUIDE_ICON_DIR / f"{name}.png").convert("RGBA")
+        w = max(1, round(img.width * GUIDE_ICON_HEIGHT / img.height))
+        img = img.resize((w, GUIDE_ICON_HEIGHT), Image.LANCZOS)
+        rgb, alpha = bytearray(), bytearray()
+        raw = img.tobytes()
+        for r, g, b, a in zip(*(raw[i::4] for i in range(4))):
+            rgb += (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)).to_bytes(2, "little")
+            alpha.append(a)
+        data = bytes(rgb + alpha)
+        parts.append(
+            f"/* {name} */\nstatic const uint8_t icon{index}_map[{len(data)}] = {{\n{c_bytes(data)}\n}};\n"
+            f"static const lv_image_dsc_t icon{index} = {{\n"
+            f"    .header = {{ .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565A8,"
+            f" .w = {w}, .h = {GUIDE_ICON_HEIGHT}, .stride = {w * 2} }},\n"
+            f"    .data_size = {len(data)},\n    .data = icon{index}_map,\n}};\n")
+        table.append(f"    &icon{index},")
+    (ROOT / "shared-ui" / "assets" / "guide_icons.c").write_text(
+        "/* generiert von tools/gen_assets.py – Symbole des Leveling-Guides, Index = Zeichen - U+E000 */\n"
+        '#include "deckbar/fonts.h"\n\n' + "\n".join(parts)
+        + "\nconst lv_image_dsc_t *const deckbar_guide_icons[] = {\n" + "\n".join(table) + "\n};\n")
+    print(f"{len(GUIDE_ICONS)} Guide-Symbole geschrieben")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--bg", type=Path, help="eigenes Hintergrundbild (wird eingepasst + weichgezeichnet)")
-    ap.add_argument("--only", choices=["fonts", "bg", "icons", "web"], help="nur einen Teil erzeugen")
+    ap.add_argument("--only", choices=["fonts", "bg", "icons", "web", "guide"], help="nur einen Teil erzeugen")
     args = ap.parse_args()
+    if args.only in (None, "guide"):
+        gen_guide_icons()
+    if args.only == "guide":
+        return 0
 
     pkg = fetch_mdi()
     cps = mdi_codepoints(pkg)

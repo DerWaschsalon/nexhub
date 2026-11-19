@@ -4,6 +4,7 @@ import zlib
 from pathlib import Path, PureWindowsPath
 
 from nexcore.settings import SettingsStore
+from nexproto.device import guide_icon
 
 from deckbar_daemon.poe.client_log import ClientLog, LevelUp, LoginScreen, ZoneEntered, parse_line
 from deckbar_daemon.poe.games import POE1, POE2, RunningGame, linux_path, steam_libraries
@@ -129,7 +130,7 @@ def test_render_colors_and_device_markup():
     assert (kill.text, kill.color) == ("hillock", KILL_COLOR)
     assert area.color == AREA_COLOR and area.text.startswith("A2 | ")
     assert [line.bullet for line in out.lines] == ["step", "step", "hint"]
-    assert device_line(out.lines[1]).startswith("• #8AB3FF WP# to #FEC076 A2 | ")
+    assert device_line(out.lines[1]).startswith(f"• {guide_icon('waypoint')} to #FEC076 A2 | ")
     buy = PageRenderer(load(), Options(), set()).render(["talk", "buy gem: frostblink", "go"], Where())
     assert [s.text for s in buy.lines[1].segments] == ["buy gems: ", "frostblink"] and buy.buy_gems == ["frostblink"]
 

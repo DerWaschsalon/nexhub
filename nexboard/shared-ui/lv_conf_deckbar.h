@@ -30,6 +30,7 @@
 #define LV_USE_SPINNER 1
 #define LV_USE_ARC 1
 #define LV_LABEL_LONG_TXT_HINT 1
+#define LV_USE_IMGFONT 1             /* Bilder als Zeichen: Symbole im Leveling-Guide */
 
 #define LV_USE_SNAPSHOT 1
 
