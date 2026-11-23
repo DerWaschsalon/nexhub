@@ -59,6 +59,14 @@ Window {
         anchors.fill: parent
         backgroundColor: "transparent"
         webChannel: channel
+        // qwebchannel.js selbst einschleusen: Ab Qt WebEngine 6.14 darf die http-Seite des Daemons
+        // qrc:///qtwebchannel/qwebchannel.js nicht mehr laden, ohne Brücke bliebe die Fläche unsichtbar
+        userScripts.collection: [{
+            name: "qwebchannel",
+            sourceUrl: "qrc:///qtwebchannel/qwebchannel.js",
+            injectionPoint: WebEngineScript.DocumentCreation,
+            worldId: WebEngineScript.MainWorld
+        }]
         url: host.pageUrl
         // Erst zeigen, wenn die Seite sich gemeldet hat: Fehlerseiten (Daemon weg, Modul aus) wären
         // sonst bildschirmfüllend und undurchsichtig über dem Spiel
