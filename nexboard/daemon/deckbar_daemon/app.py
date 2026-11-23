@@ -76,6 +76,9 @@ class NexBoard:
                               mdns and settings.mdns)
         self.radar_module = RadarModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture))
         poe1 = PoeClientModule(ctx, self.live, config_dir)
+        updates = UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json"), self.state,
+                                lambda: [d.fw for d in self.bar.devices.devices])
+        self.bar.devices.listeners.append(updates.show_on_bar)  # Firmware der Leiste erst nach dem Verbinden
         # Reihenfolge = Start- und Anzeigereihenfolge
         self.web_modules: list[WebModule] = [
             self.bar,
@@ -88,7 +91,7 @@ class NexBoard:
             poe1,
             PoeLevelingModule(ctx, self.live, self.state, poe1.session, config_dir),
             HubModule(ctx, self.live, self.hub),
-            UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json")),
+            updates,
         ]
         # Plugins liefen bis zum eigenen Modul einfach mit dem Overlay: bei alten modules.yaml neu
         self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules,

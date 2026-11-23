@@ -20,6 +20,7 @@ DEFAULTS: dict[str, Any] = {
     "dps_active": False,
     "claude": None,  # Claude-Nutzung, siehe claude.py
     "guide": None,  # Leveling-Guide (PoE), siehe poe/leveling
+    "update_available": False,  # für eine Update-Kachel, siehe modules/updates.py
 }
 
 

@@ -9,7 +9,7 @@ import hmac
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -103,6 +103,7 @@ class DeviceHub:
         self.auto_page = auto_page  # DPS-Seite, zu der die Leiste im Kampf wechselt
         self.module_page: str | None = None  # Seite, die ein Modul gerade zeigen möchte (DECK_PAGE)
         self.devices: set[Device] = set()
+        self.listeners: list[Callable[[], Awaitable[None]]] = []  # Leiste verbunden oder getrennt
         live.section("devices", self.info)
 
     def info(self) -> list[dict[str, Any]]:
@@ -110,6 +111,8 @@ class DeviceHub:
 
     async def changed(self) -> None:
         await self.live.send({"type": "devices", "devices": self.info()})
+        for fn in self.listeners:
+            await fn()
 
     # ---------------------------------------------------------------- Verteilung
     async def broadcast(self, text: str) -> None:
