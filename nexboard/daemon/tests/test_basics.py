@@ -58,6 +58,7 @@ def test_art_rgb565_chunks():
     assert all(p["rows"] * 88 * 2 <= ART_CHUNK_BYTES for p in parts)
 
 
+@pytest.mark.skipif(not keys.HEADER.exists(), reason=f"{keys.HEADER} fehlt (Paket linux-api-headers)")
 def test_keys():
     assert keys.parse("ctrl+shift+m") == [29, 42, 50]
     assert keys.ydotool_args("alt+f4") == ["56:1", "62:1", "62:0", "56:0"]
