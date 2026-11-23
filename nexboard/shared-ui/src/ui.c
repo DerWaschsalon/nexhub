@@ -137,6 +137,7 @@ static struct {
     cJSON *state;           /* aktueller State (Objekt) */
     char layout_hash[65];
     bool have_layout;
+    bool update_available;  /* state.update_available: Daemon, A2Tools oder diese Firmware neuer */
 
     tile_t *tiles;
     int tile_count;
@@ -276,10 +277,16 @@ static void update_status_ui(void)
     case DECKBAR_NET_ONLINE: txt = "Verbunden"; dot = lv_color_hex(0x30D158); break;
     }
     bool online = ui.net == DECKBAR_NET_ONLINE;
+    /* Verbunden zeigt die Pille sonst nichts; dann steht dort, dass ein Update bereitliegt */
+    bool update = online && ui.update_available;
+    if (update) {
+        txt = "Update verfügbar";
+        dot = db_theme_color(DB_STYLE_WARNING);
+    }
 
     lv_label_set_text(ui.pill_label, txt);
     lv_obj_set_style_bg_color(ui.pill_dot, dot, 0);
-    if (online || !ui.have_layout) lv_obj_add_flag(ui.pill, LV_OBJ_FLAG_HIDDEN);
+    if ((online && !update) || !ui.have_layout) lv_obj_add_flag(ui.pill, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_remove_flag(ui.pill, LV_OBJ_FLAG_HIDDEN);
 
     if (ui.have_layout) {
@@ -673,6 +680,11 @@ static void guide_update(tile_t *t);
 
 static void apply_state_key(const char *key, const cJSON *val)
 {
+    if (!strcmp(key, "update_available")) {
+        ui.update_available = truthy(val);
+        update_status_ui();
+        return;
+    }
     bool media = !strcmp(key, "track") || !strcmp(key, "playing");
     uint32_t now = lv_tick_get();
     for (int i = 0; i < ui.tile_count; i++) {
@@ -713,6 +725,8 @@ static void apply_state_key(const char *key, const cJSON *val)
 static void apply_full_state(void)
 {
     const cJSON *it;
+    ui.update_available = false;  /* fehlt der Schlüssel (älterer Daemon), gibt es keinen Hinweis */
+    update_status_ui();
     cJSON_ArrayForEach(it, ui.state) apply_state_key(it->string, it);
     for (int i = 0; i < ui.tile_count; i++) {
         if (ui.tiles[i].type == IT_MEDIA) media_update(&ui.tiles[i]);

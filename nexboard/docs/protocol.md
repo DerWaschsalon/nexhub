@@ -192,6 +192,7 @@ Eigene Schlüssel sind erlaubt (z. B. aus Shell-Statusbefehlen) und lassen sich 
 | `dps_active`  | bool         | gerade Schaden im Kampf                 |
 | `claude`      | object\|null | Claude-Nutzung, nur solange das Layout eine `claude`-Kachel hat |
 | `guide`       | object\|null | Leveling-Guide (PoE), `null` = Modul aus |
+| `update_available` | bool | NexBoard, A2Tools oder Firmware neuer zu haben; die Leiste zeigt dann oben rechts die Pille „Update verfügbar“ (ab FW 0.9.1) |
 
 `dps` ist `null`, solange keine Verbindung zum Meter besteht, sonst:
 

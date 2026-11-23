@@ -1175,6 +1175,18 @@
             }
           ],
           "default": null
+        },
+        "update_available": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Update Available"
         }
       },
       "title": "StateValues",

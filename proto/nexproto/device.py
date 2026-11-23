@@ -258,6 +258,7 @@ class StateValues(BaseModel):
     dps_active: bool | None = None
     claude: ClaudeUsage | None = None
     guide: Guide | None = None
+    update_available: bool | None = None  # Leiste zeigt oben rechts „Update verfügbar“
 
 
 class State(_Message):

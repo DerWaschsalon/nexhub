@@ -145,7 +145,7 @@ function dashboard(ctx) {
       el("div", {}, el("h2", { text: greeting() }), el("p", { text: `${enabled.length} von ${S.modules.modules.length} Modulen aktiv · ${S.settings?.settings?.name || BRAND}` })),
       el("div", { class: "row wrap" },
         modOn("deck") ? chip(devs ? `${devs} Gerät${devs === 1 ? "" : "e"} verbunden` : "Kein Gerät verbunden", devs ? "ok" : "") : null,
-        S.updates?.available ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null,
+        S.updates?.available || S.updates?.firmware?.outdated?.length ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null,
         modOn("aion2.overlay") ? button("Overlay bearbeiten", () => overlayCommand("edit"), "sm", "cursor-move") : null)));
     for (const [cat, label] of Object.entries(S.modules.categories)) {
       const mods = enabled.filter((m) => m.category === cat);

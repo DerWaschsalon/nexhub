@@ -127,26 +127,69 @@ def test_firmware_stand_im_repo(tmp_path):
     assert not firmware_outdated("0.8.1", None)
 
 
-async def test_update_kachel_auf_der_leiste(tmp_path, monkeypatch):
+def updates_module(tmp_path, monkeypatch, firmware, web_url=None):
     from nexcore import Context, EventBus, Paths
 
     from deckbar_daemon.core.live import LiveHub
     from deckbar_daemon.modules import updates as module
     from deckbar_daemon.state import State
 
-    monkeypatch.setattr(module, "firmware_in_repo", lambda: "0.9.0")
-    state, firmware = State(), ["0.9.0"]
+    monkeypatch.setattr(module, "firmware_in_repo", lambda: "0.9.1")
+    state, bus = State(), EventBus()
     updates = Updates(tmp_path, tmp_path / "updates-state.json")
-    bus = EventBus()
-    m = module.UpdatesModule(Context(bus, Paths("test")), LiveHub(bus), updates, state, lambda: firmware)
+    m = module.UpdatesModule(Context(bus, Paths("test")), LiveHub(bus), updates, state, lambda: firmware, web_url)
+    m.active = True
+    return m, updates, state
 
-    await m.show_on_bar()
-    assert state.values["update_available"] is False
-    firmware.append("0.8.1")  # zweite Leiste mit alter Firmware verbunden
-    await m.show_on_bar()
+
+async def test_update_hinweis_auf_der_leiste(tmp_path, monkeypatch):
+    firmware = ["0.9.1"]
+    m, updates, state = updates_module(tmp_path, monkeypatch, firmware)
+
+    await m.announce()
+    assert state.values["update_available"] is False and m.news() == []
+    firmware.append("0.9.0")  # zweite Leiste mit alter Firmware verbunden
+    await m.announce()
     assert state.values["update_available"] is True
-    assert m.ui_info()["firmware"] == {"repo": "0.9.0", "outdated": ["0.8.1"]}  # Hinweis in der Web-UI
+    assert m.news() == ["Leiste: Firmware 0.9.0, neu 0.9.1 (selbst flashen)"]
+    assert m.ui_info()["firmware"] == {"repo": "0.9.1", "outdated": ["0.9.0"]}  # Hinweis in der Web-UI
     firmware.pop()
-    updates.state["available"] = True  # neue Commits oder A2Tools-Release
+    updates.state.update(deckbar={"behind": 3}, a2tools={"newer": True, "latest": "v2.0.96", "current": "v2.0.95"})
     await updates._changed()  # wie nach einer Prüfung
-    assert state.values["update_available"] is True
+    assert m.news() == ["NexBoard: 3 neue Commits", "A2Tools v2.0.96 (bisher v2.0.95)"]
+    await m.stop()  # Modul aus: kein Hinweis mehr auf der Leiste
+    assert state.values["update_available"] is False
+
+
+async def test_desktop_benachrichtigung_einmal_je_stand(tmp_path, monkeypatch):
+    """notify-send und xdg-open als Skripte: der Knopf wird „geklickt“, die Web-UI geht auf."""
+    import asyncio
+    import os
+
+    bin_dir, log = tmp_path / "bin", tmp_path / "aufrufe.txt"
+    bin_dir.mkdir()
+    for name, script in (("notify-send", f'echo "$@" >> {log}\necho open'), ("xdg-open", f'echo "xdg-open $1" >> {log}')):
+        (bin_dir / name).write_text(f"#!/bin/sh\n{script}\n")
+        (bin_dir / name).chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    m, updates, _ = updates_module(tmp_path, monkeypatch, [], web_url=lambda: "http://localhost:8765/")
+
+    updates.state["deckbar"] = {"behind": 1}
+    await m.announce()
+    await m._notice
+    await m.announce()  # gleicher Stand: keine zweite Benachrichtigung
+    for _ in range(100):  # xdg-open läuft losgelöst
+        if "xdg-open" in log.read_text():
+            break
+        await asyncio.sleep(0.01)
+    calls = log.read_text().splitlines()
+    assert len([c for c in calls if "Update verfügbar" in c]) == 1
+    assert "NexBoard: 1 neuer Commit" in calls[0] and "-A open=Updates anzeigen" in calls[0]
+    assert calls[-1] == "xdg-open http://localhost:8765/#/updates"
+
+
+async def test_ohne_web_url_keine_benachrichtigung(tmp_path, monkeypatch):
+    m, updates, state = updates_module(tmp_path, monkeypatch, [])
+    updates.state["deckbar"] = {"behind": 2}
+    await m.announce()
+    assert state.values["update_available"] is True and m._notice is None  # Testinstanz

@@ -76,9 +76,11 @@ class NexBoard:
                               mdns and settings.mdns)
         self.radar_module = RadarModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture))
         poe1 = PoeClientModule(ctx, self.live, config_dir)
+        # Desktop-Benachrichtigungen nur vom echten Daemon, nicht von Testinstanzen
+        web_url = (lambda: f"http://localhost:{self.settings.port}/") if self.real_config else None
         updates = UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json"), self.state,
-                                lambda: [d.fw for d in self.bar.devices.devices])
-        self.bar.devices.listeners.append(updates.show_on_bar)  # Firmware der Leiste erst nach dem Verbinden
+                                lambda: [d.fw for d in self.bar.devices.devices], web_url)
+        self.bar.devices.listeners.append(updates.announce)  # Firmware der Leiste erst nach dem Verbinden
         # Reihenfolge = Start- und Anzeigereihenfolge
         self.web_modules: list[WebModule] = [
             self.bar,
