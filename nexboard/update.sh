@@ -64,9 +64,11 @@ newer() { [[ -n $1 && $1 != "$2" && $(printf '%s\n%s\n' "$2" "$1" | sort -V | ta
 LOCAL_A2=$(git -C "$SUB" describe --tags --exact-match 2>/dev/null || true)
 # Eigene Patches (capture/patches) zurücknehmen, sonst scheitert das Auschecken eines neuen
 # Stands; capture/build.sh wendet sie beim nächsten Bauen wieder an
+shopt -s nullglob
 for p in capture/patches/*.patch; do
   [[ -e $SUB/.git ]] && git -C "$SUB" apply --reverse --quiet "../patches/${p##*/}" 2>/dev/null || true
 done
+shopt -u nullglob
 git submodule update --init --quiet "$SUB" || fail "Submodul $SUB"
 REPO_A2=$(git -C "$SUB" describe --tags --abbrev=0)
 if newer "$LOCAL_A2" "$REPO_A2"; then

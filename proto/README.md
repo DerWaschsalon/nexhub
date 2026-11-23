@@ -77,8 +77,7 @@ Eine Zeile pro Treffer, Zeit relativ zum Kampfbeginn:
 | `flags` | Merkmale als Bits, die Namen stehen in `flags` (crit, back, frontal, perfect, double, parry, shield_block, iron_wall, regeneration, perfect_block, dot) |
 
 Woher: Das A2Tools-Meter zählt Treffer nur zusammen (Schaden pro Fähigkeit, Zeitpunkte pro
-Treffer). Ein kleiner Haken im Kern ([`nexboard/capture/patches/`](../nexboard/capture/patches/),
-`capture/build.sh` wendet ihn an) meldet jeden Treffer an `deckbar-capture`, das beim Speichern
+Treffer). Ein Haken im Kern (`DataStorage::set_on_hit`, seit A2Tools 2.0.97) meldet jeden Treffer an `deckbar-capture`, das beim Speichern
 eines Kampfes `hits/<id>.json` neben `history/<id>.json` schreibt. Gegenprobe mit einem echten
 Dungeon-Abend (13 Kämpfe, 28 000 Treffer, abgespielt mit `deckbar-capture --replay`): Schaden,
 Trefferzahl und Krits stimmen pro Figur, Fähigkeit und DoT exakt mit den Summen des Meters überein.
