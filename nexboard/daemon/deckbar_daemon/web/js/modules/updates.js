@@ -21,6 +21,8 @@ function updatesTab(ctx) {
           try { await api("POST", "/api/updates/run"); toast("Update läuft im Konsole-Fenster"); } catch (e) { toast(e.message, true); }
         }, "primary sm", "download", { disabled: !!u.running })) : null,
       u.error ? callout("warn", "alert", u.error) : null,
+      u.firmware?.outdated?.length ? callout("warn", "alert",
+        `Firmware der Leiste ${u.firmware.outdated.join(", ")}, im Repo ${u.firmware.repo}: neu flashen (update.sh macht das nicht).`) : null,
       el("div", { class: "cols" },
         card("NexBoard", d.upstream ? `Zweig ${d.upstream}` : d.branch ? `lokaler Zweig ${d.branch} (ohne Upstream)` : "Git-Repository", d.behind ? chip(`${d.behind} neu`, "info") : chip("aktuell", "ok"),
           el("table", { class: "list" }, el("tbody", {},
@@ -45,7 +47,7 @@ function updatesTab(ctx) {
 }
 
 export default {
-  status: () => (S.updates?.available ? "warn" : ""),
+  status: () => (S.updates?.available || S.updates?.firmware?.outdated?.length ? "warn" : ""),
   card() {
     const u = S.updates;
     return el("div", { class: "stack", style: "gap:10px" },

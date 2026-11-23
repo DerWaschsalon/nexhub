@@ -34,12 +34,30 @@ FIRST_CHECK_S = 120
 CHECK_EVERY_S = 24 * 3600
 GIT_TIMEOUT_S = 60  # git fetch ohne Netz/Antwort hing sonst unbegrenzt
 UNIT = "deckbar-update"
+# Firmware-Stand im Repo; update.sh flasht nicht, eine ältere Leiste muss man selbst flashen
+FIRMWARE_CONFIG = REPO / "firmware" / "include" / "deckbar_config.h"
+FIRMWARE_VERSION = re.compile(r'#define\s+DECKBAR_FW_VERSION\s+"([^"]+)"')
 
 
 def version_tuple(tag: str | None) -> tuple[int, ...]:
     """"v2.0.62" → (2, 0, 62); Unlesbares → ()."""
     m = re.match(r"v?(\d+(?:\.\d+)*)", (tag or "").strip())
     return tuple(int(x) for x in m.group(1).split(".")) if m else ()
+
+
+def firmware_in_repo(path: Path = FIRMWARE_CONFIG) -> str | None:
+    """DECKBAR_FW_VERSION aus dem Repo, z. B. "0.9.0"; None, wenn nicht lesbar."""
+    try:
+        match = FIRMWARE_VERSION.search(path.read_text(encoding="utf-8"))
+    except OSError:
+        return None
+    return match.group(1) if match else None
+
+
+def firmware_outdated(device_fw: str, repo_fw: str | None) -> bool:
+    """Hat die Leiste eine ältere Firmware als das Repo? Unlesbare Stände (z. B. Simulator) zählen nicht."""
+    have, want = version_tuple(device_fw), version_tuple(repo_fw)
+    return bool(have and want) and have < want
 
 
 async def _git(*args: str, cwd: Path) -> tuple[int, str]:

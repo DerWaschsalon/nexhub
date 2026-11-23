@@ -109,3 +109,44 @@ async def test_ergebnis_uebersteht_neustart(tmp_path, monkeypatch):
         return "def|v1"  # update.sh hat aktualisiert
     again._local = anders
     assert await again._first_delay() == up_mod.FIRST_CHECK_S
+
+
+def test_firmware_stand_im_repo(tmp_path):
+    from deckbar_daemon.updates import (
+        FIRMWARE_CONFIG,
+        firmware_in_repo,
+        firmware_outdated,
+    )
+
+    assert version_tuple(firmware_in_repo()) >= (0, 9)  # liest die echte deckbar_config.h
+    assert FIRMWARE_CONFIG.is_file()
+    assert firmware_in_repo(tmp_path / "fehlt.h") is None
+    assert firmware_outdated("0.8.1", "0.9.0") and not firmware_outdated("0.9.0", "0.9.0")
+    assert not firmware_outdated("0.10.0", "0.9.0")  # neuer geflasht als das Repo
+    assert not firmware_outdated("", "0.9.0") and not firmware_outdated("sim", "0.9.0")
+    assert not firmware_outdated("0.8.1", None)
+
+
+async def test_update_kachel_auf_der_leiste(tmp_path, monkeypatch):
+    from nexcore import Context, EventBus, Paths
+
+    from deckbar_daemon.core.live import LiveHub
+    from deckbar_daemon.modules import updates as module
+    from deckbar_daemon.state import State
+
+    monkeypatch.setattr(module, "firmware_in_repo", lambda: "0.9.0")
+    state, firmware = State(), ["0.9.0"]
+    updates = Updates(tmp_path, tmp_path / "updates-state.json")
+    bus = EventBus()
+    m = module.UpdatesModule(Context(bus, Paths("test")), LiveHub(bus), updates, state, lambda: firmware)
+
+    await m.show_on_bar()
+    assert state.values["update_available"] is False
+    firmware.append("0.8.1")  # zweite Leiste mit alter Firmware verbunden
+    await m.show_on_bar()
+    assert state.values["update_available"] is True
+    assert m.ui_info()["firmware"] == {"repo": "0.9.0", "outdated": ["0.8.1"]}  # Hinweis in der Web-UI
+    firmware.pop()
+    updates.state["available"] = True  # neue Commits oder A2Tools-Release
+    await updates._changed()  # wie nach einer Prüfung
+    assert state.values["update_available"] is True

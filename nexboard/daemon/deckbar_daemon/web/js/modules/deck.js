@@ -13,7 +13,7 @@ const STYLE_NAMES = { default: "Standard", accent: "Akzent", danger: "Rot", succ
 const TYPE_NAMES = { button: "Button", toggle: "Toggle", slider: "Slider", media: "Media", dps: "DPS-Meter", claude: "Claude-Nutzung", guide: "Leveling-Guide" };
 // Icon für Kacheln ohne eigenes Icon (Liste im Editor)
 const TYPE_ICONS = { media: "music", dps: "flash", claude: "chart-bar", guide: "format-list-bulleted" };
-const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active", "claude", "guide"];
+const BUILTIN_KEYS = ["mic_muted", "out_muted", "playing", "out_volume", "mic_volume", "art_url", "dps", "dps_active", "claude", "guide", "update_available"];
 const EXTRA_NAMES = { pct: "Anteil in %", dmg: "Gesamtschaden", none: "nichts" };
 // Vorschau im Bearbeiten-Modus, solange das Meter nichts liefert
 const DPS_DEMO = { target: "Beispiel-Boss", time: 92, hp: 37.4, rows: [
@@ -41,6 +41,8 @@ const TEMPLATES = [
   { name: "Seite wechseln", icon: "chevron-right", item: { label: "Mehr", icon: "chevron-right", nav: "" } },
   { name: "AION 2 DPS-Meter", icon: "flash", item: { type: "dps" }, needs: "aion2.dps" },
   { name: "Claude-Nutzung", icon: "chart-bar", item: { type: "claude", w: 2 } },
+  // Leuchtet, wenn NexBoard, A2Tools oder die Firmware der Leiste neuer zu haben ist (Modul Updates)
+  { name: "Update verfügbar", icon: "bell", item: { type: "toggle", label: "Update", icon: "check", icon_on: "bell", bind: "update_available", style: "warning" }, needs: "updates" },
   { name: "PoE Leveling-Guide", icon: "gamepad-variant", item: { type: "guide" }, needs: "poe1.leveling" },
 ];
 
