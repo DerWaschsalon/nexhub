@@ -106,6 +106,7 @@ async def test_api_module_settings(client):
     assert (await client.get("/api/m/gibts-nicht/settings")).status == 404
 
 
+@pytest.mark.a2tools
 async def test_api_plugins_nur_verwalten(client):
     r = await client.post("/api/plugins", json={"cmd": "plugin_list"})
     assert r.status == 200 and "plugins" in (await r.json())["result"]

@@ -420,6 +420,7 @@ async def ui(tmp_path, cdn):
     await a2.plugins.stop()
 
 
+@pytest.mark.a2tools
 async def test_plugin_dateien_mit_csp(ui, cdn):
     cdn.add("ping", extra={"sub/a.js": b"1"})
     await ui.plugins.install("ping")
@@ -435,6 +436,7 @@ async def test_plugin_dateien_mit_csp(ui, cdn):
     assert (await ui.client.get("/__a2plugin__/anderes/index.html")).status == 404
 
 
+@pytest.mark.a2tools
 async def test_host_seiten_bekommen_das_shim(ui):
     for page in ("/plugin-host.html", "/plugin-widget.html"):
         text = await (await ui.client.get(page)).text()
