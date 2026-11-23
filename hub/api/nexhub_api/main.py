@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from nexproto.hubapi import REQUEST_ID_HEADER, accept_request_id, request_id
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -72,6 +73,14 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
                 and request.headers.get("origin") != settings.origin):
             return JSONResponse({"detail": "Fremde Herkunft"}, status_code=403)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def tag_request(request: Request, call_next):
+        """Anfrage-Kennung übernehmen oder vergeben: steht in jeder Logzeile und geht an den Bot weiter."""
+        request_id.set(accept_request_id(request.headers.get(REQUEST_ID_HEADER)))
+        response = await call_next(request)
+        response.headers[REQUEST_ID_HEADER] = request_id.get()
+        return response
 
     @app.get("/api/health", tags=["system"])
     async def health(db: DB) -> dict:

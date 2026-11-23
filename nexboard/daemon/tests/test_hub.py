@@ -357,3 +357,69 @@ def test_discord_schalter_aus_der_web_ui(tmp_path):
     assert again.settings.discord is True and again.settings.token == ""
     hub.update({"discord": False})
     assert Hub(tmp_path).settings.discord is False
+
+
+async def test_api_stand_und_kennung_gehen_mit(tmp_path):
+    from nexproto.hubapi import API_HEADER, HUB_API, REQUEST_ID_HEADER
+
+    headers = []
+
+    async def runs(request):
+        headers.append(("run", request.headers.get(API_HEADER), request.headers.get(REQUEST_ID_HEADER)))
+        return web.json_response({"id": 1, "url": "http://hub/hub/runs/1", "duplicate": False}, status=201)
+
+    async def report(request):
+        headers.append(("report", request.headers.get(API_HEADER), request.headers.get(REQUEST_ID_HEADER)))
+        return web.json_response({"forwarded": True}, status=202)
+
+    app = web.Application()
+    app.router.add_post("/api/runs", runs)
+    app.router.add_post("/api/runs/{run_id}/report", report)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    hub = uploading_hub(tmp_path, f"http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}")
+    hub._enqueue("1-600022.nexlog.gz", b"x")
+    hub._enqueue_report("1-600022", "{}")
+    try:
+        await hub.flush_outbox()
+        (_, api, rid), (kind, _, report_rid) = headers
+        assert api == str(HUB_API) and len(rid) == 12
+        assert kind == "report" and report_rid == rid  # Upload und Bericht tragen dieselbe Kennung
+    finally:
+        await hub.close()
+        await runner.cleanup()
+
+
+async def test_veraltetes_nexboard_behaelt_die_runs(tmp_path):
+    runner, url, _ = await fake_runs_hub(426)
+    hub = uploading_hub(tmp_path, url)
+    hub._enqueue("1-600022.nexlog.gz", b"x")
+    try:
+        await hub.flush_outbox()
+        assert hub.info()["outbox"] == 1 and hub._failures == 0  # kein Wiederholen im Minutentakt
+        assert hub.last_upload["text"] == "kaputt"  # Text des Hubs, dort steht „bitte aktualisieren“
+    finally:
+        await hub.close()
+        await runner.cleanup()
+
+
+async def test_hub_meldet_veraltetes_nexboard(tmp_path):
+    async def me(request):
+        return web.json_response({"detail": "NexBoard ist zu alt für diesen Hub, bitte aktualisieren"}, status=426)
+
+    app = web.Application()
+    app.router.add_get("/api/devices/me", me)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    hub = uploading_hub(tmp_path, f"http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}")
+    try:
+        await hub.check()
+        assert hub.status == "offline" and "aktualisieren" in hub.detail
+        assert hub.settings.token == "geraete-token"  # Kopplung bleibt, nach dem Update geht es weiter
+    finally:
+        await hub.close()
+        await runner.cleanup()

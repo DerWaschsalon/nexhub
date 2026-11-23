@@ -8,6 +8,7 @@ import sys
 
 import discord
 from discord.ext import commands
+from nexproto.hubapi import log_request_ids
 
 from .admin.control import ControlApi
 from .admin.setup import Setup
@@ -93,8 +94,10 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
 def main() -> None:
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        # [Kennung] verbindet Zeilen der Steuer-API mit denen im Hub und im NexBoard (nexproto.hubapi)
+        format="%(asctime)s %(levelname)-7s [%(request_id)s] %(name)s: %(message)s",
     )
+    log_request_ids()
     token = os.getenv("DISCORD_TOKEN", "").strip()
     if not token:
         sys.exit("DISCORD_TOKEN fehlt (siehe .env.example)")

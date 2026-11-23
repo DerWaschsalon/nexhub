@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
+from nexproto.hubapi import API_HEADER, HUB_API, client_api
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -67,6 +68,8 @@ async def require_admin(user: Annotated[User, Depends(require_user)]) -> User:
 async def require_device(request: Request, db: DB) -> Device:
     """Gerät zum Token in `Authorization: Bearer …`; merkt sich Zeit und Version des Kontakts.
 
+    Spricht der Daemon einen älteren API-Stand als der Hub (nexproto.hubapi), gibt es 426.
+
     Gehört das Gerät zu einem gesperrten Konto, gilt das Token nicht mehr."""
     scheme, _, token = request.headers.get("authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not token:
@@ -79,6 +82,9 @@ async def require_device(request: Request, db: DB) -> Device:
     device.last_seen_at = datetime.now(UTC)
     device.version = request.headers.get("x-nexboard-version", device.version or "")[:40] or None
     await db.commit()
+    # Erst nach dem Merken ablehnen, damit die Geräteliste zeigt, welcher PC veraltet ist
+    if client_api(request.headers.get(API_HEADER)) < HUB_API:
+        raise HTTPException(426, "NexBoard ist zu alt für diesen Hub, bitte aktualisieren")
     return device
 
 

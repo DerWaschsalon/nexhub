@@ -295,9 +295,12 @@ def test_run_bericht_geht_ueber_den_hub_an_den_bot(make_client, fake, as_user):
         token = pair(c, as_user(MEMBER))
         run = upload(c, token, nexlog()).json()
         seen.clear()  # der Run-Link für alte NexBoards
-        r = c.post(f"/api/runs/{run['id']}/report", json=bericht, headers={"Authorization": f"Bearer {token}"})
+        r = c.post(f"/api/runs/{run['id']}/report", json=bericht,
+                   headers={"Authorization": f"Bearer {token}", "X-Request-ID": "run-abc123"})
         assert r.status_code == 202 and r.json() == {"forwarded": True}
         assert len(seen) == 1 and seen[0].url.path == "/control/run"
+        # Die Kennung des Daemons kommt zurück und geht an den Bot weiter
+        assert r.headers["X-Request-ID"] == "run-abc123" and seen[0].headers["X-Request-ID"] == "run-abc123"
         assert json.loads(seen[0].content) == {"guild_id": 4242, "report": {**bericht, "bosses": [], "image_webp": None},
                                               "url": run["url"]}
         # kaputter Bericht und fremder Run

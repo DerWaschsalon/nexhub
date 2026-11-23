@@ -130,3 +130,19 @@ def test_gesperrtes_konto_sperrt_seine_geraete(client, as_user):
 def test_code_normalisieren():
     assert normalize_code(" bcdf-ghjk ") == "BCDFGHJK"
     assert normalize_code("A0O1-bcdf") == "BCDF"  # nicht vorkommende Zeichen fallen raus
+
+
+def test_veralteter_daemon_bekommt_426_und_bleibt_sichtbar(client, as_user):
+    from nexproto.hubapi import API_HEADER, HUB_API
+
+    member = as_user(MEMBER)
+    token = pair(client, member)
+    old = client.get("/api/devices/me", headers={**bearer(token), API_HEADER: str(HUB_API - 1),
+                                                 "x-nexboard-version": "0.0.9"})
+    assert old.status_code == 426 and "aktualisieren" in old.json()["detail"]
+    # In der Geräteliste steht trotzdem, welcher PC das war
+    devices = member.get("/api/devices").json()
+    assert [d["version"] for d in devices] == ["0.0.9"]
+    # Aktueller Stand und Daemons von vor der Kopfzeile kommen durch
+    assert client.get("/api/devices/me", headers={**bearer(token), API_HEADER: str(HUB_API)}).status_code == 200
+    assert client.get("/api/devices/me", headers=bearer(token)).status_code == 200
