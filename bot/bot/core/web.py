@@ -24,6 +24,7 @@ from typing import Any, TypeGuard
 
 import discord
 from aiohttp import web
+from nexproto.hubapi import REQUEST_ID_HEADER, accept_request_id, request_id
 
 from ..errors import UserError
 from ..hubpages import ApiError
@@ -154,6 +155,8 @@ def control_app(table: RouteTable, key: str) -> web.Application:
 
     @web.middleware
     async def middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+        # Kennung vom Hub übernehmen: dieselbe steht in dessen Log und im Log des NexBoards
+        request_id.set(accept_request_id(request.headers.get(REQUEST_ID_HEADER)))
         scheme, _, token = request.headers.get("Authorization", "").partition(" ")
         if scheme.lower() != "bearer" or not hmac.compare_digest(token.encode(), key.encode()):
             return web.json_response({"detail": "Schlüssel fehlt oder falsch"}, status=401)

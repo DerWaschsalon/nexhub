@@ -11,6 +11,7 @@ import webbrowser
 from pathlib import Path
 
 from aiohttp import web
+from nexproto.hubapi import log_request_ids
 from pydantic import ValidationError
 
 from .app import NexBoard, build_app
@@ -84,9 +85,11 @@ def main() -> int:
     args = ap.parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        # [Kennung] verbindet die Zeilen eines Uploads mit denen im Hub und im Bot (nexproto.hubapi)
+        format="%(asctime)s %(levelname)-7s [%(request_id)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    log_request_ids()
     logging.getLogger("aiohttp").setLevel(logging.WARNING)
     try:
         deck = asyncio.run(serve(args))

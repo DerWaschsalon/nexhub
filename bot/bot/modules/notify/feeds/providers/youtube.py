@@ -12,6 +12,8 @@ from xml.etree import ElementTree
 import aiohttp
 import discord
 
+from bot.core.http import HTTP_TIMEOUT
+
 from .base import Notification, Provider, ProviderError
 
 log = logging.getLogger(__name__)
@@ -58,7 +60,7 @@ class YouTubeProvider(Provider):
 
     def _s(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            self._session = aiohttp.ClientSession(timeout=HTTP_TIMEOUT)
         return self._session
 
     async def close(self) -> None:

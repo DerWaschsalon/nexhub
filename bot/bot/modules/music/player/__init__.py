@@ -12,6 +12,7 @@ from discord.ext import commands
 from nexcore import ModuleInfo
 
 from bot.core import BotContext, BotModule, GuildSettings
+from bot.core.http import HTTP_TIMEOUT
 from bot.core.module import Listener
 from bot.errors import UserError
 from bot.hubpages import Page
@@ -51,7 +52,7 @@ class MusicPlayer(BotModule):
         self.background: set[asyncio.Task[None]] = set()  # asyncio hält nur schwache Verweise
 
     async def start(self) -> None:
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(timeout=HTTP_TIMEOUT)
         self.radio = RadioBrowser(self.session)
 
     def http(self) -> aiohttp.ClientSession:

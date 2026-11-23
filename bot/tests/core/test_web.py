@@ -81,3 +81,22 @@ def test_control_key_too_short_keeps_api_off(monkeypatch: pytest.MonkeyPatch) ->
     assert control_key() == KEY
     monkeypatch.delenv("BOT_CONTROL_KEY")
     assert control_key() == ""
+
+
+def test_steuer_api_uebernimmt_die_kennung_vom_hub() -> None:
+    from nexproto.hubapi import REQUEST_ID_HEADER, request_id
+
+    async def which(_request: web.Request) -> dict[str, Any]:
+        return {"id": request_id.get()}
+
+    async def go() -> None:
+        table = RouteTable()
+        table.control("GET", "/control/which", which)
+        async with TestClient(TestServer(control_app(table, KEY))) as control:
+            auth = {"Authorization": f"Bearer {KEY}"}
+            got = await control.get("/control/which", headers={**auth, REQUEST_ID_HEADER: "run-abc123"})
+            assert await got.json() == {"id": "run-abc123"}
+            fresh = await (await control.get("/control/which", headers=auth)).json()
+            assert len(fresh["id"]) == 12  # ohne Kennung vergibt der Bot eine
+
+    asyncio.run(go())

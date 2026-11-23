@@ -18,6 +18,7 @@ from typing import Any
 import aiohttp
 import discord
 
+from bot.core.http import HTTP_TIMEOUT
 from bot.hubpages import Field
 
 from .base import Notification, Provider, ProviderError
@@ -118,7 +119,7 @@ class GitHubProvider(Provider):
 
     def _s(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(headers=_headers())
+            self._session = aiohttp.ClientSession(headers=_headers(), timeout=HTTP_TIMEOUT)
         return self._session
 
     async def close(self) -> None:

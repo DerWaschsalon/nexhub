@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 import httpx
+from nexproto.hubapi import REQUEST_ID_HEADER, request_id
 
 from .config import Settings
 
@@ -16,7 +17,8 @@ async def tell_bot(http: httpx.AsyncClient, settings: Settings, action: str, pay
     Ein Fehler hier darf den Aufrufer nicht stören, er wird nur geloggt."""
     try:
         r = await http.post(f"{settings.bot_control_url}/control/{action}", json=payload, timeout=10,
-                            headers={"Authorization": f"Bearer {settings.bot_control_key}"})
+                            headers={"Authorization": f"Bearer {settings.bot_control_key}",
+                                     REQUEST_ID_HEADER: request_id.get()})
     except httpx.HTTPError as e:
         log.warning("Bot nicht erreichbar (%s): %s", action, e)
         return

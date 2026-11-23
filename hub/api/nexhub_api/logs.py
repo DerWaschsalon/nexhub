@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+from nexproto.hubapi import log_request_ids
+
 # Pfade, deren Query Geheimnisse trägt: beim Discord-Rücksprung stehen dort code und state
 SECRET_QUERY_PATHS = ("/api/auth/callback",)
 
@@ -23,6 +25,8 @@ class HideSecretQuery(logging.Filter):
 
 
 def setup() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    # [Kennung] verbindet die Zeilen eines Runs mit denen im Daemon und im Bot (nexproto.hubapi)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(request_id)s] %(name)s: %(message)s")
+    log_request_ids()
     # httpx meldet jede Anfrage an Discord; das reicht als Warnung bei Fehlern
     logging.getLogger("httpx").setLevel(logging.WARNING)

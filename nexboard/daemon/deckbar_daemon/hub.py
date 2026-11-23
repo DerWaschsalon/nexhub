@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 
 import aiohttp
 from nexcore.settings import HIDDEN, SECRET, SettingsStore
+from nexproto.hubapi import API_HEADER, HUB_API, REQUEST_ID_HEADER, new_request_id, request_id
 from pydantic import Field, field_validator
 
 from . import __version__
@@ -190,7 +191,8 @@ class Hub:
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=TIMEOUT_S),
-                headers={"User-Agent": f"NexBoard/{__version__}", "X-NexBoard-Version": __version__})
+                headers={"User-Agent": f"NexBoard/{__version__}", "X-NexBoard-Version": __version__,
+                         API_HEADER: str(HUB_API)})
         return self._session
 
     async def _call(self, method: str, path: str, *, auth: bool = False, json: dict | None = None) -> tuple[int, dict]:
@@ -285,6 +287,8 @@ class Hub:
                     # Im Hub entfernt oder Konto gesperrt: das Token ist wertlos
                     self.save(self.settings.model_copy(update={"token": ""}))
                     self._forget("Im Hub entfernt – bei Bedarf neu koppeln")
+                elif status == 426:
+                    self.status, self.detail = "offline", body.get("detail") or "NexBoard zu alt, bitte aktualisieren"
                 else:
                     self.status, self.detail = "offline", f"Hub antwortet {status}"
         await self._changed()
@@ -370,7 +374,8 @@ class Hub:
         if not path.exists():
             return
         body = await asyncio.to_thread(path.read_text)
-        headers = {"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/json",
+                   REQUEST_ID_HEADER: request_id.get()}
         try:
             async with self.session().post(f"{self.settings.url}/api/runs/{run_id}/report", data=body,
                                            headers=headers, timeout=aiohttp.ClientTimeout(total=UPLOAD_TIMEOUT_S)) as r:
@@ -388,39 +393,57 @@ class Hub:
         """Alles im Postausgang hochladen, älteste zuerst. Bricht beim ersten Netzfehler ab."""
         if not (self.settings.upload and self.settings.token and self.settings.url):
             return
-        for path in self._queued():
-            data = await asyncio.to_thread(path.read_bytes)
-            headers = {"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/gzip"}
-            try:
-                async with self.session().post(self.settings.url + "/api/runs", data=data, headers=headers,
-                                               timeout=aiohttp.ClientTimeout(total=UPLOAD_TIMEOUT_S)) as r:
-                    body = await r.json(content_type=None) if r.content_length != 0 else {}
-                    status = r.status
-            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
-                self._failures += 1
-                self._note(False, f"Hub nicht erreichbar ({e.__class__.__name__}), neuer Versuch später")
-                await self._changed()
-                return
-            body = body if isinstance(body, dict) else {}
-            if status in (200, 201):
-                if status == 201 and isinstance(body.get("id"), int):
-                    await self.send_report(path, body["id"])
-                path.with_name(path.name.removesuffix(NEXLOG) + REPORT).unlink(missing_ok=True)
-                path.unlink(missing_ok=True)
-                self._failures = 0
-                self._note(True, "schon im Hub" if body.get("duplicate") else "hochgeladen", body.get("url"))
-            elif status == 401:
-                await self.check()  # Gerät im Hub entfernt: Token weg, Postausgang bleibt für später
-                return
-            elif status in (413, 422):
-                # Der Hub lehnt die Datei selbst ab: beiseitelegen statt sie ewig neu zu schicken
-                rejected = self.outbox / "abgelehnt"
-                rejected.mkdir(exist_ok=True)
-                path.replace(rejected / path.name)
-                self._note(False, f"Hub lehnt den Run ab: {body.get('detail') or status}")
-            else:
-                self._failures += 1
-                self._note(False, f"Hub antwortet {status}, neuer Versuch später")
-                await self._changed()
-                return
+        token = request_id.set("-")
+        try:
+            for path in self._queued():
+                # Eine Kennung je Run: steht in den Logs von Daemon, Hub und Bot (nexproto.hubapi)
+                request_id.set(new_request_id())
+                if not await self._upload(path):
+                    return
+        finally:
+            request_id.reset(token)
+
+    async def _upload(self, path: Path) -> bool:
+        """Einen Run aus dem Postausgang hochladen. False: abbrechen, der Rest wartet auf später."""
+        data = await asyncio.to_thread(path.read_bytes)
+        headers = {"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/gzip",
+                   REQUEST_ID_HEADER: request_id.get()}
+        try:
+            async with self.session().post(self.settings.url + "/api/runs", data=data, headers=headers,
+                                           timeout=aiohttp.ClientTimeout(total=UPLOAD_TIMEOUT_S)) as r:
+                body = await r.json(content_type=None) if r.content_length != 0 else {}
+                status = r.status
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+            self._failures += 1
+            self._note(False, f"Hub nicht erreichbar ({e.__class__.__name__}), neuer Versuch später")
             await self._changed()
+            return False
+        body = body if isinstance(body, dict) else {}
+        if status in (200, 201):
+            if status == 201 and isinstance(body.get("id"), int):
+                await self.send_report(path, body["id"])
+            path.with_name(path.name.removesuffix(NEXLOG) + REPORT).unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
+            self._failures = 0
+            self._note(True, "schon im Hub" if body.get("duplicate") else "hochgeladen", body.get("url"))
+        elif status == 401:
+            await self.check()  # Gerät im Hub entfernt: Token weg, Postausgang bleibt für später
+            return False
+        elif status == 426:
+            # Hub ist neuer als dieses NexBoard: Runs bleiben liegen, bis jemand aktualisiert
+            self._note(False, body.get("detail") or "NexBoard zu alt, bitte aktualisieren")
+            await self._changed()
+            return False
+        elif status in (413, 422):
+            # Der Hub lehnt die Datei selbst ab: beiseitelegen statt sie ewig neu zu schicken
+            rejected = self.outbox / "abgelehnt"
+            rejected.mkdir(exist_ok=True)
+            path.replace(rejected / path.name)
+            self._note(False, f"Hub lehnt den Run ab: {body.get('detail') or status}")
+        else:
+            self._failures += 1
+            self._note(False, f"Hub antwortet {status}, neuer Versuch später")
+            await self._changed()
+            return False
+        await self._changed()
+        return True

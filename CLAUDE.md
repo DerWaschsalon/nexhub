@@ -52,6 +52,9 @@ etwas machst.
   steht. Auf `main` keine Force-Pushes und keine Pfadänderungen ohne Absprache, sonst bricht das
   Update beim nächsten Klick ab oder der Daemon findet seine Dateien nicht. Hub ausrollen:
   `nexhub-update <wer> main`.
+- **Geräte-Endpunkte des Hubs** (`/api/devices/*`, `/api/runs*`): Wer sie so ändert, dass ältere
+  Daemons sie falsch verstehen, erhöht `HUB_API` in `proto/nexproto/hubapi.py`. Ältere NexBoards
+  bekommen dann 426 und „bitte aktualisieren“ statt still zu scheitern.
 - Die Symlinks `daemon`, `capture`, `overlay` und `update.sh` an der Wurzel sind Übergänge für
   NexBoard-Checkouts aus der Zeit vor dem Monorepo (systemd-Unit, uv-Installation und Tray-Knopf
   zeigen dorthin). Nicht entfernen, solange es solche Installationen gibt.
