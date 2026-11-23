@@ -16,9 +16,10 @@ if [[ ${1:-} == --install ]]; then
 fi
 # Nur anlegen, wenn es fehlt: ein per update.sh --a2tools lokal angehobener Stand bleibt so
 [[ -e a2tools/.git ]] || git -C .. submodule update --init capture/a2tools
-# Eigene Änderungen am Kern (patches/*.patch, z. B. der Treffer-Haken für den Hub). Schon
-# angewandt: nichts zu tun. Passt ein Patch nach einem A2Tools-Update nicht mehr: Abbruch, Patch
-# an den neuen Stand anpassen.
+# Eigene Änderungen am Kern (patches/*.patch, derzeit keine: der Treffer-Haken set_on_hit ist seit
+# A2Tools 2.0.97 im Kern). Schon angewandt: nichts zu tun. Passt ein Patch nach einem
+# A2Tools-Update nicht mehr: Abbruch, Patch an den neuen Stand anpassen.
+shopt -s nullglob
 for p in patches/*.patch; do
   git -C a2tools apply --reverse --check "../$p" 2>/dev/null && continue
   git -C a2tools apply "../$p" || { echo "Patch $p passt nicht auf diesen A2Tools-Stand." >&2; exit 1; }
