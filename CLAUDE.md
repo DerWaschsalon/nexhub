@@ -125,4 +125,5 @@ Tracker); Runs nach Discord nur Daemon → Hub → Bot, das Webhook-Bild bleibt 
 Referenzbilder, siehe `nexboard/README.md`, „Tests“); Pfadänderungen nur mit Weiterleitung in update.sh,
 die Wurzel-Symlinks bleiben, solange alte Installationen existieren. Den Daemon nie neu starten, solange
 AION 2 läuft (Ziel: update.sh merkt den Neustart dann nur vor). Testinstanzen nie mit echtem systemd oder echtem Mitschnitt. Jede Fachregel, die
-beim Umbau berührt wird, wandert in Daten oder nexproto. Pro Modul ein Review gegen die Prüffragen oben.
+beim Umbau berührt wird, wandert in Daten oder nexproto. Pro Modul ein Review gegen die Prüffragen oben. Die Frage „Importiert ein Modul etwas aus einem anderen Modul?“ prüfen
+`bot/tests/core/test_module_boundaries.py` (läuft in der CI) und `nexboard/daemon/tests/test_module_boundaries.py`.
