@@ -89,6 +89,11 @@
 			Gemeinschaft (Art. 6 Abs. 1 lit. f DSGVO). Runs bleiben gespeichert, bis die Hochladenden oder ein
 			Admin sie löschen; eine automatische Löschfrist gibt es derzeit nicht.
 		</p>
+		<p>
+			Feedback: Schreibst du im Hub einen Wunsch oder stimmst für einen ab, speichert der Hub den Text, deine
+			Stimme und dein Konto dazu. Andere Mitglieder sehen Text und Stimmenzahl, aber nicht, von wem sie
+			stammen; Admins sehen, wer einen Eintrag geschrieben hat. Einträge bleiben, bis ein Admin sie löscht.
+		</p>
 
 		<h2>6. Inhalte von fremden Servern</h2>
 		<p>
@@ -179,6 +184,11 @@
 			and chances of items come from MetaBot.GG (metabot.gg) and contain no personal data. Search engines are asked not to index such pages. Purpose: analysing the
 			community's runs together (Art. 6(1)(f) GDPR). Runs are kept until the uploader or an admin deletes
 			them; there is currently no automatic deletion.
+		</p>
+		<p>
+			Feedback: if you write a wish in the hub or vote for one, the hub stores the text, your vote and your
+			account with it. Other members see the text and the number of votes but not whose they are; admins see
+			who wrote an entry. Entries stay until an admin deletes them.
 		</p>
 
 		<h2>6. Content from other servers</h2>

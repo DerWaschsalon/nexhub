@@ -1,0 +1,52 @@
+import { defineTexts } from '#lib/i18n.svelte.ts';
+
+export const TEXTS = defineTexts(
+	{
+		'feedback.nav': 'Feedback',
+		'feedback.title': 'Feedback',
+		'feedback.intro': 'Wishes and notes for NexHub, NexBoard and the bot. Other members do not see who wrote an entry.',
+		'feedback.open': 'Open ({n})',
+		'feedback.closed': 'Done ({n})',
+		'feedback.new': 'New entry',
+		'feedback.field.title': 'What should change?',
+		'feedback.field.body': 'Details (optional)',
+		'feedback.send': 'Send',
+		'feedback.none': 'Nothing here yet.',
+		'feedback.vote': 'Vote for this',
+		'feedback.unvote': 'Take your vote back',
+		'feedback.votes': 'Votes',
+		'feedback.by': 'by {name}',
+		'feedback.setStatus': 'Status',
+		'feedback.remove': 'Delete',
+		'feedback.confirmRemove': 'Delete “{title}”?',
+		'feedback.status.neu': 'new',
+		'feedback.status.gesehen': 'seen',
+		'feedback.status.geplant': 'planned',
+		'feedback.status.erledigt': 'done',
+		'feedback.status.abgelehnt': 'declined'
+	},
+	{
+		'feedback.nav': 'Feedback',
+		'feedback.title': 'Feedback',
+		'feedback.intro': 'Wünsche und Hinweise zu NexHub, NexBoard und Bot. Andere Mitglieder sehen nicht, wer einen Eintrag geschrieben hat.',
+		'feedback.open': 'Offen ({n})',
+		'feedback.closed': 'Erledigt ({n})',
+		'feedback.new': 'Neuer Eintrag',
+		'feedback.field.title': 'Was soll sich ändern?',
+		'feedback.field.body': 'Einzelheiten (freiwillig)',
+		'feedback.send': 'Abschicken',
+		'feedback.none': 'Hier steht noch nichts.',
+		'feedback.vote': 'Dafür stimmen',
+		'feedback.unvote': 'Stimme zurücknehmen',
+		'feedback.votes': 'Stimmen',
+		'feedback.by': 'von {name}',
+		'feedback.setStatus': 'Status',
+		'feedback.remove': 'Löschen',
+		'feedback.confirmRemove': '„{title}“ löschen?',
+		'feedback.status.neu': 'neu',
+		'feedback.status.gesehen': 'gesehen',
+		'feedback.status.geplant': 'geplant',
+		'feedback.status.erledigt': 'erledigt',
+		'feedback.status.abgelehnt': 'abgelehnt'
+	}
+);
