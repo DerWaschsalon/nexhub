@@ -121,16 +121,24 @@ class Census:
         gibt es für sie keine Note."""
         return bool((self.slots.get(group(slot)) or {}).get("width"))
 
+    def width(self, slot: str) -> tuple[int, int]:
+        """Wie viele Werte und Skills ein Teil der Top-Spieler auf diesem Platz meist hat."""
+        stats, skills = (self.slots.get(group(slot)) or {}).get("width") or (0, 0)
+        return stats, skills
+
+    def skill_names(self, slot: str) -> list[str]:
+        return (self.slots.get(group(slot)) or {}).get("skills") or []
+
     def best_piece(self, slot: str) -> float:
         """Punkte des besten Stücks dieses Platzes: die häufigsten Werte und Skills, voll, so viele wie ein
         Teil der Top-Spieler dort meist trägt. Gleich für jedes Teil des Platzes."""
         entry = self.slots.get(group(slot)) or {}
         if not entry.get("width"):
             return 1.0
-        skill_names = set(entry["skills"])
+        skill_names = set(self.skill_names(slot))
         stats = sorted((n for name, n in entry["lines"].items() if name not in skill_names), reverse=True)
         skills = sorted((n for name, n in entry["lines"].items() if name in skill_names), reverse=True)
-        wide_stats, wide_skills = entry["width"]
+        wide_stats, wide_skills = self.width(slot)
         return sum(stats[:wide_stats] + skills[:wide_skills]) / entry["players"] or 1.0
 
 
@@ -161,15 +169,20 @@ def score(census: Census, item: dict, table: dict, cls: str) -> tuple[float, lis
     return round(100 * sum(ln["points"] for ln in lines) / best, 1), lines
 
 
-def ideal_lines(census: Census, item: dict, table: dict, cls: str, n: int) -> list[str]:
-    """Die n Zeilen, die Top-Spieler auf diesem Platz am häufigsten tragen und dieser Gegenstand würfeln
-    kann, nach Priorität (Anteil, bei Gleichstand der größere Wert)."""
-    values = _item_max(table, cls)
-    for line in lines_of(item):
-        values.setdefault(line["name"], line["value"])
+def ideal_piece(census: Census, item: dict, table: dict, cls: str) -> list[dict]:
+    """Das Idealteil des Platzes, soweit dieser Gegenstand es würfeln kann: die Werte und Skills, die
+    Top-Spieler dort am häufigsten tragen (so viele, wie ein Teil meist hat), nach Priorität. Je Zeile der
+    Anteil, der Höchstwert auf diesem Gegenstand und ob das Teil sie schon hat (`have`)."""
     slot = item["slot_name"]
-    ranked = sorted(values, key=lambda nm: (-census.share(slot, nm), -points(census, slot, nm, values[nm])))
-    return ranked[:n]
+    own = {line["name"]: line for line in lines_of(item)}
+    values = {**{name: line["value"] for name, line in own.items()}, **_item_max(table, cls)}
+    skills = set(census.skill_names(slot)) | {name for name, line in own.items() if line["kind"] == "skill"}
+    skills |= {o["name"] for o in ((table.get("skills") or {}).get(cls) or {}).get("options") or []}
+    ranked = sorted(values, key=lambda name: (-census.share(slot, name), -points(census, slot, name, values[name])))
+    wide_stats, wide_skills = census.width(slot)
+    chosen = [n for n in ranked if n not in skills][:wide_stats] + [n for n in ranked if n in skills][:wide_skills]
+    return [{"name": name, "share": round(census.share(slot, name), 3), "max": values[name], "have": name in own}
+            for name in chosen if census.share(slot, name) > 0]
 
 
 # ---- Ausgabe für die Armory ----
@@ -182,15 +195,21 @@ def names_de(item_en: dict, item_de: dict | None) -> dict[str, str]:
             if en["kind"] == de["kind"]}
 
 
+def _table_names_de(table: dict, cls: str) -> dict[str, str]:
+    """Englischer → deutscher Name der Zeilen, die ein Gegenstand würfeln kann (aus der Würfeltabelle)."""
+    rows = (table.get("rolls") or []) + (((table.get("skills") or {}).get(cls) or {}).get("options") or [])
+    return {r["name"]: r["name_de"] for r in rows if r.get("name_de")}
+
+
 def rate_item(census: Census, item: dict, item_de: dict | None, table: dict, cls: str, lang: str) -> dict:
     """Bewertung eines Gegenstands in einer Sprache (Format wie modules/logs/rating.ts)."""
     value, lines = score(census, item, table, cls)
-    ideal = set(ideal_lines(census, item, table, cls, len(lines)))
-    names = names_de(item, item_de) if lang == "de" else {}
+    names = {**_table_names_de(table, cls), **names_de(item, item_de)} if lang == "de" else {}
     shown = [{"kind": ln["kind"], "name": names.get(ln["name"], ln["name"]), "value": ln["value"], "unit": ln["unit"],
               "max": ln["max"], "share": ln["share"]} for ln in lines]
+    ideal = [{**line, "name": names.get(line["name"], line["name"])} for line in ideal_piece(census, item, table, cls)]
     return {"slot": item["slot_name"], "score": value, "letter": letter(value), "lines": shown,
-            "ideal": len([ln for ln in lines if ln["name"] in ideal]), "ideal_of": len(lines),
+            "ideal": len([line for line in ideal if line["have"]]), "ideal_of": len(ideal), "ideal_piece": ideal,
             "source": table.get("url"), "upgrade": None}
 
 
