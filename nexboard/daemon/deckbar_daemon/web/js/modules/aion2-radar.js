@@ -7,6 +7,7 @@ import { fill, el, api, S, field, input, select, button, chip, card, settingsRow
 
 const REICHWEITEN = { 50: "50 m", 100: "100 m", 150: "150 m", 300: "300 m", 600: "600 m" };
 const DREHUNG = { 0: "0°", 90: "90°", 180: "180°", 270: "270°" };
+const QUELLE = { tcpdump: "Eigenes Mitlesen (tcpdump)", capture: "Mitschnitt der Kampfdaten (Test)" };
 const TON = { aus: "Aus", piep: "Piepton", ansage: "Ansage" };
 // Wörter wie im A2Tools-Plugin „Boss Callouts“, von dem die Boss-Ansagen stammen
 const STIL = { beides: "Kurze Ansage und der Satz des Bosses", anweisung: "Kurze Ansage", zeile: "Der Satz des Bosses" };
@@ -162,7 +163,8 @@ function radarUndKarte(ctx) {
           settingsRow("Ausrichtung drehen", null, select(DREHUNG, String(k.drehung), (v) => setzen("drehung", Number(v)))),
           settingsRow("Spiegeln (Ost/West)", null, sw(k.spiegeln, (v) => setzen("spiegeln", v))),
           collapsible("Erweitert", view,
-            settingsRow("Laufrichtung oben", "Dreht das Radar mit, statt Norden oben. Ungeprüft.", sw(k.kurs_oben, (v) => setzen("kurs_oben", v))))),
+            settingsRow("Laufrichtung oben", "Dreht das Radar mit, statt Norden oben. Ungeprüft.", sw(k.kurs_oben, (v) => setzen("kurs_oben", v))),
+            settingsRow("Paketquelle", "Gilt für Radar, Warnungen und Feldbosse. Der Mitschnitt der Kampfdaten liest die Pakete ohnehin; damit entfällt das zweite Mitlesen. Noch nicht im Spiel bestätigt.", select(QUELLE, k.quelle, (v) => setzen("quelle", v))))),
         card("Karte", "Cube-Fundorte, Teleporter, gesehene Spawnpunkte und deine Position", null,
           settingsRow("Karte", null, select(karten, k.karte_name || "", (v) => setzen("karte_name", v))),
           settingsRow("Spieler folgen", "Ziehen pausiert es, Doppelklick auf die Karte folgt wieder", sw(k.karte_folgen, (v) => setzen("karte_folgen", v))),
