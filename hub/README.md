@@ -272,7 +272,9 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
     Gegenstand einmal pro Woche, 3 s Pause zwischen Seiten. MetaBot erlaubt das mit Link auf die Seite
     (Nutzungsbedingungen, „Data Usage & Attribution“): das Gegenstandsfenster verlinkt sie.
   - **Rechnung** (`rating.py`, rein): Punkte einer Zeile = Anteil der Top-Spieler × Wert ÷ größter Wert
-    des Platzes, Note = Summe ÷ bestes mögliches Stück, Bänder wie bei kisk (BiS ab 90, S+ ab 55 …).
+    des Platzes, Note = Summe ÷ bestes Stück des Platzes (die häufigsten Werte und Skills, so viele wie ein
+    Teil der Top-Spieler dort meist trägt, also für jedes Teil des Platzes gleich), Bänder wie bei kisk
+    (BiS ab 90, S+ ab 55 …).
     Upgrades: jede Zeile, die nicht zu den idealen gehört, neu würfeln, Ziel sind die fehlenden idealen
     Zeilen nach Priorität (auch bei S+). Die Chance pro Versuch kommt aus MetaBot; wie oft ein Wurf ein
     Skill wird, ist geschätzt (Anteil der Skill-Zeilen bei den Top-Spielern). Werte aus dem Durchbruch

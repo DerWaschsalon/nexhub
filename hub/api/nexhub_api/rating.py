@@ -8,7 +8,9 @@ Rein, ohne Netz und Datenbank. Eingaben:
           die deutschen Namen kommen über die Reihenfolge der Zeilen dazu
 
 Punkte einer Zeile = Anteil der Top-Spieler mit ihr auf diesem Platz × Wert ÷ größter Wert des Platzes.
-Note = Summe ÷ bestes mögliches Stück (die häufigsten Zeilen des Platzes, voll). Upgrades: jede Zeile,
+Note = Summe ÷ bestes Stück des Platzes: die häufigsten Zeilen, voll, und so viele davon, wie ein Teil der
+Top-Spieler dort meist trägt. Der Nenner hängt also nicht am eigenen Teil; ein Teil mit weniger Zeilen
+kann 100 nicht erreichen, und zwei Teile eines Platzes sind direkt vergleichbar. Upgrades: jede Zeile,
 die nicht zu den idealen gehört, neu würfeln, Ziel sind die fehlenden idealen Zeilen nach Priorität.
 """
 from __future__ import annotations
@@ -52,9 +54,11 @@ def lines_of(item: dict) -> list[dict]:
 # ---- Zählung (census.py speichert das Ergebnis je Klasse) ----
 
 def count_players(equipments: list[list[dict]]) -> dict:
-    """Je Platz: wie viele Spieler ihn bewertbar belegt haben, wie viele welche Zeile tragen und wie
-    viele Zeilen Werte bzw. Skills sind (für die Chance, dass ein Wurf ein Skill wird)."""
+    """Je Platz: wie viele Spieler ihn bewertbar belegt haben, wie viele welche Zeile tragen, wie viele
+    Zeilen Werte bzw. Skills sind (für die Chance, dass ein Wurf ein Skill wird), welche Zeilen Skills
+    sind und wie viele Werte und Skills ein Teil dort meist hat (`width`, für das beste Stück)."""
     slots: dict[str, dict] = {}
+    sizes: dict[str, Counter[tuple[int, int]]] = {}
     for equipment in equipments:
         seen: dict[str, set[str]] = {}
         for item in equipment:
@@ -62,15 +66,21 @@ def count_players(equipments: list[list[dict]]) -> dict:
             lines = lines_of(item)
             if not lines:
                 continue
-            entry = slots.setdefault(slot, {"players": 0, "lines": Counter(), "kinds": [0, 0]})
+            entry = slots.setdefault(slot, {"players": 0, "lines": Counter(), "kinds": [0, 0], "skills": set()})
             seen.setdefault(slot, set()).update(ln["name"] for ln in lines)
+            skills = [ln["name"] for ln in lines if ln["kind"] == "skill"]
+            entry["skills"].update(skills)
+            sizes.setdefault(slot, Counter())[len(lines) - len(skills), len(skills)] += 1
             if slot not in ARCANA:
-                for line in lines:
-                    entry["kinds"][line["kind"] == "skill"] += 1
+                entry["kinds"][0] += len(lines) - len(skills)
+                entry["kinds"][1] += len(skills)
         for slot, names in seen.items():
             slots[slot]["players"] += 1
             slots[slot]["lines"].update(names)
-    return {slot: {**e, "lines": dict(e["lines"])} for slot, e in slots.items()}
+    # die häufigste Größe statt der größten, damit ein einzelnes Sonderteil das beste Stück nicht verschiebt
+    return {slot: {**e, "lines": dict(e["lines"]), "skills": sorted(e["skills"]),
+                   "width": list(sizes[slot].most_common(1)[0][0])}
+            for slot, e in slots.items()}
 
 
 def add_tops(census: dict, items_by_slot: dict[str, set[str]], rolls: dict, cls: str) -> dict:
@@ -106,11 +116,22 @@ class Census:
         stats, skills = (self.slots.get(group(slot)) or {}).get("kinds") or [0, 0]
         return skills / (stats + skills) if stats + skills else 0.0
 
-    def best_piece(self, slot: str, n: int) -> float:
+    def rated(self, slot: str) -> bool:
+        """Zählungen von vor dem 24.11.2026 kennen `width` noch nicht; bis zur nächsten Zählung (stündlich)
+        gibt es für sie keine Note."""
+        return bool((self.slots.get(group(slot)) or {}).get("width"))
+
+    def best_piece(self, slot: str) -> float:
+        """Punkte des besten Stücks dieses Platzes: die häufigsten Werte und Skills, voll, so viele wie ein
+        Teil der Top-Spieler dort meist trägt. Gleich für jedes Teil des Platzes."""
         entry = self.slots.get(group(slot)) or {}
-        shares = sorted((c / entry["players"] for c in (entry.get("lines") or {}).values()), reverse=True) \
-            if entry.get("players") else []
-        return sum(shares[:n]) or 1.0
+        if not entry.get("width"):
+            return 1.0
+        skill_names = set(entry["skills"])
+        stats = sorted((n for name, n in entry["lines"].items() if name not in skill_names), reverse=True)
+        skills = sorted((n for name, n in entry["lines"].items() if name in skill_names), reverse=True)
+        wide_stats, wide_skills = entry["width"]
+        return sum(stats[:wide_stats] + skills[:wide_skills]) / entry["players"] or 1.0
 
 
 # ---- Bewertung eines Gegenstands ----
@@ -136,7 +157,7 @@ def score(census: Census, item: dict, table: dict, cls: str) -> tuple[float, lis
         line["share"] = round(census.share(item["slot_name"], line["name"]), 3)
         line["max"] = own_max.get(line["name"]) or census.top(item["slot_name"], line["name"])
         line["points"] = points(census, item["slot_name"], line["name"], line["value"])
-    best = census.best_piece(item["slot_name"], max(len(lines), 1))
+    best = census.best_piece(item["slot_name"])
     return round(100 * sum(ln["points"] for ln in lines) / best, 1), lines
 
 
@@ -191,7 +212,7 @@ def upgrade(census: Census, item: dict, table: dict, cls: str) -> dict | None:
     ideal = ideal_lines(census, item, table, cls, len(lines))
     missing = [nm for nm in ideal if nm not in {ln["name"] for ln in lines}]
     weak = sorted((ln for ln in lines if ln["name"] not in ideal), key=lambda ln: ln["points"])
-    best = census.best_piece(slot, max(len(lines), 1))
+    best = census.best_piece(slot)
     candidates = pool(census, item, table, cls)
     steps, lo_total, hi_total = [], now, now
     for line in weak:
@@ -260,7 +281,7 @@ def rate(census: dict, rolls: dict, en: dict, de: dict | None, cls: str, lang: s
         table = rolls.get(item["name"]) or {}
         if not lines_of(item) or not (table.get("rolls") or item["slot_name"] in ARCANA):
             continue
-        if not (c.slots.get(group(item["slot_name"])) or {}).get("players"):
+        if not c.rated(item["slot_name"]):
             continue
         items.append(rate_item(c, item, by_slot_de.get(item["slot_name"]), table, cls, lang))
     size = max((e["players"] for e in c.slots.values()), default=0)

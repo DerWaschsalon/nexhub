@@ -9,11 +9,12 @@ from __future__ import annotations
 
 # Klassen, die Schaden machen. Für Tank und Heiler wären Verteidigung und LP kein verschenkter Wert.
 DAMAGE_CLASSES = {"ranger", "assassin", "gladiator", "sorcerer", "spiritmaster"}
-# Kennungen von Werten, die einem Schadens-Build nichts bringen (in jeder Sprache gleich)
+# Kennungen von Werten, die einem Schadens-Build nichts bringen (in jeder Sprache gleich). Lauftempo
+# („MoveSpeed“) gehört nicht dazu: fertig gewürfelte Top-Spieler tragen es auf Stiefeln und Ohrringen.
 WASTED_FOR_DAMAGE = {
     "HPMax", "MPMax", "HPRegen", "MPRegen", "Restoration", "HpPotionRate",
     "ArmorDefense", "ArmorEvasion", "Evasion", "Block", "CriticalResist", "CriticalDamageDefense",
-    "PvEDecreaseDamage", "PvPDamageDefense", "FrontAttackDefense", "MoveSpeed",
+    "PvEDecreaseDamage", "PvPDamageDefense", "FrontAttackDefense",
 }
 ORDER = ("sockel", "verzaubern", "stein", "nebenwert", "set")  # leere Sockel sind am schnellsten erledigt
 
