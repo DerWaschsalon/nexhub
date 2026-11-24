@@ -52,6 +52,14 @@ else
   echo "Zweig $(git rev-parse --abbrev-ref HEAD) hat keinen Upstream – überspringe git pull."
 fi
 NEW=$(git rev-parse HEAD)
+# „Neu in dieser Version“ für die Web-UI: die gemergten PRs seit dem alten Stand (infra/changelog.py).
+# Nur ein Hinweis: scheitert das, läuft das Update trotzdem weiter.
+NEWS=${XDG_CONFIG_HOME:-$HOME/.config}/deckbar/updates-news.json
+if [[ $OLD != "$NEW" ]] && python3 ../infra/changelog.py "$OLD..$NEW" > "$NEWS.tmp" 2>/dev/null; then
+  mv "$NEWS.tmp" "$NEWS"
+else
+  rm -f "$NEWS.tmp"
+fi
 changed() { [[ $OLD != "$NEW" ]] && ! git diff --quiet "$OLD" "$NEW" -- "$@"; }
 SUMMARY=()
 [[ -n ${SUMMARY_SWITCH-} ]] && SUMMARY+=("$SUMMARY_SWITCH")

@@ -62,12 +62,19 @@ class UpdatesModule(WebModule):
         router.add_get("/api/updates", self.api_get)
         router.add_post("/api/updates/check", self.api_check)
         router.add_post("/api/updates/run", self.api_run)
+        router.add_post("/api/updates/news/seen", self.api_news_seen)
 
     async def api_get(self, request: web.Request) -> web.Response:
         return web.json_response(self.ui_info())
 
     async def api_check(self, request: web.Request) -> web.Response:
         await self.updates.check()
+        return web.json_response(self.ui_info())
+
+    async def api_news_seen(self, request: web.Request) -> web.Response:
+        """„Neu in dieser Version“ als gelesen: Die Liste verschwindet bis zum nächsten Update."""
+        self.updates.dismiss_news()
+        await self.changed()
         return web.json_response(self.ui_info())
 
     async def api_run(self, request: web.Request) -> web.Response:
