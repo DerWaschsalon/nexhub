@@ -275,10 +275,12 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
     des Platzes, Note = Summe ÷ bestes Stück des Platzes (die häufigsten Werte und Skills, so viele wie ein
     Teil der Top-Spieler dort meist trägt, also für jedes Teil des Platzes gleich), Bänder wie bei kisk
     (BiS ab 90, S+ ab 55 …).
-    Upgrades: jede Zeile, die nicht zu den idealen gehört, neu würfeln, Ziel sind die fehlenden idealen
-    Zeilen nach Priorität (auch bei S+). Die Chance pro Versuch kommt aus MetaBot; wie oft ein Wurf ein
-    Skill wird, ist geschätzt (Anteil der Skill-Zeilen bei den Top-Spielern). Werte aus dem Durchbruch
-    schickt NC nicht.
+  - **Upgrade-Plan** (`upgrades.py`, rein; `GET /api/armory/{id}/upgrades?goal=S%2B&lang=de`): Ziel ist S+ (oder
+    BiS). Je Teil die höchstens drei Zeilen, die im Mittel die wenigsten Versuche bis zur Zielnote brauchen;
+    ein Ziel zählt nur, wenn es schon beim schlechtesten Wurf seinen Anteil bringt. Jedes Teil steht in genau
+    einer Gruppe: würfeln (`cards`, sortiert nach Punkten je Versuch), nur noch binden, schon dort, nicht
+    erreichbar, Arkana. Die Chance pro Versuch kommt aus MetaBot; wie oft ein Wurf ein Skill wird, ist
+    geschätzt (Anteil der Skill-Zeilen bei den Top-Spielern). Werte aus dem Durchbruch schickt NC nicht.
   - **Web**: Note je Platz (`EquipmentPanel`), Rolls mit Höchstwert und Anteil und „Weg zu Best in Slot“
     im Gegenstandsfenster (`modules/logs/rating.ts`, `UpgradeSteps`, `RatingBadge`).
 - Profil (Armory, Mitspieler eines Runs) und BiS-Listen teilen sich das Charakterfenster `CharacterLayout`

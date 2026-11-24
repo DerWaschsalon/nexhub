@@ -10,8 +10,8 @@ Rein, ohne Netz und Datenbank. Eingaben:
 Punkte einer Zeile = Anteil der Top-Spieler mit ihr auf diesem Platz × Wert ÷ größter Wert des Platzes.
 Note = Summe ÷ bestes Stück des Platzes: die häufigsten Zeilen, voll, und so viele davon, wie ein Teil der
 Top-Spieler dort meist trägt. Der Nenner hängt also nicht am eigenen Teil; ein Teil mit weniger Zeilen
-kann 100 nicht erreichen, und zwei Teile eines Platzes sind direkt vergleichbar. Upgrades: jede Zeile,
-die nicht zu den idealen gehört, neu würfeln, Ziel sind die fehlenden idealen Zeilen nach Priorität.
+kann 100 nicht erreichen, und zwei Teile eines Platzes sind direkt vergleichbar. Den Weg zu einer
+besseren Note plant upgrades.py.
 """
 from __future__ import annotations
 
@@ -172,77 +172,9 @@ def ideal_lines(census: Census, item: dict, table: dict, cls: str, n: int) -> li
     return ranked[:n]
 
 
-def pool(census: Census, item: dict, table: dict, cls: str) -> list[dict]:
-    """Was beim Neuwürfeln einer Zeile kommen kann, ohne die Zeilen, die schon drauf sind: Werte mit
-    ihrer Chance von MetaBot, Skills geschätzt über den Anteil der Skill-Zeilen auf dem Platz."""
-    have = {ln["name"] for ln in lines_of(item)}
-    stats = [r for r in table.get("rolls") or [] if r["name"] not in have]
-    skill_table = (table.get("skills") or {}).get(cls) or {}
-    skills = [o for o in skill_table.get("options") or [] if o["name"] not in have]
-    p_skill = census.p_skill(item["slot_name"]) if skills and stats else (1.0 if skills else 0.0)
-    out = []
-    total = sum(r["chance"] for r in stats) or 1.0
-    for r in stats:
-        out.append({"name": r["name"], "name_de": r.get("name_de"), "chance": (1 - p_skill) * r["chance"] / total,
-                    "lo": r["min"], "hi": r["max"]})
-    total = sum(o["chance"] for o in skills) or 1.0
-    for o in skills:
-        out.append({"name": o["name"], "name_de": o.get("name_de"), "chance": p_skill * o["chance"] / total,
-                    "lo": 1.0, "hi": float(skill_table.get("max_level") or 1)})
-    return out
-
-
-def _gains(census: Census, slot: str, line: dict, candidates: list[dict], best: float) -> list[dict]:
-    """Zugewinn in Punkten, wenn diese Zeile zu einem der Kandidaten wird (niedrigster/höchster Wurf)."""
-    out = []
-    for c in candidates:
-        lo = 100 * (points(census, slot, c["name"], c["lo"]) - line["points"]) / best
-        hi = 100 * (points(census, slot, c["name"], c["hi"]) - line["points"]) / best
-        out.append({**c, "gain_lo": round(lo, 1), "gain_hi": round(hi, 1)})
-    return out
-
-
-def upgrade(census: Census, item: dict, table: dict, cls: str) -> dict | None:
-    """Weg zu Best in Slot: jede Zeile, die nicht ideal ist, neu würfeln (die schwächste zuerst); Ziel
-    sind die fehlenden idealen Zeilen nach Priorität, daneben, was mindestens halb so viel bringt."""
-    if not table.get("rolls"):
-        return None  # Arkana und feste Werte (Armbänder) würfelt man nicht neu
-    now, lines = score(census, item, table, cls)
-    slot = item["slot_name"]
-    ideal = ideal_lines(census, item, table, cls, len(lines))
-    missing = [nm for nm in ideal if nm not in {ln["name"] for ln in lines}]
-    weak = sorted((ln for ln in lines if ln["name"] not in ideal), key=lambda ln: ln["points"])
-    best = census.best_piece(slot)
-    candidates = pool(census, item, table, cls)
-    steps, lo_total, hi_total = [], now, now
-    for line in weak:
-        if not missing:
-            break
-        gains = _gains(census, slot, line, candidates, best)
-        hits = sorted((g for g in gains if g["name"] in missing), key=lambda g: missing.index(g["name"]))
-        if not hits:
-            continue
-        top = max(g["gain_hi"] for g in hits)
-        fallback = sorted((g for g in gains
-                           if g["name"] not in missing and g["gain_lo"] > 0 and g["gain_hi"] >= top / 2),
-                          key=lambda g: -g["gain_hi"])
-        steps.append({"line": line, "chance": round(100 * sum(g["chance"] for g in hits), 1),
-                      "best": hits, "good": fallback})
-        # angenommen, die wichtigste fehlende Zeile kommt; sie fällt für die nächsten Schritte weg
-        landed = hits[0]
-        lo_total += landed["gain_lo"]
-        hi_total += landed["gain_hi"]
-        missing.remove(landed["name"])
-        candidates = [c for c in candidates if c["name"] != landed["name"]]
-    if not steps:
-        return None
-    lo_total, hi_total = round(min(lo_total, 100.0), 1), round(min(hi_total, 100.0), 1)
-    return {"steps": steps, "after": [lo_total, hi_total], "after_letter": letter(lo_total)}
-
-
 # ---- Ausgabe für die Armory ----
 
-def _names_de(item_en: dict, item_de: dict | None) -> dict[str, str]:
+def names_de(item_en: dict, item_de: dict | None) -> dict[str, str]:
     """Englischer → deutscher Name der Zeilen eines Gegenstands, über ihre Reihenfolge bei NC."""
     if not item_de:
         return {}
@@ -250,30 +182,21 @@ def _names_de(item_en: dict, item_de: dict | None) -> dict[str, str]:
             if en["kind"] == de["kind"]}
 
 
-def _target(g: dict, lang: str) -> dict:
-    name = (g.get("name_de") or g["name"]) if lang == "de" else g["name"]
-    return {"name": name, "gain_lo": g["gain_lo"], "gain_hi": g["gain_hi"]}
-
-
 def rate_item(census: Census, item: dict, item_de: dict | None, table: dict, cls: str, lang: str) -> dict:
     """Bewertung eines Gegenstands in einer Sprache (Format wie modules/logs/rating.ts)."""
     value, lines = score(census, item, table, cls)
     ideal = set(ideal_lines(census, item, table, cls, len(lines)))
-    names = _names_de(item, item_de) if lang == "de" else {}
-    up = upgrade(census, item, table, cls)
+    names = names_de(item, item_de) if lang == "de" else {}
     shown = [{"kind": ln["kind"], "name": names.get(ln["name"], ln["name"]), "value": ln["value"], "unit": ln["unit"],
               "max": ln["max"], "share": ln["share"]} for ln in lines]
-    steps = [{"line": names.get(s["line"]["name"], s["line"]["name"]), "chance": s["chance"],
-              "tiers": {k: [_target(g, lang) for g in s[k]] for k in ("best", "good") if s[k]}}
-             for s in up["steps"]] if up else []
     return {"slot": item["slot_name"], "score": value, "letter": letter(value), "lines": shown,
             "ideal": len([ln for ln in lines if ln["name"] in ideal]), "ideal_of": len(lines),
-            "source": table.get("url"),
-            "upgrade": {"steps": steps, "after": up["after"], "after_letter": up["after_letter"]} if up else None}
+            "source": table.get("url"), "upgrade": None}
 
 
 def rate(census: dict, rolls: dict, en: dict, de: dict | None, cls: str, lang: str) -> dict:
-    """Alle bewertbaren Gegenstände eines Charakters: Würfeltabelle vorhanden oder Arkana."""
+    """Alle bewertbaren Gegenstände eines Charakters: Würfeltabelle vorhanden oder Arkana. Den Weg zur
+    Zielnote (`upgrade`) trägt die Armory-Route aus upgrades.plan() nach."""
     c = Census(census["slots"], census.get("tops") or {})
     by_slot_de = {i["slot_name"]: i for i in (de or {}).get("equipment") or []}
     items = []

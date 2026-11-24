@@ -4,6 +4,7 @@
     GET    /api/armory                           alle eingetragenen Charaktere, ohne die Daten
     POST   /api/armory                           eigenen Charakter eintragen (Treffer aus der Suche)
     GET    /api/armory/{id}                      Momentaufnahme und Verlauf
+    GET    /api/armory/{id}/upgrades             Upgrade-Plan (routes/upgrades.py)
     DELETE /api/armory/{id}                      austragen (wer eingetragen hat oder ein Admin)
     POST   /api/armory/{id}/refresh              jetzt neu abrufen (alle, höchstens alle 10 Minuten)
     POST   /api/armory/compare/share             Teilen-Link für einen Vergleich (öffentlich unter /v/<token>)
@@ -30,6 +31,7 @@ from ..deps import DB, CurrentUser, SettingsDep
 from ..models import Character, CharacterDay, ClassCensus, Comparison, ItemRolls, User
 from ..ratgeber import hints
 from ..rating import rate
+from ..upgrades import plan
 from .characters import CharacterOut, _out
 from .runs import Shared
 
@@ -110,7 +112,7 @@ def _profile_of(row: Character) -> dict:
     return {out: p.get(key) for out, key in PROFILE.items()}
 
 
-async def _get(db: DB, character_id: int) -> tuple[Character, User]:
+async def character_or_404(db: DB, character_id: int) -> tuple[Character, User]:
     found = (await db.execute(select(Character, User).join(User, User.id == Character.user_id)
                               .where(Character.id == character_id))).first()
     if found is None:
@@ -188,7 +190,7 @@ def comparison_url(settings: Settings, row: Comparison) -> str:
 
 async def load_comparison(request: Request, db: DB, row: Comparison, lang: str) -> ComparisonOut:
     """Einen geteilten Vergleich laden: links aus der Armory, rechts live von der Website."""
-    left, _ = await _get(db, row.left_id)
+    left, _ = await character_or_404(db, row.left_id)
     side = Side(name=left.name, cls=left.cls, class_name=_profile_of(left)["class_name"], data=left.data)
     try:
         return ComparisonOut(left=side, right=await fetch_live(request, row.right_name, row.right_server_id, lang),
@@ -202,7 +204,7 @@ async def load_comparison(request: Request, db: DB, row: Comparison, lang: str) 
 @router.post("/compare/share")
 async def share_comparison(body: CompareShare, user: CurrentUser, db: DB, settings: SettingsDep) -> Shared:
     """Teilen-Link erzeugen; teilt dasselbe Konto denselben Vergleich noch einmal, bleibt es beim Link."""
-    await _get(db, body.left)
+    await character_or_404(db, body.left)
     if shard_of(body.server_id) is None:
         raise HTTPException(422, "Server nicht unterstützt")
     name = body.name.strip()
@@ -258,23 +260,37 @@ async def add(body: NewCharacter, request: Request, user: CurrentUser, db: DB,
     return ArmoryOut(**_armory_out(row, user, user, _profile_of(row)))
 
 
-async def _ratings(db: DB, row: Character) -> dict[str, dict]:
-    """Bewertung je Sprache aus der gespeicherten Zählung der Klasse und den Würfeltabellen (census.py)."""
+async def rating_inputs(db: DB, row: Character) -> tuple[dict, dict, dict, dict, str] | None:
+    """Was Bewertung und Upgrade-Plan brauchen: Zählung der Klasse, Würfeltabellen der getragenen
+    Gegenstände, Momentaufnahme englisch und deutsch, Klasse. None ohne Zählung oder ohne Daten."""
     cls = character_class(row)
     census = await db.get(ClassCensus, cls) if cls and row.data else None
-    if census is None or not row.data:
-        return {}
+    if census is None or not row.data or not cls:
+        return None
     en, de = localized(row.data, "en"), localized(row.data, "de")
     names = {str(e.get("name")) for e in en.get("equipment") or []}
     rolls = {r.name: r.data for r in (await db.scalars(select(ItemRolls).where(ItemRolls.name.in_(names)))).all()
              if r.data}
-    data = {**census.data, "group": census.group_label}
-    return {lang: rate(data, rolls, en, de, cls, lang) for lang in LANGS}
+    return {**census.data, "group": census.group_label}, rolls, en, de, cls
+
+
+async def _ratings(db: DB, row: Character) -> dict[str, dict]:
+    """Bewertung je Sprache (rating.py); je Gegenstand hängt der Weg zur Zielnote aus dem Upgrade-Plan daran."""
+    inputs = await rating_inputs(db, row)
+    if inputs is None:
+        return {}
+    out = {}
+    for lang in LANGS:
+        cards = {card["slot"]: card for card in plan(*inputs, lang)["cards"]}
+        out[lang] = rate(*inputs, lang)
+        for item in out[lang]["items"]:
+            item["upgrade"] = cards.get(item["slot"])
+    return out
 
 
 @router.get("/{character_id}")
 async def get_character(character_id: int, user: CurrentUser, db: DB) -> ArmoryDetail:
-    row, owner = await _get(db, character_id)
+    row, owner = await character_or_404(db, character_id)
     days = await db.scalars(select(CharacterDay).where(CharacterDay.character_id == row.id).order_by(CharacterDay.day))
     return ArmoryDetail(**_armory_out(row, owner, user, _profile_of(row)),
                         data=row.data, error=row.error,
@@ -286,7 +302,7 @@ async def get_character(character_id: int, user: CurrentUser, db: DB) -> ArmoryD
 
 @router.delete("/{character_id}", status_code=204)
 async def remove(character_id: int, user: CurrentUser, db: DB) -> None:
-    row, _ = await _get(db, character_id)
+    row, _ = await character_or_404(db, character_id)
     if not _may_manage(row, user):
         raise HTTPException(403, "Nur wer eingetragen hat, oder ein Admin")
     # ausdrücklich, weil SQLite (Tests) ON DELETE CASCADE ohne PRAGMA foreign_keys nicht ausführt
@@ -304,7 +320,7 @@ class Started(BaseModel):
 async def refresh(character_id: int, request: Request, user: CurrentUser, db: DB,
                   background: BackgroundTasks) -> Started:
     armory = _armory(request)
-    row, _ = await _get(db, character_id)
+    row, _ = await character_or_404(db, character_id)
     if row.status == "offen" or character_id in armory.running:
         raise HTTPException(409, "Wird gerade abgerufen")
     last = aware(row.fetched_at) if row.fetched_at else None

@@ -70,6 +70,13 @@ def test_zaehlung_aus_dem_bestand_der_bis_listen(make_client, fake, database_url
     assert item["source"] == "https://metabot.gg/en/aion-2/items/testbogen"
     assert d["ratings"]["de"]["group"] == "EU · Altboss · Hard 5"
 
+    # Upgrade-Plan: der Bogen ist schon auf Zielnote, auch gegen BiS
+    plan = c.get(f"/api/armory/{cid}/upgrades", params={"goal": "BiS", "lang": "de"}).json()
+    assert plan["goal"] == "BiS" and plan["group"] == "EU · Altboss · Hard 5"
+    assert [p["slot"] for p in plan["done"]] == ["MainHand"] and plan["cards"] == []
+    assert c.get(f"/api/armory/{cid}/upgrades").json()["goal"] == "S+"
+    assert c.get(f"/api/armory/{cid}/upgrades", params={"goal": "A"}).status_code == 422
+
 
 def test_wuerfeltabellen_nur_einmal_pro_woche(make_client, fake, database_url):
     async def work(census: Census, _):
@@ -87,3 +94,4 @@ def test_ohne_zaehlung_keine_bewertung(make_client, fake):
     c = login(make_client, fake, MEMBER)
     cid = c.post("/api/armory", json=NEW, headers=ORIGIN).json()["id"]
     assert c.get(f"/api/armory/{cid}").json()["ratings"] == {}
+    assert c.get(f"/api/armory/{cid}/upgrades").json() is None
