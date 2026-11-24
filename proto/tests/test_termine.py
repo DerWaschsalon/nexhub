@@ -2,7 +2,7 @@
 Die Erwartungen im November stammen von kisk.app/timers/eu (abgerufen am 24.11.2026)."""
 from datetime import datetime, timezone
 
-from nexproto.termine import EVENT_BY_KEY, EVENTS, cycle, next_start, upcoming
+from nexproto.termine import EVENT_BY_KEY, EVENTS, cycle, next_start, starts_between, upcoming
 
 
 def utc(text: str) -> float:
@@ -52,3 +52,11 @@ def test_eigene_ereignisse_rechnen_ohne_server_uhr():
 
 def test_schluessel_sind_eindeutig():
     assert len(EVENT_BY_KEY) == len(EVENTS)
+
+
+def test_wochenplan():
+    week = (utc("2026-11-24 12:00"), utc("2026-12-01 12:00"))
+    assert starts_between(EVENT_BY_KEY["artifact_siege"], *week) == [utc("2026-11-26 20:00"), utc("2026-11-28 20:00")]
+    assert starts_between(EVENT_BY_KEY["nahma"], *week) == [utc("2026-11-27 20:00"), utc("2026-11-29 20:00")]
+    # mitten im offenen Fenster zählt die laufende Belagerung nicht mehr mit
+    assert starts_between(EVENT_BY_KEY["artifact_siege"], utc("2026-11-26 20:30"), week[1]) == [utc("2026-11-28 20:00")]

@@ -9,6 +9,7 @@
 		shield: 'M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6zM9 12l2 2 4-4',
 		chart: 'M4 4v16h16M7.5 15l3.5-4 3 2.5 5-6.5',
 		bot: 'M5 9h14v10H5zM12 5v4M12 5h.01M9 13h.01M15 13h.01M9.5 16.5h5M3 13v2M21 13v2',
+		clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2',
 		logout: 'M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10'
 	} as const;
 	export type IconName = keyof typeof PATHS;

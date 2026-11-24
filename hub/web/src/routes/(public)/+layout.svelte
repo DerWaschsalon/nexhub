@@ -13,6 +13,7 @@
 <header class="glass">
 	<Brand />
 	<div class="right">
+		<a class="page-link" href="/termine">{t('schedule.nav')}</a>
 		<LangSwitch />
 		{#if data.me}
 			<a class="btn primary small" href="/hub">{t('shell.toHub')}</a>
@@ -51,6 +52,15 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
+	}
+	.page-link {
+		color: var(--dim);
+		font-size: 14px;
+		font-weight: 550;
+		text-decoration: none;
+	}
+	.page-link:hover {
+		color: var(--text);
 	}
 	main {
 		max-width: 1100px;

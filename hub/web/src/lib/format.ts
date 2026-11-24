@@ -37,6 +37,15 @@ export function formatDuration(ms: number): string {
 	return sign + (h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`);
 }
 
+/** Restzeit eines Countdowns aus Sekunden: "2 h 05 min", unter einer Stunde "12:34"; nie negativ. */
+export function formatCountdown(seconds: number): string {
+	const s = Math.max(0, Math.round(seconds));
+	const h = Math.floor(s / 3600);
+	const m = Math.floor((s % 3600) / 60);
+	if (h) return `${h} h ${String(m).padStart(2, '0')} min`;
+	return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
 /** Achsenmarken für Zeitachsen: runde Schritte, höchstens `max` Stück. */
 export function timeTicks(durationMs: number, max = 8): number[] {
 	const step = [5, 10, 15, 30, 60, 120, 300, 600].map((s) => s * 1000).find((s) => durationMs / s <= max) ?? 600_000;
