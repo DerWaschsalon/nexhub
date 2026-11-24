@@ -2,6 +2,7 @@ name: Pakete
 
 # nexproto: Formate und alle daraus erzeugten Dateien (Schemas, C, JS, TS, Rust) aktuell
 # nexcore: Tests, Lint, strikte Typen und Abhängigkeitsrichtung
+# infra: Skripte mit eigener Logik (Changelog)
 on:
   push:
     branches: [main]
@@ -30,3 +31,10 @@ jobs:
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run mypy
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx pytest -q infra/tests
