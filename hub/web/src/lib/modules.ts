@@ -20,6 +20,7 @@ export const NAV: NavItem[] = [
 	{ href: '/hub', label: 'nav.overview', icon: 'home' },
 	...MODULES.flatMap((m) => m.nav),
 	{ href: '/hub/admin/konten', label: 'nav.accounts', icon: 'users', admin: true },
+	{ href: '/hub/admin/statistik', label: 'nav.stats', icon: 'chart', admin: true },
 	{ href: '/hub/admin/system', label: 'nav.system', icon: 'server', admin: true }
 ];
 
