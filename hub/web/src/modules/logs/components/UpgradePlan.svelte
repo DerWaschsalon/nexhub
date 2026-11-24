@@ -50,6 +50,7 @@
 	<span class="dim">{t('logs.upgrades.goal')}</span>
 	<Tabs tabs={goals} active={plan.goal} label={t('logs.upgrades.goal')} />
 	{#if plan.group}<span class="chip">{plan.group}</span>{/if}
+	<a class="how" href="/hub/bewertung#upgrades">{t('logs.upgrades.how')}</a>
 </div>
 
 {#if hints.length}
@@ -105,6 +106,10 @@
 		align-items: center;
 		gap: 10px;
 		margin-bottom: 14px;
+	}
+	.how {
+		margin-left: auto;
+		font-size: 13px;
 	}
 	.panel {
 		padding: 14px 16px;

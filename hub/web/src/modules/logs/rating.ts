@@ -83,6 +83,18 @@ export type Rating = {
 /** Bewertung eines Charakters: je Ausrüstungsplatz, dazu woher die Vergleichsgruppe stammt */
 export type Ratings = { size: number; group: string; items: Rating[] };
 
+/** Antwort von GET /api/rating/rules: die Zahlen hinter Note und Upgrade-Plan (routes/rating.py) */
+export type RatingRules = {
+	bounds: { letter: string; low: number }[];
+	region: string;
+	pool_size: number;
+	goals: string[];
+	default_goal: string;
+	max_rerolls: number;
+	tier_best: number;
+	tier_good: number;
+};
+
 /** Farbe je Note, von BiS (orange) bis D (grau) */
 export const LETTER_COLOR: Record<string, string> = {
 	BiS: '#ff9d3a',
