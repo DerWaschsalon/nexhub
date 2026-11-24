@@ -69,9 +69,13 @@ def test_ohne_wuerfeltabelle_nicht_erreichbar():
 def test_nur_noch_binden():
     # dieselben idealen Zeilen wie TOP, aber niedrig gewürfelt und erst halb gebunden
     low = shield(("Combat Speed", "5%"), ("Weapon Damage Boost", "3%"), ("Might", "10"), ("Multi-hit Chance", "4%"))
-    low["detail"]["soul_bind_rate"] = 50.0
+    low["detail"]["soul_bind_rate"] = "50"  # als Text, wie die NC-API sie liefert
     out = upgrades.plan(census(), ROLLS, {"equipment": [low]}, None, "ranger", "en")
     assert [p["slot"] for p in out["bind"]] == [SLOT] and out["cards"] == []
+    for unreadable, group in (("100", "cards"), ("", "cards"), (None, "cards")):  # voll gebunden oder unbekannt: würfeln
+        low["detail"]["soul_bind_rate"] = unreadable
+        out = upgrades.plan(census(), ROLLS, {"equipment": [low]}, None, "ranger", "en")
+        assert out["bind"] == [] and len(out[group]) + len(out["unreachable"]) == 1, unreadable
 
 
 def test_deutsche_namen():
