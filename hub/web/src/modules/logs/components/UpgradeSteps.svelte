@@ -1,6 +1,7 @@
 <!-- Die Würfel-Schritte eines Gegenstands: welche Zeile neu würfeln, Chance pro Versuch, Ziele in
      Stufen mit ihrem Zugewinn. Für den Reiter „Upgrades“ und das Gegenstandsfenster. -->
 <script lang="ts">
+	import { formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { RerollStep, RerollTarget } from '../rating.ts';
 
@@ -22,6 +23,8 @@
 			<p>
 				{before}<b>{s.line}</b>{after}
 				<span class="chance">{t('logs.rating.chance', { n: Math.round(s.chance) })}</span>
+				<span class="dim">{t('logs.rating.tries', { n: formatNumber(Math.ceil(s.tries)) })}</span>
+				{#if s.skill_only}<span class="chip">{t('logs.rating.beforeBind')}</span>{/if}
 			</p>
 			{#each TIERS as tier (tier)}
 				{@const list = s.tiers[tier]}
@@ -51,7 +54,7 @@
 		margin: 2px 0;
 	}
 	.chance {
-		margin-left: 6px;
+		margin: 0 6px;
 		color: var(--game-gold);
 		font-weight: 700;
 	}

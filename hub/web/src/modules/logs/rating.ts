@@ -48,9 +48,13 @@ export type UpgradeCard = PlanPiece & {
 	per_try: number;
 };
 
+/** Zielnoten des Upgrade-Plans (upgrades.py: GOALS); die erste gilt, wenn die Adresse keine nennt */
+export const GOALS = ['S+', 'BiS'] as const;
+export const DEFAULT_GOAL = GOALS[0];
+
 /** Antwort von GET /api/armory/{id}/upgrades: jedes Teil in genau einer Gruppe */
 export type UpgradePlan = {
-	goal: 'S+' | 'BiS';
+	goal: (typeof GOALS)[number];
 	group: string;
 	cards: UpgradeCard[];
 	bind: PlanPiece[];

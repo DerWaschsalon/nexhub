@@ -1,8 +1,5 @@
-<!-- Ein Charakter der Armory: Ansicht wie im Spiel (CharacterSheet), im Kopf der Verlauf, dazu
-     Aktualisieren und Entfernen. Solange der Abruf läuft, alle 5 s neu laden. -->
+<!-- Ein Charakter der Armory: Ansicht wie im Spiel (CharacterSheet), im Kopf der Verlauf. -->
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
-	import { api } from '#lib/api.ts';
 	import DayChart from '#lib/components/DayChart.svelte';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import { classColor, classFromName } from '#modules/logs/classes.ts';
@@ -12,52 +9,7 @@
 	let { data }: PageProps = $props();
 	const c = $derived(data.character);
 	const cls = $derived(c.cls ?? classFromName(c.class_name));
-	let error = $state('');
-
-	$effect(() => {
-		if (c.status !== 'offen') return;
-		const timer = setInterval(() => invalidateAll(), 5000);
-		return () => clearInterval(timer);
-	});
-
-	async function refresh() {
-		error = '';
-		try {
-			await api<unknown>(`/api/armory/${c.id}/refresh`, { method: 'POST' });
-			await invalidateAll();
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		}
-	}
-
-	async function remove() {
-		if (!confirm(t('armory.confirmRemove', { name: c.name }))) return;
-		try {
-			await api<void>(`/api/armory/${c.id}`, { method: 'DELETE' });
-			await goto('/hub/armory');
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		}
-	}
 </script>
-
-<svelte:head><title>{c.name} · {t('armory.title')} · NexHub</title></svelte:head>
-
-<div class="bar">
-	<a class="back" href="/hub/armory">‹ {t('armory.back')}</a>
-	<span class="actions">
-		<a class="btn small" href="/hub/armory/vergleich?links={c.id}">{t('armory.compare')}</a>
-		<button class="btn small" onclick={refresh} disabled={c.status === 'offen'}>{t('armory.refresh')}</button>
-		{#if c.can_delete}<button class="btn small danger" onclick={remove}>{t('armory.remove')}</button>{/if}
-	</span>
-</div>
-
-{#if c.status === 'offen'}
-	<p class="notice" role="status">{t('armory.updating')}</p>
-{:else if c.status !== 'ok' && c.data}
-	<p class="notice error" role="alert">{t('armory.lastFailed', { why: c.error ?? '' })}</p>
-{/if}
-{#if error}<p class="notice error" role="alert">{error}</p>{/if}
 
 {#if c.data}
 	<CharacterSheet character={{ ...c, cls }} data={c.data} source={t('armory.source')} ratings={c.ratings[i18n.lang] ?? c.ratings.en}>
@@ -83,24 +35,6 @@
 {/if}
 
 <style>
-	.bar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-		margin-bottom: 14px;
-	}
-	.bar .back {
-		margin-bottom: 0;
-	}
-	.actions {
-		display: flex;
-		gap: 8px;
-	}
-	.notice {
-		margin-bottom: 14px;
-	}
 	h2 {
 		font-size: 17px;
 		margin-bottom: 10px;
