@@ -12,7 +12,7 @@
 
 <svelte:head><title>{t('legal.privacy')} · NexHub</title></svelte:head>
 
-<article class="glass pad legal-page">
+<article class="glass pad prose">
 	{#if i18n.lang === 'de'}
 		<h1>Datenschutzerklärung</h1>
 		<p class="dim">Stand: November 2026</p>
@@ -206,31 +206,3 @@
 		</p>
 	{/if}
 </article>
-
-<style>
-	.legal-page {
-		max-width: 760px;
-		margin: 0 auto;
-	}
-	h1 {
-		font-size: 28px;
-	}
-	h2 {
-		font-size: 17px;
-		margin: 26px 0 8px;
-	}
-	p,
-	li {
-		color: var(--dim);
-	}
-	p {
-		margin: 0 0 10px;
-	}
-	ul {
-		margin: 0 0 10px;
-		padding-left: 20px;
-	}
-	code {
-		font-size: 13px;
-	}
-</style>

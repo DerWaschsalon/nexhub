@@ -95,3 +95,11 @@ def test_ohne_zaehlung_keine_bewertung(make_client, fake):
     cid = c.post("/api/armory", json=NEW, headers=ORIGIN).json()["id"]
     assert c.get(f"/api/armory/{cid}").json()["ratings"] == {}
     assert c.get(f"/api/armory/{cid}/upgrades").json() is None
+
+
+def test_regeln_der_bewertung(make_client, fake, client):
+    assert client.get("/api/rating/rules").status_code == 401
+    rules = login(make_client, fake, MEMBER).get("/api/rating/rules").json()
+    assert rules["bounds"][0] == {"letter": "BiS", "low": 90.0} and rules["bounds"][-1]["letter"] == "D"
+    assert rules["default_goal"] == "S+" and rules["goals"] == ["S+", "BiS"] and rules["max_rerolls"] == 3
+    assert rules["region"] == "EU"
