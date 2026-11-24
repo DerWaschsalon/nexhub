@@ -179,3 +179,41 @@ def test_tode_ueberleben_das_radar_und_gehoeren_zum_run():
     r.deaths.extend([{"t_ms": 100, "name": "A", "skill": 1}, {"t_ms": 500, "name": "B", "skill": 2}])
     r._stop()
     assert r.deaths_between(0, 200) == [{"t_ms": 100, "name": "A", "skill": 1}]
+
+
+async def test_radar_laeuft_solange_ein_teil_an_ist():
+    """Die Module Radar, Boss-Warnungen und Feldbosse teilen sich einen Dienst."""
+    r, _ = radar(game_running=spiel(lambda: True), poll_s=0.05)
+    r.enable("warnings")
+    r.enable("radar")
+    await warten_bis(lambda: r.running)
+    service = r.service
+    assert service.parts == {"warnings", "radar"}
+    await r.disable("warnings")
+    assert r.running and service.parts == {"radar"} and service.calls[-1] == "reload"  # Schalter übernommen
+    await r.disable("radar")
+    assert not r.running and service.calls[-1] == "stop"
+    r.enable("field_bosses")  # geht wieder an
+    await warten_bis(lambda: r.running)
+    await r.disable("field_bosses")
+
+
+def test_ausgeschaltete_teile_schweigen(tmp_path, monkeypatch):
+    from deckbar_daemon.aion2.service import RadarService
+    from deckbar_daemon.core import speech
+    played = []
+    monkeypatch.setattr(speech, "play", lambda file: played.append(file.name))
+    monkeypatch.setattr(speech, "CACHE", tmp_path)
+    service = RadarService(spawn_log=None)
+    service.parts = {"field_bosses"}
+    service.reload()
+    service._ping_due = True
+    service.test_warning()
+    service.tick()
+    assert service.state()["warnungen"] == [] and played == []  # Warnungen und Cube-Ton aus
+    service.parts = {"radar", "warnings"}
+    service.reload()
+    service._ping_due = True
+    service.test_warning()
+    service.tick()
+    assert [w["titel"] for w in service.state()["warnungen"]] == ["Todesmal"] and "ping.wav" in played

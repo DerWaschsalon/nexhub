@@ -5,6 +5,7 @@ Tests mit @pytest.mark.a2tools brauchen das Submodul capture/a2tools; ohne es (z
 ohne `git submodule update --init`) werden sie übersprungen statt rot zu werden."""
 import pytest
 
+from deckbar_daemon.aion2 import gamedata, spawn_points
 from deckbar_daemon.aion2 import settings as radar_settings
 from deckbar_daemon.meter_files import SDK
 
@@ -30,3 +31,6 @@ def _default_radar_settings(tmp_path, monkeypatch):
     Sprache, die gerade eingestellt ist, und Tests könnten die Datei überschreiben."""
     monkeypatch.setattr(radar_settings, "FILE", tmp_path / "aion2-radar.json")
     monkeypatch.setattr(radar_settings, "_settings", None)
+    # gesehene Spawnpunkte und Feldboss-Timer der Tests nicht in den echten Datenordner
+    monkeypatch.setattr(spawn_points, "FILE", tmp_path / "cubepunkte.json")
+    monkeypatch.setattr(gamedata, "STORE", tmp_path / "aion2-radar")

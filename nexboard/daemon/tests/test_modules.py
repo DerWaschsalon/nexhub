@@ -17,10 +17,12 @@ def test_dependency_graph(tmp_path):
     assert {"aion2.overlay", "aion2.runs"} <= m.dependents("aion2.dps")
     assert "discord.bot" not in m.infos  # Runs gehen über den Hub an den Bot (report.py)
     assert m.dependents("deck") == set()
-    assert m.requirements("aion2.radar") == {"aion2.schedule"}  # Feldbosse stehen unter Termine
+    assert m.requirements("aion2.field_bosses") == {"aion2.schedule"}  # Feldbosse stehen unter Termine
+    assert m.requirements("aion2.radar") == m.requirements("aion2.warnings") == set()
     assert m.requirements("aion2.plugins") == {"aion2.overlay", "aion2.dps"}
     assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.plugins", "aion2.runs", "aion2.schedule",
-                       "aion2.radar", "poe1.client", "poe1.leveling", "hub", "updates"]
+                       "aion2.radar", "aion2.warnings", "aion2.field_bosses", "poe1.client", "poe1.leveling", "hub",
+                       "updates"]
     assert m.requirements("poe1.leveling") == {"poe1.client"}
     for mid, info in m.infos.items():
         assert all(r in m.infos for r in info.requires), mid

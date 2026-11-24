@@ -1,12 +1,14 @@
-"""Modul Radar: Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay."""
+"""Die Module des Radars: Hidden Cubes und Karte, Boss-Warnungen, Feldbosse. Sie teilen sich einen
+RadarService (ein Mitschnitt, eine Welt); er läuft, solange eines von ihnen an ist."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from aiohttp import web
 from nexcore import Context, ModuleInfo
 from nexcore.errors import ApiError
 
+from ..aion2.service import CUBES, FIELD_BOSSES, WARNINGS
 from ..boss_effekte import BossEffekte
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
@@ -15,41 +17,46 @@ from ..radar import Radar
 from .base import WebModule
 
 
-class RadarModule(WebModule):
-    info = ModuleInfo(
-        "aion2.radar", "AION 2 · Radar", "ingame", "radar",
-        "Hidden Cubes, Karte und Boss-Warnungen als Widgets im Overlay, Feldbosse unter "
-        "Termine. Läuft mit AION 2 und liest den Server-Verkehr passiv mit (tcpdump).",
-        # die Feldbosse und ihre Ansage stehen auf der Seite des Moduls Termine
-        requires=("aion2.schedule",), tags=("AION 2", "Desktop"),
-    )
-    overlay_widgets = (
-        WidgetSpec("cube", "Cube-Radar", "Kleines Radar mit Richtung und Abstand; zeigt sich nur, solange ein "
-                   "Hidden Cube in Sicht ist"),
-        WidgetSpec("map", "Karte", "Karte mit Cubes, Spawnpunkten und Teleportern; die Kartenbilder kommen aus "
-                   "dem Plugin Pet Soul Tracker", enabled=False, size=(340, 300), profiles=()),
-        WidgetSpec("warnings", "Boss-Warnungen", "Nur während einer Warnung; was gewarnt wird, steht unter "
-                   "Warnungen"),
-    )
+class RadarPart(WebModule):
+    """Ein Teil des Radars als Modul: schaltet seinen Teil am gemeinsamen Dienst."""
 
-    def __init__(self, ctx: Context, live: LiveHub, radar: Radar, boss_effects: BossEffekte) -> None:
+    part: ClassVar[str]
+
+    def __init__(self, ctx: Context, live: LiveHub, radar: Radar) -> None:
         super().__init__(ctx, live)
         self.radar = radar
-        self.boss_effects = boss_effects
 
     async def start(self) -> None:
-        self.spawn(self.radar.watch)
+        self.radar.enable(self.part)
+
+    async def stop(self) -> None:
+        await self.radar.disable(self.part)
 
     def status(self) -> dict[str, Any]:
         return {"laeuft": self.radar.running, "spiel": self.radar.game, "aufnahme": self.radar.recording,
                 "fehler": self.radar.error}
 
+
+class RadarModule(RadarPart):
+    info = ModuleInfo(
+        "aion2.radar", "AION 2 · Radar", "ingame", "radar",
+        "Hidden Cubes und Karte als Widgets im Overlay, mit Ton bei einem neuen Cube. Läuft mit AION 2 und "
+        "liest den Server-Verkehr passiv mit (tcpdump).",
+        tags=("AION 2", "Desktop"),
+    )
+    part = CUBES
+    overlay_widgets = (
+        WidgetSpec("cube", "Cube-Radar", "Kleines Radar mit Richtung und Abstand; zeigt sich nur, solange ein "
+                   "Hidden Cube in Sicht ist"),
+        WidgetSpec("map", "Karte", "Karte mit Cubes, Spawnpunkten und Teleportern; die Kartenbilder kommen aus "
+                   "dem Plugin Pet Soul Tracker", enabled=False, size=(340, 300), profiles=()),
+    )
+
     def routes(self, router: web.UrlDispatcher) -> None:
+        """Einstellungen und Knöpfe aller Radar-Module (eine Datei, eine Route)."""
         router.add_get("/api/radar", self.api_get)
         router.add_put("/api/radar", self.api_put)
         router.add_post("/api/radar/befehl", self.api_command)
-        router.add_get("/api/radar/feldbosse", self.api_field_bosses)
-        router.add_get("/api/radar/kampf", self.api_fight)
 
     def overlay_routes(self, router: web.UrlDispatcher) -> None:
         """Auf dem Port der Overlay-Seite: die Karte."""
@@ -77,12 +84,6 @@ class RadarModule(WebModule):
             raise ApiError(409, str(e)) from e
         return ok(**self.radar.info())
 
-    async def api_fight(self, request: web.Request) -> web.Response:
-        return web.json_response({**self.radar.fight_state(), **await self.boss_effects.aktuell()})
-
-    async def api_field_bosses(self, request: web.Request) -> web.Response:
-        return web.json_response({"feldbosse": self.radar.field_bosses()})
-
     async def api_map(self, request: web.Request) -> web.Response:
         return web.json_response(self.radar.map())
 
@@ -91,3 +92,44 @@ class RadarModule(WebModule):
         if not path:
             raise web.HTTPNotFound()
         return web.FileResponse(path)
+
+
+class WarningsModule(RadarPart):
+    info = ModuleInfo(
+        "aion2.warnings", "AION 2 · Boss-Warnungen", "ingame", "bell-alert",
+        "Warnt vor Boss-Mechaniken und sagt an, was zu tun ist: Mechaniken je Dungeon, Boss-Ansagen, „Jetzt "
+        "staggern“, Fläche unter dir, wenig HP. Als Widget im Overlay und gesprochen.",
+        split_from="aion2.radar", tags=("AION 2", "Desktop"),
+    )
+    part = WARNINGS
+    overlay_widgets = (
+        WidgetSpec("warnings", "Boss-Warnungen", "Nur während einer Warnung; was gewarnt wird, steht unter "
+                   "Warnungen"),
+    )
+
+    def __init__(self, ctx: Context, live: LiveHub, radar: Radar, boss_effects: BossEffekte) -> None:
+        super().__init__(ctx, live, radar)
+        self.boss_effects = boss_effects
+
+    def routes(self, router: web.UrlDispatcher) -> None:
+        router.add_get("/api/radar/kampf", self.api_fight)
+
+    async def api_fight(self, request: web.Request) -> web.Response:
+        """Für andere Programme auf diesem PC: Boss groggy, laufende Warnungen, Effekte auf Boss und dir."""
+        return web.json_response({**self.radar.fight_state(), **await self.boss_effects.aktuell()})
+
+
+class FieldBossModule(RadarPart):
+    info = ModuleInfo(
+        "aion2.field_bosses", "AION 2 · Feldbosse", "ingame", "timer-outline",
+        "Respawn-Timer der Feldbosse auf der Seite Termine, mit Ansage 5 Minuten vorher und beim Respawn; "
+        "dazu die Ansage für den Riss.",
+        requires=("aion2.schedule",), split_from="aion2.radar", tags=("AION 2",),
+    )
+    part = FIELD_BOSSES
+
+    def routes(self, router: web.UrlDispatcher) -> None:
+        router.add_get("/api/radar/feldbosse", self.api_field_bosses)
+
+    async def api_field_bosses(self, request: web.Request) -> web.Response:
+        return web.json_response({"feldbosse": self.radar.field_bosses()})

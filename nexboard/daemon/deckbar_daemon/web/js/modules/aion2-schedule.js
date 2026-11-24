@@ -100,7 +100,7 @@ function schedulePage(ctx) {
   const load = async () => {
     try {
       entries = (await api("GET", "/api/schedule")).entries;
-      if (!modOn("aion2.radar")) return;
+      if (!modOn("aion2.field_bosses")) return;
       bosses = (await api("GET", "/api/radar/feldbosse")).feldbosse;
       S.radar ??= await api("GET", "/api/radar"); // für den Schalter der Feldboss-Ansage
     } catch { /* bleibt */ }
@@ -115,7 +115,7 @@ function schedulePage(ctx) {
   const draw = () => {
     if (!entries || !settings) return;
     fill(box, listCard(entries, settings, save), ownEventsCard(settings, save),
-      modOn("aion2.radar") ? fieldBossCard(bosses) : null);
+      modOn("aion2.field_bosses") ? fieldBossCard(bosses) : null);
   };
   // nicht neu zeichnen, während ein Feld in Benutzung ist
   const busy = () => box.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName);

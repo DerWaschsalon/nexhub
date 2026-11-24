@@ -10,7 +10,7 @@ import deck from "./modules/deck.js";
 import dps from "./modules/aion2-dps.js";
 import overlay, { cmd as overlayCommand } from "./modules/aion2-overlay.js";
 import runs from "./modules/aion2-runs.js";
-import radar from "./modules/aion2-radar.js";
+import radar, { fieldBosses, warnings } from "./modules/aion2-radar.js";
 import schedule from "./modules/aion2-schedule.js";
 import plugins from "./modules/aion2-plugins.js";
 import poe1Client from "./modules/poe1-client.js";
@@ -22,12 +22,14 @@ export const BRAND = "NexBoard";
 // Reihenfolge = Reihenfolge in der Seitenleiste je Bereich (Im Spiel: Overlay, Warnungen, Radar & Karte, Termine,
 // Kampfdaten, Plugins)
 const UI = {
-  "aion2.overlay": overlay, "aion2.radar": radar, "aion2.schedule": schedule, "aion2.dps": dps, "aion2.plugins": plugins,
+  "aion2.overlay": overlay, "aion2.warnings": warnings, "aion2.radar": radar, "aion2.field_bosses": fieldBosses,
+  "aion2.schedule": schedule, "aion2.dps": dps, "aion2.plugins": plugins,
   "poe1.leveling": poe1Leveling, "poe1.client": poe1Client, deck, "aion2.runs": runs, hub, updates,
 };
 // Seiten-ID → { page, mid }; die erste Seite eines Moduls trägt meist seine ID
 const PAGES = new Map(Object.entries(UI).flatMap(([mid, ui]) => ui.pages.map((page) => [page.id, { page, mid }])));
-const firstPage = (mid) => UI[mid]?.pages[0].id ?? mid;
+// Module ohne eigene Seite nennen die Seite, auf der sie stehen (home)
+const firstPage = (mid) => UI[mid]?.pages[0]?.id ?? UI[mid]?.home ?? mid;
 const shortName = (m) => m.name.replace(/^AION 2 · /, "");
 const SYSTEM = [
   { id: "modules", name: "Module", icon: "puzzle" },

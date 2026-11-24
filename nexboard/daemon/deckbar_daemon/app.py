@@ -40,7 +40,7 @@ from .modules.overlay import OverlayModule
 from .modules.plugins import PluginsModule
 from .modules.poe_client import PoeClientModule
 from .modules.poe_leveling import PoeLevelingModule
-from .modules.radar import RadarModule
+from .modules.radar import FieldBossModule, RadarModule, WarningsModule
 from .modules.runs import RunsModule
 from .modules.schedule import ScheduleModule
 from .modules.updates import UpdatesModule
@@ -77,7 +77,7 @@ class NexBoard:
         self._build_components()
         self.bar = DeckModule(ctx, self.live, lambda: self.settings, self.state, config_dir, WEB_DIR,
                               mdns and settings.mdns)
-        self.radar_module = RadarModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture))
+        self.radar_module = RadarModule(ctx, self.live, self.radar)
         poe1 = PoeClientModule(ctx, self.live, config_dir)
         updates = UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json"), self.state,
                                 lambda: [d.fw for d in self.bar.devices.devices])
@@ -91,6 +91,8 @@ class NexBoard:
             RunsModule(ctx, self.live, self.runs, self.state, self.webhook),
             ScheduleModule(ctx, self.live, Schedule(config_dir, lambda: self.settings.language)),
             self.radar_module,
+            WarningsModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture)),
+            FieldBossModule(ctx, self.live, self.radar),
             poe1,
             PoeLevelingModule(ctx, self.live, self.state, poe1.session, config_dir),
             HubModule(ctx, self.live, self.hub),

@@ -32,6 +32,7 @@ class ModuleInfo:
     summary: str
     requires: tuple[str, ...] = ()
     default: bool = False  # bei einer frischen Installation an
+    split_from: str = ""  # aus diesem Modul herausgelöst: erbt beim ersten Mal dessen Schalter
     tags: tuple[str, ...] = ()
 
 

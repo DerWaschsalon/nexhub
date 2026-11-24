@@ -93,11 +93,13 @@ class Registry:
         return enabled
 
     def _adopt_new(self, enabled: set[str], known: Any) -> set[str]:
-        """Neue Standardmodule einschalten, wenn alles, was sie brauchen, schon an ist."""
+        """Neue Module einschalten, wenn alles, was sie brauchen, schon an ist: Standardmodule immer, aus einem
+        Modul herausgelöste, wenn dieses an ist (wer es nutzte, behält alle seine Teile)."""
         if not isinstance(known, list):
             known = [mid for mid in self.infos if mid not in self.introduced]
         new = [mid for mid, info in self.infos.items()
-               if info.default and mid not in known and self.requirements(mid) <= enabled]
+               if (info.default or info.split_from in enabled) and mid not in known
+               and self.requirements(mid) <= enabled]
         if new or set(self.infos) - set(known):
             log.info("neue Module: %s", ", ".join(new) or "keins eingeschaltet")
             self._save(enabled | set(new))

@@ -1,7 +1,7 @@
 # AION2 Radar
 
-Radar für AION 2 unter Linux (KDE Wayland, Spiel unter Proton), als Modul **AION 2 · Radar** des
-NexBoard. Liest den Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel ein.
+Radar für AION 2 unter Linux (KDE Wayland, Spiel unter Proton), als drei Module des NexBoard: **AION 2 · Radar**,
+**AION 2 · Boss-Warnungen** und **AION 2 · Feldbosse**. Liest den Server-Verkehr passiv per `tcpdump` mit (`cap_net_raw`), greift nicht ins Spiel ein.
 Es läuft im NexBoard-Daemon und zeigt sich als Widgets im NexBoard-Overlay (Radar, Boss-Warnungen,
 Karte), kein eigenes Programm und keine eigenen Fenster.
 
@@ -99,7 +99,7 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
   `python3 -m werkzeuge.lernen mitschnitte/<datei>.pcap`: pro Boss jeder Skill mit Vorlauf bis zum Treffer,
   Toden und dem Cast, der regelmäßig davor kommt.
 
-Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seiten „Warnungen“ und „Radar & Karte“). Ist es an, startet der Daemon das Radar
+Start: über die NexBoard-Module **AION 2 · Radar** (Seite „Radar & Karte“), **AION 2 · Boss-Warnungen** (Seite „Warnungen“) und **AION 2 · Feldbosse** (Seite „Termine“), einzeln schaltbar. Ist eines an, startet der Daemon das Radar
 (`RadarService`), sobald AION 2 läuft, und beendet es 30 s nach Spielende. Den Stand schickt er etwa fünfmal pro
 Sekunde als Overlay-Ereignis `radar`, gezeichnet von den Widgets `cube.js`, `map.js` und `warnings.js` unter `daemon/deckbar_daemon/web/overlay/widgets/`. Auf den Seiten
 stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den allgemeinen Einstellungen
