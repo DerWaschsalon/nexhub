@@ -47,6 +47,39 @@ def test_ideales_stueck_ist_bis():
     assert lines[0]["max"] == 12.3 and lines[0]["share"] == 0.9
 
 
+def wide_census() -> rating.Census:
+    """Top-Spieler tragen einen Schild mit sechs Werten und einem Skill, das eigene Teil hat nur vier Zeilen."""
+    wide = shield(("Combat Speed", "12.3%"), ("Weapon Damage Boost", "7.3%"), ("Might", "25"),
+                  ("Multi-hit Chance", "9.1%"), ("Damage Boost", "5.5%"), ("Critical Hit", "61"))
+    wide["detail"]["skills"] = [{"name": "Testschuss", "level": 2}]
+    data = rating.add_tops({"slots": rating.count_players([[wide]] * 10)}, {SLOT: {"Testschild"}},
+                           {"Testschild": TABLE}, "ranger")
+    return rating.Census(data["slots"], data["tops"])
+
+
+def test_bestes_stueck_haengt_nicht_am_eigenen_teil():
+    c = wide_census()
+    assert c.slots[SLOT]["width"] == [6, 1] and c.slots[SLOT]["skills"] == ["Testschuss"]
+    # sechs Werte und ein Skill, alle bei jedem Top-Spieler
+    assert c.best_piece(SLOT) == 7.0
+    # vier volle ideale Zeilen sind vier Siebtel des besten Stücks, nicht 100
+    value, _ = rating.score(c, TOP, TABLE, "ranger")
+    assert value == round(100 * 4 / 7, 1)
+
+
+def test_teile_eines_platzes_sind_vergleichbar():
+    c = wide_census()
+    five = shield(("Combat Speed", "12.3%"), ("Weapon Damage Boost", "7.3%"), ("Might", "25"),
+                  ("Multi-hit Chance", "9.1%"), ("Damage Boost", "5.5%"))
+    assert rating.score(c, five, TABLE, "ranger")[0] > rating.score(c, TOP, TABLE, "ranger")[0]
+
+
+def test_alte_zaehlung_ohne_breite_gibt_keine_note():
+    data = census()
+    del data["slots"][SLOT]["width"]
+    assert rating.rate(data, {"Testschild": TABLE}, {"equipment": [MINE]}, None, "ranger", "en")["items"] == []
+
+
 def test_krit_wird_zu_kampftempo():
     c = rating.Census(census()["slots"], census()["tops"])
     up = rating.upgrade(c, MINE, TABLE, "ranger")

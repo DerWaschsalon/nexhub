@@ -25,6 +25,11 @@ def test_reihenfolge_von_schnell_bis_teuer():
     assert out[2]["werte"] == ["MP +6"] and out[3]["werte"] == ["Blocken 4%"]
 
 
+def test_lauftempo_ist_nicht_verschenkt():
+    snap = {"equipment": [item("Boots", sub=[stone("MoveSpeed", "Lauftempo", "8%")])]}
+    assert hints(snap, "ranger") == []
+
+
 def test_tank_und_heiler_ohne_wertepruefung():
     snap = {"equipment": [item(stones=[stone("ArmorDefense", "Verteidigung")], stone_slots=1)]}
     assert hints(snap, "templar") == []
