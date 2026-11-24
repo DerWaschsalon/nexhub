@@ -84,6 +84,20 @@ export type Status = {
 	active_sessions: number;
 };
 
+/** Antwort von GET /api/admin/stats: Tagesreihen (ein Wert je Tag in `days`) und Summen */
+export type Stats = {
+	days: string[];
+	runs: number[];
+	accounts: number[];
+	total_runs: number;
+	total_accounts: number;
+	characters: number;
+	devices: number;
+	devices_active: number;
+	devices_by_version: Record<string, number>;
+	bis: { cls: string; players: number; counted_at: string | null }[];
+};
+
 /** JSON senden (PUT/POST/DELETE) und die Antwort zurückgeben. */
 export function send<T>(path: string, method: string, body?: unknown): Promise<T> {
 	return api<T>(path, {

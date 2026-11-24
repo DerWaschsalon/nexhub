@@ -67,3 +67,29 @@ def test_admins_lassen_sich_nicht_sperren(as_user):
     admin = as_user(ADMIN)
     me = _account(admin, ADMIN)["id"]
     assert admin.post(f"/api/admin/users/{me}/block", headers=ORIGIN).status_code == 400
+
+
+def test_statistik_zaehlt_aus_vorhandenen_tabellen(client, as_user):
+    from .test_devices import pair
+    from .test_runs import nexlog, upload
+
+    admin = as_user(ADMIN)
+    upload(client, pair(client, admin), nexlog())
+    s = admin.get("/api/admin/stats", params={"days": 7}).json()
+    assert len(s["days"]) == 7 and s["runs"] == [0] * 6 + [1] and s["accounts"][-1] == 1
+    assert (s["total_runs"], s["total_accounts"], s["devices"], s["devices_active"]) == (1, 1, 1, 1)
+    assert sum(s["devices_by_version"].values()) == 1 and s["bis"] == []
+    assert admin.get("/api/admin/stats", params={"days": 3}).status_code == 422
+    assert as_user(MEMBER).get("/api/admin/stats").status_code == 403
+
+
+def test_tagesreihe():
+    from datetime import UTC, date, datetime
+
+    from nexhub_api.stats import last_days, per_day
+
+    days = last_days(date(2026, 11, 24), 3)
+    assert days == [date(2026, 11, 22), date(2026, 11, 23), date(2026, 11, 24)]
+    stamps = [datetime(2026, 11, 22, 23, 59, tzinfo=UTC), datetime(2026, 11, 24, 0, 0, tzinfo=UTC),
+              datetime(2026, 11, 24, 12, 0, tzinfo=UTC), datetime(2026, 11, 1, tzinfo=UTC)]
+    assert per_day(stamps, days) == [1, 0, 2]

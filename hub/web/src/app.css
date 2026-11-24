@@ -344,6 +344,33 @@ select.input optgroup {
 	border-color: var(--edge-soft);
 }
 
+/* Kacheln mit einer Kennzahl (Admin: System, Statistik) */
+.tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 14px;
+}
+.tile {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.tile .label {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--faint);
+}
+.tile strong {
+	font-size: 17px;
+	overflow-wrap: anywhere;
+}
+.tile .num {
+	font-size: 30px;
+	font-variant-numeric: tabular-nums;
+}
+
 /* Lange Textseiten (Datenschutz, „Wie wir bewerten“): schmale Spalte, ruhige Absätze */
 .prose {
 	max-width: 760px;

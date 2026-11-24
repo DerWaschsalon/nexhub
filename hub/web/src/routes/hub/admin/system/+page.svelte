@@ -44,31 +44,6 @@
 </section>
 
 <style>
-	.tiles {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 14px;
-	}
-	.tile {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.label {
-		font-size: 12px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--faint);
-	}
-	strong {
-		font-size: 17px;
-		overflow-wrap: anywhere;
-	}
-	.num {
-		font-size: 30px;
-		font-variant-numeric: tabular-nums;
-	}
 	code {
 		font-size: 13px;
 	}
