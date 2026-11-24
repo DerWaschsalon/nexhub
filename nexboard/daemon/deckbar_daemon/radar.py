@@ -4,8 +4,8 @@ Mitschnitt und Auswertung stecken in nexboard/radar (RadarDienst, ohne Fenster).
 dessen Takt mehrmals pro Sekunde auf und schickt den Stand als Overlay-Ereignis „radar“. Das
 Radar-Widget zeigt sich dort nur, solange ein Cube in Sicht ist.
 
-Die Einstellungen stehen in ~/.config/aion2-radar.json. Standardwerte und Warnungsliste kommen aus
-radar/standard.json und radar/meldungen.json, denselben Dateien, die das Radar nutzt.
+Die Einstellungen stehen in ~/.config/aion2-radar.json. Standardwerte stehen in radar/standard.json, die
+Schalter der Warnungen ergeben sich aus radar/mechaniken.json und radar/ansagen.json (warnung.SCHALTER).
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from .game_process import aion2_running
 
 ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
 sys.path.insert(0, str(ORDNER))  # Paket „radar“ liegt dort, nicht im Daemon
-from radar import daten, konfig, uebersicht  # noqa: E402
+from radar import daten, konfig, uebersicht, warnung  # noqa: E402
 from radar.ansagen import seitenliste  # noqa: E402
 from radar.dienst import RadarDienst  # noqa: E402
 from radar.punkte import Karte  # noqa: E402
@@ -67,7 +67,7 @@ class Radar:
         self.neuer_dienst = dienst
         self.abfrage_s = abfrage_s
         self.nachlauf_s = nachlauf_s  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
-        self.meldungen = _json(ORDNER / "radar" / "meldungen.json")
+        self.meldungen = warnung.SCHALTER
         self.ansagen = seitenliste()  # Boss-Ansagen je Schalter, für eigene Worte und ▶ auf der Seite
         self.dienst: RadarDienst | None = None
         self.spiel = False

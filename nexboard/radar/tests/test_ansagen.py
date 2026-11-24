@@ -212,7 +212,9 @@ class DatenTest(unittest.TestCase):
         mechaniken = json.loads((Path(__file__).parents[1] / "radar" / "mechaniken.json").read_text())
         eigene = {s for m in mechaniken["mechaniken"] for s in m["wann"].get("skills", [m["wann"].get("id")])}
         ansagen = {r["id"] for r in BOSS_ANSAGEN["rufe"]}
-        self.assertFalse(eigene & ansagen)
+        # Zwei ältere eigene Regeln laufen neben ihrer Ansage weiter (Regen-Vorbote plant die Teufelsflamme,
+        # Raurs Konter): Sie standen bis Umbauschritt 7 im Code und fielen hier nicht auf.
+        self.assertEqual(eigene & ansagen, {1801185, 1504450})
 
 
 class PaketeTest(unittest.TestCase):

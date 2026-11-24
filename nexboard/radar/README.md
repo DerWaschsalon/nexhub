@@ -39,7 +39,7 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
 - **Lernhilfe:** Jeder Cast eines Bosses, zu dem es noch keine Cast-Warnung gibt, erscheint grau mit Namen aus den A2Tools-Daten
   (Schalter „Alle Boss-Casts zeigen“).
 - **Status auf dir** (`0x382A`): Ignus' Flammenbombe → „Verzögerte Explosion – DU!“ (3 s, danach Feuerpfütze).
-  Weitere Effekte in `STATUS_REGELN` (`radar/warnung.py`), IDs aus A2Tools `abnormals`.
+  Weitere Effekte als Einträge mit `wann.art: effekt` in `radar/mechaniken.json`, IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
 - **Weitere Dungeons** (`radar/mechaniken.json`, 32 Mechaniken; 10 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie): Urugugu (Raur-Konter, Auldor-Sturmstreich,
   Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Versteinerung, Vakron-Male), Krao-Höhle
@@ -50,8 +50,9 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
   Boss-Ansagen (unten). Mit Folge-Hinweis, wenn es vorbei ist („Abstand halten“). IDs und Zeiten nach
   [xinjalin/glass-cannon](https://github.com/xinjalin/glass-cannon) `gamedata/boss-mechanics.json`
   (MIT, Copyright (c) 2026 Xinjalin), Texte eigene; dort zum Teil nur als Hinweise ungeprüft, selbst bestätigt
-  sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechaniken.json` plus Schalter in
-  `meldungen.json`.
+  sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechaniken.json`; ihr Schalter auf
+  der Seite entsteht daraus (`meldung`). Auch die älteren Regeln (Feuertempel, Albtraum, Urugugu) stehen dort,
+  mit `zugleich`/`plan` für Vorhersagen und `fenster` für Kromedes Regen.
 - **Boss-Ansagen** (`radar/ansagen.py`, Daten `radar/ansagen.json`, ein Schalter je Boss): wie das Plugin
   „Boss Callouts“ von [taengu/A2Tools-Plugins](https://github.com/taengu/A2Tools-Plugins) (GPL-3.0, Zeilen
   (c) NCSOFT), 202 Ansagen von 54 Bossen, auch Ludra, Kelch von Muspel, Läuterungsstätte der Korrosion, Roter
@@ -103,7 +104,8 @@ Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seiten „Warnungen
 Sekunde als Overlay-Ereignis `radar`, gezeichnet von den Widgets `cube.js`, `map.js` und `warnings.js` unter `daemon/deckbar_daemon/web/overlay/widgets/`. Auf den Seiten
 stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den allgemeinen Einstellungen
 (der Daemon schreibt sie in die Datei des Radars). Standardwerte und Warnungsliste stehen in
-`radar/standard.json` und `radar/meldungen.json` (liest auch die Seite).
+`radar/standard.json`; die Schalter der Warnungen ergeben sich aus `radar/mechaniken.json` und `radar/ansagen.json`
+(`warnung.schalter()`, liest auch die Seite).
 
 | Datei | Inhalt |
 |---|---|
@@ -122,7 +124,7 @@ stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den a
 | `werkzeuge/bosse.py` | erzeugt `radar/bosse.json` und `radar/zonen.json` (Boss/Zone -> Dungeon) aus den A2Tools-Daten |
 
 - Kämpfe auswerten: `python3 -m werkzeuge.auswertung mitschnitte/datei.pcap`
-- Für andere Programme auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true, "warnungen": [{"gruppe", "titel", "ich", "rest"}]}`: groggy, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s, hängt nicht an der Warnungsanzeige), dazu die gerade laufenden Warnungen (ohne Lernhilfe; auf der Seite abgeschaltete fehlen auch hier). Gruppen wie in `meldungen.json`. Dazu `boss_effekte` und `eigene_effekte`, je `[{"id", "seit"}]`: Effekte, die gerade auf dem aktuellen Ziel des DPS-Meters bzw. auf dir liegen, aus dem Capture statt aus dem Radar (genauer Anfang und Ende, z. B. Lakshmis Schadensreflexion `16059101`, Präzision/„Letalität“ vom Markierungsschuss `140900171`; Code `nexboard/daemon/deckbar_daemon/boss_effekte.py`). Ohne laufendes Capture leer (`eigene_effekte` dann `null` = unbekannt, ebenso solange die eigene ID fehlt), nach 10 s ohne Treffer am Ziel gilt der Stand als veraltet.
+- Für andere Programme auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true, "warnungen": [{"gruppe", "titel", "ich", "rest"}]}`: groggy, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s, hängt nicht an der Warnungsanzeige), dazu die gerade laufenden Warnungen (ohne Lernhilfe; auf der Seite abgeschaltete fehlen auch hier). Gruppen wie in `mechaniken.json`. Dazu `boss_effekte` und `eigene_effekte`, je `[{"id", "seit"}]`: Effekte, die gerade auf dem aktuellen Ziel des DPS-Meters bzw. auf dir liegen, aus dem Capture statt aus dem Radar (genauer Anfang und Ende, z. B. Lakshmis Schadensreflexion `16059101`, Präzision/„Letalität“ vom Markierungsschuss `140900171`; Code `nexboard/daemon/deckbar_daemon/boss_effekte.py`). Ohne laufendes Capture leer (`eigene_effekte` dann `null` = unbekannt, ebenso solange die eigene ID fehlt), nach 10 s ohne Treffer am Ziel gilt der Stand als veraltet.
 - Tests: `../daemon/.venv/bin/python -m pytest -q tests` (mit der .venv des Daemons, darin sind nexproto und
   python-xlib). Dazu gehört der Goldtest (`tests/test_gold.py`): Er spielt jeden Mitschnitt aus
   `~/.local/share/aion2-radar/mitschnitte/` durch den RadarDienst und durch `deckbar-capture --replay` und vergleicht
