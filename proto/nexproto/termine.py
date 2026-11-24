@@ -93,3 +93,16 @@ def upcoming(now: float) -> list[tuple[Event, float, float | None]]:
         start, is_open = next_start(now, event)
         rows.append((event, start, start + event.open_min * 60 if is_open else None))
     return rows
+
+
+def starts_between(event: Event, begin: float, end: float) -> list[float]:
+    """Jeder Beginn des Termins von `begin` bis vor `end`, für einen Wochenplan."""
+    starts = []
+    now = begin
+    while True:
+        start, _ = next_start(now, event)
+        if start >= end:
+            return starts
+        if start >= begin:
+            starts.append(start)
+        now = start + event.open_min * 60  # hinter das offene Fenster, dann folgt der nächste Beginn

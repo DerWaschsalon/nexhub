@@ -73,6 +73,7 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 |---|---|---|
 | `logs` | Runs | `hub/runs/…`, geteilt `(public)/r/<token>/…` |
 | `armory` | Armory | `hub/armory/…`, geteilter Vergleich `(public)/v/<token>` – Profilansicht aus `logs` |
+| `schedule` | Termine | `hub/termine/`, öffentlich `(public)/termine/`: feste Termine aus `nexproto.termine` mit Countdown und Wochenplan, `GET /api/public/termine` |
 | `devices` | Geräte | `hub/geraete/` |
 | `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 
