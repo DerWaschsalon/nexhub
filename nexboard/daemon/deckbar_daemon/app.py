@@ -87,7 +87,7 @@ class NexBoard:
             OverlayModule(ctx, self.live, self.overlay, self.state),
             PluginsModule(ctx, self.live, self.a2.plugins),
             RunsModule(ctx, self.live, self.runs, self.state),
-            ScheduleModule(ctx, self.live, Schedule(config_dir)),
+            ScheduleModule(ctx, self.live, Schedule(config_dir, lambda: self.settings.language)),
             self.radar_module,
             poe1,
             PoeLevelingModule(ctx, self.live, self.state, poe1.session, config_dir),

@@ -73,7 +73,7 @@ function listCard(entries, settings, save) {
     const i = own;
     const toggle = t.own
       ? (v) => { settings.events[i].enabled = v; save({ events: settings.events }); }
-      : (v) => save({ hidden: v ? settings.hidden.filter((n) => n !== t.name) : [...settings.hidden, t.name] });
+      : (v) => save({ hidden: v ? settings.hidden.filter((key) => key !== t.key) : [...settings.hidden, t.key] });
     const status = t.open_until !== null
       ? el("td", { class: "ok", text: `offen bis ${clock(t.open_until).slice(-5)}` })
       : el("td", { class: "warn", text: countdown(t.start - now) });
