@@ -3,7 +3,7 @@ name: Pakete
 # nexproto: Formate und alle daraus erzeugten Dateien (Schemas, C, JS, TS, Rust) aktuell
 # nexcore: Tests, Lint, strikte Typen und Abhängigkeitsrichtung
 # infra: Skripte mit eigener Logik (Changelog)
-# daemon: Tests des NexBoard-Daemons samt denen, die das Submodul capture/a2tools brauchen
+# daemon: Tests des NexBoard-Daemons und des Radars, samt denen, die das Submodul capture/a2tools brauchen
 on:
   push:
     branches: [main]
@@ -51,3 +51,6 @@ jobs:
           submodules: true
       - uses: astral-sh/setup-uv@v6
       - run: uv run python -m pytest -q
+      # das Radar läuft im Daemon und nutzt dessen Umgebung; der Goldtest überspringt sich ohne Mitschnitte
+      - run: uv run --project ../daemon python -m pytest -q tests
+        working-directory: nexboard/radar
