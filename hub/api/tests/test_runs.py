@@ -22,7 +22,7 @@ def fight(n: int, boss_dmg: int = 1_000_000) -> dict:
     }
 
 
-def nexlog(deaths: list[dict] | None = None, **run) -> bytes:
+def nexlog(deaths: list[dict] | None = None, loot: list[dict] | None = None, **run) -> bytes:
     fights = [fight(1), fight(2, boss_dmg=500_000)]
     for f in fights:
         f["dungeonId"] = run.get("dungeon_id", f["dungeonId"])
@@ -37,6 +37,7 @@ def nexlog(deaths: list[dict] | None = None, **run) -> bytes:
         "hits": {"auto_1": {"fight": "auto_1", "target": 1, "start_ms": 0, "columns": list(HIT_COLUMNS),
                             "flags": {"crit": 1}, "rows": [[0, 1, 0, 1, 10, 0, 1], [5, 2, 0, 2, 5, 0, 0]]}},
         "deaths": deaths or [],
+        "loot": loot,  # None: die Aufnahme meldet keine Beute
     }))
 
 
