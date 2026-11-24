@@ -6,17 +6,17 @@ Die Dungeon-Namen sind dieselben wie unter „dungeons“ in mechanics.json.
 Quelle sind die Daten des A2Tools-DPS-Meters. Nach einem Update des Meters neu ausfuehren.
 Dungeons, die A2Tools nur als Nummer kennt (Ludra, Kelch von Muspel ...), bekommen ihren Namen ueber
 ihre Bosse aus callouts.json (werkzeuge.ansagen).
-Aufruf: python -m werkzeuge.bosse [Ordner data/i18n, Standard: der installierte Meter]
+Aufruf: python -m werkzeuge.bosse [Ordner data/i18n, Standard: das Submodul capture/a2tools]
 """
 import json
 import sys
 from pathlib import Path
 
-from deckbar_daemon.aion2.gamedata import DATA
+from deckbar_daemon.aion2.gamedata import DATA, a2tools_data_dir
 
 from .ansagen import OHNE_DUNGEON
 
-DATEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n")
+DATEN = a2tools_data_dir() / "i18n"
 UMBENENNEN = {"Fire Temple": "Feuertempel", "the Hall of Illusion": "Hall of Illusion"}
 NACHTRAG = {"200003": {"name": "Albtraum"}}  # fehlt in den A2Tools-Dungeons (Zikel, Sura, Hohepriesterin, ...)
 
