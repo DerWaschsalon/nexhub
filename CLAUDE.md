@@ -53,8 +53,8 @@ etwas machst.
   steht. Auf `main` keine Force-Pushes und keine Pfadänderungen ohne Absprache, sonst bricht das
   Update beim nächsten Klick ab oder der Daemon findet seine Dateien nicht. Hub ausrollen:
   `nexhub-update <wer> main`.
-- **PR-Titel sind Changelog-Zeilen.** Die Seite „Neu“ im Hub entsteht aus den Titeln der gemergten PRs
-  (`infra/changelog.py`), eine zweite Liste pflegt niemand. Also: deutsch, für Laien lesbar, mit dem Teil
+- **PR-Titel sind Changelog-Zeilen.** Die Seite „Neu“ im Hub und „Neu in dieser Version“ in der Web-UI der
+  NexBoard entstehen aus den Titeln der gemergten PRs (`infra/changelog.py`), eine zweite Liste pflegt niemand. Also: deutsch, für Laien lesbar, mit dem Teil
   vorn („Hub: …“, „NexBoard: …“, „Bot: …“).
 - **Geräte-Endpunkte des Hubs** (`/api/devices/*`, `/api/runs*`): Wer sie so ändert, dass ältere
   Daemons sie falsch verstehen, erhöht `HUB_API` in `proto/nexproto/hubapi.py`. Ältere NexBoards

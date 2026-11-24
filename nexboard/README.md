@@ -416,6 +416,9 @@ Stand und meldet dann „Fehlgeschlagen: Submodul capture/a2tools“, weil das a
 alten Pfade kennt. Einfach noch einmal aktualisieren: Ab dann läuft das neue Skript
 (`nexboard/update.sh`, an der Wurzel als Symlink) und richtet Daemon, Unit und Mitschnitt neu ein.
 
+Nach einem Update zeigt die Seite „Updates“ einmal „Neu in dieser Version“: die gemergten PRs seit dem alten
+Stand (`infra/changelog.py`, abgelegt in `~/.config/deckbar/updates-news.json`), bis man sie als gelesen markiert.
+
 Muss `deckbar-capture` neu gebaut werden, fragt das Skript per `sudo` nach dem Passwort für die
 Mitschnitt-Rechte. Bei lokalen Änderungen im Repo bricht es ab, statt etwas zu überschreiben.
 Wer das Repo pflegt, zieht ein neues A2Tools-Release mit `git -C capture/a2tools checkout vX.Y.Z`

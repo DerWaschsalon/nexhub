@@ -1,4 +1,5 @@
 """updates.py: Versionsvergleich, Commits hinter dem Upstream, A2Tools-Release."""
+import json
 import subprocess
 
 from deckbar_daemon.updates import Updates, version_tuple
@@ -150,3 +151,17 @@ async def test_update_kachel_auf_der_leiste(tmp_path, monkeypatch):
     updates.state["available"] = True  # neue Commits oder A2Tools-Release
     await updates._changed()  # wie nach einer Prüfung
     assert state.values["update_available"] is True
+
+
+def test_neu_in_dieser_version_bis_gelesen(tmp_path):
+    """update.sh legt die gemergten PRs neben die Zustandsdatei; gelesen heißt: Datei weg."""
+    updates = Updates(tmp_path, tmp_path / "updates-state.json")
+    assert updates.info()["news"] == []
+    news = [{"date": "2026-11-24", "pr": 136, "title": "NexBoard: Termine im Overlay mit Karte", "areas": ["nexboard"]}]
+    (tmp_path / "updates-news.json").write_text(json.dumps(news))
+    assert updates.info()["news"] == news
+    updates.dismiss_news()
+    assert updates.info()["news"] == [] and not (tmp_path / "updates-news.json").exists()
+    (tmp_path / "updates-news.json").write_text("kaputt")
+    assert updates.news() == []  # eine kaputte Datei stört die Seite nicht
+    assert Updates(tmp_path).news() == []  # ohne Zustandsdatei (Tests) gibt es keine Liste

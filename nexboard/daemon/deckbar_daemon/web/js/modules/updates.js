@@ -8,6 +8,20 @@ function summary(u) {
   return parts.join(" · ");
 }
 
+const AREAS = { nexboard: "NexBoard", firmware: "Firmware", hub: "Hub", bot: "Bot", core: "Formate", infra: "Server" };
+
+/* Was das letzte Update gebracht hat: die gemergten PRs, bis man sie als gelesen markiert. */
+function newsCard(news, redraw) {
+  const rows = news.map((n) => el("tr", {},
+    el("td", { text: n.title }),
+    el("td", {}, ...n.areas.map((a) => chip(AREAS[a] || a)))));
+  return card("Neu in dieser Version", `${news.length} Änderung${news.length === 1 ? "" : "en"} seit dem letzten Update`,
+    button("Gelesen", async () => {
+      try { S.updates = await api("POST", "/api/updates/news/seen"); redraw(); } catch (e) { toast(e.message, true); }
+    }, "sm", "check"),
+    el("table", { class: "list" }, el("tbody", {}, ...rows)));
+}
+
 function updatesTab(ctx) {
   const box = el("div", { class: "stack" });
   const draw = () => {
@@ -21,6 +35,7 @@ function updatesTab(ctx) {
           try { await api("POST", "/api/updates/run"); toast("Update läuft im Konsole-Fenster"); } catch (e) { toast(e.message, true); }
         }, "primary sm", "download", { disabled: !!u.running })) : null,
       u.error ? callout("warn", "alert", u.error) : null,
+      u.news?.length ? newsCard(u.news, draw) : null,
       u.firmware?.outdated?.length ? callout("warn", "alert",
         `Firmware der Leiste ${u.firmware.outdated.join(", ")}, im Repo ${u.firmware.repo}: neu flashen (update.sh macht das nicht).`) : null,
       el("div", { class: "cols" },

@@ -30,6 +30,8 @@ log = logging.getLogger(__name__)
 
 REPO = Path(__file__).resolve().parents[2]
 A2_RELEASES = "https://api.github.com/repos/taengu/A2Tools-DPS-Meter/releases/latest"
+# Neuerungen des letzten Updates, neben der Zustandsdatei; schreibt update.sh (infra/changelog.py)
+NEWS_FILE = "updates-news.json"
 FIRST_CHECK_S = 120
 CHECK_EVERY_S = 24 * 3600
 GIT_TIMEOUT_S = 60  # git fetch ohne Netz/Antwort hing sonst unbegrenzt
@@ -85,7 +87,24 @@ class Updates:
         self._wake = asyncio.Event()
 
     def info(self) -> dict:
-        return dict(self.state)
+        return {**self.state, "news": self.news()}
+
+    def _news_path(self) -> Path | None:
+        return self.state_path.with_name(NEWS_FILE) if self.state_path else None
+
+    def news(self) -> list[dict]:
+        """Was das letzte Update gebracht hat (gemergte PRs), bis es jemand als gelesen markiert."""
+        path = self._news_path()
+        try:
+            entries = json.loads(path.read_text()) if path else []
+        except (OSError, ValueError):
+            return []
+        return entries if isinstance(entries, list) else []
+
+    def dismiss_news(self) -> None:
+        path = self._news_path()
+        if path:
+            path.unlink(missing_ok=True)
 
     async def _changed(self) -> None:
         for fn in self.listeners:
