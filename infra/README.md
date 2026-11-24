@@ -9,6 +9,10 @@ Zugang nur per SSH-Schlüssel, der Anbieter hat keine Konsole.
 - `server/usr/local/bin/waschsalon-lock`: Sperre und Änderungsprotokoll
   (`/srv/waschsalon/CHANGELOG.md`).
 
+- `changelog.py`: Changelog aus den gemergten PRs von `main` als JSON (`infra/changelog.py [alt..neu]`).
+  `nexhub-update` schreibt damit vor dem Bauen `hub/web/static/changelog.json` für die Seite „Neu“.
+  Tests: `uvx pytest -q infra/tests`.
+
 ## Ablauf einer Änderung
 ```
 ssh waschsalon waschsalon-lock holen claude-gamunex "Firewall"
