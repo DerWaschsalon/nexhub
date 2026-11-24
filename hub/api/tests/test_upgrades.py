@@ -72,10 +72,10 @@ def test_nur_noch_binden():
     low["detail"]["soul_bind_rate"] = "50"  # als Text, wie die NC-API sie liefert
     out = upgrades.plan(census(), ROLLS, {"equipment": [low]}, None, "ranger", "en")
     assert [p["slot"] for p in out["bind"]] == [SLOT] and out["cards"] == []
-    for unreadable, group in (("100", "cards"), ("", "cards"), (None, "cards")):  # voll gebunden oder unbekannt: würfeln
-        low["detail"]["soul_bind_rate"] = unreadable
+    for rate in ("100", "", None):  # voll gebunden oder unbekannt: nicht „nur noch binden“
+        low["detail"]["soul_bind_rate"] = rate
         out = upgrades.plan(census(), ROLLS, {"equipment": [low]}, None, "ranger", "en")
-        assert out["bind"] == [] and len(out[group]) + len(out["unreachable"]) == 1, unreadable
+        assert out["bind"] == [] and len(out["cards"]) + len(out["unreachable"]) == 1, rate
 
 
 def test_deutsche_namen():
