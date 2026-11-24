@@ -5,7 +5,7 @@ Tests mit @pytest.mark.a2tools brauchen das Submodul capture/a2tools; ohne es (z
 ohne `git submodule update --init`) werden sie übersprungen statt rot zu werden."""
 import pytest
 
-from deckbar_daemon.a2ui import SDK
+from deckbar_daemon.meter_files import SDK
 
 
 def pytest_collection_modifyitems(items):

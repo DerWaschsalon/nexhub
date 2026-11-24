@@ -67,7 +67,7 @@ async def serve(args: argparse.Namespace) -> NexBoard:
     await stop.wait()
 
     log.info("starte neu …" if deck.restart_requested else "beende …")
-    a2.close_clients()
+    a2.events.close()
     await a2.plugins.stop()
     await deck.close_clients()
     await deck.modules.shutdown()
