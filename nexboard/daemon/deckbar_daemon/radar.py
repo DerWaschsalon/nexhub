@@ -24,7 +24,9 @@ from .aion2.gamedata import load_state
 from .aion2.maps import GameMap
 from .aion2.rules import SWITCHES
 from .aion2.service import DEATHS_KEPT, PARTS, RadarService
+from .capture import Capture
 from .config import _atomic_write
+from .core.packets import CaptureSource
 from .game_process import aion2_running
 
 log = logging.getLogger(__name__)
@@ -43,6 +45,9 @@ WARNING_PRESETS: dict[str, dict[str, Any]] = {
     "alles": {"warn_an": True, "nur_mich": False},  # auch Angriffe und Effekte auf andere Spieler
 }
 OWN_PRESET = "eigene"
+# Einstellung quelle: woher das Radar die Pakete nimmt. „capture“ = vom Rust-Mitschnitt der Kampfdaten, ohne
+# zweites Mitlesen; noch nicht im Spiel bestätigt, deshalb ist tcpdump der Standard.
+SOURCE, SOURCES, FROM_CAPTURE = "quelle", ("tcpdump", "capture"), "capture"
 RESTART = "neustart"
 # Knopf der NexBoard-Seite → was er am laufenden Dienst tut
 COMMANDS: dict[str, Callable[[RadarService, str], None]] = {
@@ -63,10 +68,12 @@ async def _game_running() -> bool:
 class Radar:
     def __init__(self, publish: Callable[[dict], Awaitable[None]],
                  game_running: Callable[[], Awaitable[bool]] = _game_running,
-                 service: Callable[[str], Any] = RadarService, poll_s: float = 5, linger_s: float = 30) -> None:
+                 service: Callable[..., Any] = RadarService, poll_s: float = 5, linger_s: float = 30,
+                 capture: Capture | None = None) -> None:
         self.publish = publish  # Overlay-Ereignis „radar“
         self.game_running = game_running
         self.new_service = service
+        self.capture = capture  # Mitschnitt der Kampfdaten, falls das Radar seine Pakete von dort nimmt
         self.poll_s = poll_s
         self.linger_s = linger_s  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
         self.callouts = page_list()  # Boss-Ansagen je Schalter, für eigene Worte und ▶ auf der Seite
@@ -138,6 +145,8 @@ class Radar:
             allowed = (int, float) if wanted is float else wanted  # 1 statt 1.0 ist in Ordnung
             if isinstance(value, bool) != (wanted is bool) or not isinstance(value, allowed):
                 raise ValueError(f"{key}: erwartet {wanted.__name__}")
+        if change.get(SOURCE, SOURCES[0]) not in SOURCES:
+            raise ValueError(f"{SOURCE}: erwartet {' oder '.join(SOURCES)}")
 
     async def save(self, change: dict) -> dict:
         """Ändert nur, was die Seite schickt; fremde Schlüssel in der Datei bleiben."""
@@ -161,7 +170,10 @@ class Radar:
         content = {**settings.read_file(), **change}
         _atomic_write(settings.FILE, json.dumps(content, indent=2, ensure_ascii=False))
         settings.reload()
-        if self.service:
+        if self.service and SOURCE in change:
+            self._stop()  # die Quelle steht beim Start fest
+            self._start()
+        elif self.service:
             self.service.reload()
 
     async def command(self, name: str, call: str = "") -> None:
@@ -204,7 +216,10 @@ class Radar:
 
     def _start(self) -> None:
         log.info("AION 2 läuft, starte Radar")
-        self.service = self.new_service(self.settings()["name"])
+        current = self.settings()
+        from_capture = self.capture is not None and current[SOURCE] == FROM_CAPTURE
+        source = {"source": CaptureSource(self.capture)} if from_capture else {}
+        self.service = self.new_service(current["name"], **source)
         self.service.deaths = self.deaths
         self.service.parts = self.parts
         self.service.start()

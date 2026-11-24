@@ -128,7 +128,7 @@ class NexBoard:
         self.runs.publishers += [self.webhook, self.hub]  # erst das Bild nach Discord, dann der NexHub
         self.overlay = Overlay(c, manage_unit=self.real_config)
         self.overlay.game_check = self._game_running
-        self.radar = Radar(self._publish_radar, game_running=self._game_running)
+        self.radar = Radar(self._publish_radar, game_running=self._game_running, capture=self.dps.capture)
         self.hub.deaths = self.radar.deaths_between
         loot = FeedBuffer("lootRoll", loot_drop)
         self.dps.capture.data_listeners.append(loot.on_capture)

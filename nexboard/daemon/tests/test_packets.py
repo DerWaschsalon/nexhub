@@ -78,3 +78,37 @@ def test_typisierte_nachricht_wird_einmal_dekodiert_und_kaputte_faellt_weg():
     source.publish(0x3809, b"")  # nicht einmal eine Entity
     assert first == [CastBar(127, 1604670, None)] and first[0] is second[0]
     assert source.packets == 3
+
+
+class FakeCapture:
+    def __init__(self) -> None:
+        self.running, self.data_listeners, self.requests = True, [], []
+
+    async def request(self, cmd: str, timeout: float = 5, **args):
+        self.requests.append((cmd, args))
+
+
+async def test_quelle_aus_dem_mitschnitt_abonniert_nur_was_abnehmer_hat():
+    import asyncio
+
+    from deckbar_daemon.core.packets import CaptureSource
+    from deckbar_daemon.core.packets.messages import CastBar
+    capture = FakeCapture()
+    source = CaptureSource(capture)
+    bars, raw = [], []
+    source.on(CastBar, bars.append)
+    source.subscribe((0x3634,), lambda op, p: raw.append(p))
+    source.start()
+    await asyncio.sleep(0)
+    assert capture.requests == [("subscribe_frames", {"opcodes": [0x3634, 0x3809]})] and source.error is None
+    notify = capture.data_listeners[0]
+    bar = b"\x7f\x02" + struct.pack("<I", 1604670) + b"\x01\x02"
+    await notify("frame", {"op": 0x3809, "data": bar.hex(), "at": 1})
+    await notify("frame", {"op": 0x3634, "data": "0a0b", "at": 2})
+    assert bars == [CastBar(127, 1604670, None)] and raw == [b"\x0a\x0b"]
+    await notify("hello", {})  # Mitschnitt neu gestartet: neu abonnieren
+    assert len(capture.requests) == 2
+    capture.running = False
+    assert "Mitschnitt läuft nicht" in source.error
+    source.stop()
+    assert capture.data_listeners == []

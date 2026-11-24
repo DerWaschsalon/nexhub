@@ -217,3 +217,27 @@ def test_ausgeschaltete_teile_schweigen(tmp_path, monkeypatch):
     service.test_warning()
     service.tick()
     assert [w["titel"] for w in service.state()["warnungen"]] == ["Todesmal"] and "ping.wav" in played
+
+
+async def test_quelle_capture_nimmt_den_mitschnitt_und_ein_wechsel_startet_neu(konfig):
+    class Capture:
+        running, data_listeners = False, []
+    made = []
+
+    class Service(FakeService):
+        def __init__(self, name: str, source=None) -> None:
+            super().__init__(name)
+            made.append(source)
+    sent: list = []
+
+    async def publish(state: dict) -> None:
+        sent.append(state)
+    r = Radar(publish, game_running=spiel(lambda: True), service=Service, poll_s=0.05, capture=Capture())
+    r.enable("radar")
+    await warten_bis(lambda: r.running)
+    assert made == [None]  # Standard: eigenes Mitlesen
+    await r.save({"quelle": "capture"})
+    assert len(made) == 2 and made[1].capture is r.capture
+    with pytest.raises(ValueError):
+        await r.save({"quelle": "funk"})
+    await r.disable("radar")

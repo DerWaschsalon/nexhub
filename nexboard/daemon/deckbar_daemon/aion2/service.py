@@ -10,7 +10,7 @@ import time
 from collections import deque
 from pathlib import Path
 
-from ..core.packets import TcpdumpSource
+from ..core.packets import PacketSource, Recorder, TcpdumpSource
 from ..core.speech import Speech
 from . import minimap
 from .callouts import Callouts, short_texts
@@ -42,12 +42,13 @@ SHOWN_WARNINGS = 3
 
 
 class RadarService:
-    def __init__(self, name: str = "", spawn_log: Path | None = SPAWN_LOG) -> None:
+    def __init__(self, name: str = "", spawn_log: Path | None = SPAWN_LOG, source: PacketSource | None = None) -> None:
         self.settings = settings()
         self.parts: set[str] = set(PARTS)  # was davon an ist; der Daemon setzt hier seine Modulschalter ein
         if spawn_log:
             spawn_log.parent.mkdir(parents=True, exist_ok=True)
-        self.source = TcpdumpSource()
+        self.source = source or TcpdumpSource()  # woher die Pakete kommen (Einstellung quelle)
+        self.recorder = Recorder()
         self.speech = Speech(lambda: self.settings["sprache"])
         self.world = World(name)
         self.cubes = CubeTracker(self.world, spawn_log)
@@ -83,6 +84,7 @@ class RadarService:
         self.source.start()
 
     def stop(self) -> None:
+        self.recorder.stop()
         self.source.stop()
 
     def reload(self) -> None:
@@ -112,18 +114,18 @@ class RadarService:
         self.speech.ping()
 
     def start_recording(self) -> None:
-        self.source.start_recording(self.world.dungeon or "dungeon")
+        self.recorder.start(self.world.dungeon or "dungeon")
 
     def stop_recording(self) -> None:
-        self.source.stop_recording()
+        self.recorder.stop()
 
     @property
     def recording(self) -> bool:
-        return self.source.recording
+        return self.recorder.recording
 
     @property
     def error(self) -> str | None:
-        """Warum der Mitschnitt nicht läuft (etwa tcpdump ohne Rechte), sonst None."""
+        """Warum keine Pakete kommen (tcpdump ohne Rechte, Mitschnitt aus), sonst None."""
         return self.source.error
 
     # ------------------------------------------------------------ Ereignisse aus dem Mitschnitt-Thread
@@ -153,7 +155,7 @@ class RadarService:
             if not dungeon:
                 self.stop_recording()
             elif self.settings["aufnahme_auto"]:
-                self.source.start_recording(dungeon)  # Lernmodus: jeder Lauf eine eigene Datei
+                self.recorder.start(dungeon)  # Lernmodus: jeder Lauf eine eigene Datei
         if int(time.time()) != self._second:
             self._second = int(time.time())
             if FIELD_BOSSES in self.parts:

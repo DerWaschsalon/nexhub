@@ -1,18 +1,18 @@
 """Paketquellen: verteilen Spielpakete als (Opcode, Nutzdaten) an Abnehmer, die sich dafür anmelden.
 
-`PcapSource` liest rohe TCP-Segmente aus einem pcap (Tests, Werkzeuge, Goldtest). `TcpdumpSource` ist der
-Live-Weg des Radars über ein eigenes tcpdump, bis das Radar am Rust-Mitschnitt hängt (Umbauschritt 7).
+`PcapSource` liest rohe TCP-Segmente aus einem pcap (Tests, Werkzeuge, Goldtest). Live gibt es zwei Wege:
+`TcpdumpSource` über ein eigenes tcpdump und `CaptureSource` über den Rust-Mitschnitt, der die Pakete ohnehin
+liest (dann entfällt das zweite Mitlesen).
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import struct
 import subprocess
 import threading
-from collections.abc import Callable, Iterable
-from datetime import datetime
-from pathlib import Path
-from typing import BinaryIO
+from collections.abc import Awaitable, Callable, Coroutine, Iterable
+from typing import Any, BinaryIO, Protocol
 
 from .frames import StreamParser
 from .messages import Message
@@ -22,7 +22,6 @@ log = logging.getLogger(__name__)
 
 Handler = Callable[[int, bytes], None]  # (Opcode, Nutzdaten)
 UNREADABLE = (ValueError, struct.error, IndexError)  # Nutzdaten passen nicht zur Nachricht
-RECORDINGS = Path.home() / ".local" / "share" / "aion2-radar" / "mitschnitte"  # nie ins Repo
 
 
 class PacketSource:
@@ -112,7 +111,6 @@ class TcpdumpSource(PcapSource):
         super().__init__()
         self.error: str | None = None  # warum der Mitschnitt nicht läuft, für die Anzeige
         self._process: subprocess.Popen | None = None
-        self._recording: subprocess.Popen | None = None  # zweites tcpdump, schreibt für den Lernmodus eine Datei
 
     def start(self, interface: str = "any") -> threading.Thread:
         def run() -> None:
@@ -131,24 +129,64 @@ class TcpdumpSource(PcapSource):
         thread.start()
         return thread
 
-    @property
-    def recording(self) -> bool:
-        return self._recording is not None
-
-    def start_recording(self, name: str = "dungeon") -> None:
-        self.stop_recording()
-        RECORDINGS.mkdir(parents=True, exist_ok=True)
-        file = RECORDINGS / f"{name.replace(' ', '_')}-{datetime.now():%Y%m%d-%H%M}.pcap"
-        self._recording = start_tcpdump(file=str(file))
-        log.info("Aufnahme läuft: %s", file.name)
-
-    def stop_recording(self) -> None:
-        if self._recording:
-            self._recording.terminate()
-            self._recording = None
-            log.info("Aufnahme beendet")
-
     def stop(self) -> None:
-        self.stop_recording()
         if self._process and self._process.poll() is None:
             self._process.terminate()
+
+
+class Capture(Protocol):
+    """Was die CaptureSource vom Mitschnitt braucht (capture.Capture)."""
+    running: bool
+    data_listeners: list[Callable[[str, Any], Awaitable[None]]]
+
+    async def request(self, cmd: str, timeout: float = 5, **args: Any) -> Any: ...
+
+
+class CaptureSource(PacketSource):
+    """Pakete aus `deckbar-capture`: Der Mitschnitt schickt die abonnierten Opcodes roh als Meldung `frame`
+    (capture/src/frames.rs). Abonniert wird, was hier Abnehmer hat; ohne laufenden Mitschnitt kommt nichts."""
+
+    NOT_RUNNING = "Mitschnitt läuft nicht (Modul AION 2 · Kampfdaten mit eigenem Mitschnitt einschalten)"
+
+    def __init__(self, capture: Capture) -> None:
+        super().__init__()
+        self.capture = capture
+        self.active = False
+        self._tasks: set[asyncio.Task] = set()  # Referenzen, sonst räumt asyncio laufende Aufgaben weg
+
+    @property
+    def error(self) -> str | None:
+        return None if self.capture.running or not self.active else self.NOT_RUNNING
+
+    def opcodes(self) -> list[int]:
+        return sorted({*self._by_opcode, *self._typed})
+
+    def start(self) -> None:
+        self.active = True
+        self.capture.data_listeners.append(self._on_capture)
+        if self.capture.running:
+            self._spawn(self._subscribe(self.opcodes()))
+
+    def stop(self) -> None:
+        self.active = False
+        if self._on_capture in self.capture.data_listeners:
+            self.capture.data_listeners.remove(self._on_capture)
+        if self.capture.running:
+            self._spawn(self._subscribe([]))
+
+    async def _on_capture(self, event: str, payload: Any) -> None:
+        if event == "hello":  # Mitschnitt neu gestartet: er weiß von nichts mehr
+            await self._subscribe(self.opcodes())
+        elif event == "frame":
+            self.publish(payload["op"], bytes.fromhex(payload["data"]))
+
+    async def _subscribe(self, opcodes: list[int]) -> None:
+        try:
+            await self.capture.request("subscribe_frames", opcodes=opcodes)
+        except (RuntimeError, TimeoutError, OSError) as e:
+            log.warning("Pakete nicht beim Mitschnitt abonniert: %s", e)
+
+    def _spawn(self, job: Coroutine) -> None:
+        task = asyncio.get_running_loop().create_task(job)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)

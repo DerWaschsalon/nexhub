@@ -168,6 +168,8 @@ class Capture:
                     await self._notify(kind, msg)
                 case ("reply", msg):
                     self.requests.reply(msg)
+                case ("frame", msg):  # abonniertes Spielpaket, roh (core.packets.CaptureSource)
+                    await self._notify("frame", msg)
 
     async def _on_status(self, msg: dict) -> None:
         ping = msg.get("ping")
