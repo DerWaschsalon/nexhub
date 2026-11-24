@@ -1,6 +1,35 @@
 /* NexBoard-UI · DPS-Kachel (AION 2): Kopfzeile mit Ziel, HP und Zeit, darunter die Spielerzeilen. */
 #include "ui_internal.h"
 
+typedef struct {
+    lv_obj_t *row;   /* Zeile (Hintergrundspur) */
+    lv_obj_t *bar;   /* Balken in Klassenfarbe, Breite = DPS relativ zum Besten */
+    lv_obj_t *name;
+    lv_obj_t *val;   /* DPS */
+    lv_obj_t *extra; /* Anteil oder Gesamtschaden */
+    /* zuletzt gesetzte Werte: Style-Setter lassen LVGL immer neu zeichnen, und das Panel nimmt nur
+     * ganze Frames an (220 KB über QSPI). Deshalb nur bei Änderung setzen. */
+    int32_t bar_px;
+    lv_color_t color;
+    bool color_set;
+    bool you;
+} dps_row_t;
+
+/* DPS-Kachel: Kopfzeile (Ziel, HP, Zeit) und bis zu 8 vorab angelegte Zeilen */
+typedef struct {
+    int n;          /* angelegte Zeilen */
+    int extra;      /* 0 = Anteil, 1 = Schaden, 2 = nichts */
+    int32_t bar_w;  /* volle Balkenbreite */
+    lv_obj_t *target;
+    lv_obj_t *time;
+    lv_obj_t *hp_track; /* dünne Spur unter der Kopfzeile … */
+    lv_obj_t *hp;       /* … mit den Rest-HP des Bosses */
+    int32_t hp_w;
+    int32_t hp_px;  /* zuletzt gesetzte HP-Breite */
+    lv_obj_t *msg;  /* „nicht verbunden“ / „Warte auf Kampf“ */
+    dps_row_t rows[DECKBAR_DPS_MAX_ROWS];
+} dps_view_t;
+
 /* ======================================================================= DPS (AION 2) */
 
 static lv_color_t class_color(const char *cls)
@@ -38,9 +67,9 @@ void dbui_set_hidden(lv_obj_t *o, bool hidden)
     else lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
 }
 
-void dbui_dps_update(tile_t *t)
+static void dps_update(tile_t *t)
 {
-    dps_view_t *v = t->dps;
+    dps_view_t *v = t->view;
     if (!v) return;
     const cJSON *d = cJSON_GetObjectItemCaseSensitive(ui.state, "dps");
     const cJSON *rows = cJSON_IsObject(d) ? cJSON_GetObjectItemCaseSensitive(d, "rows") : NULL;
@@ -121,14 +150,16 @@ void dbui_dps_update(tile_t *t)
  *   ab h >= 90: Kopfzeile mit Ziel, HP und Kampfzeit, darunter dünner HP-Balken
  *   dann `players` Zeilen: [Rang Name ......... DPS  Anteil], Balken in Klassenfarbe
  */
-void dbui_build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *extra)
+static void build_dps(tile_t *t, int32_t w, int32_t h, const cJSON *item)
 {
+    int players = dbui_jint(item, "players", DECKBAR_DPS_DEFAULT_PLAYERS);
+    const char *extra = dbui_jstr(item, "extra");
     lv_obj_t *o = t->obj;
     lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_clip_corner(o, true, 0);
     dps_view_t *v = lv_malloc_zeroed(sizeof *v);
     if (!v) return;
-    t->dps = v;
+    t->view = v;
     v->extra = extra && !strcmp(extra, "dmg") ? 1 : extra && !strcmp(extra, "none") ? 2 : 0;
 
     const int32_t px = 10, gap = 3;
@@ -212,5 +243,7 @@ void dbui_build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *ex
     v->msg = dbui_text_label(o, &db_font_label, "");
     lv_obj_add_style(v->msg, &db_theme.text_dim, 0);
     lv_obj_align(v->msg, LV_ALIGN_CENTER, 0, v->target ? 8 : 0);
-    dbui_dps_update(t);
+    dps_update(t);
 }
+
+const tile_class_t dbui_tile_dps = {"dps", build_dps, dps_update, {"dps"}};

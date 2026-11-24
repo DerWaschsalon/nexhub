@@ -1,6 +1,14 @@
 /* NexBoard-UI · Guide-Kachel (PoE-Leveling): Kopfzeile und die Zeilen des aktuellen Schritts. */
 #include "ui_internal.h"
 
+/* Guide-Kachel: Kopfzeile (Akt · Stufe · XP, Schritt, Knöpfe) und die Zeilen des aktuellen Schritts */
+typedef struct {
+    lv_obj_t *head;
+    lv_obj_t *step;
+    lv_obj_t *body; /* eine Beschriftung mit Farbbefehlen („#FEC076 Zone#“), Zeilen durch \n getrennt */
+    lv_obj_t *msg;
+} guide_view_t;
+
 /* Lange auf „weiter“: Schnellvorlauf zur Zone, in der man gerade steht (Daemon: long_press, part next) */
 static void guide_long_cb(lv_event_t *e)
 {
@@ -8,9 +16,9 @@ static void guide_long_cb(lv_event_t *e)
     dbui_send_event("long_press", t->id, "next", NULL, -1);
 }
 
-void dbui_guide_update(tile_t *t)
+static void guide_update(tile_t *t)
 {
-    guide_view_t *v = t->guide;
+    guide_view_t *v = t->view;
     if (!v) return;
     const cJSON *g = cJSON_GetObjectItemCaseSensitive(ui.state, "guide");
     if (!cJSON_IsObject(g)) {
@@ -69,13 +77,14 @@ static const lv_font_t *guide_font(void)
  *   Kopfzeile: [Akt · Stufe · XP ........ 12/231  <  >]
  *   darunter die Zeilen des Schritts, Farben vom Daemon; lange auf > = zur aktuellen Zone springen
  */
-void dbui_build_guide(tile_t *t, int32_t w, int32_t h)
+static void build_guide(tile_t *t, int32_t w, int32_t h, const cJSON *item)
 {
+    (void)item;
     lv_obj_t *o = t->obj;
     lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
     guide_view_t *v = lv_malloc_zeroed(sizeof *v);
     if (!v) return;
-    t->guide = v;
+    t->view = v;
 
     /* große Schrift: auf der Leiste muss man den Schritt im Spiel aus dem Augenwinkel lesen können */
     const int32_t px = 10, btn = 30, gap = 6, head_h = btn + 6, step_w = 70;
@@ -108,5 +117,7 @@ void dbui_build_guide(tile_t *t, int32_t w, int32_t h)
     v->msg = dbui_text_label(o, &db_font_small, "");
     lv_obj_set_style_text_color(v->msg, db_theme_color(DB_STYLE_WARNING), 0);
     lv_obj_align(v->msg, LV_ALIGN_BOTTOM_RIGHT, -px, -6);
-    dbui_guide_update(t);
+    guide_update(t);
 }
+
+const tile_class_t dbui_tile_guide = {"guide", build_guide, guide_update, {"guide"}};

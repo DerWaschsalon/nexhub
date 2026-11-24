@@ -104,36 +104,30 @@ static void media_update(tile_t *t)
 }
 
 
+static bool wants(const tile_class_t *cls, const char *key)
+{
+    for (size_t i = 0; i < sizeof cls->keys / sizeof cls->keys[0]; i++)
+        if (cls->keys[i] && !strcmp(cls->keys[i], key)) return true;
+    return false;
+}
+
 void dbui_apply_state_key(const char *key, const cJSON *val)
 {
-    bool media = !strcmp(key, "track") || !strcmp(key, "playing");
     uint32_t now = lv_tick_get();
     for (int i = 0; i < ui.tile_count; i++) {
         tile_t *t = &ui.tiles[i];
-        if (t->type == IT_MEDIA) {
-            if (media) media_update(t);
-            continue;
-        }
-        if (t->type == IT_DPS) {
-            if (!strcmp(key, "dps")) dbui_dps_update(t);
-            continue;
-        }
-        if (t->type == IT_CLAUDE) {
-            if (!strcmp(key, "claude")) dbui_claude_update(t);
-            continue;
-        }
-        if (t->type == IT_GUIDE) {
-            if (!strcmp(key, "guide")) dbui_guide_update(t);
+        if (t->cls->update) { /* Kachel mit eigenem State */
+            if (wants(t->cls, key)) t->cls->update(t);
             continue;
         }
         if (t->bind[0] && !strcmp(t->bind, key)) {
-            if (t->type == IT_TOGGLE) {
+            if (t->cls == &dbui_tile_toggle) {
                 if (t->timer) {
                     lv_timer_delete(t->timer);
                     t->timer = NULL;
                 }
                 tile_set_checked(t, dbui_truthy(val));
-            } else if (t->type == IT_SLIDER && cJSON_IsNumber(val)) {
+            } else if (t->cls == &dbui_tile_slider && cJSON_IsNumber(val)) {
                 int32_t v = (int32_t)val->valuedouble;
                 /* Beim Ziehen und kurz danach gewinnt der Finger */
                 if (!t->dragging && (int32_t)(now - t->settle_until) >= 0) slider_animate_to(t, v);
@@ -147,12 +141,8 @@ void dbui_apply_full_state(void)
 {
     const cJSON *it;
     cJSON_ArrayForEach(it, ui.state) dbui_apply_state_key(it->string, it);
-    for (int i = 0; i < ui.tile_count; i++) {
-        if (ui.tiles[i].type == IT_MEDIA) media_update(&ui.tiles[i]);
-        if (ui.tiles[i].type == IT_DPS) dbui_dps_update(&ui.tiles[i]);
-        if (ui.tiles[i].type == IT_CLAUDE) dbui_claude_update(&ui.tiles[i]);
-        if (ui.tiles[i].type == IT_GUIDE) dbui_guide_update(&ui.tiles[i]);
-    }
+    for (int i = 0; i < ui.tile_count; i++)
+        if (ui.tiles[i].cls->update) ui.tiles[i].cls->update(&ui.tiles[i]);
 }
 
 /* ======================================================================= Kacheln: Events */
@@ -177,14 +167,14 @@ static void tile_event_cb(lv_event_t *e)
             return;
         }
         if (ui.net != DECKBAR_NET_ONLINE) return;
-        if (t->type == IT_TOGGLE) {
+        if (t->cls == &dbui_tile_toggle) {
             /* optimistisch umschalten; der Daemon bestätigt per state */
             tile_set_checked(t, !t->checked);
             if (t->timer) lv_timer_delete(t->timer);
             t->timer = lv_timer_create(toggle_revert_cb, TOGGLE_REVERT_MS, t);
             lv_timer_set_repeat_count(t->timer, 1);
         }
-        dbui_send_event("button_press", t->id, t->type == IT_MEDIA ? "toggle" : NULL, NULL, -1);
+        dbui_send_event("button_press", t->id, t->cls == &dbui_tile_media ? "toggle" : NULL, NULL, -1);
     } else if (code == LV_EVENT_LONG_PRESSED) {
         if (!t->nav[0]) dbui_send_event("long_press", t->id, NULL, NULL, -1);
     }
@@ -283,7 +273,7 @@ lv_obj_t *dbui_make_tile_obj(lv_obj_t *page, tile_t *t, int32_t x, int32_t y, in
     lv_obj_t *o = dbui_plain_obj(page);
     lv_obj_add_style(o, &db_theme.glass, 0);
     /* Bei Toggles bestimmt style nur den aktiven Zustand */
-    if (t->type != IT_TOGGLE) lv_obj_add_style(o, &db_theme.tint[t->style], 0);
+    if (t->cls != &dbui_tile_toggle) lv_obj_add_style(o, &db_theme.tint[t->style], 0);
     lv_obj_add_style(o, &db_theme.glass_pressed, LV_STATE_PRESSED);
     lv_obj_add_style(o, &db_theme.active[t->style], LV_STATE_CHECKED);
     lv_obj_set_pos(o, x, y);
@@ -294,8 +284,9 @@ lv_obj_t *dbui_make_tile_obj(lv_obj_t *page, tile_t *t, int32_t x, int32_t y, in
     return o;
 }
 
-void dbui_build_button(tile_t *t, int32_t w, int32_t h, const char *label)
+static void build_button(tile_t *t, int32_t w, int32_t h, const cJSON *item)
 {
+    const char *label = dbui_jstr(item, "label");
     lv_obj_t *o = t->obj;
     bool big = h >= 100;
     bool row = !big && w >= 150;
@@ -324,8 +315,9 @@ void dbui_build_button(tile_t *t, int32_t w, int32_t h, const char *label)
     lv_obj_add_event_cb(o, tile_event_cb, LV_EVENT_LONG_PRESSED, t);
 }
 
-void dbui_build_slider(tile_t *t, int32_t w, int32_t h, const char *label)
+static void build_slider(tile_t *t, int32_t w, int32_t h, const cJSON *item)
 {
+    const char *label = dbui_jstr(item, "label");
     lv_obj_t *o = t->obj;
     /* Wischen auf dem Slider darf nicht die Seite wechseln */
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLL_CHAIN | LV_OBJ_FLAG_GESTURE_BUBBLE);
@@ -404,8 +396,9 @@ static void build_cover(tile_t *t, int32_t x, int32_t y, int32_t px)
  *   flach (sonst):    [Cover] Titel/Interpret ........ ⏮ ⏯ ⏭  (schmal: nur ⏯)
  * Alles wird aus w/h berechnet, damit sich nichts überlappt.
  */
-void dbui_build_media(tile_t *t, int32_t w, int32_t h)
+static void build_media(tile_t *t, int32_t w, int32_t h, const cJSON *item)
 {
+    (void)item;
     lv_obj_t *o = t->obj;
     const int32_t m = 8; /* Rand um das Cover */
     int32_t lt = lv_font_get_line_height(&db_font_title);
@@ -472,4 +465,23 @@ void dbui_build_media(tile_t *t, int32_t w, int32_t h)
     lv_label_set_long_mode(t->artist, LV_LABEL_LONG_DOT);
     lv_obj_add_event_cb(o, tile_event_cb, LV_EVENT_SHORT_CLICKED, t);
     dbui_media_show_cover(t);
+}
+
+/* ======================================================================= Kacheltypen */
+
+const tile_class_t dbui_tile_button = {"button", build_button, NULL, {NULL}};
+const tile_class_t dbui_tile_toggle = {"toggle", build_button, NULL, {NULL}};
+const tile_class_t dbui_tile_slider = {"slider", build_slider, NULL, {NULL}};
+const tile_class_t dbui_tile_media = {"media", build_media, media_update, {"track", "playing"}};
+
+static const tile_class_t *const TILE_CLASSES[] = {
+    &dbui_tile_button, &dbui_tile_toggle, &dbui_tile_slider, &dbui_tile_media,
+    &dbui_tile_dps,    &dbui_tile_claude, &dbui_tile_guide,
+};
+
+const tile_class_t *dbui_tile_class(const char *name)
+{
+    for (size_t i = 0; name && i < sizeof TILE_CLASSES / sizeof TILE_CLASSES[0]; i++)
+        if (!strcmp(TILE_CLASSES[i]->name, name)) return TILE_CLASSES[i];
+    return &dbui_tile_button;
 }
