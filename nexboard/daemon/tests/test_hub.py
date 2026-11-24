@@ -6,7 +6,8 @@ from aiohttp import web
 from pydantic import ValidationError
 
 from deckbar_daemon import hub as hubmod
-from deckbar_daemon.hub import Hub, HubError
+from deckbar_daemon.feed_buffer import FeedBuffer
+from deckbar_daemon.hub import Hub, HubError, loot_drop
 
 
 async def fake_hub(polls_until_approved: int = 1):
@@ -234,6 +235,15 @@ async def test_run_wird_als_nexlog_hochgeladen(tmp_path):
     hub.history_dir = lambda: hist
     tod = {"t_ms": run.start_ms + 1000, "name": "Morgan", "skill": 1801120, "warning": "Todesmal", "lead_ms": 4100}
     hub.deaths = lambda start_ms, end_ms: [tod] if start_ms <= tod["t_ms"] <= end_ms else []
+    # Würfel-Beute aus dem Feed des Mitschnitts: nur „steht zum Würfeln“ zählt, auch kurz nach dem letzten Boss
+    loot = FeedBuffer("lootRoll", loot_drop)
+    hub.loot = loot.between
+    opened = {"type": "open", "rollId": "ab", "itemId": 110430050, "count": 1, "endsAt": 0}
+    won = {"type": "won", "rollId": "ab", "itemId": 110430050, "player": {"serverId": 2302, "name": "Morgan"}}
+    earlier = {"type": "open", "rollId": "cd", "itemId": 7, "count": 1, "endsAt": 0}
+    for at, roll in ((run.end_ms + 5_000, opened), (run.end_ms + 9_000, won), (run.start_ms - 60_000, earlier)):
+        await loot.on_capture("plugin_feed", {"event": "lootRoll", "data": roll, "at": at})
+    await loot.on_capture("plugin_feed", {"event": "deathRecap", "data": opened, "at": run.end_ms})  # andere Art
     try:
         await hub.on_fight({"rows": [{"name": "Gamunex", "cls": "chanter", "you": True}, {"name": "Morgan"}]})
         await hub.on_run(run)
@@ -247,6 +257,8 @@ async def test_run_wird_als_nexlog_hochgeladen(tmp_path):
         assert [f.id for f in log.fights] == [f.id for f in run.fights]
         assert list(log.hits) == [run.fights[0].id] and len(log.hits[run.fights[0].id].rows) == 2
         assert [d.model_dump() for d in log.deaths] == [tod]  # Todesursachen vom Radar
+        # nur der Gegenstand dieses Runs, ohne den Namen der Gewinnerin
+        assert [d.model_dump() for d in log.loot] == [{"t_ms": run.end_ms + 5_000, "item_id": 110430050, "count": 1}]
     finally:
         await hub.close()
         await runner.cleanup()

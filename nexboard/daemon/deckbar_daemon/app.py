@@ -28,7 +28,8 @@ from .core.live import LiveHub
 from .core.topics import LANGUAGE
 from .dps import SETTINGS_FILE as dps_settings_file
 from .dps import DpsFeed
-from .hub import Hub
+from .feed_buffer import FeedBuffer
+from .hub import Hub, loot_drop
 from .modules import CATEGORIES
 from .modules.base import WebModule
 from .modules.deck import DeckModule
@@ -124,6 +125,9 @@ class NexBoard:
         self.overlay.game_check = self._game_running
         self.radar = Radar(self._publish_radar, spiel_laeuft=self._game_running)
         self.hub.deaths = self.radar.tode_zwischen
+        loot = FeedBuffer("lootRoll", loot_drop)
+        self.dps.capture.data_listeners.append(loot.on_capture)
+        self.hub.loot = loot.between
         self._sync_radar()
         # Oberfläche des A2Tools-Meters mit dem Plugin-Host (eigener Port, siehe __main__); Testinstanzen
         # bekommen eigene Plugin-Ordner, damit sie die installierten Plugins nicht anfassen

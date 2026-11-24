@@ -9,7 +9,8 @@ Aufbau (Einzelheiten in proto/README.md):
      "names": {...},      aufgelöste Namen: "Mo***n|ranger" → "Moonlin"
      "fights": [...],     die Kampfdateien des Mitschnitts, unverändert im A2Tools-Format
      "hits": {...},       Einzeltreffer je Kampf-ID, wie deckbar-capture sie schreibt (hits/<id>.json)
-     "deaths": [...]}     Todesursachen vom Radar (Skill, Warnung), falls es lief
+     "deaths": [...],     Todesursachen vom Radar (Skill, Warnung), falls es lief
+     "loot": [...]}       Würfel-Beute der Gruppe (Gegenstand, Anzahl, Zeit), ohne Namen
 
 Gepackt mit gzip. Die Kampfdateien bleiben roh, damit der Hub später mehr auswerten kann, ohne
 dass sich das Format ändert. Von ihnen prüft das Modell nur die Felder, die der Hub sicher braucht;
@@ -124,6 +125,15 @@ class Death(_Strict):
     lead_ms: int | None = Field(None, ge=0)  # so lange vor dem Tod erschien sie
 
 
+class Loot(_Strict):
+    """Ein Gegenstand, um den die Gruppe gewürfelt hat (Würfel-Beute aus dem Mitschnitt). Ohne Namen: wer
+    gewonnen hat, steht nicht drin. Der Hub ordnet die Beute über die Zeit dem Bosskampf davor zu."""
+
+    t_ms: int  # ms seit 1970, als der Gegenstand zum Würfeln stand
+    item_id: int
+    count: int = Field(1, ge=1)
+
+
 class NexLog(_Strict):
     format: Literal["nexlog"] = FORMAT
     version: Literal[1] = VERSION
@@ -136,6 +146,8 @@ class NexLog(_Strict):
     hits: dict[str, FightHits] = Field(default_factory=dict, max_length=MAX_FIGHTS)
     # Neu: ältere Hubs kennen das Feld nicht und lehnen es ab, deshalb erst den Hub aktualisieren
     deaths: list[Death] = Field(default_factory=list, max_length=500)
+    # Neu wie `deaths`: erst den Hub aktualisieren, dann die NexBoards
+    loot: list[Loot] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode="after")
     def _consistent(self) -> NexLog:

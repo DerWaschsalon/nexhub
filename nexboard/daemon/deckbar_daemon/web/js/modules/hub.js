@@ -2,7 +2,7 @@
 import { fill, el, api, S, on, button, chip, callout, card, settingsRow, sw, saver, toast, fmtWhen, modOn, setModule } from "../core.js";
 import { moduleSettings } from "../form.js";
 
-const PRIVACY = "Hochgeladene Runs enthalten die Charakternamen, Klassen und Ausrüstungswerte deiner Mitspieler und jeden einzelnen Treffer. Sie sind im Hub für alle freigeschalteten Mitglieder sichtbar. Sprich das mit deiner Gruppe ab.";
+const PRIVACY = "Hochgeladene Runs enthalten die Charakternamen, Klassen und Ausrüstungswerte deiner Mitspieler und jeden einzelnen Treffer, dazu die Gegenstände, um die gewürfelt wurde (ohne Namen). Sie sind im Hub für alle freigeschalteten Mitglieder sichtbar. Sprich das mit deiner Gruppe ab.";
 const DISCORD_PRIVACY = "Der Post zeigt Namen, Klassen und Schaden deiner Mitspieler im Discord-Kanal des Hubs. Sprich das mit deiner Gruppe ab.";
 
 const STATUS = {
