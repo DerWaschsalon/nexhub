@@ -1,6 +1,6 @@
 // Bewertung der Ausrüstung gegen Top-Spieler derselben Klasse (Vorbild kisk.app/scoring): Note je
-// Gegenstand und der Weg zu Best in Slot durch Neuwürfeln (fehlende ideale Zeilen nach Priorität).
-// Gerechnet wird im Hub (API), hier nur Typen und Farben.
+// Gegenstand und der Weg zur Zielnote durch Neuwürfeln (wenigste Versuche im Mittel).
+// Gerechnet wird im Hub (API: rating.py, upgrades.py), hier nur Typen und Farben.
 
 /** Eine Zeile der Seelenbindung: Wert, Höchstwert dieses Gegenstands, Anteil der Top-Spieler mit ihr.
  *  Manasteine und Göttersteine (stone, godstone) kommen nur von den BiS-Listen. */
@@ -19,8 +19,44 @@ export type RerollTarget = { name: string; gain_lo: number; gain_hi: number };
 /** Ein Schritt: diese Zeile neu würfeln, bis eines der Ziele kommt */
 export type RerollStep = {
 	line: string;
+	/** Prozent je Versuch */
 	chance: number;
+	/** Versuche im Mittel */
+	tries: number;
+	/** nur Skills als Ziel: muss nicht vor dem Binden kommen */
+	skill_only: boolean;
 	tiers: Partial<Record<'best' | 'good' | 'fine', RerollTarget[]>>;
+};
+
+/** Ein Teil im Upgrade-Plan; ohne Würfeltabelle gibt es keine Note */
+export type PlanPiece = {
+	slot: string;
+	name: string | null;
+	icon: string | null;
+	grade: string | null;
+	score: number | null;
+	letter: string | null;
+};
+
+/** Der Plan für ein Teil: Schritte, Note danach bei Pech und Glück (`after`) und im Mittel */
+export type UpgradeCard = PlanPiece & {
+	steps: RerollStep[];
+	after: [number, number];
+	mean: number;
+	after_letter: string;
+	tries: number;
+	per_try: number;
+};
+
+/** Antwort von GET /api/armory/{id}/upgrades: jedes Teil in genau einer Gruppe */
+export type UpgradePlan = {
+	goal: 'S+' | 'BiS';
+	group: string;
+	cards: UpgradeCard[];
+	bind: PlanPiece[];
+	done: PlanPiece[];
+	unreachable: (PlanPiece & { reason: 'no_rolls' | 'too_far' })[];
+	arcana: PlanPiece[];
 };
 
 export type Rating = {
@@ -32,7 +68,7 @@ export type Rating = {
 	ideal_of: number;
 	/** Seite mit den Würfeldaten (MetaBot.GG), muss verlinkt werden */
 	source: string | null;
-	upgrade: { steps: RerollStep[]; after: [number, number]; after_letter: string } | null;
+	upgrade: UpgradeCard | null;
 };
 
 /** Bewertung eines Charakters: je Ausrüstungsplatz, dazu woher die Vergleichsgruppe stammt */

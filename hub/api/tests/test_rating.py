@@ -1,4 +1,4 @@
-"""Bewertung der Ausrüstung (rating.py): Zählung, Note, ideale Zeilen, Weg zu Best in Slot.
+"""Bewertung der Ausrüstung (rating.py): Zählung, Note, ideale Zeilen.
 Nur erfundene Daten, gebaut nach dem Muster eines Schilds mit Krit statt Kampftempo."""
 from nexhub_api import rating
 
@@ -80,25 +80,6 @@ def test_alte_zaehlung_ohne_breite_gibt_keine_note():
     assert rating.rate(data, {"Testschild": TABLE}, {"equipment": [MINE]}, None, "ranger", "en")["items"] == []
 
 
-def test_krit_wird_zu_kampftempo():
-    c = rating.Census(census()["slots"], census()["tops"])
-    up = rating.upgrade(c, MINE, TABLE, "ranger")
-    first = up["steps"][0]
-    assert first["line"]["name"] == "Critical Hit"
-    # die fehlenden idealen Zeilen nach Priorität, Kampftempo und Mehrfachtreffer
-    assert [g["name"] for g in first["best"]] == ["Combat Speed", "Multi-hit Chance"]
-    assert 0 < first["chance"] < 100
-    assert up["after"][0] > rating.score(c, MINE, TABLE, "ranger")[0]
-
-
-def test_ideal_auch_wenn_die_note_schon_gut_ist():
-    c = rating.Census(census()["slots"], census()["tops"])
-    value, _ = rating.score(c, MINE, TABLE, "ranger")
-    assert 35 <= value < 90  # gut benotet, aber kein BiS: trotzdem ein Weg zu Best in Slot
-    assert rating.upgrade(c, MINE, TABLE, "ranger") is not None
-    assert rating.upgrade(c, TOP, TABLE, "ranger") is None
-
-
 def test_ausgabe_deutsch():
     me_en = {"equipment": [MINE]}
     me_de = {"equipment": [shield(("Schadensverstärkung", "5.5%"), ("Macht", "25"), ("Kritischer Treffer", "44"),
@@ -107,9 +88,6 @@ def test_ausgabe_deutsch():
     item = out["items"][0]
     assert out["size"] == 10 and out["group"] == "EU · Testraid · Hard"
     assert [ln["name"] for ln in item["lines"]][2] == "Kritischer Treffer"
-    step = item["upgrade"]["steps"][0]
-    assert step["line"] == "Kritischer Treffer"
-    assert [t["name"] for t in step["tiers"]["best"]] == ["Kampftempo", "Mehrfachtreffer"]
     assert item["source"] == TABLE["url"]
 
 
