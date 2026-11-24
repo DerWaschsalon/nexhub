@@ -453,11 +453,48 @@ def test_termin_tafel_und_pings() -> None:
     assert f"**Riss** <t:{int(um('2026-10-07 03:00'))}:t>" in text
     assert f"**Wächterin Kaira** <t:{int(um('2026-10-07 05:00'))}:t>" in text  # 07:00 Serverzeit
     # Riss und Shugo-Fest in 3 Minuten, Resets nie
-    faellig = faellige_pings(jetzt, set())
-    assert [n for n, _ in faellig] == ["Riss", "Shugo-Fest"]
-    assert faellige_pings(jetzt, set(faellig)) == []  # nicht doppelt
+    faellig = faellige_pings(jetzt, set(), 5 * 60)
+    assert [key for key, _ in faellig] == ["rift", "shugo"]
+    assert faellige_pings(jetzt, set(faellig), 5 * 60) == []  # nicht doppelt
+    assert faellige_pings(jetzt, set(), 2 * 60) == []  # Vorlauf 2 Minuten: noch zu früh
     # läuft gerade: Riss offen bis 03:10
     assert f"läuft, bis <t:{int(um('2026-10-07 03:10'))}:t>" in str(tafel(um("2026-10-07 03:05")).description)
+
+
+def test_gepingte_termine_ueberleben_als_text() -> None:
+    from bot.modules.aion2.schedule import decode_announced, encode_announced
+
+    announced = {("rift", 1795000000), ("artifact_siege", 1795003600)}
+    assert decode_announced(encode_announced(announced)) == announced
+    assert decode_announced("") == set() and decode_announced("kaputt,rift@x,shugo@12") == {("shugo", 12)}
+
+
+def test_wochentermine_kommen_einmal_in_den_event_kalender() -> None:
+    from datetime import timezone
+
+    from bot.modules.aion2.schedule import Schedule, calendar_entries
+
+    now = datetime(2026, 11, 23, 12, 0, tzinfo=timezone.utc).timestamp()  # Montag
+    entries = calendar_entries(now)
+    assert sorted({event.key for event, _ in entries}) == ["artifact_siege", "nahma"]
+    assert len(entries) == 4 and all(now < start < now + 7 * 86400 for _, start in entries)  # je zwei Tage
+
+    class Guild:
+        def __init__(self) -> None:
+            self.created: list[dict[str, Any]] = []
+
+        async def fetch_scheduled_events(self) -> list[SimpleNamespace]:
+            return [SimpleNamespace(name=e["name"], start_time=e["start_time"]) for e in self.created]
+
+        async def create_scheduled_event(self, **event: Any) -> None:
+            self.created.append(event)
+
+    guild = Guild()
+    asyncio.run(Schedule.sync_calendar(SimpleNamespace(), guild, now))  # type: ignore[arg-type]
+    asyncio.run(Schedule.sync_calendar(SimpleNamespace(), guild, now + 3600))  # type: ignore[arg-type]
+    assert len(guild.created) == 4  # beim zweiten Abgleich steht alles schon da
+    first = min(guild.created, key=lambda e: e["start_time"])
+    assert first["end_time"] > first["start_time"] and first["location"]
 
 
 def test_run_report_from_hub_with_link() -> None:

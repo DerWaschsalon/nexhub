@@ -131,5 +131,13 @@
  "aion.termine_role": {
   "empty": null,
   "stored": "323456789012345678"
+ },
+ "aion.termine_lead_minutes": {
+  "empty": 5,
+  "stored": 7
+ },
+ "aion.termine_events": {
+  "empty": false,
+  "stored": true
  }
 }
