@@ -33,61 +33,27 @@
  * aufgefüllt), w, h, y, rows (je uint16 little endian), dann rows*w*2 Byte RGB565 */
 #define IMAGE_ID_LEN (DECKBAR_IMAGE_ID_MAX + 1)
 
-typedef enum { IT_BUTTON, IT_TOGGLE, IT_SLIDER, IT_MEDIA, IT_DPS, IT_CLAUDE, IT_GUIDE } it_type_t;
+typedef struct tile tile_t;
 
-
+/* Kachel-Schnittstelle: Ein Kacheltyp baut sich aus seinem Eintrag im Layout und zeigt seinen Teil des
+ * States. Ein neuer Typ ist eine Datei mit seiner Klasse und eine Zeile in der Tabelle in ui_tiles.c. */
 typedef struct {
-    lv_obj_t *row;   /* Zeile (Hintergrundspur) */
-    lv_obj_t *bar;   /* Balken in Klassenfarbe, Breite = DPS relativ zum Besten */
-    lv_obj_t *name;
-    lv_obj_t *val;   /* DPS */
-    lv_obj_t *extra; /* Anteil oder Gesamtschaden */
-    /* zuletzt gesetzte Werte: Style-Setter lassen LVGL immer neu zeichnen, und das Panel nimmt nur
-     * ganze Frames an (220 KB über QSPI). Deshalb nur bei Änderung setzen. */
-    int32_t bar_px;
-    lv_color_t color;
-    bool color_set;
-    bool you;
-} dps_row_t;
+    const char *name; /* „type“ im Layout */
+    void (*build)(tile_t *t, int32_t w, int32_t h, const cJSON *item);
+    void (*update)(tile_t *t); /* sein State hat sich geändert; NULL: die Kachel hängt an bind/mute_bind */
+    const char *keys[2];       /* State-Schlüssel, bei denen update() gerufen wird */
+} tile_class_t;
 
-/* DPS-Kachel: Kopfzeile (Ziel, HP, Zeit) und bis zu 8 vorab angelegte Zeilen */
-typedef struct {
-    int n;          /* angelegte Zeilen */
-    int extra;      /* 0 = Anteil, 1 = Schaden, 2 = nichts */
-    int32_t bar_w;  /* volle Balkenbreite */
-    lv_obj_t *target;
-    lv_obj_t *time;
-    lv_obj_t *hp_track; /* dünne Spur unter der Kopfzeile … */
-    lv_obj_t *hp;       /* … mit den Rest-HP des Bosses */
-    int32_t hp_w;
-    int32_t hp_px;  /* zuletzt gesetzte HP-Breite */
-    lv_obj_t *msg;  /* „nicht verbunden“ / „Warte auf Kampf“ */
-    dps_row_t rows[DECKBAR_DPS_MAX_ROWS];
-} dps_view_t;
+extern const tile_class_t dbui_tile_button, dbui_tile_toggle, dbui_tile_slider, dbui_tile_media;
+extern const tile_class_t dbui_tile_dps, dbui_tile_claude, dbui_tile_guide;
 
-/* Claude-Kachel: je Limit (Sitzung, Woche) eine Zeile [Name  Balken  Prozent  Reset] */
-typedef struct {
-    lv_obj_t *fill;
-    lv_obj_t *pct;
-    lv_obj_t *reset;
-} usage_row_t;
+/* Die Klasse zu einem Typnamen; unbekannte Namen sind Knöpfe. */
+const tile_class_t *dbui_tile_class(const char *name);
 
-typedef struct {
-    int32_t bar_w;
-    usage_row_t rows[2];
-} claude_view_t;
 
-/* Guide-Kachel: Kopfzeile (Akt · Stufe · XP, Schritt, Knöpfe) und die Zeilen des aktuellen Schritts */
-typedef struct {
-    lv_obj_t *head;
-    lv_obj_t *step;
-    lv_obj_t *body; /* eine Beschriftung mit Farbbefehlen („#FEC076 Zone#“), Zeilen durch \n getrennt */
-    lv_obj_t *msg;
-} guide_view_t;
-
-typedef struct {
+struct tile {
     char id[ID_LEN];
-    it_type_t type;
+    const tile_class_t *cls;
     db_style_t style;
     char bind[ID_LEN];
     char mute_bind[ID_LEN];
@@ -107,9 +73,7 @@ typedef struct {
     lv_obj_t *cover;   /* Media: Cover-Bild (über dem Platzhalter-Icon in t->icon) */
     int32_t cover_px;  /* Media: Kantenlänge des Covers, 0 = keins */
     bool flat;         /* Media: einzeiliges Layout, Text wird vertikal zentriert */
-    dps_view_t *dps;   /* DPS-Kachel */
-    claude_view_t *claude;
-    guide_view_t *guide;
+    void *view;        /* typ-eigene Ansicht (DPS, Claude, Guide), wird mit der Kachel freigegeben */
 
     bool checked;
     bool muted;
@@ -123,7 +87,7 @@ typedef struct {
     int32_t last_sent_value;
     uint32_t settle_until;
     lv_timer_t *timer; /* Slider: Settle-Ende, Toggle: Revert */
-} tile_t;
+};
 
 /* Bild, das zeilenweise in mehreren Nachrichten kommt (`art`, `bg`). Zwei Puffer, damit nie
  * ein halb empfangenes Bild zu sehen ist: empfangen wird in den hinteren, angezeigt der vordere. */
@@ -175,9 +139,6 @@ extern ui_state_t ui;
 /* ui_tiles.c */
 void dbui_apply_full_state(void);
 void dbui_apply_state_key(const char *key, const cJSON *val);
-void dbui_build_button(tile_t *t, int32_t w, int32_t h, const char *label);
-void dbui_build_media(tile_t *t, int32_t w, int32_t h);
-void dbui_build_slider(tile_t *t, int32_t w, int32_t h, const char *label);
 void dbui_fill_anim_cb(void *var, int32_t v);
 lv_obj_t *dbui_make_tile_obj(lv_obj_t *page, tile_t *t, int32_t x, int32_t y, int32_t w, int32_t h);
 lv_obj_t *dbui_mini_button(lv_obj_t *parent, tile_t *t, const char *glyph, const char *part, int32_t size);
@@ -195,19 +156,11 @@ void dbui_handle_bg(const cJSON *msg);
 void dbui_media_show_cover(tile_t *t);
 void dbui_request_art(void);
 
-/* ui_tile_claude.c */
-void dbui_build_claude(tile_t *t, int32_t w, int32_t h);
-void dbui_claude_update(tile_t *t);
 
 /* ui_tile_dps.c */
-void dbui_build_dps(tile_t *t, int32_t w, int32_t h, int players, const char *extra);
-void dbui_dps_update(tile_t *t);
 void dbui_set_hidden(lv_obj_t *o, bool hidden);
 void dbui_set_text(lv_obj_t *l, const char *txt);
 
-/* ui_tile_guide.c */
-void dbui_build_guide(tile_t *t, int32_t w, int32_t h);
-void dbui_guide_update(tile_t *t);
 
 /* ui_status.c */
 void dbui_build_status_ui(void);

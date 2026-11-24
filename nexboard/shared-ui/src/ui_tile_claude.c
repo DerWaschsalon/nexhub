@@ -1,13 +1,25 @@
 /* NexBoard-UI · Claude-Kachel: je Limit (Sitzung, Woche) eine Zeile mit Balken, Prozent und Reset. */
 #include "ui_internal.h"
 
+/* Claude-Kachel: je Limit (Sitzung, Woche) eine Zeile [Name  Balken  Prozent  Reset] */
+typedef struct {
+    lv_obj_t *fill;
+    lv_obj_t *pct;
+    lv_obj_t *reset;
+} usage_row_t;
+
+typedef struct {
+    int32_t bar_w;
+    usage_row_t rows[2];
+} claude_view_t;
+
 /* Schlüssel im State `claude` und Beschriftung, in Zeilenreihenfolge (siehe daemon/claude.py) */
 static const char *const CLAUDE_KEYS[2] = {"session", "week"};
 static const char *const CLAUDE_NAMES[2] = {"5 h", "Woche"};
 
-void dbui_claude_update(tile_t *t)
+static void claude_update(tile_t *t)
 {
-    claude_view_t *v = t->claude;
+    claude_view_t *v = t->view;
     if (!v) return;
     const cJSON *c = cJSON_GetObjectItemCaseSensitive(ui.state, "claude");
     char buf[8];
@@ -34,13 +46,14 @@ void dbui_claude_update(tile_t *t)
 }
 
 /* Claude-Kachel: Auslastung des Claude-Abos, Werte kommen alle 5 Minuten vom Daemon */
-void dbui_build_claude(tile_t *t, int32_t w, int32_t h)
+static void build_claude(tile_t *t, int32_t w, int32_t h, const cJSON *item)
 {
+    (void)item;
     lv_obj_t *o = t->obj;
     lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
     claude_view_t *v = lv_malloc_zeroed(sizeof *v);
     if (!v) return;
-    t->claude = v;
+    t->view = v;
 
     const int32_t px = 12, gap = 8, name_w = 40, pct_w = 36;
     /* Rücksetzzeit („Sa 01:00“) nur, wenn die Kachel breit genug ist */
@@ -82,5 +95,7 @@ void dbui_build_claude(tile_t *t, int32_t w, int32_t h)
             lv_obj_set_pos(r->reset, pct_x + pct_w + gap, mid - lh / 2);
         }
     }
-    dbui_claude_update(t);
+    claude_update(t);
 }
+
+const tile_class_t dbui_tile_claude = {"claude", build_claude, claude_update, {"claude"}};

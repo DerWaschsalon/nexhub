@@ -54,7 +54,7 @@ void dbui_media_show_cover(tile_t *t)
 static void art_apply_all(void)
 {
     for (int i = 0; i < ui.tile_count; i++)
-        if (ui.tiles[i].type == IT_MEDIA) dbui_media_show_cover(&ui.tiles[i]);
+        if (ui.tiles[i].cls == &dbui_tile_media) dbui_media_show_cover(&ui.tiles[i]);
 }
 
 /* Fordert das Cover in der Größe der größten Media-Kachel an (nach Layout und welcome). */
@@ -62,7 +62,7 @@ void dbui_request_art(void)
 {
     int32_t px = 0;
     for (int i = 0; i < ui.tile_count; i++)
-        if (ui.tiles[i].type == IT_MEDIA && ui.tiles[i].cover_px > px) px = ui.tiles[i].cover_px;
+        if (ui.tiles[i].cls == &dbui_tile_media && ui.tiles[i].cover_px > px) px = ui.tiles[i].cover_px;
     if (!px || ui.net != DECKBAR_NET_ONLINE) return;
     char buf[96];
     int f = ui.art.front;

@@ -80,24 +80,11 @@ static void free_tiles(void)
         tile_t *t = &ui.tiles[i];
         lv_anim_delete(t, dbui_fill_anim_cb);
         if (t->timer) lv_timer_delete(t->timer);
-        lv_free(t->dps);
-        lv_free(t->claude);
-        lv_free(t->guide);
+        lv_free(t->view);
     }
     lv_free(ui.tiles);
     ui.tiles = NULL;
     ui.tile_count = 0;
-}
-
-static it_type_t parse_type(const char *s)
-{
-    if (s && !strcmp(s, "toggle")) return IT_TOGGLE;
-    if (s && !strcmp(s, "slider")) return IT_SLIDER;
-    if (s && !strcmp(s, "media")) return IT_MEDIA;
-    if (s && !strcmp(s, "dps")) return IT_DPS;
-    if (s && !strcmp(s, "claude")) return IT_CLAUDE;
-    if (s && !strcmp(s, "guide")) return IT_GUIDE;
-    return IT_BUTTON;
 }
 
 /* Setzt die Items einer Seite zeilenweise in die erste freie Lücke (auto-flow dense). */
@@ -149,7 +136,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         tile_t *t = &ui.tiles[ui.tile_count++];
         memset(t, 0, sizeof *t);
         dbui_copy_str(t->id, sizeof t->id, id);
-        t->type = parse_type(dbui_jstr(ji, "type"));
+        t->cls = dbui_tile_class(dbui_jstr(ji, "type"));
         t->style = db_style_parse(dbui_jstr(ji, "style"));
         dbui_copy_str(t->bind, sizeof t->bind, dbui_jstr(ji, "bind"));
         dbui_copy_str(t->mute_bind, sizeof t->mute_bind, dbui_jstr(ji, "mute_bind"));
@@ -163,14 +150,7 @@ static void build_page(lv_obj_t *page, const cJSON *jp, int page_idx)
         (void)page_idx;
 
         dbui_make_tile_obj(page, t, x0, y0, pw, ph);
-        switch (t->type) {
-        case IT_SLIDER: dbui_build_slider(t, pw, ph, dbui_jstr(ji, "label")); break;
-        case IT_MEDIA: dbui_build_media(t, pw, ph); break;
-        case IT_DPS: dbui_build_dps(t, pw, ph, dbui_jint(ji, "players", DECKBAR_DPS_DEFAULT_PLAYERS), dbui_jstr(ji, "extra")); break;
-        case IT_CLAUDE: dbui_build_claude(t, pw, ph); break;
-        case IT_GUIDE: dbui_build_guide(t, pw, ph); break;
-        default: dbui_build_button(t, pw, ph, dbui_jstr(ji, "label")); break;
-        }
+        t->cls->build(t, pw, ph, ji);
     }
 }
 
@@ -254,7 +234,7 @@ bool dbui_apply_layout(const cJSON *msg)
 
     lv_obj_update_layout(ui.tv);
     for (int i = 0; i < ui.tile_count; i++)
-        if (ui.tiles[i].type == IT_SLIDER) dbui_slider_show(&ui.tiles[i], ui.tiles[i].value_cur);
+        if (ui.tiles[i].cls == &dbui_tile_slider) dbui_slider_show(&ui.tiles[i], ui.tiles[i].value_cur);
     dbui_apply_full_state();
 
     dbui_copy_str(ui.layout_hash, sizeof ui.layout_hash, dbui_jstr(msg, "hash"));
