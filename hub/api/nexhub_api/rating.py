@@ -42,7 +42,8 @@ def letter(score: float) -> str:
 def lines_of(item: dict) -> list[dict]:
     """Zeilen der Seelenbindung eines Gegenstands: Werte und verstärkte Skills, in der Reihenfolge von NC."""
     d = item.get("detail") or {}
-    out = [{"kind": "stat", "name": s["name"], "value": number(s["value"]), "unit": "%" if "%" in str(s["value"]) else ""}
+    out = [{"kind": "stat", "name": s["name"], "value": number(s["value"]),
+            "unit": "%" if "%" in str(s["value"]) else ""}
            for s in d.get("sub") or []]
     out += [{"kind": "skill", "name": k["name"], "value": float(k["level"]), "unit": ""} for k in d.get("skills") or []]
     return out
@@ -62,7 +63,7 @@ def count_players(equipments: list[list[dict]]) -> dict:
             if not lines:
                 continue
             entry = slots.setdefault(slot, {"players": 0, "lines": Counter(), "kinds": [0, 0]})
-            seen.setdefault(slot, set()).update(l["name"] for l in lines)
+            seen.setdefault(slot, set()).update(ln["name"] for ln in lines)
             if slot not in ARCANA:
                 for line in lines:
                     entry["kinds"][line["kind"] == "skill"] += 1
@@ -136,7 +137,7 @@ def score(census: Census, item: dict, table: dict, cls: str) -> tuple[float, lis
         line["max"] = own_max.get(line["name"]) or census.top(item["slot_name"], line["name"])
         line["points"] = points(census, item["slot_name"], line["name"], line["value"])
     best = census.best_piece(item["slot_name"], max(len(lines), 1))
-    return round(100 * sum(l["points"] for l in lines) / best, 1), lines
+    return round(100 * sum(ln["points"] for ln in lines) / best, 1), lines
 
 
 def ideal_lines(census: Census, item: dict, table: dict, cls: str, n: int) -> list[str]:
@@ -153,7 +154,7 @@ def ideal_lines(census: Census, item: dict, table: dict, cls: str, n: int) -> li
 def pool(census: Census, item: dict, table: dict, cls: str) -> list[dict]:
     """Was beim Neuwürfeln einer Zeile kommen kann, ohne die Zeilen, die schon drauf sind: Werte mit
     ihrer Chance von MetaBot, Skills geschätzt über den Anteil der Skill-Zeilen auf dem Platz."""
-    have = {l["name"] for l in lines_of(item)}
+    have = {ln["name"] for ln in lines_of(item)}
     stats = [r for r in table.get("rolls") or [] if r["name"] not in have]
     skill_table = (table.get("skills") or {}).get(cls) or {}
     skills = [o for o in skill_table.get("options") or [] if o["name"] not in have]
@@ -188,8 +189,8 @@ def upgrade(census: Census, item: dict, table: dict, cls: str) -> dict | None:
     now, lines = score(census, item, table, cls)
     slot = item["slot_name"]
     ideal = ideal_lines(census, item, table, cls, len(lines))
-    missing = [nm for nm in ideal if nm not in {l["name"] for l in lines}]
-    weak = sorted((l for l in lines if l["name"] not in ideal), key=lambda l: l["points"])
+    missing = [nm for nm in ideal if nm not in {ln["name"] for ln in lines}]
+    weak = sorted((ln for ln in lines if ln["name"] not in ideal), key=lambda ln: ln["points"])
     best = census.best_piece(slot, max(len(lines), 1))
     candidates = pool(census, item, table, cls)
     steps, lo_total, hi_total = [], now, now
@@ -201,7 +202,8 @@ def upgrade(census: Census, item: dict, table: dict, cls: str) -> dict | None:
         if not hits:
             continue
         top = max(g["gain_hi"] for g in hits)
-        fallback = sorted((g for g in gains if g["name"] not in missing and g["gain_lo"] > 0 and g["gain_hi"] >= top / 2),
+        fallback = sorted((g for g in gains
+                           if g["name"] not in missing and g["gain_lo"] > 0 and g["gain_hi"] >= top / 2),
                           key=lambda g: -g["gain_hi"])
         steps.append({"line": line, "chance": round(100 * sum(g["chance"] for g in hits), 1),
                       "best": hits, "good": fallback})
@@ -238,13 +240,13 @@ def rate_item(census: Census, item: dict, item_de: dict | None, table: dict, cls
     ideal = set(ideal_lines(census, item, table, cls, len(lines)))
     names = _names_de(item, item_de) if lang == "de" else {}
     up = upgrade(census, item, table, cls)
-    shown = [{"kind": l["kind"], "name": names.get(l["name"], l["name"]), "value": l["value"], "unit": l["unit"],
-              "max": l["max"], "share": l["share"]} for l in lines]
+    shown = [{"kind": ln["kind"], "name": names.get(ln["name"], ln["name"]), "value": ln["value"], "unit": ln["unit"],
+              "max": ln["max"], "share": ln["share"]} for ln in lines]
     steps = [{"line": names.get(s["line"]["name"], s["line"]["name"]), "chance": s["chance"],
               "tiers": {k: [_target(g, lang) for g in s[k]] for k in ("best", "good") if s[k]}}
              for s in up["steps"]] if up else []
     return {"slot": item["slot_name"], "score": value, "letter": letter(value), "lines": shown,
-            "ideal": len([l for l in lines if l["name"] in ideal]), "ideal_of": len(lines),
+            "ideal": len([ln for ln in lines if ln["name"] in ideal]), "ideal_of": len(lines),
             "source": table.get("url"),
             "upgrade": {"steps": steps, "after": up["after"], "after_letter": up["after_letter"]} if up else None}
 

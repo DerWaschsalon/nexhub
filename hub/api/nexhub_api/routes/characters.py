@@ -19,8 +19,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from ..deps import DB, CurrentUser
 from ..characters import has_item_ids
+from ..deps import DB, CurrentUser
 from ..models import Character, RunCharacter
 from .runs import _get, _may_manage
 

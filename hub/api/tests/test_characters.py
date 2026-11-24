@@ -177,7 +177,7 @@ def test_geteilt_ohne_profile(make_client, fake, as_user):
 
 
 def test_refresh(make_client, fake, as_user):
-    from .conftest import ADMIN, log_in
+    from .conftest import log_in
     fake.nc.routes["/aion2global/search/v2/character"] = 503
     member = as_user(MEMBER)
     with make_client(**ON) as daemon, make_client(**ON) as admin:
@@ -198,8 +198,8 @@ def test_refresh(make_client, fake, as_user):
 
 # Robustheit des Abrufs (Funde aus dem Review)
 
-from nexhub_api.aion2 import NC  # noqa: E402
 from nexhub_api import characters  # noqa: E402
+from nexhub_api.aion2 import NC  # noqa: E402
 from nexhub_api.characters import Fetcher  # noqa: E402
 
 

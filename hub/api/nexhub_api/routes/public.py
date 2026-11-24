@@ -13,10 +13,9 @@ eingetragen oder geteilt hat. Suchmaschinen sollen beides nicht aufnehmen.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from nexproto import dungeon_label
 from pydantic import BaseModel
 from sqlalchemy import select
-
-from nexproto import dungeon_label
 
 from ..deps import DB, SettingsDep
 from ..models import Comparison, Run
@@ -40,7 +39,8 @@ class Info(BaseModel):
 
 @router.get("/info")
 async def info(settings: SettingsDep) -> Info:
-    return Info(login=settings.discord_configured, operator=settings.operator, hoster=settings.hub_hoster.strip() or None)
+    return Info(login=settings.discord_configured, operator=settings.operator,
+                hoster=settings.hub_hoster.strip() or None)
 
 
 class SharedRun(BaseModel):
@@ -78,7 +78,8 @@ async def shared_fight(token: str, fight_id: str, db: DB, settings: SettingsDep,
 @router.get("/runs/{token}")
 async def shared_run(token: str, db: DB, response: Response) -> SharedRun:
     run = await _shared(db, token, response)
-    return SharedRun(dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty, start_ms=run.start_ms, end_ms=run.end_ms,
+    return SharedRun(dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty,
+                     start_ms=run.start_ms, end_ms=run.end_ms,
                      complete=run.complete, bosses_total=run.bosses_total, bosses_killed=run.bosses_killed,
                      fights=run.fights, hits=run.hits, character=run.character, summary=run.summary)
 

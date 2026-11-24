@@ -1,0 +1,41 @@
+name: Hub
+
+# NexHub: API (Tests, Lint) und Web (svelte-check, Build) prüfen, bevor etwas nach main kommt.
+# Ausgerollt wird weiter per nexhub-update auf dem VPS; dieser Lauf hält nur kaputten Code davon fern.
+on:
+  push:
+    branches: [main]
+    paths: ["hub/**", "proto/**", ".github/workflows/hub.yml"]
+  pull_request:
+    paths: ["hub/**", "proto/**", ".github/workflows/hub.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --python 3.12 pytest -q
+      - run: uv run --python 3.12 ruff check .
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"  # wie im hub/Dockerfile
+          cache: npm
+          cache-dependency-path: hub/web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run build

@@ -23,12 +23,12 @@ from sqlalchemy.orm import defer
 
 from ..aion2 import LANGS, NC, NCError, NotFound, localized, shard_of
 from ..armory import Armory
-from ..ratgeber import hints
+from ..census import character_class
 from ..config import Settings
 from ..db import aware
 from ..deps import DB, CurrentUser, SettingsDep
-from ..census import character_class
 from ..models import Character, CharacterDay, ClassCensus, Comparison, ItemRolls, User
+from ..ratgeber import hints
 from ..rating import rate
 from .characters import CharacterOut, _out
 from .runs import Shared

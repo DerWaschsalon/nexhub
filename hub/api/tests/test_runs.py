@@ -15,7 +15,8 @@ def fight(n: int, boss_dmg: int = 1_000_000) -> dict:
         "details": {"maxHp": 1_000_000, "totalTargetDamage": boss_dmg,
                     "skills": [{"actorId": 1, "code": 1, "name": "Pfeilhagel", "dmg": boss_dmg // 2, "time": 10,
                                 "crit": 4, "back": 5, "perfect": 0, "double": 1},
-                               {"actorId": 1, "code": 3, "name": "Gift", "isDot": True, "dmg": boss_dmg // 4, "time": 20},
+                               {"actorId": 1, "code": 3, "name": "Gift", "isDot": True, "dmg": boss_dmg // 4,
+                                "time": 20},
                                {"actorId": 2, "code": 2, "name": "Schlag", "dmg": boss_dmg // 4, "time": 8}],
                     "deaths": [{"actorId": 2, "tsMs": 40_000, "revivedMs": 52_000}]},
     }
@@ -172,7 +173,8 @@ def test_kampf_details(client, as_user):
     assert d["run_players"] == ["Testheld", "Moonlin"]  # Farbreihenfolge für alle Kämpfe des Runs
     held, moon = d["players"]
     assert (held["name"], held["cls"], held["damage"], held["dps"]) == ("Testheld", "ranger", 750_000, 7_500)
-    assert [(x["name"], x["dot"], x["share"], x["hits"], x["crit"], x["back"], x["double"]) for x in held["skills"]] == \
+    assert [(x["name"], x["dot"], x["share"], x["hits"], x["crit"], x["back"], x["double"])
+            for x in held["skills"]] == \
         [("Pfeilhagel", False, 66.7, 10, 40.0, 50.0, 10.0), ("Gift", True, 33.3, 20, 0.0, 0.0, 0.0)]
     assert d["deaths"] == [{"name": "Moonlin", "t_ms": 40_000, "revived_ms": 52_000,
                             "skill": None, "warning": None, "lead_ms": None}]  # ohne Radar keine Ursache
@@ -220,7 +222,8 @@ def test_kampf_details_geteilt(client, as_user):
     run_id = upload(client, pair(client, member), nexlog()).json()["id"]
     token = member.post(f"/api/runs/{run_id}/share", headers=ORIGIN).json()["share_url"].rsplit("/", 1)[1]
     r = client.get(f"/api/public/runs/{token}/fights/auto_1")
-    assert r.status_code == 200 and r.json()["players"][0]["name"] == "Testheld" and "noindex" in r.headers["x-robots-tag"]
+    assert r.status_code == 200 and r.json()["players"][0]["name"] == "Testheld"
+    assert "noindex" in r.headers["x-robots-tag"]
     member.delete(f"/api/runs/{run_id}/share", headers=ORIGIN)
     assert client.get(f"/api/public/runs/{token}/fights/auto_1").status_code == 404
 
@@ -301,7 +304,8 @@ def test_run_bericht_geht_ueber_den_hub_an_den_bot(make_client, fake, as_user):
         assert len(seen) == 1 and seen[0].url.path == "/control/run"
         # Die Kennung des Daemons kommt zurück und geht an den Bot weiter
         assert r.headers["X-Request-ID"] == "run-abc123" and seen[0].headers["X-Request-ID"] == "run-abc123"
-        assert json.loads(seen[0].content) == {"guild_id": 4242, "report": {**bericht, "bosses": [], "image_webp": None},
+        assert json.loads(seen[0].content) == {"guild_id": 4242,
+                                              "report": {**bericht, "bosses": [], "image_webp": None},
                                               "url": run["url"]}
         # kaputter Bericht und fremder Run
         bad = c.post(f"/api/runs/{run['id']}/report", json={**bericht, "players": []},
