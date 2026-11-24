@@ -1,6 +1,14 @@
 # Gemeinsamer UI-Code als statische Bibliothek. Erwartet ein Target "lvgl".
 add_library(deckbar_ui STATIC
     src/ui.c
+    src/ui_util.c
+    src/ui_status.c
+    src/ui_images.c
+    src/ui_tiles.c
+    src/ui_tile_dps.c
+    src/ui_tile_claude.c
+    src/ui_tile_guide.c
+    src/ui_pages.c
     src/theme.c
     src/icons.c
     src/icons_table.c
