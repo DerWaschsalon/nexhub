@@ -120,7 +120,7 @@ class NexBoard:
         self.hub.history_dir = self._history_dir
         self.hub.language = lambda: self.settings.language
         self.hub.capture_build = self._capture_build
-        self.dps.fight_listeners.append(self.hub.on_fight)
+        self.dps.combat.fight_listeners.append(self.hub.on_fight)
         self.webhook = WebhookPublisher(lambda: self.runs.settings)
         self.runs.publishers += [self.webhook, self.hub]  # erst das Bild nach Discord, dann der NexHub
         self.overlay = Overlay(c, manage_unit=self.real_config)
