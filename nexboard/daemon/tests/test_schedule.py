@@ -27,8 +27,8 @@ def test_feste_und_eigene_termine_in_einer_liste(tmp_path):
 def test_widget_zeigt_offene_zuerst_und_nur_sichtbare(tmp_path):
     (tmp_path / SETTINGS_FILE).write_text(yaml.safe_dump({"events": [
         {"name": "Aus", "every": 60, "enabled": False}], "hidden": list(BUILTIN_NAMES[1:])}))
-    visible = Schedule(tmp_path).visible(utc(10, 3, 5))  # Riss: 03:00 UTC, 10 min offen
-    assert [r["name"] for r in visible] == ["Riss"] and visible[0]["open_until"] == utc(10, 3, 10)
+    visible = Schedule(tmp_path).visible(utc(10, 4, 5))  # Riss: 05:00 Serverzeit = 04:00 UTC, 10 min offen
+    assert [r["name"] for r in visible] == ["Riss"] and visible[0]["open_until"] == utc(10, 4, 10)
 
 
 def test_ortszeit_folgt_der_uhr(monkeypatch):

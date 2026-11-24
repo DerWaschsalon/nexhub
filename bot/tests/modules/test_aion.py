@@ -451,7 +451,7 @@ def test_termin_tafel_und_pings() -> None:
     text = str(tafel(jetzt).description)
     # Zeiten als Discord-Zeitstempel: jeder sieht sie in seiner Zeitzone
     assert f"**Riss** <t:{int(um('2026-10-07 03:00'))}:t>" in text
-    assert f"**Wächterin Kaira** <t:{int(um('2026-10-07 04:00'))}:t>" in text
+    assert f"**Wächterin Kaira** <t:{int(um('2026-10-07 05:00'))}:t>" in text  # 07:00 Serverzeit
     # Riss und Shugo-Fest in 3 Minuten, Resets nie
     faellig = faellige_pings(jetzt, set())
     assert [n for n, _ in faellig] == ["Riss", "Shugo-Fest"]

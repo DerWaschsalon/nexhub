@@ -10,7 +10,7 @@ Dateien (`uv run python -m nexproto.codegen`, ein Test und die CI prüfen, dass 
 | Geräteprotokoll v1 | `nexproto/device.py` | `nexboard/docs/protocol.schema.json` | Daemon ↔ Touch-Leiste, Beschreibung in [`protocol.md`](../nexboard/docs/protocol.md) |
 | Grenzwerte der Leiste | `nexproto/device.py` | `nexboard/shared-ui/include/deckbar/proto_gen.h`, `nexboard/daemon/deckbar_daemon/web/js/nexproto.js` | Bildschirmgröße, Port, Seiten- und Kachelgrenzen, Bildteile |
 | AION-2-Klassen | `nexproto/classes.py` | dieselben, dazu `hub/web/src/lib/nexproto.ts` und `nexboard/capture/src/proto_gen.rs` | Schlüssel, jobId, Namen DE/EN, eine Farbe je Klasse (wie im A2Tools-Meter) |
-| Termine | `nexproto/termine.py` | – | Riss, Shugo-Fest, Resets … für Radar, Overlay-Timer und Bot |
+| Termine | `nexproto/termine.py` | – | Riss, Shugo-Fest, Resets, Belagerung, Nahma auf der Uhr des EU-Servers (mit Zeitumstellung), für NexBoard, Bot und Hub |
 | Dungeon-Namen | `nexproto/dungeons.py` | – | Namen, die A2Tools noch nicht kennt |
 
 Neue Klasse, neuer Grenzwert: im Modul ändern, `codegen` laufen lassen, beides zusammen committen.
