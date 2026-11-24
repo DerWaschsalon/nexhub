@@ -73,7 +73,7 @@ def test_ausgabe_deutsch():
     out = rating.rate(census(), {"Testschild": TABLE}, me_en, me_de, "ranger", "de")
     item = out["items"][0]
     assert out["size"] == 10 and out["group"] == "EU · Testraid · Hard"
-    assert [l["name"] for l in item["lines"]][2] == "Kritischer Treffer"
+    assert [ln["name"] for ln in item["lines"]][2] == "Kritischer Treffer"
     step = item["upgrade"]["steps"][0]
     assert step["line"] == "Kritischer Treffer"
     assert [t["name"] for t in step["tiers"]["best"]] == ["Kampftempo", "Mehrfachtreffer"]

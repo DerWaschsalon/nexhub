@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 from nexhub_api.deps import SESSION_COOKIE
 from nexhub_api.routes.auth import STATE_COOKIE, safe_next
 
-from .conftest import ADMIN, MEMBER, STRANGER, BASE, log_in, start_login
+from .conftest import ADMIN, BASE, MEMBER, STRANGER, log_in, start_login
 
 
 def test_login_leitet_mit_pkce_zu_discord(client):

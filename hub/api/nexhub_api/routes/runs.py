@@ -26,12 +26,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from sqlalchemy import delete, select
-
 from nexproto import NexLogError, dungeon_label, unpack
 from nexproto.nexlog import MAX_PACKED
 from nexproto.runreport import RunReport
+from pydantic import BaseModel
+from sqlalchemy import delete, select
 
 from .. import characters
 from ..analysis import fight_detail, summarize
@@ -159,8 +158,8 @@ class RunDetail(RunOut):
 
 
 def _out(run: Run, uploader: User) -> dict:
-    return dict(id=run.id, dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty, start_ms=run.start_ms,
-                end_ms=run.end_ms, complete=run.complete, bosses_total=run.bosses_total,
+    return dict(id=run.id, dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty,
+                start_ms=run.start_ms, end_ms=run.end_ms, complete=run.complete, bosses_total=run.bosses_total,
                 bosses_killed=run.bosses_killed, fights=run.fights, hits=run.hits, character=run.character,
                 uploader=uploader.name, created_at=run.created_at,
                 players=[p["name"] for p in run.summary.get("players", [])],

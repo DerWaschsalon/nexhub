@@ -41,7 +41,7 @@ etwas machst.
   `planner/`, `infra/` (VPS). Jeder Teil hat eine eigene README mit Tests.
 - Tests vor dem Push: Daemon `cd nexboard/daemon && uv run python -m pytest -q`, Radar
   `cd nexboard/radar && ../daemon/.venv/bin/python -m pytest -q tests`, Bot
-  `cd bot && python -m pytest -q tests && ruff check . && mypy`, Hub `cd hub/api && uv run pytest -q` und
+  `cd bot && python -m pytest -q tests && ruff check . && mypy`, Hub `cd hub/api && uv run pytest -q && uv run ruff check .` und
   `cd hub/web && npm run check`, Mitschnitt `cd nexboard/capture && ./build.sh && cargo test --release &&
   cargo clippy --release -- -D warnings && cargo fmt --check`, Formate `cd proto && uv run pytest -q`, Kern
   `cd packages/nexcore && uv run pytest -q && uv run ruff check . && uv run mypy`.

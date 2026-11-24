@@ -3,8 +3,8 @@
 Revision: 0008
 Vorgänger: 0007
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0008"
 down_revision = "0007"

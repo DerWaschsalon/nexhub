@@ -12,13 +12,12 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm.exc import StaleDataError
-
 from nexproto import NexLog
 from nexproto.classes import JOB_CLASSES
 from nexproto.nexlog import player_name
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm.exc import StaleDataError
 
 from .aion2 import LANGS, NC, NCError, NotFound, combat_power, item_level, localized
 from .models import RunCharacter, Snapshot
