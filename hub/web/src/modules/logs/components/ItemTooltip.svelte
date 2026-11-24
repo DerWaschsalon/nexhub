@@ -51,8 +51,13 @@
 {#snippet ratedTail(line: RatedLine | undefined)}
 	{#if line}
 		{#if line.max}<span class="max"> / {line.kind === 'skill' ? line.max : line.unit === '%' ? `${line.max}%` : line.max}</span>{/if}
-		<span class="share" title={t('logs.rating.shareHint')}><i style:width="{line.share * 100}%"></i>{Math.round(line.share * 100)}%</span>
+		{@render shareBar(line.share)}
 	{/if}
+{/snippet}
+
+<!-- Anteil der Top-Spieler mit einer Zeile als kleiner Balken -->
+{#snippet shareBar(share: number)}
+	<span class="share" title={t('logs.rating.shareHint')}><i style:width="{share * 100}%"></i>{Math.round(share * 100)}%</span>
 {/snippet}
 
 <div class="frame" style:--grade={gradeColor(item.grade, '#9aa0a6')}>
@@ -145,6 +150,20 @@
 			{/if}
 		{/if}
 
+		{#if rating?.ideal_piece.length}
+			<details class="block ideal">
+				<summary>{t('logs.rating.idealPiece')} <small>{t('logs.rating.ideal', { n: rating.ideal, of: rating.ideal_of })}</small></summary>
+				<ul>
+					{#each rating.ideal_piece as line (line.name)}
+						<li class:have={line.have}>
+							<span class="tick" title={t(line.have ? 'logs.rating.has' : 'logs.rating.missing')}>{line.have ? '✓' : '·'}</span>
+							<span>{line.name}</span>
+							<b>{line.max}{@render shareBar(line.share)}</b>
+						</li>
+					{/each}
+				</ul>
+			</details>
+		{/if}
 		{#if rating?.upgrade}
 			<div class="block upgrade">
 				<p class="up-head">
@@ -404,6 +423,40 @@
 		top: 2px;
 		bottom: 2px;
 		background: color-mix(in srgb, var(--game-gold) 18%, transparent);
+	}
+	/* Idealteil: aufklappbar, je Zeile ein Haken, wenn das Teil sie schon hat */
+	.ideal summary {
+		cursor: pointer;
+		font-weight: 600;
+	}
+	.ideal summary small {
+		margin-left: 6px;
+		font-weight: 450;
+		color: var(--faint);
+	}
+	.ideal ul {
+		list-style: none;
+		margin: 8px 0 0;
+		padding: 0;
+		font-size: 14px;
+	}
+	.ideal li {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 3px 0;
+		color: var(--faint);
+	}
+	.ideal li.have {
+		color: var(--text);
+	}
+	.ideal li span:nth-child(2) {
+		flex: 1;
+	}
+	.tick {
+		width: 14px;
+		text-align: center;
+		color: var(--game-green);
 	}
 	.up-head {
 		display: flex;

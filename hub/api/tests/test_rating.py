@@ -80,6 +80,15 @@ def test_alte_zaehlung_ohne_breite_gibt_keine_note():
     assert rating.rate(data, {"Testschild": TABLE}, {"equipment": [MINE]}, None, "ranger", "en")["items"] == []
 
 
+def test_idealteil_mit_haken():
+    c = rating.Census(census()["slots"], census()["tops"])
+    ideal = rating.ideal_piece(c, MINE, TABLE, "ranger")
+    # die vier häufigsten Zeilen des Platzes nach Priorität; MINE hat zwei davon
+    assert [line["name"] for line in ideal] == ["Might", "Weapon Damage Boost", "Combat Speed", "Multi-hit Chance"]
+    assert [line["have"] for line in ideal] == [True, True, False, False]
+    assert ideal[2] == {"name": "Combat Speed", "share": 0.9, "max": 12.3, "have": False}
+
+
 def test_ausgabe_deutsch():
     me_en = {"equipment": [MINE]}
     me_de = {"equipment": [shield(("Schadensverstärkung", "5.5%"), ("Macht", "25"), ("Kritischer Treffer", "44"),
@@ -89,6 +98,9 @@ def test_ausgabe_deutsch():
     assert out["size"] == 10 and out["group"] == "EU · Testraid · Hard"
     assert [ln["name"] for ln in item["lines"]][2] == "Kritischer Treffer"
     assert item["source"] == TABLE["url"]
+    # Idealteil: Namen vom eigenen Teil, sonst aus der Würfeltabelle
+    assert (item["ideal"], item["ideal_of"]) == (2, 4)
+    assert [line["name"] for line in item["ideal_piece"]][-2:] == ["Kampftempo", "Mehrfachtreffer"]
 
 
 def test_ohne_wuerfeltabelle_keine_note():

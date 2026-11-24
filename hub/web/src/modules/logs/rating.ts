@@ -13,6 +13,9 @@ export type RatedLine = {
 	share: number;
 };
 
+/** Eine Zeile des Idealteils eines Platzes: Höchstwert auf diesem Gegenstand, Anteil der Top-Spieler */
+export type IdealLine = { name: string; share: number; max: number; have: boolean };
+
 /** Ziel beim Neuwürfeln und was es an Punkten bringt (niedrigster bis höchster Wurf) */
 export type RerollTarget = { name: string; gain_lo: number; gain_hi: number };
 
@@ -68,8 +71,10 @@ export type Rating = {
 	score: number;
 	letter: string;
 	lines: RatedLine[];
+	/** wie viele Zeilen des Idealteils das Teil schon hat, und wie viele es sind */
 	ideal: number;
 	ideal_of: number;
+	ideal_piece: IdealLine[];
 	/** Seite mit den Würfeldaten (MetaBot.GG), muss verlinkt werden */
 	source: string | null;
 	upgrade: UpgradeCard | null;
