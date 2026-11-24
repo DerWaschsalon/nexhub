@@ -4,9 +4,7 @@ Ohne Netz und ohne Bild: runs.py beobachtet die History und postet, run_image.py
 """
 import json
 import logging
-import os
 from dataclasses import dataclass, field
-from functools import cache
 from pathlib import Path
 from typing import Protocol
 
@@ -14,6 +12,7 @@ from nexproto.classes import JOB_CLASSES
 from nexproto.dungeons import EXTRA_DUNGEONS
 
 from .a2tools_meter import a2tools_settings_path
+from .aion2.gamedata import a2_i18n
 
 log = logging.getLogger(__name__)
 
@@ -61,36 +60,16 @@ def a2tools_dir() -> Path:
     return a2tools_settings_path().parent
 
 
-REPO_DATA = Path(__file__).resolve().parents[2] / "capture" / "a2tools" / "src" / "data"
-
-
-def a2tools_data_dir() -> Path:
-    """Übersetzungen (Boss-, Dungeonnamen): installiertes Meter, sonst das Submodul im Repo."""
-    if env := os.environ.get("DECKBAR_A2TOOLS_DATA"):
-        return Path(env)
-    installed = Path("/usr/lib/A2Tools DPS Meter/data")
-    return installed if installed.is_dir() or not REPO_DATA.is_dir() else REPO_DATA
-
-
-@cache
-def _i18n(name: str) -> dict:
-    try:
-        data = json.loads((a2tools_data_dir() / "i18n" / name).read_text())
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
 def boss_name(mob: int, fallback: str) -> str:
-    return (_i18n("npcs/de.json").get(str(mob)) or {}).get("name") or fallback or f"Boss {mob}"
+    return (a2_i18n("npcs/de.json").get(str(mob)) or {}).get("name") or fallback or f"Boss {mob}"
 
 
 def is_end_boss(mob: int) -> bool:
-    return (_i18n("npcs/en.json").get(str(mob)) or {}).get("name") in END_BOSSES
+    return (a2_i18n("npcs/en.json").get(str(mob)) or {}).get("name") in END_BOSSES
 
 
 def dungeon_name(dungeon: int) -> str:
-    entry = _i18n("dungeons/en.json").get(str(dungeon)) or {}
+    entry = a2_i18n("dungeons/en.json").get(str(dungeon)) or {}
     name = entry.get("name") or EXTRA_DUNGEONS.get(dungeon) or f"Dungeon {dungeon}"
     diff = {"normal": "Normal", "exploration": "Erkundung", "hard": "Schwer"}.get(entry.get("difficulty"))
     return f"{name} ({diff})" if diff else name
@@ -99,13 +78,13 @@ def dungeon_name(dungeon: int) -> str:
 def dungeon_parts_en(dungeon: int) -> tuple[str, str | None]:
     """Englischer Name und Schwierigkeit („Hard“) – sprachunabhängig, für Weitergaben an andere
     Programme (report.py, der Bot), damit Meldungen verschiedener Spieler zusammenpassen."""
-    entry = _i18n("dungeons/en.json").get(str(dungeon)) or {}
+    entry = a2_i18n("dungeons/en.json").get(str(dungeon)) or {}
     diff = {"normal": "Normal", "exploration": "Exploration", "hard": "Hard"}.get(entry.get("difficulty"))
     return entry.get("name") or EXTRA_DUNGEONS.get(dungeon) or f"Dungeon {dungeon}", diff
 
 
 def boss_name_en(mob: int, fallback: str = "") -> str:
-    return (_i18n("npcs/en.json").get(str(mob)) or {}).get("name") or fallback or f"Boss {mob}"
+    return (a2_i18n("npcs/en.json").get(str(mob)) or {}).get("name") or fallback or f"Boss {mob}"
 
 
 @dataclass
@@ -146,7 +125,7 @@ def parse_fight(data: dict, you_actor: int | None = None) -> Fight | None:
         dungeon = int(data.get("dungeonId") or 0)
         mob = int(data.get("mobCode") or 0)
         details = data.get("details") or {}
-        if not dungeon or data.get("isTrain") or (_i18n("npcs/de.json").get(str(mob)) or {}).get("isDummy"):
+        if not dungeon or data.get("isTrain") or (a2_i18n("npcs/de.json").get(str(mob)) or {}).get("isDummy"):
             return None
         dmg: dict[int, int] = {}
         for s in details.get("skills") or []:

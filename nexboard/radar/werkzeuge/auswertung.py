@@ -16,6 +16,7 @@ from pathlib import Path
 
 from deckbar_daemon.aion2.cast_trainer import CastTrainer
 from deckbar_daemon.aion2.fight import FightEvents
+from deckbar_daemon.aion2.gamedata import a2tools_data_dir
 from deckbar_daemon.aion2.mechanic_warnings import MechanicWarnings
 from deckbar_daemon.aion2.warning_board import WarningBoard
 from deckbar_daemon.aion2.world import World
@@ -23,7 +24,7 @@ from deckbar_daemon.core.packets import PcapSource, server_segments
 from deckbar_daemon.core.packets.messages import Hit, Vitals
 
 KAEMPFE = Path.home() / ".local/share/deckbar/aion2/history"
-SKILLNAMEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n/skills/de.json")
+SKILLNAMEN = a2tools_data_dir() / "i18n" / "skills" / "de.json"
 TEUFELSFLAMME = 1801120
 
 

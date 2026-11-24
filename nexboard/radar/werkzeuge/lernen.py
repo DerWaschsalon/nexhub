@@ -11,14 +11,13 @@ from __future__ import annotations
 import argparse
 import json
 from collections import Counter, defaultdict
-from pathlib import Path
 from statistics import median
 
-from deckbar_daemon.aion2.gamedata import BOSSES
+from deckbar_daemon.aion2.gamedata import BOSSES, a2tools_data_dir
 from deckbar_daemon.core.packets import PcapSource, server_segments
 from deckbar_daemon.core.packets.messages import Cast, Hit, NpcSeen, Vitals
 
-NAMEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n")
+NAMEN = a2tools_data_dir() / "i18n"
 
 
 def main() -> None:
