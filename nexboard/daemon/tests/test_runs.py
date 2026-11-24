@@ -11,7 +11,8 @@ from deckbar_daemon import run_image, run_model
 from deckbar_daemon import runs as runs_mod
 from deckbar_daemon.run_image import render_run
 from deckbar_daemon.run_model import RunTracker, char_key, mask, parse_fight
-from deckbar_daemon.runs import DungeonRuns, RunSettings, post_discord
+from deckbar_daemon.run_webhook import WebhookPublisher, post_discord
+from deckbar_daemon.runs import DungeonRuns, RunSettings
 
 T0 = 1_791_700_000_000
 DUNGEON = 600022
@@ -203,11 +204,11 @@ async def test_poll_waits_for_files_to_settle(tmp_path, monkeypatch):
     runs = DungeonRuns(tmp_path / "cfg")
     runs.save(RunSettings(enabled=True, webhook="https://discord.com/api/webhooks/1/x"))
 
-    async def fake_post(session, run):
-        posted.append(run)
-        return True
+    class Collect:  # ein Weg für beendete Runs (RunPublisher), der nur mitschreibt
+        async def publish(self, run):
+            posted.append(run)
 
-    monkeypatch.setattr(runs, "post", fake_post)
+    runs.publishers.append(Collect())
     runs.last_ms = 0
     await runs.start()
     runs.tracker.known = {DUNGEON: {1: 1000, 2: 3000}}
@@ -221,23 +222,23 @@ async def test_poll_waits_for_files_to_settle(tmp_path, monkeypatch):
 
     write(fight(1, base))
     write(fight(2, base + 100, dur_s=30, max_hp=3000, dmg=(500, 300)))
-    await runs.poll(None)
+    await runs.poll()
     assert runs.tracker.run and not runs.pending
     write(fight(2, base + 100, dur_s=150, max_hp=3000, dmg=(2000, 1000)), age=5)
-    await runs.poll(None)
+    await runs.poll()
     assert runs.tracker.run is None and len(runs.pending) == 1 and not posted
     # Nachzügler-Update derselben Datei landet im wartenden Run, nicht in einem neuen
     write(fight(2, base + 100, dur_s=152, max_hp=3000, dmg=(2010, 1000)), age=3)
-    await runs.poll(None)
+    await runs.poll()
     assert runs.tracker.run is None and len(runs.pending) == 1
     monkeypatch.setattr(runs_mod, "SETTLE_RUN_S", 0)
-    await runs.poll(None)
+    await runs.poll()
     [run] = posted
     assert run.complete and run.kills == 2 and len(run.fights) == 2
     assert {b.mob: b.duration_ms for b in run.bosses()}[2] == 152_000
     # danach geänderte Dateien des Runs erzeugen keinen neuen Run
     write(fight(2, base + 100, dur_s=153, max_hp=3000, dmg=(2011, 1000)), age=2)
-    await runs.poll(None)
+    await runs.poll()
     assert runs.tracker.run is None and len(posted) == 1
 
 
@@ -285,10 +286,10 @@ async def test_event_driven_reads_only_after_fights_saved(tmp_path, monkeypatch)
     runs._dirty = False
     base = (int(time.time()) * 1000 - T0) // 1000 - 300
     (hist / "a.json").write_text(json.dumps(fight(1, base)))
-    await runs.poll(None)
+    await runs.poll()
     assert runs.tracker.run is None  # ohne Meldung kein Blick in den Ordner
     runs.wake()
-    await runs.poll(None)
+    await runs.poll()
     assert runs.tracker.run and len(runs.tracker.run.fights) == 1
 
 
@@ -370,3 +371,27 @@ def test_jede_klasse_hat_ein_icon():
     assert JOB_CLASSES[19] == "brawler"
     for cls in CLASS_KEYS:
         assert run_image.class_icon(cls, 20) is not None
+
+
+async def test_webhook_weg_postet_nur_eingeschaltet(tmp_path, monkeypatch):
+    """Der Weg nach Discord entscheidet selbst, ob er dran ist; sein Ergebnis steht für die Web-UI bereit."""
+    from deckbar_daemon import run_webhook
+
+    settings = RunSettings(enabled=False, webhook="https://discord.com/api/webhooks/1/x")
+    sent = []
+
+    async def fake_image(run):
+        return b"bild"
+
+    async def fake_post(session, webhook, text, png, filename):
+        sent.append((webhook, png))
+
+    monkeypatch.setattr(run_webhook, "run_image", fake_image)
+    monkeypatch.setattr(run_webhook, "post_discord", fake_post)
+    publisher = WebhookPublisher(lambda: settings)
+    run = run_model.Run(DUNGEON, [parse_fight(fight(1, 0), 2)])
+    await publisher.publish(run)
+    assert sent == [] and publisher.result == ""
+    settings = RunSettings(enabled=True, webhook="https://discord.com/api/webhooks/1/x")
+    await publisher.publish(run)
+    assert sent == [("https://discord.com/api/webhooks/1/x", b"bild")] and publisher.result.startswith("gepostet")

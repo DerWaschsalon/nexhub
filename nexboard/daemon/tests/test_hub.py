@@ -246,7 +246,7 @@ async def test_run_wird_als_nexlog_hochgeladen(tmp_path):
     await loot.on_capture("plugin_feed", {"event": "deathRecap", "data": opened, "at": run.end_ms})  # andere Art
     try:
         await hub.on_fight({"rows": [{"name": "Gamunex", "cls": "chanter", "you": True}, {"name": "Morgan"}]})
-        await hub.on_run(run)
+        await hub.publish(run)
         assert hub.info()["outbox"] == 1
         await hub.flush_outbox()
         assert hub.info()["outbox"] == 0 and hub.last_upload["ok"] and hub.last_upload["url"].endswith("/runs/1")
@@ -269,10 +269,10 @@ async def test_ohne_einstellung_oder_kopplung_wird_nichts_verpackt(tmp_path):
     run, hist = history_run(tmp_path)
     hub.history_dir = lambda: hist
     hub.update({"upload": False})
-    await hub.on_run(run)
+    await hub.publish(run)
     hub.update({"upload": True})
     hub.enabled = False  # Modul aus
-    await hub.on_run(run)
+    await hub.publish(run)
     assert not (tmp_path / "outbox").exists()
 
 
@@ -282,7 +282,7 @@ async def test_fehlschlag_bleibt_im_postausgang(tmp_path):
     run, hist = history_run(tmp_path)
     hub.history_dir = lambda: hist
     try:
-        await hub.on_run(run)
+        await hub.publish(run)
         await hub.flush_outbox()
         assert hub.info()["outbox"] == 1 and not hub.last_upload["ok"] and hub._failures == 1
         await hub.flush_outbox()  # zweiter Versuch klappt
@@ -297,7 +297,7 @@ async def test_hub_nicht_erreichbar_behaelt_den_run(tmp_path):
     run, hist = history_run(tmp_path)
     hub.history_dir = lambda: hist
     try:
-        await hub.on_run(run)
+        await hub.publish(run)
         await hub.flush_outbox()
         assert hub.info()["outbox"] == 1 and "nicht erreichbar" in hub.last_upload["text"]
     finally:
@@ -310,7 +310,7 @@ async def test_abgelehnter_run_wird_beiseitegelegt(tmp_path):
     run, hist = history_run(tmp_path)
     hub.history_dir = lambda: hist
     try:
-        await hub.on_run(run)
+        await hub.publish(run)
         await hub.flush_outbox()
         assert hub.info()["outbox"] == 0 and len(list((tmp_path / "outbox" / "abgelehnt").iterdir())) == 1
         assert "lehnt" in hub.last_upload["text"]
@@ -334,7 +334,7 @@ async def test_fehlende_kampfdatei(tmp_path):
     run, hist = history_run(tmp_path)
     (hist / f"{run.fights[1].id}.json").unlink()
     hub.history_dir = lambda: hist
-    await hub.on_run(run)
+    await hub.publish(run)
     assert hub.info()["outbox"] == 0 and "nicht verpackt" in hub.last_upload["text"]
 
 
@@ -348,7 +348,7 @@ async def test_run_bericht_geht_nach_dem_upload_an_den_hub(tmp_path, monkeypatch
     run, hist = history_run(tmp_path)
     hub.history_dir = lambda: hist
     try:
-        await hub.on_run(run)
+        await hub.publish(run)
         assert sorted(p.name.split(".", 1)[1] for p in (tmp_path / "outbox").iterdir()) == ["nexlog.gz", "report.json"]
         await hub.flush_outbox()
         kind, run_id, report = got[1]

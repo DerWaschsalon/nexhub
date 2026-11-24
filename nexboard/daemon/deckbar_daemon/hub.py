@@ -331,8 +331,8 @@ class Hub:
             if row.get("you") and row.get("name") and "*" not in row["name"]:
                 self.you = {"name": str(row["name"])[:64], "cls": row.get("cls")}
 
-    async def on_run(self, run: Run) -> None:
-        """Beendeter Run (DungeonRuns.run_listeners): als NexLog in den Postausgang legen."""
+    async def publish(self, run: Run) -> None:
+        """Beendeter Run (RunPublisher): als NexLog in den Postausgang legen, wenn Hochladen an ist."""
         if not (self.enabled and self.settings.upload and self.settings.token):
             return
         try:

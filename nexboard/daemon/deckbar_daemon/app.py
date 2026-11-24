@@ -47,6 +47,7 @@ from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
 from .radar import Radar
 from .run_model import a2tools_dir
+from .run_webhook import WebhookPublisher
 from .runs import SETTINGS_FILE as runs_settings_file
 from .runs import DungeonRuns
 from .schedule import Schedule
@@ -86,7 +87,7 @@ class NexBoard:
             DpsModule(ctx, self.live, self.dps, self.state),
             OverlayModule(ctx, self.live, self.overlay, self.state),
             PluginsModule(ctx, self.live, self.a2.plugins),
-            RunsModule(ctx, self.live, self.runs, self.state),
+            RunsModule(ctx, self.live, self.runs, self.state, self.webhook),
             ScheduleModule(ctx, self.live, Schedule(config_dir, lambda: self.settings.language)),
             self.radar_module,
             poe1,
@@ -120,7 +121,8 @@ class NexBoard:
         self.hub.language = lambda: self.settings.language
         self.hub.capture_build = self._capture_build
         self.dps.fight_listeners.append(self.hub.on_fight)
-        self.runs.run_listeners.append(self.hub.on_run)
+        self.webhook = WebhookPublisher(lambda: self.runs.settings)
+        self.runs.publishers += [self.webhook, self.hub]  # erst das Bild nach Discord, dann der NexHub
         self.overlay = Overlay(c, manage_unit=self.real_config)
         self.overlay.game_check = self._game_running
         self.radar = Radar(self._publish_radar, spiel_laeuft=self._game_running)
