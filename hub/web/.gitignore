@@ -21,3 +21,6 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Changelog: erzeugt nexhub-update beim Bauen (infra/changelog.py)
+/static/changelog.json

@@ -44,7 +44,8 @@ etwas machst.
   `cd bot && python -m pytest -q tests && ruff check . && mypy`, Hub `cd hub/api && uv run pytest -q && uv run ruff check .` und
   `cd hub/web && npm run check`, Mitschnitt `cd nexboard/capture && ./build.sh && cargo test --release &&
   cargo clippy --release -- -D warnings && cargo fmt --check`, Formate `cd proto && uv run pytest -q`, Kern
-  `cd packages/nexcore && uv run pytest -q && uv run ruff check . && uv run mypy`.
+  `cd packages/nexcore && uv run pytest -q && uv run ruff check . && uv run mypy`, Skripte
+  `uvx pytest -q infra/tests`.
 - **Ein Arbeitszweig: `main`** (seit 21.10.2026; `monorepo` ist darin aufgegangen und gelöscht).
   Laufende NexBoard-Installationen aktualisieren per `update.sh` von `main`. `modular` läuft aus:
   `update.sh` stellt Checkouts darauf von selbst auf `main` um (beim zweiten Update-Klick, der
@@ -52,6 +53,9 @@ etwas machst.
   steht. Auf `main` keine Force-Pushes und keine Pfadänderungen ohne Absprache, sonst bricht das
   Update beim nächsten Klick ab oder der Daemon findet seine Dateien nicht. Hub ausrollen:
   `nexhub-update <wer> main`.
+- **PR-Titel sind Changelog-Zeilen.** Die Seite „Neu“ im Hub entsteht aus den Titeln der gemergten PRs
+  (`infra/changelog.py`), eine zweite Liste pflegt niemand. Also: deutsch, für Laien lesbar, mit dem Teil
+  vorn („Hub: …“, „NexBoard: …“, „Bot: …“).
 - **Geräte-Endpunkte des Hubs** (`/api/devices/*`, `/api/runs*`): Wer sie so ändert, dass ältere
   Daemons sie falsch verstehen, erhöht `HUB_API` in `proto/nexproto/hubapi.py`. Ältere NexBoards
   bekommen dann 426 und „bitte aktualisieren“ statt still zu scheitern.
