@@ -15,8 +15,7 @@ class FakeDienst:
         self.name = name
         self.aufrufe: list[str] = []
         self.aufnahme = False
-        self.quelle = self
-        self.fehler = None  # Quelle.fehler: Mitschnitt läuft
+        self.fehler = None  # Mitschnitt läuft
 
     def starten(self) -> None:
         self.aufrufe.append("starten")

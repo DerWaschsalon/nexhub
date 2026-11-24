@@ -9,11 +9,12 @@ import time
 from collections import deque
 from pathlib import Path
 
+from deckbar_daemon.core.packets import TcpdumpSource
+
 from . import minikarte
 from .ansagen import Ansagen
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
-from .quelle import Quelle
 from .uebersicht import feldboss_ansagen
 from .warnung import (STATUS_REGELN, TODESMAL, TREFFER_REGELN, WarnZentrale, alarm_abspielen, ansage,
                       ansagen_vorbereiten, piep_abspielen, tr)
@@ -31,7 +32,8 @@ class RadarDienst:
         if spawn_log:
             spawn_log.parent.mkdir(parents=True, exist_ok=True)
         self.zustand = RadarZustand(name, spawn_log, speichern=True)
-        self.quelle = Quelle(self.zustand)
+        self.quelle = TcpdumpSource()
+        self.quelle.subscribe(None, self.zustand.verarbeiten)
         self.punkte = PunkteDB()  # jeder gesehene Cube wird als Spawnpunkt gemerkt
         self.zentrale = WarnZentrale(self.zustand)
         self.zustand.bei_neuem_cube.append(self._neuer_cube)
@@ -64,10 +66,10 @@ class RadarDienst:
 
     def starten(self) -> None:
         ansagen_vorbereiten()
-        self.quelle.live_starten()
+        self.quelle.start()
 
     def stoppen(self) -> None:
-        self.quelle.stoppen()
+        self.quelle.stop()
 
     def neu_laden(self) -> None:
         """Einstellungen von der NexBoard-Seite uebernehmen."""
@@ -83,11 +85,19 @@ class RadarDienst:
         self.zentrale.cast(0, TODESMAL, self.zustand.eigene_eid)
 
     def aufnahme_starten(self) -> None:
-        self.quelle.aufnahme_starten(self.zustand.dungeon or "dungeon")
+        self.quelle.start_recording(self.zustand.dungeon or "dungeon")
+
+    def aufnahme_stoppen(self) -> None:
+        self.quelle.stop_recording()
 
     @property
     def aufnahme(self) -> bool:
-        return bool(self.quelle.aufnahme)
+        return self.quelle.recording
+
+    @property
+    def fehler(self) -> str | None:
+        """Warum der Mitschnitt nicht läuft (etwa tcpdump ohne Rechte), sonst None."""
+        return self.quelle.error
 
     def kampf(self) -> dict:
         """Fuer andere Programme auf diesem PC (GET /api/radar/kampf): Boss groggy und die laufenden Warnungen mit
@@ -123,9 +133,9 @@ class RadarDienst:
         if dungeon != self._dungeon:  # Dungeon betreten oder verlassen
             self._dungeon = dungeon
             if not dungeon:
-                self.quelle.aufnahme_stoppen()
+                self.aufnahme_stoppen()
             elif self.k["aufnahme_auto"]:
-                self.quelle.aufnahme_starten(dungeon)  # Lernmodus: jeder Lauf eine eigene Datei
+                self.quelle.start_recording(dungeon)  # Lernmodus: jeder Lauf eine eigene Datei
         if int(time.time()) != self._sekunde:
             self._sekunde = int(time.time())
             feldboss_ansagen(self.zustand, self._gemeldet)
@@ -190,8 +200,8 @@ class RadarDienst:
                 "lernhilfe": w.regel.gruppe == "casts"}  # Lernhilfe: echter Vorlauf unbekannt, keine Sekunden
 
     def _status(self, s: dict) -> str:
-        if self.quelle.fehler:
-            return f"Fehler: {self.quelle.fehler}"
+        if self.fehler:
+            return f"Fehler: {self.fehler}"
         if not s["nachrichten"]:
             return "warte auf Spieldaten …"
         if s["eid"] is None:

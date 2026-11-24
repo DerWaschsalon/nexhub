@@ -15,9 +15,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from statistics import median
 
-from radar.mitschnitt import SERVER_PORTS, pcap_pakete, tcp_segment
-from radar.protokoll import uvarint
-from radar.quelle import Quelle
+from deckbar_daemon.core.packets import PcapSource, server_segments, uvarint
 from radar.zustand import BOSSE, OP_CAST, OP_NPC, RadarZustand
 
 NAMEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n")
@@ -60,15 +58,12 @@ def main() -> None:
                 hp[eid] = wert
         except (ValueError, struct.error):
             pass
-    zustand.verarbeiten = mitlesen
-
-    quelle = Quelle(zustand)
+    quelle = PcapSource()
+    quelle.subscribe(None, mitlesen)
     with open(a.pcap, "rb") as f:
-        for zeit, ip in pcap_pakete(f):
-            seg = tcp_segment(ip)
-            if seg and seg[0][1] in SERVER_PORTS:
-                uhr[0] = zeit
-                quelle._strom(seg[0]).segment(*seg[1:])
+        for zeit, segment in server_segments(f):
+            uhr[0] = zeit
+            quelle.feed(*segment)
 
     for eid, npc in boss_von.items():
         liste = casts[eid]

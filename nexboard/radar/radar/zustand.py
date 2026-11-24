@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import daten
-from .protokoll import Leser, uvarint
+from deckbar_daemon.core.packets import Reader, uvarint
 
 OP_TOD = 0x8D04       # CharDie_NT (Name wie im Desktop-Programm von questlog.gg): Opfer (Varint), Skill u32,
                       # Taeter (Varint), Server u16, Name des Taeters (nur bei einem Spieler als Taeter)
@@ -178,7 +178,7 @@ class RadarZustand:
 
     def _tod(self, p: bytes) -> None:
         """Jeder Tod, auch durch Monster: die Todesursache im Run. Den Namen gibt es nur bei einem Spieler als Taeter."""
-        r = Leser(p)
+        r = Reader(p)
         opfer = r.varint()
         skill = r.i32()
         r.varint()  # Taeter
@@ -468,7 +468,7 @@ class RadarZustand:
 
     @staticmethod
     def _eigene_punkte(p: bytes, n: int) -> bool:
-        r = Leser(p)
+        r = Reader(p)
         r.pos = n
         if not r.u8() & 1:
             return False

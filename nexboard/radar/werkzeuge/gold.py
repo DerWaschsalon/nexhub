@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
-from radar.mitschnitt import SERVER_PORTS, TcpStrom, pcap_pakete, tcp_segment
+from deckbar_daemon.core.packets import TcpStream, server_segments
 
 RADAR = Path(__file__).resolve().parent.parent
 DATEN = Path.home() / ".local" / "share" / "aion2-radar"
@@ -92,13 +92,10 @@ class Aufzeichnung:
         self.notieren("ende", {k: s[k] for k in ("nachrichten", "eid", "eid_sicher", "dungeon")})
 
 
-def server_segmente(pcap: Path) -> Iterator[tuple[float, tuple, int, int, bytes]]:
-    """(Zeit, Fluss, seq, Flags, Nutzdaten) jedes TCP-Segments vom Spielserver."""
+def segmente(pcap: Path) -> Iterator[tuple[float, tuple]]:
+    """(Zeit, Segment) jedes TCP-Segments vom Spielserver."""
     with open(pcap, "rb") as f:
-        for zeit, ip in pcap_pakete(f):
-            seg = tcp_segment(ip)
-            if seg and seg[0][1] in SERVER_PORTS:
-                yield zeit, *seg
+        yield from server_segments(f)
 
 
 def radar_ereignisse(pcap: Path) -> list[str]:
@@ -113,13 +110,13 @@ def radar_ereignisse(pcap: Path) -> list[str]:
     dienst.zentrale.uhr = auf.uhr
     naechster_takt = 0.0
     with mock.patch("time.time", auf.uhr):
-        for zeit, fluss, seq, flags, daten in server_segmente(pcap):
+        for zeit, segment in segmente(pcap):
             auf.jetzt = zeit
             auf.start = zeit if auf.start is None else auf.start
             if zeit >= naechster_takt:
                 auf.takt()
                 naechster_takt = zeit + TAKT_S
-            dienst.quelle._strom(fluss).segment(seq, flags, daten)
+            dienst.quelle.feed(*segment)
         auf.takt()
         auf.ende()
     return auf.zeilen
@@ -127,19 +124,19 @@ def radar_ereignisse(pcap: Path) -> list[str]:
 
 def a2tools_mitschnitt(pcap: Path, ziel: Path) -> None:
     """pcap in das Textformat, das `deckbar-capture --replay` liest: Zeit|Client:<Port>:<Port>|Hex,
-    je Strom in TCP-Reihenfolge (TcpStrom sortiert und verwirft Wiederholungen)."""
+    je Strom in TCP-Reihenfolge (TcpStream sortiert und verwirft Wiederholungen)."""
     zeit = 0.0
-    stroeme: dict[tuple, TcpStrom] = {}
+    stroeme: dict[tuple, TcpStream] = {}
     with open(ziel, "w") as aus:
-        def strom(fluss: tuple) -> TcpStrom:
+        def strom(fluss: tuple) -> TcpStream:
             schluessel = f"Client:{fluss[3]}:{fluss[1]}"
 
             def ausgabe(daten: bytes) -> None:
                 stempel = datetime.fromtimestamp(zeit, timezone.utc).isoformat(timespec="milliseconds")
                 aus.write(f"{stempel}|{schluessel}|{daten.hex()}\n")
-            return stroeme.setdefault(fluss, TcpStrom(ausgabe, lambda: None))
+            return stroeme.setdefault(fluss, TcpStream(ausgabe, lambda: None))
 
-        for zeit, fluss, seq, flags, daten in server_segmente(pcap):
+        for zeit, (fluss, seq, flags, daten) in segmente(pcap):
             strom(fluss).segment(seq, flags, daten)
 
 
@@ -168,6 +165,7 @@ def run_bilder(pcap: Path) -> list[str]:
     die Bildpunkte des Run-Bildes (verglichen wird das entpackte Bild, nicht die WebP-Datei). Mit
     RUN_BILDER=<Ordner> landen die Bilder zum Ansehen dort."""
     from deckbar_daemon import runs  # das Daemon-Paket, gleiche .venv
+    from deckbar_daemon.run_webhook import run_message
     from PIL import Image
     with tempfile.TemporaryDirectory() as tmp:
         ordner = Path(tmp) / "aion2"
@@ -186,7 +184,7 @@ def run_bilder(pcap: Path) -> list[str]:
             ziel.parent.mkdir(parents=True, exist_ok=True)
             ziel.write_bytes(bild)
         punkte = Image.open(io.BytesIO(bild)).convert("RGBA")
-        zeilen.append(geordnet({"text": runs.run_message(run), "komplett": run.complete, "groesse": punkte.size,
+        zeilen.append(geordnet({"text": run_message(run), "komplett": run.complete, "groesse": punkte.size,
                                 "bosse": [[b.name, b.attempts, b.killed, b.total] for b in run.bosses()],
                                 "bildpunkte": hashlib.sha256(punkte.tobytes()).hexdigest()}))
     return zeilen

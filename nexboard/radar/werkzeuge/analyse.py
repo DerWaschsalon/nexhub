@@ -9,8 +9,7 @@ import struct
 import sys
 from collections import Counter, defaultdict
 
-from radar.mitschnitt import SERVER_PORTS, TcpStrom, pcap_pakete, tcp_segment
-from radar.protokoll import StromZerleger, uvarint
+from deckbar_daemon.core.packets import PcapSource, server_segments, uvarint
 
 
 def main() -> None:
@@ -24,49 +23,26 @@ def main() -> None:
     zaehler: Counter[int] = Counter()
     beispiele: dict[int, list[tuple[float, bytes]]] = defaultdict(list)
     spawn_ids: Counter[int] = Counter()
-    luecken = 0
     zeit = 0.0
-    zerleger: dict[tuple, StromZerleger] = {}
-    stroeme: dict[tuple, TcpStrom] = {}
 
-    def ausgabe_fuer(fluss):
-        z = zerleger[fluss]
+    def zaehlen(op: int, p: bytes) -> None:
+        zaehler[op] += 1
+        if op in a.opcode and len(beispiele[op]) < a.hex:
+            beispiele[op].append((zeit, p))
+        if op == 0x3634:
+            try:
+                _, n = uvarint(p)
+                spawn_ids[struct.unpack_from("<I", p, n + 2)[0]] += 1
+            except Exception:
+                pass
 
-        def ausgabe(daten: bytes) -> None:
-            for op, p in z.fuettern(daten):
-                zaehler[op] += 1
-                if op in a.opcode and len(beispiele[op]) < a.hex:
-                    beispiele[op].append((zeit, p))
-                if op == 0x3634:
-                    try:
-                        _, n = uvarint(p)
-                        spawn_ids[struct.unpack_from("<I", p, n + 2)[0]] += 1
-                    except Exception:
-                        pass
-        return ausgabe
-
-    def luecke_fuer(fluss):
-        def luecke() -> None:
-            nonlocal luecken
-            luecken += 1
-            zerleger[fluss].zuruecksetzen()
-        return luecke
-
+    quelle = PcapSource()
+    quelle.subscribe(None, zaehlen)
     with open(a.pcap, "rb") as f:
-        for zeit, ip in pcap_pakete(f):
-            seg = tcp_segment(ip)
-            if not seg:
-                continue
-            fluss, seq, flags, daten = seg
-            if fluss[1] not in SERVER_PORTS:
-                continue
-            if fluss not in stroeme:
-                zerleger[fluss] = StromZerleger()
-                stroeme[fluss] = TcpStrom(ausgabe_fuer(fluss), luecke_fuer(fluss))
-            stroeme[fluss].segment(seq, flags, daten)
+        for zeit, segment in server_segments(f):
+            quelle.feed(*segment)
 
-    print(f"Stroeme: {len(stroeme)}  Luecken: {luecken}  "
-          f"verworfene Bytes: {sum(z.verworfen for z in zerleger.values())}")
+    print(f"Stroeme: {quelle.streams}  Luecken: {quelle.gaps}  verworfene Bytes: {quelle.dropped}")
     print(f"Nachrichten: {sum(zaehler.values())}")
     for op, n in zaehler.most_common(a.top):
         print(f"  0x{op:04x} ({op:5d}): {n}")

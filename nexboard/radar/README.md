@@ -107,9 +107,7 @@ stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den a
 
 | Datei | Inhalt |
 |---|---|
-| `radar/protokoll.py` | Varint, LZ4, Frames |
-| `radar/mitschnitt.py` | tcpdump, pcap lesen, TCP zusammensetzen |
-| `radar/quelle.py` | verbindet Mitschnitt und Zustand |
+| `daemon/deckbar_daemon/core/packets/` | Kernbaustein des Daemons: Varint, LZ4, Frames (`frames.py`), pcap und TCP (`tcp.py`), Paketquellen mit `subscribe(opcodes, handler)` (`source.py`: `PcapSource`, `TcpdumpSource`) |
 | `radar/zustand.py` | wertet Nachrichten aus: Cubes, eigene ID, Position, Casts |
 | `radar/dienst.py` | RadarDienst: verbindet alles, Ton, Ansagen, Aufnahme, Stand fürs Overlay |
 | `radar/warnung.py` | Boss-Regeln, Warnungen, Ansagen |

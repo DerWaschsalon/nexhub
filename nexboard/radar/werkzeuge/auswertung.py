@@ -15,9 +15,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from radar.mitschnitt import SERVER_PORTS, pcap_pakete, tcp_segment
-from radar.protokoll import uvarint
-from radar.quelle import Quelle
+from deckbar_daemon.core.packets import PcapSource, server_segments, uvarint
 from radar.warnung import WarnZentrale
 from radar.zustand import RadarZustand
 
@@ -72,18 +70,15 @@ def main() -> None:
                 treffer[eid].append((uhr[0], angreifer, struct.unpack_from("<I", p, n + 2 + k)[0]))
         except (ValueError, struct.error):
             pass
-    zustand.verarbeiten = mitlesen
-
-    quelle = Quelle(zustand)
+    quelle = PcapSource()
+    quelle.subscribe(None, mitlesen)
     von = None
     with open(a.pcap, "rb") as f:
-        for zeit, ip in pcap_pakete(f):
-            seg = tcp_segment(ip)
-            if seg and seg[0][1] in SERVER_PORTS:
-                von = von or zeit
-                uhr[0] = zeit
-                quelle._strom(seg[0]).segment(*seg[1:])
-                warnungen.append((zeit, [(w.regel.titel, w.seit) for w in zentrale.schnappschuss()]))
+        for zeit, segment in server_segments(f):
+            von = von or zeit
+            uhr[0] = zeit
+            quelle.feed(*segment)
+            warnungen.append((zeit, [(w.regel.titel, w.seit) for w in zentrale.schnappschuss()]))
 
     vorwarnung = []
     ursachen = Counter()
