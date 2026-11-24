@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import Any, Literal
 
 from nexcore.settings import HIDDEN, SettingsStore
-from nexproto.termine import TERMINE, termin, termin_ab
+from nexproto.termine import EVENTS, cycle, next_start
 from pydantic import Field
 
 from .config import _Strict
 
 SETTINGS_FILE = "aion2.schedule.yaml"
 WEEK_START = datetime(1970, 1, 5, tzinfo=timezone.utc).timestamp()  # ein Montag, 00:00 UTC
-BUILTIN_NAMES = tuple(name for name, *_ in TERMINE)
+BUILTIN_NAMES = tuple(event.name_de for event in EVENTS)
 
 
 class Event(_Strict):
@@ -61,10 +61,11 @@ class Schedule:
         """Alle Termine in fester Reihenfolge: erst die der Server, dann die eigenen (wie in den Einstellungen)."""
         now = time.time() if now is None else now
         settings = self.store.value
-        rows = [_row(name, termin(now, reference, every, open_min), open_min, False, name not in settings.hidden)
-                for name, reference, every, open_min in TERMINE]
+        rows = [_row(fixed.name_de, next_start(now, fixed), fixed.open_min, False,
+                     fixed.name_de not in settings.hidden)
+                for fixed in EVENTS]
         for event in settings.events:
-            start_open = termin_ab(now, event_reference(event, now), event.every, event.open)
+            start_open = cycle(now, event_reference(event, now), event.every, event.open)
             rows.append(_row(event.name, start_open, event.open, True, event.enabled))
         return rows
 

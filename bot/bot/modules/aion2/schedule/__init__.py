@@ -1,5 +1,5 @@
 """Termin-Tafel für AION 2: eine Nachricht im eingestellten Kanal, die sich jede Minute selbst
-aktualisiert (Riss, Shugo-Fest, Beritra-Luftangriff, Wächterin Kaira, Resets).
+aktualisiert (Riss, Shugo-Fest, Beritra-Luftangriff, Wächterin Kaira, Resets, Belagerung, Nahma).
 
 Die Zeiten stehen als Discord-Zeitstempel in der Nachricht, jeder sieht sie also in seiner Zeitzone.
 5 Minuten vor einem Ereignis (nicht vor den Resets) kommt ein Ping an die eingestellte Rolle, der sich
@@ -23,7 +23,7 @@ UPDATE_EVERY_S = 60
 PING_AHEAD_S = 5 * 60
 FORGET_AFTER_S = 3600  # gemeldete Pings so lange merken, dann vergessen
 MIN_PING_LIFETIME_S = 60
-NO_PING = ("Tages-Reset", "Wochen-Reset")
+NO_PING = ("daily_reset", "weekly_reset")  # Schlüssel aus nexproto.termine
 COLOUR = 0x7DD8D8
 
 Event = tuple[str, int]  # (Name, Beginn als Unix-Zeit)
@@ -32,22 +32,22 @@ Event = tuple[str, int]  # (Name, Beginn als Unix-Zeit)
 def board(now: float) -> discord.Embed:
     """Die Tafel: je Termin der nächste Beginn, oder „läuft bis …“, solange er offen ist."""
     lines = []
-    for name, start, open_until in termine.alle(now):
+    for event, start, open_until in termine.upcoming(now):
         if open_until:
-            lines.append(f"🟢 **{name}** läuft, bis <t:{int(open_until)}:t> (<t:{int(open_until)}:R>)")
+            lines.append(f"🟢 **{event.name_de}** läuft, bis <t:{int(open_until)}:t> (<t:{int(open_until)}:R>)")
         else:
-            lines.append(f"**{name}** <t:{int(start)}:t> (<t:{int(start)}:R>)")
+            lines.append(f"**{event.name_de}** <t:{int(start)}:t> (<t:{int(start)}:R>)")
     embed = discord.Embed(title="AION 2 · Termine", description="\n".join(lines), color=COLOUR)
-    embed.set_footer(text="Zeiten in deiner Zeitzone · aktualisiert sich jede Minute · Riss bestätigt, Rest geschätzt")
+    embed.set_footer(text="Zeiten in deiner Zeitzone · aktualisiert sich jede Minute · Uhr des EU-Servers")
     return embed
 
 
 def due_pings(now: float, announced: set[Event]) -> list[Event]:
     """Ereignisse, die in den nächsten 5 Minuten beginnen und noch nicht gemeldet sind."""
     due = []
-    for name, start, open_until in termine.alle(now):
-        key = (name, int(start))
-        if name in NO_PING or open_until or key in announced:
+    for event, start, open_until in termine.upcoming(now):
+        key = (event.name_de, int(start))
+        if event.key in NO_PING or open_until or key in announced:
             continue
         if 0 < start - now <= PING_AHEAD_S:
             due.append(key)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from nexproto.termine import TERMINE, termin
+from nexproto.termine import EVENT_BY_KEY, next_start
 
 from .daten import npc_name
 from .konfig import konfig_laden
@@ -15,7 +15,7 @@ GRUEN, ORANGE, GRAU = "ok", "warn", "leise"  # Farbklassen der NexBoard-Seite
 
 
 def riss(jetzt: float) -> tuple[float, bool]:
-    return termin(jetzt, *TERMINE[0][1:])
+    return next_start(jetzt, EVENT_BY_KEY["rift"])
 
 
 def feldboss_name(platz: str, boss: dict) -> str:

@@ -13,7 +13,7 @@ from pathlib import Path
 
 import yaml
 from nexcore import atomic_write
-from nexproto.termine import TERMINE
+from nexproto.termine import EVENTS
 
 from . import dps, runs, schedule
 from .modules import deck
@@ -116,7 +116,7 @@ def _move_timer_events(config_dir: Path, backup: Backup) -> list[str]:
         events = layout["widgets"]["timers"].pop("events")
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return []
-    builtin = FORMER_DEFAULT_EVENTS | {name for name, *_ in TERMINE}
+    builtin = FORMER_DEFAULT_EVENTS | {event.name_de for event in EVENTS}
     own = [e for e in events if isinstance(e, dict) and e.get("name") not in builtin]
     backup.save(OVERLAY_LAYOUT)
     _write_yaml(config_dir / schedule.SETTINGS_FILE, {"events": own})
