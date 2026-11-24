@@ -18,8 +18,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from .capture import aion2_running
 from .config import _atomic_write
+from .game_process import aion2_running
 
 ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
 sys.path.insert(0, str(ORDNER))  # Paket „radar“ liegt dort, nicht im Daemon

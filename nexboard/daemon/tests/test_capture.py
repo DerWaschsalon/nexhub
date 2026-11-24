@@ -1,4 +1,4 @@
-"""capture.py: Programm mit dem Spiel starten und beenden, Zeilen auswerten. Statt deckbar-capture
+"""capture.py und seine Teile: Programm mit dem Spiel starten und beenden, Zeilen auswerten. Statt deckbar-capture
 läuft ein kleines Python-Skript mit demselben Zeilenformat."""
 import asyncio
 import sys
@@ -7,8 +7,9 @@ import textwrap
 import pytest
 
 from deckbar_daemon import capture
-from deckbar_daemon.capture import Capture, is_aion2_process
+from deckbar_daemon.capture import Capture
 from deckbar_daemon.dps_view import compact
+from deckbar_daemon.game_process import is_aion2_process
 
 FAKE = textwrap.dedent('''\
     import json, sys

@@ -26,8 +26,8 @@ from typing import Any, Awaitable, Callable, Iterable
 from aiohttp import web
 from pydantic import ValidationError
 
-from .capture import aion2_running
 from .config import _atomic_write
+from .game_process import aion2_running
 from .overlay_layout import OverlayLayout, WidgetSpec, default_profiles, merge
 
 log = logging.getLogger(__name__)

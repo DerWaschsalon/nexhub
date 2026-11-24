@@ -1,105 +1,38 @@
 """AION-2-Mitschnitt per `deckbar-capture` (Ordner capture/ im Repo, Kern des A2Tools DPS Meter).
 
-Läuft AION 2 (Prozess AION2.exe unter Proton), startet der Daemon das Programm und liest dessen
-Zeilen-JSON (Format siehe capture/src/main.rs):
-
-    {"type":"hello","cap_net_raw":true,…}         einmal beim Start
-    {"type":"dps","view":{"target":…,"timeMs":…,"hp":…,"rows":[…]}}   bei jeder Änderung
-    {"type":"status","port":…,"ping":…,"dungeon":…}                   bei jeder Änderung
-    {"type":"fights_saved","ids":[…]}             Kampf-History geschrieben
-    {"type":"reply","id":…,"ok":…,"result":…}     Antwort auf request()
-
-Endet das Spiel, schließt der Daemon nach STOP_AFTER_S die Eingabe des Programms. Es speichert
-dann die laufenden Kämpfe und beendet sich.
+Läuft AION 2 (Prozess AION2.exe unter Proton), startet der Daemon das Programm (capture_process.py) und
+liest dessen Zeilen-JSON (capture_protocol.py). Endet das Spiel, schließt der Daemon nach STOP_AFTER_S die
+Eingabe des Programms. Es speichert dann die laufenden Kämpfe und beendet sich.
 """
 from __future__ import annotations
 
 import asyncio
-import itertools
-import json
 import logging
-import os
-import re
-import shutil
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Literal
 
+from .capture_process import BINARY, CaptureProcess, find_binary, history_root, repo_binary
+from .capture_protocol import Requests, parse
+from .game_process import aion2_running
+
 log = logging.getLogger(__name__)
 
-BINARY = "deckbar-capture"
 DEFAULT_INTERVAL_MS = 500  # Standard von deckbar-capture
 GAME_POLL_S = 5
 STOP_AFTER_S = 30   # Spiel weg: so lange weiterlaufen lassen (Absturz mit Neustart, Ladebildschirm)
-STOP_WAIT_S = 10    # nach geschlossener Eingabe, dann SIGTERM
-MAX_LINE = 4 * 1024 * 1024  # volle DpsData mit allen Skills
 PING_STEP_MS = 5
-# Zeile mit der vollen DpsData, genau so geschrieben von deckbar-capture (out.rs): nur den Inhalt herausschneiden
-DPS_DATA_PREFIX = b'{"type":"dps_data","data":'
+PLUGIN_EVENTS = ("plugin_frame", "plugin_character", "plugin_feed")
 
 Phase = Literal["no_binary", "no_game", "starting", "running", "no_caps", "crashed"]
-
-
-def repo_binary() -> Path:
-    return Path(__file__).resolve().parents[2] / "capture" / "target" / "release" / BINARY
-
-
-def find_binary(configured: str = "") -> Path | None:
-    """Fester Pfad aus den Einstellungen, sonst PATH bzw. ~/.local/bin (`build.sh --install`, mit
-    cap_net_raw), sonst der Build im Repo."""
-    if configured:
-        p = Path(configured).expanduser()
-        return p if p.is_file() else None
-    found = shutil.which(BINARY)
-    if found:
-        return Path(found)
-    for p in (Path.home() / ".local" / "bin" / BINARY, repo_binary()):
-        if p.is_file():
-            return p
-    return None
-
-
-def history_root() -> Path:
-    """Dort schreibt deckbar-capture `history/<id>.json` (Format des A2Tools-Meters)."""
-    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
-    return Path(base) / "deckbar" / "aion2"
-
-
-def is_aion2_process(comm: str, cmdline: bytes) -> bool:
-    """Wie `platform::procfs::is_aion2_process` im Meter: Name des Prozesses oder argv[0]."""
-    def is_game(name: str) -> bool:
-        return name.strip().lower() == "aion2.exe"
-
-    if is_game(comm):
-        return True
-    argv0 = cmdline.split(b"\0", 1)[0].decode(errors="replace")
-    return is_game(re.split(r"[/\\]", argv0)[-1])
-
-
-def aion2_running(proc: Path = Path("/proc")) -> bool:
-    try:
-        entries = list(os.scandir(proc))
-    except OSError:
-        return False
-    for e in entries:
-        if not e.name.isdigit():
-            continue
-        try:
-            comm = (proc / e.name / "comm").read_text()
-            if is_aion2_process(comm, b""):
-                return True
-            if "wine" in comm.lower() or comm.strip().lower().startswith("aion"):
-                if is_aion2_process("", (proc / e.name / "cmdline").read_bytes()):
-                    return True
-        except OSError:
-            continue
-    return False
-
-
 ViewListener = Callable[[dict | None, bool], Awaitable[None]]  # (view oder None, erster nach Start)
 
 
+def _without_ping(status: dict) -> dict:
+    return {k: v for k, v in status.items() if k != "ping"}
+
+
 class Capture:
-    """Hält deckbar-capture am Laufen, solange das Spiel läuft."""
+    """Hält deckbar-capture am Laufen, solange das Spiel läuft, und verteilt, was es meldet."""
 
     def __init__(self, on_view: ViewListener, on_change: Callable[[], Awaitable[None]],
                  on_fights: Callable[[list[str]], Awaitable[None]] | None = None) -> None:
@@ -115,12 +48,11 @@ class Capture:
         self.game: bool | None = None  # letzter Blick auf /proc (None = noch keiner bzw. ohne Programm)
         # Takt der DPS-Ansicht; die A2-Oberfläche setzt ihn aus den Meter-Einstellungen (a2ui.py)
         self.interval_ms = DEFAULT_INTERVAL_MS
-        # Volle DpsData (Skills je Spieler) nur, solange jemand sie braucht (Overlay, a2ui.py)
+        # Volle DpsData (Skills je Spieler) nur, solange jemand sie braucht (Overlay, meter_events.py)
         self.full = False
         self.data_listeners: list[Callable[[str, Any], Awaitable[None]]] = []  # (Ereignis, Inhalt)
-        self._proc: asyncio.subprocess.Process | None = None
-        self._pending: dict[int, asyncio.Future] = {}
-        self._ids = itertools.count(1)
+        self.process = CaptureProcess()
+        self.requests = Requests()
 
     def info(self) -> dict:
         return {
@@ -157,42 +89,35 @@ class Capture:
                     await self._set("no_game")
                     await asyncio.sleep(GAME_POLL_S)
                     continue
-                await self._run_once(lang)
+                await self._run_once(self.binary, lang)
         finally:
             self.game = None
-            await self._stop()
+            await self.process.stop()
 
-    async def _run_once(self, lang: str) -> None:
+    async def _run_once(self, binary: Path, lang: str) -> None:
         await self._set("starting")
         self.hello, self.status = {}, {}
-        args = [str(self.binary), "--history-dir", str(history_root()), "--lang", lang,
-                "--interval-ms", str(self.interval_ms)]
         try:
-            self._proc = await asyncio.create_subprocess_exec(
-                *args, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE, limit=MAX_LINE)
+            await self.process.start(binary, lang, self.interval_ms)
         except OSError as e:
             await self._set("crashed", str(e))
             await asyncio.sleep(GAME_POLL_S)
             return
-        log.info("%s gestartet (PID %s)", BINARY, self._proc.pid)
-        reader = asyncio.ensure_future(self._read(self._proc))
-        errors = asyncio.ensure_future(self._log_stderr(self._proc))
+        reader = asyncio.ensure_future(self._read(self.process))
+        errors = asyncio.ensure_future(self.process.log_stderr())
         watcher = asyncio.ensure_future(self._watch_game())
         try:
             await asyncio.wait({reader, watcher}, return_when=asyncio.FIRST_COMPLETED)
         finally:
             watcher.cancel()
-            await self._stop()
+            await self.process.stop()
             reader.cancel()
             errors.cancel()
-            for fut in self._pending.values():
-                fut.cancel()
-            self._pending.clear()
+            self.requests.cancel_all()
             await self.on_view(None, False)
-        code = self._proc.returncode if self._proc else None
-        self._proc = None
-        if code not in (0, None, -15):
+        code = self.process.crashed
+        self.process.forget()
+        if code is not None:
             await self._set("crashed", f"Exit-Code {code}")
             await asyncio.sleep(GAME_POLL_S)
 
@@ -212,26 +137,9 @@ class Capture:
                 log.info("AION 2 beendet, stoppe %s", BINARY)
                 return
 
-    async def _stop(self) -> None:
-        proc = self._proc
-        if not proc or proc.returncode is not None:
-            return
-        try:
-            if proc.stdin:
-                proc.stdin.close()  # Programm speichert und beendet sich
-            await asyncio.wait_for(proc.wait(), STOP_WAIT_S)
-        except (TimeoutError, ProcessLookupError):
-            try:
-                proc.terminate()
-                await asyncio.wait_for(proc.wait(), STOP_WAIT_S)
-            except (TimeoutError, ProcessLookupError):
-                proc.kill()
-        except OSError:
-            pass
-
     # ------------------------------------------------------------ Ausgabe
-    async def _read(self, proc: asyncio.subprocess.Process) -> None:
-        assert proc.stdout
+    async def _read(self, proc: Any) -> None:
+        """Zeilen von proc.stdout verteilen, bis das Programm endet."""
         first = True
         while True:
             try:
@@ -241,67 +149,51 @@ class Capture:
                 continue
             if not raw:
                 return
-            if raw.startswith(DPS_DATA_PREFIX):
-                # bis zu 100 KB: als Text weiter an die Meter-Seiten, ohne zu parsen (Format: out.rs)
-                await self._notify("dps_data", raw[len(DPS_DATA_PREFIX):].rstrip()[:-1].decode())
-                continue
-            try:
-                msg = json.loads(raw)
-            except ValueError:
-                continue
-            if not isinstance(msg, dict):
-                continue
-            t = msg.get("type")
-            if t == "dps" and isinstance(msg.get("view"), dict):
-                await self.on_view(msg["view"], first)
-                first = False
-            elif t == "status":
-                ping = msg.get("ping")
-                if ping != self.status.get("ping"):
-                    await self._notify("ping", ping)
-                old, self.status = self.status, msg
-                # deckbar-capture meldet jede Ping-Änderung (alle 2 s); Web-UI und Dashboard nur bei
-                # spürbarer Änderung (≥ PING_STEP_MS) oder wenn sich sonst etwas tut
-                same = {k: v for k, v in old.items() if k != "ping"} == {k: v for k, v in msg.items() if k != "ping"}
-                p0, p1 = old.get("ping"), ping
-                small = isinstance(p0, (int, float)) and isinstance(p1, (int, float)) and abs(p1 - p0) < PING_STEP_MS
-                if not (same and (small or p0 == p1)):
-                    await self.on_change()
-                else:
-                    self.status = {**msg, "ping": old.get("ping")}  # Bezugswert bleibt der zuletzt gezeigte
-            elif t == "hello":
-                self.hello = msg
-                if "dps_data" not in (msg.get("features") or []):
-                    log.warning("%s ist veraltet, Meter-Daten und Boss-Effekte fehlen: capture/build.sh --install",
-                                BINARY)
-                if self.full:
-                    asyncio.ensure_future(self._send_view())
-                if msg.get("cap_net_raw"):
-                    await self._set("running")
-                else:
-                    await self._set("no_caps", "ohne cap_net_raw kein Mitschnitt")
-                await self._notify("hello", msg)
-            elif t == "fights_saved":
-                ids = [str(i) for i in msg.get("ids") or []]
-                if self.on_fights:
-                    await self.on_fights(ids)
-                await self._notify("fights_saved", ids)
-            elif t in ("plugin_frame", "plugin_character", "plugin_feed"):
-                await self._notify(t, msg)
-            elif t == "reply":
-                fut = self._pending.pop(msg.get("id"), None)
-                if fut and not fut.done():
-                    if msg.get("ok"):
-                        fut.set_result(msg.get("result"))
-                    else:
-                        fut.set_exception(RuntimeError(str(msg.get("error"))))
+            match parse(raw):
+                case ("dps_data", text):
+                    await self._notify("dps_data", text)
+                case ("dps", {"view": dict(view)}):
+                    await self.on_view(view, first)
+                    first = False
+                case ("status", msg):
+                    await self._on_status(msg)
+                case ("hello", msg):
+                    await self._on_hello(msg)
+                case ("fights_saved", msg):
+                    ids = [str(i) for i in msg.get("ids") or []]
+                    if self.on_fights:
+                        await self.on_fights(ids)
+                    await self._notify("fights_saved", ids)
+                case (str(kind), msg) if kind in PLUGIN_EVENTS:
+                    await self._notify(kind, msg)
+                case ("reply", msg):
+                    self.requests.reply(msg)
 
-    async def _log_stderr(self, proc: asyncio.subprocess.Process) -> None:
-        assert proc.stderr
-        while raw := await proc.stderr.readline():
-            line = raw.decode(errors="replace").rstrip()
-            level = logging.WARNING if " WARN " in line or " ERROR " in line else logging.DEBUG
-            log.log(level, "%s: %s", BINARY, line)
+    async def _on_status(self, msg: dict) -> None:
+        ping = msg.get("ping")
+        if ping != self.status.get("ping"):
+            await self._notify("ping", ping)
+        old, self.status = self.status, msg
+        # deckbar-capture meldet jede Ping-Änderung (alle 2 s); Web-UI und Dashboard nur bei
+        # spürbarer Änderung (≥ PING_STEP_MS) oder wenn sich sonst etwas tut
+        p0 = old.get("ping")
+        small = isinstance(p0, (int, float)) and isinstance(ping, (int, float)) and abs(ping - p0) < PING_STEP_MS
+        if _without_ping(old) == _without_ping(msg) and (small or p0 == ping):
+            self.status = {**msg, "ping": p0}  # Bezugswert bleibt der zuletzt gezeigte
+        else:
+            await self.on_change()
+
+    async def _on_hello(self, msg: dict) -> None:
+        self.hello = msg
+        if "dps_data" not in (msg.get("features") or []):
+            log.warning("%s ist veraltet, Meter-Daten und Boss-Effekte fehlen: capture/build.sh --install", BINARY)
+        if self.full:
+            asyncio.ensure_future(self._send_view())
+        if msg.get("cap_net_raw"):
+            await self._set("running")
+        else:
+            await self._set("no_caps", "ohne cap_net_raw kein Mitschnitt")
+        await self._notify("hello", msg)
 
     async def _notify(self, event: str, payload: Any) -> None:
         for fn in self.data_listeners:
@@ -325,19 +217,13 @@ class Capture:
     # ------------------------------------------------------------ Befehle
     @property
     def running(self) -> bool:
-        return self._proc is not None and self._proc.returncode is None
+        return self.process.running
 
     async def request(self, cmd: str, timeout: float = 5, **args: Any) -> Any:
         """Befehl an das Programm (reset, target_mode, details, history …), wartet auf die Antwort."""
-        proc = self._proc
-        if not self.running or not proc or not proc.stdin:
-            raise RuntimeError(f"{BINARY} läuft nicht")
-        rid = next(self._ids)
-        fut: asyncio.Future = asyncio.get_running_loop().create_future()
-        self._pending[rid] = fut
-        proc.stdin.write((json.dumps({"id": rid, "cmd": cmd, **args}) + "\n").encode())
-        await proc.stdin.drain()
+        rid, reply, line = self.requests.new(cmd, args)
         try:
-            return await asyncio.wait_for(fut, timeout)
+            await self.process.send(line)
+            return await asyncio.wait_for(reply, timeout)
         finally:
-            self._pending.pop(rid, None)
+            self.requests.drop(rid)

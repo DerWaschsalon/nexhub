@@ -9,7 +9,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .capture import Capture, history_root
+from .capture import Capture
+from .capture_process import history_root
 
 SUMMARY_FIELDS = ("id", "bossName", "targetId", "startTimeMs", "durationMs", "totalDamage", "jobs", "jobIds",
                   "isTrain", "appVersion", "mobCode", "dungeonId")

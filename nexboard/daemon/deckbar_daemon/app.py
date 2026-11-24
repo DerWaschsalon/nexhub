@@ -21,7 +21,7 @@ from nexcore.settings import MASK, SettingsStore, is_mask
 from . import __version__
 from .a2ui import A2Ui
 from .boss_effekte import BossEffekte
-from .capture import aion2_running, history_root
+from .capture_process import history_root
 from .config import Settings, is_default_config, save_settings
 from .core.http import api_errors, local_only, ok, read_object
 from .core.live import LiveHub
@@ -29,6 +29,7 @@ from .core.topics import LANGUAGE
 from .dps import SETTINGS_FILE as dps_settings_file
 from .dps import DpsFeed
 from .feed_buffer import FeedBuffer
+from .game_process import aion2_running
 from .hub import Hub, loot_drop
 from .modules import CATEGORIES
 from .modules.base import WebModule
