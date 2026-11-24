@@ -251,6 +251,32 @@
       "title": "FightHits",
       "type": "object"
     },
+    "Loot": {
+      "additionalProperties": false,
+      "description": "Ein Gegenstand, um den die Gruppe gewürfelt hat (Würfel-Beute aus dem Mitschnitt). Ohne Namen: wer\ngewonnen hat, steht nicht drin. Der Hub ordnet die Beute über die Zeit dem Bosskampf davor zu.",
+      "properties": {
+        "t_ms": {
+          "title": "T Ms",
+          "type": "integer"
+        },
+        "item_id": {
+          "title": "Item Id",
+          "type": "integer"
+        },
+        "count": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "t_ms",
+        "item_id"
+      ],
+      "title": "Loot",
+      "type": "object"
+    },
     "Recorder": {
       "additionalProperties": false,
       "properties": {
@@ -409,6 +435,22 @@
       "maxItems": 500,
       "title": "Deaths",
       "type": "array"
+    },
+    "loot": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Loot"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Loot"
     }
   },
   "required": [

@@ -72,6 +72,16 @@ def test_todesursachen_kommen_mit():
         log(deaths=[{"t_ms": 1, "name": "x", "skill": 2, "lead_ms": -5}])
 
 
+def test_beute_kommt_mit():
+    loot = [{"t_ms": 1_792_000_000_500, "item_id": 110430050, "count": 2}, {"t_ms": 5, "item_id": 7}]
+    back = unpack(pack(log(loot=loot)))
+    assert [(d.item_id, d.count) for d in back.loot] == [(110430050, 2), (7, 1)]
+    assert unpack(pack(log())).loot is None  # ohne Angabe: Beute wurde nicht mitgeschrieben
+    assert unpack(pack(log(loot=[]))).loot == []
+    with pytest.raises(ValueError):
+        log(loot=[{"t_ms": 1, "item_id": 7, "winner": "Moonlin"}])  # Namen gehören nicht in die Beute
+
+
 def test_treffer_zu_unbekanntem_kampf():
     with pytest.raises(ValueError, match="unbekanntem Kampf"):
         log(hits={"auto_9": hits(9)})

@@ -49,6 +49,7 @@ CHECK_EVERY_S = 600  # Gerät noch gültig? So oft, solange das Modul an ist
 MIN_POLL_S = 1.0  # schneller fragt der Daemon nie nach, egal was der Hub sagt
 UPLOAD_TIMEOUT_S = 120
 OUTBOX_MAX_BYTES = 500 * 1024 * 1024  # darüber fliegen die ältesten Runs raus
+LOOT_GRACE_MS = 60_000  # die Beute des Endbosses steht erst nach seinem Tod zum Würfeln
 NEXLOG, REPORT = ".nexlog.gz", ".report.json"  # Dateien im Postausgang: <Start>-<Dungeon> + Endung
 RETRY_S = (60, 300, 900, 1800)  # Wartezeiten nach einem Fehlschlag, dann bleibt es bei der letzten
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
@@ -99,9 +100,18 @@ def default_outbox() -> Path:
     return Path(base) / "deckbar" / "outbox"
 
 
+def loot_drop(roll: dict, at_ms: int) -> dict | None:
+    """Würfel-Ereignis des Mitschnitts → Zeile für den NexLog. Nur „steht zum Würfeln“ zählt als Beute;
+    wer gewürfelt oder gewonnen hat (mit Namen), bleibt draußen."""
+    if roll.get("type") != "open":
+        return None
+    return {"t_ms": at_ms, "item_id": int(roll["itemId"]), "count": int(roll.get("count") or 1)}
+
+
 def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, capture: str | None,
-                 deaths: list[dict] | None = None) -> bytes:
-    """Run → gepacktes NexLog. Liest die Kampfdateien und Einzeltreffer des Mitschnitts von der Platte;
+                 deaths: list[dict] | None = None, loot: list[dict] | None = None) -> bytes:
+    """Run → gepacktes NexLog. `loot` None heißt: Beute wurde nicht mitgeschrieben (eine leere Liste: nichts
+    gewürfelt). Liest die Kampfdateien und Einzeltreffer des Mitschnitts von der Platte;
     läuft in einem Thread (Packen großer Runs dauert bis ~0,1 s)."""
     from nexproto import (  # erst hier: fehlt das Paket, scheitert nur das Hochladen
         NexLog,
@@ -125,6 +135,7 @@ def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, c
         "fights": fights,
         "hits": hits,
         "deaths": deaths or [],  # Todesursachen vom Radar, falls es lief
+        "loot": loot,  # Würfel-Beute aus dem Feed des Mitschnitts; None, wenn er sie nicht mitschreibt
     }))
 
 
@@ -152,6 +163,7 @@ class Hub:
         self.language: Callable[[], str] = lambda: "en"
         self.capture_build: Callable[[], str | None] = lambda: None
         self.deaths: Callable[[int, int], list[dict]] = lambda start_ms, end_ms: []
+        self.loot: Callable[[int, int], list[dict] | None] = lambda start_ms, end_ms: None
 
     # ------------------------------------------------------------ Einstellungen
     def save(self, settings: HubSettings) -> None:
@@ -325,7 +337,8 @@ class Hub:
             return
         try:
             data = await asyncio.to_thread(build_nexlog, run, self.history_dir(), self.you, self.language(),
-                                           self.capture_build(), self.deaths(run.start_ms, run.end_ms))
+                                           self.capture_build(), self.deaths(run.start_ms, run.end_ms),
+                                           self.loot(run.start_ms, run.end_ms + LOOT_GRACE_MS))
         except ImportError:
             self._note(False, "Paket nexproto fehlt: im Repo `uv tool install --force --editable ./daemon`")
             return
