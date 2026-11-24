@@ -61,6 +61,7 @@ body.veiled .widget { opacity: 0 !important; } /* ein Modul blendet alles aus (K
 .timer-list .soon span:last-child { color: var(--warn); }
 .timer-list .open span { color: var(--ok); }
 .timer-list .empty { color: var(--muted); }
+.timer-list small { display: block; font-size: 11px; color: var(--muted); }
 
 /* ------------------------------------------------------------ Bearbeiten */
 body.edit { background: rgba(4, 6, 14, .32); }

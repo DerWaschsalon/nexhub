@@ -3,12 +3,17 @@
 import { duration, el } from "../util.js";
 
 const SOON_S = 600; // ab hier färbt sich die Zeit
+const WEEKLY_AHEAD_S = 24 * 3600; // Wochentermine (Belagerung, Nahma) erscheinen erst einen Tag vorher
+
+const due = (entry, now) => !entry.weekly || entry.open_until !== null || entry.start - now <= WEEKLY_AHEAD_S;
 
 function row(entry, now) {
   const open = entry.open_until !== null;
   const left = Math.max(0, (open ? entry.open_until : entry.start) - now);
   const line = el("div", open ? "open" : left < SOON_S ? "soon" : "");
-  line.append(el("span", "", entry.name), el("span", "", open ? `offen · ${duration(left)}` : duration(left)));
+  const name = el("span", "", entry.name);
+  if (entry.place) name.append(el("small", "", entry.place));
+  line.append(name, el("span", "", open ? `offen · ${duration(left)}` : duration(left)));
   return line;
 }
 
@@ -28,7 +33,7 @@ export default {
         return;
       }
       const now = Date.now() / 1000;
-      list.replaceChildren(...entries.map((entry) => row(entry, now)));
+      list.replaceChildren(...entries.filter((entry) => due(entry, now)).map((entry) => row(entry, now)));
     }
 
     const timer = setInterval(render, 1000);

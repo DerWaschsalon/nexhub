@@ -6,19 +6,22 @@ nur hier (mit nexproto.termine); Web-UI und Overlay zählen bloß bis zu den gel
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
 from nexcore.settings import HIDDEN, SettingsStore
 from nexproto.termine import EVENTS, cycle, next_start
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from .config import _Strict
 
 SETTINGS_FILE = "aion2.schedule.yaml"
 WEEK_START = datetime(1970, 1, 5, tzinfo=timezone.utc).timestamp()  # ein Montag, 00:00 UTC
-BUILTIN_NAMES = tuple(event.name_de for event in EVENTS)
+BUILTIN_KEYS = tuple(event.key for event in EVENTS)
+# bis November 2026 standen in `hidden` die deutschen Namen; beim Laden werden sie zu Schlüsseln
+KEY_BY_OLD_NAME = {event.name_de: event.key for event in EVENTS}
 
 
 class Event(_Strict):
@@ -35,7 +38,16 @@ class Event(_Strict):
 class ScheduleSettings(_Strict):
     # beides bearbeitet die Seite „Termine“ selbst (Tabelle), kein Formular
     events: list[Event] = Field(default_factory=list, max_length=24, json_schema_extra=HIDDEN)
-    hidden: list[str] = Field(default_factory=list, max_length=len(BUILTIN_NAMES), json_schema_extra=HIDDEN)
+    hidden: list[str] = Field(default_factory=list, max_length=len(BUILTIN_KEYS), json_schema_extra=HIDDEN)
+
+    @field_validator("hidden", mode="before")
+    @classmethod
+    def _keys(cls, value: Any) -> Any:
+        """Ausgeblendete feste Termine als Schlüssel; alte Namen übersetzen, Unbekanntes fällt weg."""
+        if not isinstance(value, list):
+            return value
+        keys = [KEY_BY_OLD_NAME.get(entry, entry) for entry in value]
+        return [key for key in dict.fromkeys(keys) if key in BUILTIN_KEYS]
 
 
 def event_reference(event: Event, now: float) -> float:
@@ -46,14 +58,16 @@ def event_reference(event: Event, now: float) -> float:
     return WEEK_START + event.at * 60 - shift
 
 
-def _row(name: str, start_open: tuple[float, bool], open_min: int, own: bool, shown: bool) -> dict[str, Any]:
+def _row(name: str, start_open: tuple[float, bool], open_min: int, shown: bool, **more: Any) -> dict[str, Any]:
+    """Eine Zeile der Liste. Feste Termine bringen `key`, `place` und `weekly` mit, eigene nichts davon."""
     start, is_open = start_open
     return {"name": name, "start": start, "open_until": start + open_min * 60 if is_open else None,
-            "own": own, "shown": shown}
+            "shown": shown, "own": "key" not in more, "key": None, "place": "", "weekly": False, **more}
 
 
 class Schedule:
-    def __init__(self, config_dir: Path) -> None:
+    def __init__(self, config_dir: Path, language: Callable[[], str] = lambda: "en") -> None:
+        self.language = language  # Sprache der Namen fester Termine (System → Allgemein)
         self.store = SettingsStore(config_dir / SETTINGS_FILE, ScheduleSettings,
                                    header="Termine: eigene Ereignisse und ausgeblendete feste Termine")
 
@@ -61,12 +75,13 @@ class Schedule:
         """Alle Termine in fester Reihenfolge: erst die der Server, dann die eigenen (wie in den Einstellungen)."""
         now = time.time() if now is None else now
         settings = self.store.value
-        rows = [_row(fixed.name_de, next_start(now, fixed), fixed.open_min, False,
-                     fixed.name_de not in settings.hidden)
+        german = self.language() == "de"
+        rows = [_row(fixed.name_de if german else fixed.name_en, next_start(now, fixed), fixed.open_min,
+                     fixed.key not in settings.hidden, key=fixed.key, place=fixed.place, weekly=bool(fixed.weekdays))
                 for fixed in EVENTS]
         for event in settings.events:
             start_open = cycle(now, event_reference(event, now), event.every, event.open)
-            rows.append(_row(event.name, start_open, event.open, True, event.enabled))
+            rows.append(_row(event.name, start_open, event.open, event.enabled))
         return rows
 
     def visible(self, now: float | None = None) -> list[dict[str, Any]]:

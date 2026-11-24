@@ -245,8 +245,10 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Kopf- oder Fußzeile, die Position bleibt gespeichert.
 - **Boss-Leiste:** HP des Ziels, Kampfzeit und Kill-Prognose aus dem HP-Verlauf, außerhalb von
   Kämpfen ausgeblendet.
-- **Termine:** Countdown bis zum nächsten Termin (Riss, Shugo-Fest, Resets … und eigene Ereignisse).
-  Dieselbe Liste wie auf der Seite „Termine“, gerechnet im Daemon aus `nexproto.termine`.
+- **Termine:** Countdown bis zum nächsten Termin (Riss, Shugo-Fest, Resets, Belagerung, Nahma … und eigene
+  Ereignisse), bei festen Terminen mit der Karte darunter. Wochentermine erscheinen erst einen Tag vorher.
+  Dieselbe Liste wie auf der Seite „Termine“, gerechnet im Daemon aus `nexproto.termine`; die Namen folgen
+  der allgemeinen Sprache, ausgeblendete Termine stehen als Schlüssel in `aion2.schedule.yaml`.
 - **Cube-Radar** (Modul „AION 2 · Radar“): kleiner Kreis mit Richtung, Abstand und Höhe zum nächsten Hidden
   Cube; erscheint nur, solange einer in Sicht ist.
 - **Karte** (Modul „AION 2 · Radar“, standardmäßig aus): Cubes, Spawnpunkte, Fundorte und Teleporter. Bilder
