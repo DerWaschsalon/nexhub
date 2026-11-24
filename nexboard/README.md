@@ -302,7 +302,7 @@ X11-Input-Shape, ohne die zusätzlichen Widgets.
 So funktioniert es: Der Daemon liefert auf Port 8766 (nur localhost) die Overlay-Seite
 (`daemon/deckbar_daemon/web/overlay/`) und die Oberfläche aus `capture/a2tools` aus, mit einem
 kleinen Ersatz für Tauris JavaScript-API davor (`web/a2shim.js`). Daten-Befehle gehen an
-`deckbar-capture` (`a2ui.py`), Fenster-Befehle an die Overlay-Seite bzw. das Programm. Die
+`deckbar-capture` (`meter_commands.py`), Fenster-Befehle an die Overlay-Seite bzw. das Programm. Die
 Einstellungen der Meter-Oberfläche liegen in `~/.config/deckbar/a2-settings.json`. Nicht dabei sind
 die übrigen Online-Funktionen und die eigenen globalen Tastenkürzel des Meters.
 

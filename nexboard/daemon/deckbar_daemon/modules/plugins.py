@@ -12,9 +12,9 @@ from aiohttp import web
 from nexcore import Context, ModuleInfo
 from nexcore.errors import ApiError
 
-from ..a2ui import A2_ROOT
 from ..core.http import read_object
 from ..core.live import LiveHub
+from ..meter_files import A2_ROOT
 from ..plugins import PluginError, PluginHost
 from .base import WebModule
 

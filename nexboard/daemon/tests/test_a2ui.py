@@ -1,8 +1,9 @@
-"""a2ui.py: Dateien der Meter-Oberfläche, Shim in index.html, Commands ohne laufendes Programm."""
+"""a2ui.py und seine Teile: Dateien der Meter-Oberfläche, Shim in index.html, Commands ohne laufendes Programm."""
 import json
 
-from deckbar_daemon import a2ui
-from deckbar_daemon.a2ui import A2Ui, inject_shim, member_jobs, resolve, summaries
+from deckbar_daemon.a2ui import A2Ui
+from deckbar_daemon.meter_commands import member_jobs, summaries
+from deckbar_daemon.meter_files import SHIM_URL, inject_shim, resolve
 
 
 def test_resolve_wie_vite(tmp_path):
@@ -27,7 +28,7 @@ def test_resolve_wie_vite(tmp_path):
 def test_shim_vor_allen_skripten():
     html = '<head><meta charset="utf-8"><script src="/a.js"></script></head>'
     out = inject_shim(html)
-    assert out.index(a2ui.SHIM_URL) < out.index("/a.js")
+    assert out.index(SHIM_URL) < out.index("/a.js")
 
 
 def test_history_ohne_programm(tmp_path):
@@ -97,7 +98,7 @@ async def test_sprachwahl_im_meter_ist_die_allgemeine(tmp_path):
     await ui.call("set_language", {"language": "de"})
     assert deck.settings.language == "de" and deck.dps.language() == "de"
     assert "language: de" in (tmp_path / "config.yaml").read_text()
-    assert ui.settings["dpsMeter.language"] == "de"
+    assert ui.settings.values["dpsMeter.language"] == "de"
 
 
 async def test_volle_daten_gehen_als_text_durch(tmp_path):
@@ -109,8 +110,8 @@ async def test_volle_daten_gehen_als_text_durch(tmp_path):
 
     ui = A2Ui(Capture(nothing, nothing), tmp_path / "a2-settings.json", plugin_dir=tmp_path)
     q: asyncio.Queue = asyncio.Queue(4)
-    ui.clients.add(q)
-    await ui._on_capture("dps_data", '{"localPlayerId":1}')
+    ui.events.clients.add(q)
+    await ui.events.on_capture("dps_data", '{"localPlayerId":1}')
     text = q.get_nowait()
     assert text == 'data: {"event": "dps-update", "payload": {"localPlayerId":1}}\n\n'
     assert json.loads(text[6:]) == {"event": "dps-update", "payload": {"localPlayerId": 1}}
