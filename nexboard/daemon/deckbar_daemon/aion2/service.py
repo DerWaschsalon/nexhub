@@ -35,12 +35,16 @@ SPAWN_LOG = STORE / "spawns.jsonl"  # alle erschienenen Objekte, für die Werkze
 MINIMAP_S = 0.2  # so oft die Minikarte lesen (ca. 5 ms je Bild), so oft wie der Stand ans Overlay geht
 LOOK_VALID_S = 2.0  # so lange nach dem letzten Blick aus der Minikarte zählt die Laufrichtung nicht
 DEATHS_KEPT = 200
+# Teile, die der Daemon einzeln schaltet (Module AION 2 · Radar, Boss-Warnungen, Feldbosse)
+CUBES, WARNINGS, FIELD_BOSSES = "radar", "warnings", "field_bosses"
+PARTS = frozenset({CUBES, WARNINGS, FIELD_BOSSES})
 SHOWN_WARNINGS = 3
 
 
 class RadarService:
     def __init__(self, name: str = "", spawn_log: Path | None = SPAWN_LOG) -> None:
         self.settings = settings()
+        self.parts: set[str] = set(PARTS)  # was davon an ist; der Daemon setzt hier seine Modulschalter ein
         if spawn_log:
             spawn_log.parent.mkdir(parents=True, exist_ok=True)
         self.source = TcpdumpSource()
@@ -52,6 +56,7 @@ class RadarService:
         self.fight = FightEvents(self.world)
         self.stagger = StaggerTracker(self.world, set(STAGGER_RULES))
         self.board = WarningBoard(self.world)
+        self._apply_switches()
         # Reihenfolge = Reihenfolge der Warnungen zu demselben Cast: erst die eigenen Regeln, dann die Ansagen
         self.mechanics = MechanicWarnings(self.board, self.fight)
         self.trainer = CastTrainer(self.board, self.fight)
@@ -73,6 +78,7 @@ class RadarService:
 
     # ------------------------------------------------------------ Lebenszyklus und Knöpfe der Seite
     def start(self) -> None:
+        self._apply_switches()
         self._prepare_speech()
         self.source.start()
 
@@ -80,9 +86,13 @@ class RadarService:
         self.source.stop()
 
     def reload(self) -> None:
-        """Einstellungen von der NexBoard-Seite übernehmen."""
-        self.board.enabled = reload()["warn_an"]
+        """Einstellungen von der NexBoard-Seite und Modulschalter übernehmen."""
+        reload()
+        self._apply_switches()
         self._prepare_speech()  # falls die Sprache gewechselt hat
+
+    def _apply_switches(self) -> None:
+        self.board.enabled = self.settings["warn_an"] and WARNINGS in self.parts
 
     def _prepare_speech(self) -> None:
         """Alle festen Ansagen vorab erzeugen, damit sie im Kampf sofort kommen."""
@@ -146,10 +156,11 @@ class RadarService:
                 self.source.start_recording(dungeon)  # Lernmodus: jeder Lauf eine eigene Datei
         if int(time.time()) != self._second:
             self._second = int(time.time())
-            self.field_boss_calls.tick()
+            if FIELD_BOSSES in self.parts:
+                self.field_boss_calls.tick()
         if self._ping_due:
             self._ping_due = False
-            if self.settings["ton"]:
+            if self.settings["ton"] and CUBES in self.parts:
                 self.speech.ping()
         self._read_minimap()
         self.callouts.tick()  # abgelaufene Phasen: „Wieder angreifen“

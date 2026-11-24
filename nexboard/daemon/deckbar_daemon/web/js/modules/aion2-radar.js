@@ -1,4 +1,5 @@
-/* Modul AION 2 · Radar: die Seiten „Warnungen“ und „Radar & Karte“. Die Feldbosse stehen unter Termine.
+/* Die Module des Radars: AION 2 · Radar (Seite „Radar & Karte“), AION 2 · Boss-Warnungen (Seite „Warnungen“)
+   und AION 2 · Feldbosse (steht auf der Seite Termine). Sie teilen sich Einstellungen und Dienst.
    Das Radar selbst läuft im Daemon und zeigt sich als Widgets im Overlay (Cube-Radar, Karte, Boss-Warnungen);
    ein- und ausschalten, Deckkraft und Position dort unter Overlay. Charaktername und Sprache stehen
    unter System → Einstellungen. */
@@ -172,13 +173,14 @@ function radarUndKarte(ctx) {
   return box;
 }
 
-export default {
+/** Status und Karte sind bei allen drei Modulen gleich: Sie zeigen den gemeinsamen Dienst. */
+const teil = (pages, home) => ({
   status: (m) => (m.status?.fehler ? "bad" : m.status?.laeuft ? "" : "off"),
-  card(m) {
-    return el("div", { class: "row wrap" }, statusChip(m.status));
-  },
-  pages: [
-    { id: "aion2.warnings", name: "Warnungen", icon: "bell-alert", render: (tab, ctx) => warnungen(ctx) },
-    { id: "aion2.radar", name: "Radar & Karte", icon: "radar", render: (tab, ctx) => radarUndKarte(ctx) },
-  ],
-};
+  card: (m) => el("div", { class: "row wrap" }, statusChip(m.status)),
+  pages,
+  home,
+});
+
+export const warnings = teil([{ id: "aion2.warnings", name: "Warnungen", icon: "bell-alert", render: (tab, ctx) => warnungen(ctx) }]);
+export const fieldBosses = teil([], "aion2.schedule");
+export default teil([{ id: "aion2.radar", name: "Radar & Karte", icon: "radar", render: (tab, ctx) => radarUndKarte(ctx) }]);

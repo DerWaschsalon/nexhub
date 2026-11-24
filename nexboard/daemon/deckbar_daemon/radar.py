@@ -23,7 +23,7 @@ from .aion2.callouts import page_list
 from .aion2.gamedata import load_state
 from .aion2.maps import GameMap
 from .aion2.rules import SWITCHES
-from .aion2.service import DEATHS_KEPT, RadarService
+from .aion2.service import DEATHS_KEPT, PARTS, RadarService
 from .config import _atomic_write
 from .game_process import aion2_running
 
@@ -72,8 +72,31 @@ class Radar:
         self.callouts = page_list()  # Boss-Ansagen je Schalter, für eigene Worte und ▶ auf der Seite
         self.service: RadarService | None = None
         self.game = False
+        self.parts: set[str] = set()  # eingeschaltete Teile (Module); das Radar läuft, solange einer an ist
+        self._task: asyncio.Task | None = None
         # Tode mit Ursache; hier, damit sie ein Ende des Radars bis zum Hochladen überleben
         self.deaths: deque[dict] = deque(maxlen=DEATHS_KEPT)
+
+    def enable(self, part: str) -> None:
+        """Ein Modul geht an: das Radar läuft ab jetzt (auch) für diesen Teil."""
+        assert part in PARTS, part
+        self.parts.add(part)
+        self._parts_changed()
+        if self._task is None:
+            self._task = asyncio.create_task(self.watch())
+
+    async def disable(self, part: str) -> None:
+        """Ein Modul geht aus; mit dem letzten endet das Radar."""
+        self.parts.discard(part)
+        self._parts_changed()
+        if not self.parts and self._task:
+            task, self._task = self._task, None
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    def _parts_changed(self) -> None:
+        if self.service:
+            self.service.reload()
 
     @property
     def running(self) -> bool:
@@ -183,6 +206,7 @@ class Radar:
         log.info("AION 2 läuft, starte Radar")
         self.service = self.new_service(self.settings()["name"])
         self.service.deaths = self.deaths
+        self.service.parts = self.parts
         self.service.start()
 
     def _stop(self) -> None:

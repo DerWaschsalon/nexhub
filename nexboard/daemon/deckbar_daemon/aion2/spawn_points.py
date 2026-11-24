@@ -18,11 +18,11 @@ SEEN = "radar"
 
 
 class SpawnPoints:
-    def __init__(self, file: Path = FILE) -> None:
-        self.file = file
+    def __init__(self, file: Path | None = None) -> None:
+        self.file = file or FILE
         self.lock = threading.Lock()
         try:
-            self.points: list[dict] = json.loads(file.read_text())
+            self.points: list[dict] = json.loads(self.file.read_text())
         except (OSError, ValueError):
             self.points = []
 

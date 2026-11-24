@@ -8,7 +8,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from deckbar_daemon.modules.dps import DpsModule
-from deckbar_daemon.modules.radar import RadarModule
+from deckbar_daemon.modules.radar import RadarModule, WarningsModule
 from deckbar_daemon.modules.schedule import ScheduleModule
 from deckbar_daemon.overlay import Overlay
 from deckbar_daemon.overlay_layout import OverlayLayout, WidgetSpec, merge
@@ -19,7 +19,7 @@ PVE = ["meter", "boss", "timers", "cube", "warnings"]
 def overlay(config_dir: Path, manage_unit: bool = False) -> Overlay:
     """Overlay mit den Widgets, die die Module im Daemon anmelden."""
     o = Overlay(config_dir, manage_unit=manage_unit)
-    for module in (DpsModule, ScheduleModule, RadarModule):
+    for module in (DpsModule, ScheduleModule, RadarModule, WarningsModule):
         o.register(module.info.id, module.overlay_widgets)
     return o
 
@@ -44,7 +44,8 @@ def test_widgets_come_from_the_modules(tmp_path):
     assert info["timers"]["module"] == "aion2.schedule" and info["map"]["resizable"]
     assert [option["key"] for option in info["boss"]["options"]] == ["show_ttk", "hide_idle"]
     o.module_on = lambda module: module != "aion2.radar"
-    assert [w["id"] for w in o.widgets_info() if not w["active"]] == ["cube", "map", "warnings"]
+    assert [w["id"] for w in o.widgets_info() if not w["active"]] == ["cube", "map"]
+    assert info["warnings"]["module"] == "aion2.warnings"
 
 
 def test_layout_validation():

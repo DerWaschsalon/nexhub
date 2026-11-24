@@ -106,3 +106,20 @@ async def test_alte_datei_ohne_known(tmp_path):
     assert mit_neuem(tmp_path, introduced=frozenset({"neu"})).enabled == set()
     (tmp_path / "modules.yaml").write_text("enabled: [basis, aufbau]\n")
     assert mit_neuem(tmp_path, introduced=frozenset({"neu"})).enabled == {"basis", "aufbau", "neu"}
+
+
+class Teil(Module):
+    info = ModuleInfo("teil", "Teil", "system", "cog", "", split_from="aufbau")
+
+
+def mit_teil(tmp_path):
+    ctx = Context(EventBus(), Paths("test"))
+    return Registry(ctx.bus, [Basis(ctx), Aufbau(ctx), Teil(ctx)], tmp_path / "modules.yaml")
+
+
+async def test_herausgeloestes_modul_erbt_den_schalter_seines_ursprungs(tmp_path):
+    (tmp_path / "modules.yaml").write_text("enabled: [aufbau]\nknown: [basis, aufbau]\n")
+    assert mit_teil(tmp_path).enabled == {"basis", "aufbau", "teil"}
+    (tmp_path / "modules.yaml").write_text("enabled: [basis]\nknown: [basis, aufbau]\n")
+    assert mit_teil(tmp_path).enabled == {"basis"}  # Ursprung aus: der Teil bleibt aus
+    assert mit_teil(tmp_path).enabled == {"basis"}  # und ist jetzt bekannt

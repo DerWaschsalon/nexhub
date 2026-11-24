@@ -116,7 +116,9 @@ umschalten, die Seite passt sich auch an schmale Fenster an.
 | Modul | Seiten und Inhalt | braucht |
 |---|---|---|
 | AION 2 · Overlay | Overlay: Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
-| AION 2 · Radar | Warnungen (Aus · Nur Wichtiges · Alles, Einzelheiten unter „Erweitert“), Radar & Karte | Termine |
+| AION 2 · Boss-Warnungen | Warnungen (Aus · Nur Wichtiges · Alles, Einzelheiten unter „Erweitert“) | – |
+| AION 2 · Radar | Radar & Karte | – |
+| AION 2 · Feldbosse | steht auf der Seite Termine (Timer, Ansage) | Termine |
 | AION 2 · Termine | Termine: feste Termine der Server und eigene Ereignisse, Feldbosse des Radars | – |
 | AION 2 · Kampfdaten | Live-Ansicht, Quelle, Meter-Einstellungen öffnen | – |
 | AION 2 · Plugins | Plugins: installiert, Katalog, Updates mit Zustimmung, ein/aus, Fenster öffnen | Overlay |
@@ -253,7 +255,7 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   Cube; erscheint nur, solange einer in Sicht ist.
 - **Karte** (Modul „AION 2 · Radar“, standardmäßig aus): Cubes, Spawnpunkte, Fundorte und Teleporter. Bilder
   und Kartenlogik kommen aus dem installierten Plugin Pet Soul Tracker.
-- **Boss-Warnungen** (Modul „AION 2 · Radar“): nur während einer Warnung.
+- **Boss-Warnungen** (Modul „AION 2 · Boss-Warnungen“): nur während einer Warnung.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
 
 PvP (Kills, Tode, Assists, Abyss-Punkte), Vertraute und Würfel zeigt das Overlay nicht selbst: dafür gibt es die
