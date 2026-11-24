@@ -6,8 +6,15 @@ const FX = { "": "aus", glanz: "Glanz", brennen: "Brennen", gold: "Gold", frost:
 // Ein Begriff je Sache: „Durchklicken an“ = Overlay nimmt keine Klicks an, „aus“ = Meter bedienbar
 const START_MODE = { click: "Durchklicken aus (Meter bedienbar)", lock: "Durchklicken an (alles klickt durch)" };
 const DONE = { edit: "Bearbeiten-Modus umgeschaltet", toggle: "Overlay umgeschaltet", lock: "Durchklicken an", click: "Durchklicken aus", settings: "Meter-Einstellungen geöffnet" };
-const SHORTCUT_HINT = "Tastenkürzel: Systemeinstellungen → Tastatur → Kurzbefehle → „NexBoard Overlay ein/aus“. "
+const SHORTCUT_HINT = "Tastenkürzel: In den Kurzbefehlen nach „NexBoard Overlay ein/aus“ suchen. "
   + "Dort steht je Profil und je Widget eine eigene Aktion, der du eine Taste gibst.";
+
+async function openShortcuts() {
+  try {
+    await api("POST", "/api/overlay/shortcuts");
+    toast("Kurzbefehle geöffnet");
+  } catch (e) { toast(e.message, true); }
+}
 
 /** Befehl an das laufende Overlay-Programm (auch von Übersicht und Kampfdaten). */
 export async function cmd(c) {
@@ -94,7 +101,9 @@ function controlCard(o, redraw) {
       button("Overlay neu starten", restart, "ghost", "restart")),
     el("p", { class: "hint small", style: "margin-top:14px" },
       "Im Bearbeiten-Modus Widgets ziehen, Mausrad = Größe, Esc = fertig. Das Meter lässt sich jederzeit an Kopf- oder Fußzeile verschieben."),
-    el("p", { class: "hint small", text: SHORTCUT_HINT }));
+    el("div", { class: "row wrap", style: "margin-top:14px" },
+      button("Tastenkürzel einrichten", openShortcuts, "sm", "open-in-new"),
+      el("span", { class: "hint small", text: SHORTCUT_HINT })));
 }
 
 function lookCard(o, save, view) {

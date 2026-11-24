@@ -224,6 +224,16 @@ class Overlay:
             q.put_nowait(None)
 
     # ------------------------------------------------------------ Programm (User-Dienst)
+    async def open_shortcuts(self) -> None:
+        """Die Kurzbefehle der Systemeinstellungen öffnen (KDE); dort steht je Profil und Widget eine Aktion.
+        Testinstanzen öffnen nichts auf dem Bildschirm."""
+        program = shutil.which("kcmshell6") or shutil.which("kcmshell5")
+        if not program:
+            raise RuntimeError("Systemeinstellungen nicht gefunden (kcmshell6); Kurzbefehle bitte von Hand öffnen")
+        if self.manage_unit:
+            await asyncio.create_subprocess_exec(program, "kcm_keys", stdout=asyncio.subprocess.DEVNULL,
+                                                 stderr=asyncio.subprocess.DEVNULL)
+
     async def systemctl(self, *args: str) -> tuple[int, str]:
         if not self.manage_unit and args[0] != "show":
             return 1, "Testinstanz: systemd bleibt unangetastet"

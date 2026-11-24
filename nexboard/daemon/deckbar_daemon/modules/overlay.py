@@ -54,6 +54,7 @@ class OverlayModule(WebModule):
         router.add_put("/api/overlay", self.api_put)
         router.add_post("/api/overlay/command", self.api_command)
         router.add_post("/api/overlay/restart", self.api_restart)
+        router.add_post("/api/overlay/shortcuts", self.api_shortcuts)
 
     async def api_get(self, request: web.Request) -> web.Response:
         if self.active:
@@ -72,6 +73,14 @@ class OverlayModule(WebModule):
             await self.overlay.command(cmd)
         except ValueError as e:
             raise ApiError(400, str(e)) from e
+        except RuntimeError as e:
+            raise ApiError(409, str(e)) from e
+        return ok()
+
+    async def api_shortcuts(self, request: web.Request) -> web.Response:
+        """Die Kurzbefehle der Systemeinstellungen öffnen, statt den Weg dorthin zu beschreiben."""
+        try:
+            await self.overlay.open_shortcuts()
         except RuntimeError as e:
             raise ApiError(409, str(e)) from e
         return ok()

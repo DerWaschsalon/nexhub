@@ -304,3 +304,13 @@ async def test_resizable_widget_keeps_its_size(tmp_path):
         await o.update({"widgets": {"map": {"width": 10}}})
     await o.update({"widgets": {"boss": {"width": 500, "height": 300}}})  # lässt sich nicht ziehen: fällt weg
     assert o.layout.widgets["boss"].width is None
+
+
+async def test_kurzbefehle_oeffnen_nur_mit_systemeinstellungen(tmp_path, monkeypatch):
+    from deckbar_daemon import overlay as module
+    o = overlay(tmp_path)  # Testinstanz: öffnet nichts auf dem Bildschirm
+    monkeypatch.setattr(module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    await o.open_shortcuts()
+    monkeypatch.setattr(module.shutil, "which", lambda name: None)
+    with pytest.raises(RuntimeError, match="kcmshell6"):
+        await o.open_shortcuts()
