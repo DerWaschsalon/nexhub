@@ -1,7 +1,9 @@
 import unittest
 
-from radar.warnung import FLAECHEN, REGEN, TODESMAL, WarnZentrale
+from radar.warnung import WarnZentrale
 from radar.zustand import RadarZustand
+
+TODESMAL, REGEN, FLAECHEN = 1801070, 1801110, 1801186  # Kromedes Skills (Feuertempel)
 
 
 class WarnungTest(unittest.TestCase):

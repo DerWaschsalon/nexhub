@@ -1,13 +1,10 @@
 """Boss-Mechaniken aus mechaniken.json, Treffer, Stagger-Pruefung, Berserker, Gruppen-LP, Cube-Schluessel."""
-import json
 import struct
 import time
 import unittest
-from pathlib import Path
 
 from radar.warnung import DUNGEONS, ENGLISCH, FARBEN, STAGGER_REGELN, WarnZentrale
 from radar.zustand import BOSSE, CUBE_SCHLUESSEL, MECHANIKEN, RadarZustand
-
 from tests.test_radar import varint
 
 RAUR, THAMON, BERK = 2300206, 2300811, 2300171
@@ -22,8 +19,13 @@ class DatenTest(unittest.TestCase):
             for text in (m["titel"], m["hinweis"], m["meldung"]):  # alles hat eine englische Fassung
                 self.assertIn(text, ENGLISCH, f"{m['gruppe']}: {text}")
 
-    def test_meldungen_ist_gueltiges_json(self):
-        json.loads((Path(__file__).parents[1] / "radar" / "meldungen.json").read_text())
+    def test_schalter_kommen_aus_den_daten(self):
+        """Je Gruppe ein Schalter bei ihrem Dungeon; die Lernhilfe nur dort, wo die Daten sie nennen."""
+        self.assertEqual(DUNGEONS["Krao Cave"]["berk_stagger"], "Berk: Jetzt staggern")
+        self.assertIn("casts", DUNGEONS["Krao Cave"])
+        self.assertNotIn("casts", DUNGEONS["Feuertempel"])
+        self.assertEqual(DUNGEONS["Feuertempel"]["ansage_kromede_s_desire"], "Kromedes Gier: Ansagen")
+        self.assertEqual(DUNGEONS["Citadel of the Fallen Daeva"], {})
 
 
 class WarnungTest(unittest.TestCase):

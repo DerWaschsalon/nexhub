@@ -16,8 +16,17 @@ from .ansagen import Ansagen
 from .konfig import konfig_laden, konfig_neu_laden, ton_abspielen
 from .punkte import Karte, PunkteDB
 from .uebersicht import feldboss_ansagen
-from .warnung import (STATUS_REGELN, TODESMAL, TREFFER_REGELN, WarnZentrale, alarm_abspielen, ansage,
-                      ansagen_vorbereiten, piep_abspielen, tr)
+from .warnung import (
+    PROBE,
+    STATUS_REGELN,
+    TREFFER_REGELN,
+    WarnZentrale,
+    alarm_abspielen,
+    ansage,
+    ansagen_vorbereiten,
+    piep_abspielen,
+    tr,
+)
 from .zustand import Cube, RadarZustand
 
 LOG = Path.home() / ".local" / "share" / "aion2-radar" / "spawns.jsonl"  # alle Spawns, fuer die Werkzeuge
@@ -82,7 +91,7 @@ class RadarDienst:
         self.ansagen.testen(schluessel)
 
     def warnung_testen(self) -> None:
-        self.zentrale.cast(0, TODESMAL, self.zustand.eigene_eid)
+        self.zentrale.cast(0, PROBE, self.zustand.eigene_eid)
 
     def aufnahme_starten(self) -> None:
         self.quelle.start_recording(self.zustand.dungeon or "dungeon")

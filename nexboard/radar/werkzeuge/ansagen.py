@@ -1,5 +1,5 @@
 """Übernimmt die Boss-Ansagen des A2Tools-Plugins „Boss Callouts“ (boss-telegraph) nach
-radar/ansagen.json und legt je Boss einen Schalter in radar/meldungen.json an.
+radar/ansagen.json. Den Schalter je Boss leitet radar/warnung.py daraus ab (schalter()).
 
 Das Plugin (taengu/A2Tools-Plugins, GPL-3.0) hat seine Liste aus den Spieltabellen erzeugt: je Boss
 die Zeilen, die das Spiel bei einem Skill einblendet, mit Skill-ID und Dauer der Cast-Leiste, dazu
@@ -11,6 +11,8 @@ Aufruf (im Ordner nexboard/radar): python -m werkzeuge.ansagen
 import json
 import urllib.request
 from pathlib import Path
+
+from radar.warnung import ansage_gruppe
 
 # Fester Stand, damit ein neuer Lauf nur auf Wunsch etwas ändert (nach einem Spielpatch erhöhen)
 STAND = "f206c25c4960d1180d143776e48e4360cdf44f78"
@@ -53,8 +55,8 @@ class Umwandlung:
                 for slug, b in self.plugin["bosses"].items()}
 
     def ruf(self, r: dict) -> dict:
-        ruf = {"schluessel": r["k"], "art": ARTEN[r["t"]], "id": r["id"], "boss": r["b"], "gruppe": gruppe(r["b"]),
-               "vorlauf": r.get("lead", 0) / 1000, "zeile": self.text(r.get("line")),
+        ruf = {"schluessel": r["k"], "art": ARTEN[r["t"]], "id": r["id"], "boss": r["b"],
+               "gruppe": ansage_gruppe(r["b"]), "vorlauf": r.get("lead", 0) / 1000, "zeile": self.text(r.get("line")),
                "anweisung": self.text(r.get("act")), "buff": self.text(r.get("n")),
                "braucht_boss": bool(r.get("bind")), "wellen": bool(r.get("waves")), "reihe": r.get("mark")}
         if r.get("phase"):
@@ -74,28 +76,9 @@ class Umwandlung:
         }
 
 
-def gruppe(slug: str) -> str:
-    """Schalter auf der NexBoard-Seite: einer je Boss."""
-    return "ansage_" + slug.replace("-", "_")
-
-
-def schalter_eintragen(meldungen: dict, daten: dict) -> None:
-    """Je Boss ein Schalter in meldungen.json, beim Dungeon des Bosses; alte Ansage-Schalter raus."""
-    for gruppen in meldungen["dungeons"].values():
-        for alt in [g for g in gruppen if g.startswith("ansage_")]:
-            del gruppen[alt]
-    for slug in sorted({r["boss"] for r in daten["rufe"]}):
-        boss = daten["bosse"][slug]
-        meldungen["dungeons"].setdefault(boss["dungeon"], {})[gruppe(slug)] = f"{boss['name']['de']}: Ansagen"
-
-
 def main() -> None:
     daten = Umwandlung(laden()).alles()
     (ORDNER / "ansagen.json").write_text(json.dumps(daten, indent=1, ensure_ascii=False) + "\n")
-    datei = ORDNER / "meldungen.json"
-    meldungen = json.loads(datei.read_text())
-    schalter_eintragen(meldungen, daten)
-    datei.write_text(json.dumps(meldungen, indent=2, ensure_ascii=False) + "\n")
     print(f"{len(daten['rufe'])} Ansagen von {len(daten['bosse'])} Bossen übernommen")
 
 

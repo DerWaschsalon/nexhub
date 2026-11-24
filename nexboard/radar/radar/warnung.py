@@ -14,7 +14,7 @@ import subprocess
 import threading
 import time
 import wave
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .daten import a2_namen, npc_name
@@ -26,18 +26,6 @@ PIEP = Path.home() / ".cache" / "aion2-radar" / "piep.wav"  # kurz und hoch, z. 
 ANSAGEN = Path.home() / ".cache" / "aion2-radar" / "ansagen"   # fertig gesprochene Saetze
 PIPER = Path.home() / ".local" / "share" / "aion2-radar" / "piper"  # Programm + Stimmen
 STIMMEN = {"de": "de_DE-thorsten-medium", "en": "en_US-amy-medium"}
-
-# Skills des Bosses
-TODESMAL = 1801070     # markiert einen Spieler, 4,1 s spaeter Teufelsflamme
-REGEN = 1801110        # Regen des Hasses: landet unter einem Spieler, 2 s Schaden
-REGEN_VORBOTE = 1801185  # in 12 von 15 Faellen 3,8 s vor dem Regen
-FLAECHEN = 1801186     # Flaechenphase, Regen in 12 von 15 Faellen 22,25 s spaeter
-KLONE = 1801109        # Klon-Phase: Klon-Treffer nach 1,45 s (Linie) und 2,35 s (von hinten)
-HEULENDE_FLAMME = 1801130  # zweistufige Flaeche um den Boss, Treffer bis 5 s
-
-REGEN_PAUSE = 42.6     # Regen kam nie frueher als 42,6 s nach dem letzten
-REGEN_FENSTER = 30.0   # so lange danach "jederzeit moeglich" zeigen
-
 
 @dataclass(frozen=True)
 class Regel:
@@ -61,219 +49,89 @@ LILA, ORANGE, GELB, BLAU, ROT, GRAU = ((186, 85, 255), (255, 120, 0), (255, 210,
                                       (80, 170, 255), (255, 70, 70), (160, 170, 190))
 
 
-def flamme(vorlauf: float) -> Regel:
-    """Vorhersage der Teufelsflamme, bevor das Todesmal kommt."""
-    return Regel("Teufelsflamme erwartet", "Todesmal folgt, schon mal verteilen", vorlauf,
-                 LILA, "flamme")
+FARBEN = {"GRUEN": GRUEN, "LILA": LILA, "ORANGE": ORANGE, "GELB": GELB, "BLAU": BLAU, "ROT": ROT, "GRAU": GRAU}
+
+# Alle Regeln stehen in mechaniken.json (Aufbau dort unter _felder): je Dungeon die Mechaniken, unter „alle“
+# die Warnungen jedes Dungeons. Hier steht nur, wie eine Regel ausgelöst und gezeigt wird.
+_DATEN: dict = json.loads((Path(__file__).parent / "mechaniken.json").read_text())
+HP_TIEF, HP_WIEDER = 0.5, 0.65   # eigene HP: warnen unter 50 %, erneut erst nach ueber 65 %
+LP_KNAPP, LP_WIEDER = 0.25, 0.5  # Mitspieler: melden unter 25 % LP, erneut erst nach ueber 50 %
+LERNHILFE = "casts"  # Gruppe der grauen Lernhilfe (jeder Boss-Cast ohne eigene Regel)
 
 
-REGEN_KOMMT = Regel("Regen des Hasses kommt", "Landet unter dir: erst ausweichen, dann weglaufen",
-                    10.0, ORANGE, "regen")
-
-REGELN: dict[int, Regel] = {
-    TODESMAL: Regel("Todesmal", "Weg vom Markierten, raus aus der Front", 4.1, LILA, "flamme"),
-    REGEN: Regel("Regen des Hasses", "Erst ausweichen, dann weglaufen!", 2.0, ORANGE, "regen",
-                 danach=(flamme(7.75),)),
-    REGEN_VORBOTE: Regel("Regen des Hasses kommt", "Landet unter dir: erst ausweichen, dann weglaufen",
-                         3.8, ORANGE, "regen", danach=(flamme(11.55),)),
-    KLONE: Regel("Klon-Phase", "Erst seitlich ausweichen, dann kleiner Sprung zurück", 2.35, BLAU,
-                 "klone"),
-    HEULENDE_FLAMME: Regel("Heulende Flamme", "Zwei Treffer! Nach dem ersten nicht zurücklaufen",
-                           5.0, ROT, "heulen"),
-    FLAECHEN: Regel("Flächenphase", "Bodenflächen kommen in Wellen", 3.65, GELB, "flaechen",
-                    plan=((12.25, REGEN_KOMMT), (12.25, flamme(17.75)))),
-    # Kromede springt auf einen weit entfernten Spieler (Treffer nach 1,25 s)
-    1801160: Regel("Sprung", "Springt auf einen entfernten Spieler, ausweichen", 1.25, ROT, "sprung"),
-    # Rotflamme Ignus: Donut in drei Wellen (0,15 / 0,65 / 1,15 s)
-    1600830: Regel("Flammeneruption", "Ganz nah an den Boss oder ganz weit weg", 1.2, ROT, "ignus"),
-    # Schwarzrauch Murute: drei Treffer bei 0,25 / 2,15 / 3,9 s
-    1600720: Regel("Gigantisches Beben", "Drei Treffer, alle 2 s ausweichen", 3.9, ROT, "murute"),
-}
-
-# Kromedes Schwertangriffe: sie zielt in Blickrichtung, also hinter sie gehen.
-# Sehr haeufig und mit 0,2-1,1 s Vorlauf, deshalb standardmaessig ohne Ton.
-SCHWERT = Regel("Schwert", "Hinter sie gehen", 1.0, GRAU, "schwert")
-for _skill in (1801030, 1801040, 1801050, 1801060, 1801080, 1801090):
-    REGELN[_skill] = SCHWERT
-
-# Albtraum, Zikels Schemen (2980221). Ausgewertet 2026-10-25 an 5 Kaempfen, Ablauf nach dem Guide
-# "Zikel's Apparition Guide" (NoBS Game Guides). Skill-Namen fehlen in den A2Tools-Daten.
-REGELN.update({
-    # harter Schlag nach 1,0 s, bringt Blutung (12000151) und Verlangsamung
-    1802445: Regel("Blutschlag", "Ausweichen, sonst Blutung", 1.0, ROT, "zikel_schlag"),
-    # Boden zerschmettern: Treffer nach 1,95 s, wer nicht springt, bekommt Gebrechlichkeit
-    1802501: Regel("Boden zerschmettern", "Kurz vor Ende springen", 1.8, GELB, "zikel_springen"),
-    # Linienphase: Sprung an den Rand, Linie trifft 1,5 s nach dem Cast, danach sichere Zone
-    1802380: Regel("Linie", "Treffer abwarten, dann in die sichere Zone", 1.5, BLAU, "zikel_linien"),
-    1802381: Regel("Zweite Linie", "Zur nächsten sicheren Zone", 1.5, BLAU, "zikel_linien"),
-    1802383: Regel("Dritte Linie", "Zur dritten Zone, danach unter den Boss", 1.5, BLAU, "zikel_linien"),
-    # Ende der langen Linienphase: Donut, sicher nur direkt unter dem Boss (Zeit noch geschaetzt)
-    1802391: Regel("Donut", "Unter den Boss!", 1.0, ROT, "zikel_linien"),
-    # weitere harte Schlaege (ca. 8.000 Schaden), 1802435 trifft nur jedes fuenfte Mal: grau, ohne Ton
-    1802435: Regel("Schlag", "Ausweichen", 0.8, GRAU, "zikel_angriffe"),
-    1802433: Regel("Schlag", "Ausweichen", 1.3, GRAU, "zikel_angriffe"),
-})
-
-# Urugugu Canyon. Ausgewertet 2026-11-03 an einem Lauf (Zone 600013), Ablauf nach dem Guide
-# "Urugugu Canyon [NORMAL & HARD] guide" (Madsin). Skill-Namen fehlen zum Teil in den A2Tools-Daten.
-STURMSTREICH_KOMMT = Regel("Sturmstreich kommt", "Zu zweit zusammenstellen", 3.0, GELB, "auldor_mitte")
-REGELN.update({
-    # Hueterhauptmann Raur: Schild in den Boden, 3,8 s Konter (jeder Treffer wird zurueckgeworfen und
-    # staerkt den Boss), danach grosse Explosion um ihn, wenn jemand getroffen hat
-    1504450: Regel("Konter", "Nicht angreifen!", 3.8, ROT, "raur_konter"),
-    1504460: Regel("Konter-Explosion", "Ausweichen oder blocken", 1.2, ROT, "raur_konter"),
-    # Heiliger Auldor: Linien im Faecher (Treffer nach 1,7 s). Wer getroffen wird, fliegt hoch,
-    # 3 s spaeter Sturzschlag auf ihn (Hard Mode: Stack-Marker, toedlich fuer Einzelne)
-    1600920: Regel("Linien", "Seitlich raus, sonst wirst du gegriffen", 1.7, BLAU, "auldor_linien"),
-    1600925: Regel("Linien rundum", "In die Lücke zwischen den Linien", 0.65, BLAU, "auldor_linien"),
-    1600960: Regel("Sturzschlag", "Alle zusammenstellen!", 1.7, ROT, "auldor_sturz", auf_dir=True),
-    # bei 75 % und 35 %: Sprung in die Mitte, Wirbel-Linien, 11,6 s spaeter Sturmstreich (Stack zu zweit),
-    # ab 35 % bleibt am Rand ein Sturm
-    1601010: Regel("Sprung in die Mitte", "Wirbeln ausweichen, Rand meiden", 0.7, GELB, "auldor_mitte",
-                   plan=((8.6, STURMSTREICH_KOMMT),)),
-    1601030: Regel("Sturmstreich", "Zu zweit zusammenstellen!", 0.7, GELB, "auldor_mitte", auf_dir=True),
-})
-
-# Status-Effekte (0x382A) auf dem eigenen Charakter. Gefunden 2026-10-24: 0,1 s nach Ignus'
-# Flammenbombe (1600840) bekommen zwei Spieler 16008401 fuer 3 s, danach entsteht die Feuerpfuetze.
-STATUS_REGELN: dict[int, Regel] = {
-    16008401: Regel("Verzögerte Explosion", "Pfütze kommt unter dir", 3.0, GRUEN, "bombe"),
-    # Blutung, 20 s, ca. 1.900 Schaden alle 2 s (Zikels Blutschlag). Der Heiltrank entfernt sie.
-    12000151: Regel("Blutung", "Trank nehmen!", 3.0, ROT, "blutung"),
-    # Urugugu Canyon: Raurs Zeitbombe (3 s, dann Explosion um dich)
-    15044311: Regel("Zeitbombe", "Weg von der Gruppe!", 3.0, ROT, "raur_bombe"),
-    # Urahums Gift (3 s), danach 40 s Giftpfuetze an der Stelle
-    16051103: Regel("Gift", "Pfütze kommt: an den Rand laufen", 3.0, GRUEN, "urahum_gift"),
-    # von Auldors Linien getroffen: 3 s spaeter Sturzschlag auf dich
-    16009201: Regel("Gleich Sturzschlag", "Gruppe zu dir holen!", 3.0, ROT, "auldor_sturz"),
-}
-# Stagger-Leiste eines Bosses gebrochen (0xE005), danach etwa 5 s groggy
-GROGGY = Regel("Boss groggy", "Jetzt voller Schaden", 5.0, GELB, "groggy")
-# Eigene HP unter die Haelfte gefallen (nur im Dungeon). Bei Zikel kamen fast alle Tode als zweiter
-# Treffer wenige Sekunden nach dem ersten.
-WENIG_HP = Regel("Heilen!", "Wenig HP: erst heilen, dann angreifen", 2.0, ROT, "hp")
-HP_TIEF, HP_WIEDER = 0.5, 0.65   # warnen unter 50 %, erneut erst nach ueber 65 %
-# Gruppenmitglied unter 25 % LP; erst wieder melden, wenn es ueber 50 % war
-GRUPPE_LP = Regel("Wenig LP", "Unter 25 %", 3.0, ROT, "gruppe_lp")
-LP_KNAPP, LP_WIEDER = 0.25, 0.5
-# Boden-Markierung (0x3848) mit Mittelpunkt hoechstens so nah an dir (Einstellung flaeche_m)
-FLAECHE_DU = "Ausweichen!"
-TREFFER_REGELN: dict[int, Regel] = {}  # Skill, der dich trifft (Pfuetzen, Zonen) -> Regel
-STAGGER_REGELN: dict[int, Regel] = {}  # Boss-NPC mit Stagger-Pruefung -> „Jetzt staggern“
-FARBEN = {"GRUEN": GRUEN, "LILA": LILA, "ORANGE": ORANGE, "GELB": GELB, "BLAU": BLAU, "ROT": ROT}
+def nebenregel(d: dict, haupt: dict) -> Regel:
+    """Vorhersage zu einer Mechanik; ohne eigene Farbe oder Gruppe gilt die der Mechanik."""
+    return Regel(d["titel"], d["hinweis"], d["sekunden"], FARBEN[d.get("farbe", haupt["farbe"])],
+                 d.get("gruppe", haupt["gruppe"]))
 
 
 def mechanik_regel(m: dict) -> Regel:
     """Eine Regel aus mechaniken.json. „danach“ wird als geplante Folge-Warnung derselben Gruppe
     eingehaengt und ersetzt die erste, wenn sie abgelaufen ist."""
-    farbe = FARBEN[m["farbe"]]
-    plan = ()
+    plan = tuple((p["nach"], nebenregel(p, m)) for p in m.get("plan", ()))
     if m.get("danach"):
-        folge = Regel(m["titel"], m["danach"]["hinweis"], m["danach"]["sekunden"], farbe, m["gruppe"])
-        plan = ((m["sekunden"], folge),)
-    return Regel(m["titel"], m["hinweis"], m["sekunden"], farbe, m["gruppe"], plan=plan,
-                 auf=m["wann"].get("auf", "du"), auf_dir=m["wann"].get("auf_dir", False),
+        plan += ((m["sekunden"], nebenregel({"titel": m["titel"], **m["danach"]}, m)),)
+    wann = m.get("wann", {})
+    return Regel(m["titel"], m["hinweis"], m["sekunden"], FARBEN[m["farbe"]], m["gruppe"],
+                 danach=tuple(nebenregel(z, m) for z in m.get("zugleich", ())), plan=plan,
+                 auf=wann.get("auf", "du"), auf_dir=wann.get("auf_dir", False),
                  hinweis_ich=m.get("hinweis_ich", "Weg von der Gruppe!"))
 
 
+REGELN: dict[int, Regel] = {}          # Skill, den ein Boss beginnt -> Regel
+STATUS_REGELN: dict[int, Regel] = {}   # Status-Effekt (0x382A) -> Regel
+TREFFER_REGELN: dict[int, Regel] = {}  # Skill, der dich trifft (Pfuetzen, Zonen) -> Regel
+STAGGER_REGELN: dict[int, Regel] = {}  # Boss-NPC mit Stagger-Pruefung -> „Jetzt staggern“
+FENSTER: dict[int, dict] = {}          # Skill -> Zeitfenster, in dem er fruehestens wiederkommt
 for _m in MECHANIKEN:
     _regel, _wann = mechanik_regel(_m), _m["wann"]
     if _wann["art"] == "cast":
         REGELN.update({skill: _regel for skill in _wann["skills"]})
+        if "fenster" in _m:
+            FENSTER.update({skill: _m["fenster"] for skill in _wann["skills"]})
     elif _wann["art"] == "effekt":
         STATUS_REGELN[_wann["id"]] = _regel
     elif _wann["art"] == "treffer":
         TREFFER_REGELN.update({skill: _regel for skill in _wann["skills"]})
     elif _wann["art"] == "stagger":
         STAGGER_REGELN.update({npc: _regel for npc in _m["bosse"]})
+# Warnungen jedes Dungeons: Boss groggy, eigene HP, Mitspieler mit wenig LP, Flaeche unter dir
+ALLE: dict[str, Regel] = {a["gruppe"]: mechanik_regel(a) for a in _DATEN["alle"]}
+PROBE: int = _DATEN["probe"]  # Skill des Knopfs „Warnung testen“
 
-# Meldungen je Dungeon: Dungeon -> {Gruppe: Name}, steht in meldungen.json (liest auch die
-# NexBoard-Seite). Ohne Eintraege = noch keine Warnungen ("fehlt").
-_MELDUNGEN = json.loads((Path(__file__).parent / "meldungen.json").read_text())
-ALLE_DUNGEONS: dict[str, str] = _MELDUNGEN["alle"]  # gelten in jedem Dungeon
-DUNGEONS: dict[str, dict[str, str]] = _MELDUNGEN["dungeons"]
+
+def schalter() -> dict:
+    """Schalter der Seite „Warnungen“: Gruppe -> Name, je Dungeon in der Reihenfolge der Daten, dann die
+    Lernhilfe und je Boss mit Ansagen einer; dazu die Warnungen aller Dungeons."""
+    dungeons: dict[str, dict[str, str]] = {d["name"]: {} for d in _DATEN["dungeons"]}
+    for m in MECHANIKEN:
+        dungeons[m["dungeon"]].setdefault(m["gruppe"], m["meldung"])
+    for d in _DATEN["dungeons"]:
+        if d.get("lernhilfe"):
+            dungeons[d["name"]][LERNHILFE] = "Alle Boss-Casts zeigen (Lernhilfe, Bosse ohne Warnungen)"
+    for slug in sorted({r["boss"] for r in BOSS_ANSAGEN["rufe"]}):
+        boss = BOSS_ANSAGEN["bosse"][slug]
+        dungeons.setdefault(boss["dungeon"], {})[ansage_gruppe(slug)] = f"{boss['name']['de']}: Ansagen"
+    return {"alle": {a["gruppe"]: a["meldung"] for a in _DATEN["alle"]}, "dungeons": dungeons}
+
+
+def ansage_gruppe(slug: str) -> str:
+    """Schalter der Boss-Ansagen: einer je Boss."""
+    return "ansage_" + slug.replace("-", "_")
+
+
+SCHALTER = schalter()
+ALLE_DUNGEONS: dict[str, str] = SCHALTER["alle"]  # gelten in jedem Dungeon
+DUNGEONS: dict[str, dict[str, str]] = SCHALTER["dungeons"]  # Dungeon -> {Gruppe: Name}
 
 # Englische Texte (Deutsch ist der Grundtext). Fehlt ein Eintrag, bleibt der deutsche Text.
-ENGLISCH = {
-    " auf ": " on ", " auf dir": " on you",
-    # Feldbosse, Termine und Vertraute (Ansagen und die Tabellen auf der NexBoard-Seite)
-    "Feldboss": "Field boss", " in 5 Minuten": " in 5 minutes", " ist da": " is up", "lebt": "alive",
-    "in": "in", "vermutlich da": "probably up", "unbekannt": "unknown", "Spezial": "Special",
-    "Riss": "Rift", " ist offen": " is open", "offen bis": "open until", "Shugo-Fest": "Shugo Festival",
-    "Beritra-Luftangriff": "Beritra Air Raid", "Wächterin Kaira": "Watcher Kaira",
-    "Tages-Reset": "Daily reset", "Wochen-Reset": "Weekly reset",
-    "Kromede: Todesmal / Teufelsflamme": "Kromede: Mark of Death / Demon Flame",
-    "Ignus: Verzögerte Explosion (auf dir)": "Ignus: Delayed Explosion (on you)",
-    "Boss groggy (alle Dungeons)": "Boss groggy (all dungeons)", "Verzögerte Explosion": "Delayed Explosion",
-    "Pfütze kommt unter dir": "Puddle spawns under you",
-    "Jetzt voller Schaden": "Full damage now",
-    "Kromede: Regen des Hasses": "Kromede: Rain of Hatred",
-    "Kromede: Klon-Phase": "Kromede: Clone Phase",
-    "Kromede: Heulende Flamme": "Kromede: Howling Flame",
-    "Kromede: Flächenphase": "Kromede: AoE Phase",
-    "Kromede: Sprung": "Kromede: Dash",
-    "Kromede: Schwertangriffe": "Kromede: Sword Attacks",
-    "Ignus: Flammeneruption": "Ignus: Flame Eruption",
-    "Murute: Gigantisches Beben": "Murute: Great Earthquake",
-    # Warnungen
-    "Teufelsflamme erwartet": "Demon Flame expected", "Teufelsflamme": "Demon Flame",
-    "Todesmal": "Mark of Death", "Regen des Hasses": "Rain of Hatred",
-    "Regen des Hasses kommt": "Rain of Hatred incoming",
-    "Regen des Hasses frühestens": "Rain of Hatred earliest",
-    "Regen des Hasses jederzeit möglich": "Rain of Hatred possible any time",
-    "Klon-Phase": "Clone Phase", "Heulende Flamme": "Howling Flame", "Flächenphase": "AoE Phase",
-    "Sprung": "Dash", "Flammeneruption": "Flame Eruption", "Gigantisches Beben": "Great Earthquake",
-    "Schwert": "Sword",
-    "Todesmal folgt, schon mal verteilen": "Mark of Death next, spread out now",
-    "Landet unter dir: erst ausweichen, dann weglaufen": "Lands under you: dodge first, then run",
-    "Weg vom Markierten, raus aus der Front": "Away from the marked player, out of the front",
-    "Erst ausweichen, dann weglaufen!": "Dodge first, then run!",
-    "Erst seitlich ausweichen, dann kleiner Sprung zurück": "Dodge sideways, then a small jump back",
-    "Zwei Treffer! Nach dem ersten nicht zurücklaufen": "Two hits! Don't walk back after the first",
-    "Bodenflächen kommen in Wellen": "Ground AoEs come in waves",
-    "Springt auf einen entfernten Spieler, ausweichen": "Leaps at a distant player, dodge",
-    "Ganz nah an den Boss oder ganz weit weg": "Hug the boss or go far away",
-    "Drei Treffer, alle 2 s ausweichen": "Three hits, dodge every 2 s",
-    "Hinter sie gehen": "Get behind her",
-    "Zikel: Blutschlag": "Zikel: Bleeding Strike", "Zikel: Boden zerschmettern": "Zikel: Shatter Ground",
-    "Zikel: Linienphase und Donut": "Zikel: Line Phase and Donut", "Blutung (auf dir)": "Bleeding (on you)",
-    "Blutschlag": "Bleeding Strike", "Ausweichen, sonst Blutung": "Dodge or you bleed",
-    "Boden zerschmettern": "Shatter Ground", "Kurz vor Ende springen": "Jump right before it ends",
-    "Linie": "Line", "Treffer abwarten, dann in die sichere Zone": "Wait for the hit, then into the safe zone",
-    "Zweite Linie": "Second Line", "Zur nächsten sicheren Zone": "To the next safe zone",
-    "Dritte Linie": "Third Line", "Zur dritten Zone, danach unter den Boss": "To the third zone, then under the boss",
-    "Donut": "Donut", "Unter den Boss!": "Get under the boss!",
-    "Blutung": "Bleeding", "Trank nehmen!": "Drink a potion!",
-    "Raur: Konter (nicht angreifen)": "Raur: Counter (don't attack)", "Raur: Zeitbombe (auf dir)": "Raur: Time Bomb (on you)",
-    "Urahum: Gift (auf dir)": "Urahum: Poison (on you)", "Auldor: Linien": "Auldor: Lines",
-    "Auldor: Sturzschlag (zusammenstellen)": "Auldor: Crash (stack)",
-    "Auldor: Mitte-Phase und Sturmstreich": "Auldor: Middle Phase and Tempest Strike",
-    "Konter": "Counter", "Nicht angreifen!": "Don't attack!", "Konter-Explosion": "Counter Explosion",
-    "Ausweichen oder blocken": "Dodge or block", "Zeitbombe": "Time Bomb",
-    "Gift": "Poison", "Pfütze kommt: an den Rand laufen": "Puddle incoming: move to the edge",
-    "Linien": "Lines", "Seitlich raus, sonst wirst du gegriffen": "Step sideways or you get grabbed",
-    "Linien rundum": "Lines all around", "In die Lücke zwischen den Linien": "Into the gap between the lines",
-    "Sturzschlag": "Crash", "Alle zusammenstellen!": "Everyone stack!", "Gleich Sturzschlag": "Crash incoming",
-    "Gruppe zu dir holen!": "Get the group to you!", "Sprung in die Mitte": "Leap to the middle",
-    "Wirbeln ausweichen, Rand meiden": "Dodge the tornadoes, avoid the edge",
-    "Sturmstreich kommt": "Tempest Strike incoming", "Sturmstreich": "Tempest Strike",
-    "Zu zweit zusammenstellen": "Stack in pairs", "Zu zweit zusammenstellen!": "Stack in pairs!",
-    "Zikel: weitere Schläge (grau, ohne Ton)": "Zikel: other strikes (grey, silent)",
-    "Schlag": "Strike", "Ausweichen": "Dodge",
-    "Wenig HP: heilen (alle Dungeons)": "Low HP: heal (all dungeons)", "Heilen!": "Heal!",
-    "Wenig HP: erst heilen, dann angreifen": "Low HP: heal first, then attack",
-    "  –  DU!": "  –  YOU!", "Weg von der Gruppe!": "Away from the group!", "JETZT": "NOW",
-    "Wenig LP": "Low HP", "Unter 25 %": "Below 25 %", "Berserker": "Berserk",
-    "Fläche unter dir": "AoE under you", "Ausweichen!": "Dodge!",
-    "Bodenfläche bei dir (alle Dungeons)": "Ground AoE at you (all dungeons)",
-    "Mitspieler mit wenig LP (alle Dungeons)": "Party member with low HP (all dungeons)",
-}
-for _m in MECHANIKEN:  # englische Texte der Mechaniken stehen in mechaniken.json
+ENGLISCH: dict[str, str] = dict(_DATEN["en"])
+for _m in (*_DATEN["alle"], *MECHANIKEN):
     ENGLISCH.update(_m["en"])
 # Skills mit Boss-Ansage: dazu keine graue Lernhilfe mehr
 ANSAGE_SKILLS = {r["id"] for r in BOSS_ANSAGEN["rufe"] if r["art"] != "effekt"}
 # Lernhilfe (jeden Boss-Cast grau zeigen) gilt fuer Bosse, zu denen es noch keine Cast-Warnung gibt. Die
-# Feuertempel-Regeln oben stehen ohne Boss-IDs, ihre Bosse haben alle Cast-Warnungen.
+# Feuertempel-Regeln stehen ohne Boss-IDs, ihre Bosse haben alle Cast-Warnungen.
 CAST_BOSSE = {npc for m in MECHANIKEN if m["wann"]["art"] == "cast" for npc in m["bosse"]} | {
     npc for npc, dungeon in BOSSE.items() if dungeon == "Feuertempel"}
 
@@ -309,7 +167,7 @@ class WarnZentrale:
         self.lock = threading.Lock()
         self.aktiv: list[Warnung] = []
         self.geplant: list[tuple[float, Regel]] = []  # (faellig um, Regel)
-        self.regen_zuletzt: float | None = None
+        self.fenster_seit: dict[int, float] = {}  # Skill mit Zeitfenster -> zuletzt gesehen
         self.laut: list[tuple[str, str]] = []  # (art, text): Piepton oder Ansage, spielt der RadarDienst ab
         self.k = konfig_laden()
         self.an = self.k["warn_an"]
@@ -326,9 +184,9 @@ class WarnZentrale:
         if not regel or not self.gruppe_an(regel.gruppe) or self.fremd(ziel):
             return
         jetzt = self.uhr()
-        if skill == REGEN:
-            self.regen_zuletzt = jetzt
-        ich = (skill == TODESMAL or regel.auf_dir) and ziel is not None and ziel == self.zustand.eigene_eid
+        if skill in FENSTER:
+            self.fenster_seit[skill] = jetzt
+        ich = regel.auf_dir and ziel is not None and ziel == self.zustand.eigene_eid
         name = "" if ich or ziel == self.zustand.eigene_eid else self.zustand.spieler.get(ziel, "")
         with self.lock:
             self._ausloesen(regel, jetzt, ich, name)
@@ -348,7 +206,7 @@ class WarnZentrale:
     def gruppe_an(self, gruppe: str) -> bool:
         """Warnungen an und die Gruppe gehoert zum erkannten Dungeon (sonst Skill-ID aus einem anderen)."""
         dungeon = self.zustand.dungeon
-        return self.an and not (dungeon and gruppe not in {*DUNGEONS[dungeon], "casts"})
+        return self.an and not (dungeon and gruppe not in {*DUNGEONS[dungeon], LERNHILFE})
 
     def _ausloesen(self, regel: Regel, jetzt: float, ich: bool = False, name: str = "") -> None:
         """Warnung zeigen, ihre gleichzeitigen Vorhersagen dazu und die geplanten Folgen einreihen.
@@ -400,14 +258,14 @@ class WarnZentrale:
             self.hp_tief = True
             if self.an and self.zustand.dungeon:
                 with self.lock:
-                    self._hinzufuegen(WENIG_HP, self.uhr())
+                    self._hinzufuegen(ALLE["hp"], self.uhr())
 
     def groggy(self, boss: int) -> None:
         if self.an:
             with self.lock:
                 # gebrochen: „Jetzt staggern“ ist erledigt
                 self.aktiv = [w for w in self.aktiv if w.regel not in STAGGER_REGELN.values()]
-                self._hinzufuegen(GROGGY, self.uhr())
+                self._hinzufuegen(ALLE["groggy"], self.uhr())
 
     def flaeche(self, skill: int, x: float, y: float, bis: float) -> None:
         """Ein Monster markiert eine Flaeche am Boden. Liegt ihr Mittelpunkt nah an dir, warnen, mit
@@ -417,7 +275,7 @@ class WarnZentrale:
             return
         if math.hypot(x - pos[0], y - pos[1]) > self.k.get("flaeche_m", 6.0) * 100:  # Welt in cm
             return
-        regel = Regel("Fläche unter dir", FLAECHE_DU, bis, ROT, "flaeche", hinweis_ich=FLAECHE_DU)
+        regel = replace(ALLE["flaeche"], vorlauf=bis)
         jetzt = self.uhr()
         with self.lock:
             # mehrere Markierungen auf einmal (Nazmun: sechs) = eine Warnung, bis sie eingeschlagen ist
@@ -435,7 +293,7 @@ class WarnZentrale:
         if self.k.get("nur_mich"):
             return  # betrifft einen anderen
         with self.lock:
-            self._hinzufuegen(GRUPPE_LP, self.uhr(), ziel=self.zustand.spieler.get(eid, ""))
+            self._hinzufuegen(ALLE["gruppe_lp"], self.uhr(), ziel=self.zustand.spieler.get(eid, ""))
 
     def _hinzufuegen(self, regel: Regel, start: float, ich: bool = False, ziel: str = "") -> None:
         if regel.gruppe in self.k["meldung_aus"]:
@@ -466,7 +324,7 @@ class WarnZentrale:
     def letzte(self, jetzt: float) -> Warnung | None:
         """Die zuletzt erschienene Warnung, die gerade laeuft (fuer die Todesursache). Lernhilfe zaehlt nicht."""
         with self.lock:
-            laufend = [w for w in self.aktiv if w.regel.gruppe != "casts" and w.start <= jetzt
+            laufend = [w for w in self.aktiv if w.regel.gruppe != LERNHILFE and w.start <= jetzt
                        and w.rest(jetzt) > -1.2]
         return max(laufend, key=lambda w: w.start, default=None)
 
@@ -476,16 +334,19 @@ class WarnZentrale:
         with self.lock:
             liste = [(r.titel.replace(" kommt", "").replace(" erwartet", ""), t + r.vorlauf - jetzt)
                      for t, r in self.geplant if r.gruppe not in self.k["meldung_aus"]]
-        if "regen" in self.k["meldung_aus"]:
-            self.regen_zuletzt = None
-        if self.regen_zuletzt is not None and not any(t.startswith("Regen") for t, _ in liste):
-            seit = jetzt - self.regen_zuletzt
-            if seit < REGEN_PAUSE:
-                liste.append(("Regen des Hasses frühestens", REGEN_PAUSE - seit))
-            elif seit < REGEN_PAUSE + REGEN_FENSTER:
-                liste.append(("Regen des Hasses jederzeit möglich", 0.0))
+        for skill, fenster in FENSTER.items():
+            gruppe = REGELN[skill].gruppe
+            if gruppe in self.k["meldung_aus"]:
+                self.fenster_seit.pop(skill, None)
+            if skill not in self.fenster_seit or any(r.gruppe == gruppe for _, r in self.geplant):
+                continue  # nie gesehen, oder die Vorhersage steht schon in der Zeile
+            seit = jetzt - self.fenster_seit[skill]
+            if seit < fenster["pause"]:
+                liste.append((fenster["frueh"], fenster["pause"] - seit))
+            elif seit < fenster["pause"] + fenster["offen"]:
+                liste.append((fenster["moeglich"], 0.0))
             else:
-                self.regen_zuletzt = None  # Kampf vermutlich vorbei
+                del self.fenster_seit[skill]  # Kampf vermutlich vorbei
         for ende in list(self.zustand.berserker.values()):  # 0x8D21: Boss wird berserk
             if ende > jetzt:
                 liste.append(("Berserker", ende - jetzt))
@@ -497,7 +358,7 @@ def cast_regel(skill: int, npc: int) -> Regel:
     sprache = konfig_laden()["sprache"]
     boss = npc_name(npc, sprache) or "Boss"
     return Regel(a2_namen("skills", sprache).get(str(skill), str(skill)), f"{boss} · {skill}",
-                 3.0, GRAU, "casts")
+                 3.0, GRAU, LERNHILFE)
 
 
 def gesprochen(text: str) -> Path | None:
@@ -578,9 +439,10 @@ def ansage(text: str, wichtig: bool = True) -> None:
 
 def ansagen_vorbereiten() -> None:
     """Alle festen Ansagen vorab erzeugen, damit sie im Kampf sofort kommen."""
-    regeln = (*REGELN.values(), *STATUS_REGELN.values(), GROGGY, WENIG_HP)
-    titel = {tr(r.titel) for r in regeln} | {tr(flamme(0).titel), tr(REGEN_KOMMT.titel)}
-    texte = [*titel, tr(REGELN[TODESMAL].titel) + tr(" auf dir"), *ansage_kurztexte(konfig_laden()["sprache"])]
+    regeln = (*REGELN.values(), *STATUS_REGELN.values(), ALLE["groggy"], ALLE["hp"])
+    regeln += tuple(r for regel in regeln for r in (*regel.danach, *(folge for _, folge in regel.plan)))
+    texte = {tr(r.titel) for r in regeln} | {tr(r.titel) + tr(" auf dir") for r in regeln if r.auf_dir}
+    texte |= set(ansage_kurztexte(konfig_laden()["sprache"]))
     threading.Thread(target=lambda: [gesprochen(t) for t in texte], daemon=True).start()
 
 
