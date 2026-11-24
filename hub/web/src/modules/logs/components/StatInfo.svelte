@@ -1,6 +1,7 @@
 <!-- „Stat Info“ wie im Spiel, kompakt: Reiter Fortschritt (Titel, Daevanion, Arkana), Hauptwerte (Kreis +
      Summen) und Nebenwerte (Summen als Liste). Den Weg zu Best in Slot zeigt das Gegenstandsfenster. -->
 <script lang="ts">
+	import Tabs from '#lib/components/Tabs.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, CharacterItem } from '../api.ts';
 	import Progression from './Progression.svelte';
@@ -31,13 +32,8 @@
 
 <section class="panel">
 	<h3>{t('logs.char.statInfo')}</h3>
-	<div class="tab-row" role="tablist">
-		{#each TABS as name (name)}
-			<button role="tab" aria-selected={tab === name} class:active={tab === name} onclick={() => (tab = name)}>
-				{t(LABELS[name])}
-			</button>
-		{/each}
-	</div>
+	<Tabs underline tabs={TABS.map((id) => ({ id, label: t(LABELS[id]) }))} active={tab}
+		onselect={(id) => (tab = id as Tab)} />
 	<div class="body">
 		{#if tab === 'progression'}
 			<Progression {data} {cls} {arcana} {onItem} />
@@ -59,28 +55,6 @@
 		font-size: 20px;
 		font-weight: 400;
 		color: #fff;
-	}
-	.tab-row {
-		display: grid;
-		grid-auto-columns: 1fr;
-		grid-auto-flow: column;
-		border-top: 1px solid var(--fill-strong);
-		border-bottom: 1px solid var(--fill-strong);
-	}
-	button {
-		padding: 8px 6px;
-		border: 0;
-		border-bottom: 2px solid transparent;
-		background: none;
-		color: var(--faint);
-		font: inherit;
-		font-size: 13px;
-		font-weight: 700;
-		cursor: pointer;
-	}
-	button.active {
-		color: #fff;
-		border-bottom-color: #c9dcf5;
 	}
 	.body {
 		padding: 0 12px 12px;

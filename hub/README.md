@@ -296,6 +296,8 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
 - Diagramme: Linien zeichnet nur `lib/components/LineChart.svelte` (Rechnen in `lib/chart.ts`). Jedes Diagramm
   bekommt einen Satz, was es zeigt (`description`), und lässt sich mit den Pfeiltasten Punkt für Punkt durchgehen.
   `DpsChart` und `DayChart` bereiten nur ihre Daten auf.
+- Reiter: nur über `lib/components/Tabs.svelte`. Mit `href` sind es Unterseiten (Links, eigene Adresse je Reiter),
+  ohne `href` Ansichten einer Seite (Reiterleiste mit Pfeiltasten); `underline` ist die schmale Form für Karten.
 - Schriften (Design-Regeln vom 11.11.2026): Unbounded für Überschriften, IBM Plex für Text, lokal über
   Fontsource (`app.css`, `--font-heading`, `--font-sans`, `--font-mono`); Inhaltsbreite `--page-width`.
 
