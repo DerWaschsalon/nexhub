@@ -10,6 +10,7 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import LangSwitch from '#lib/components/LangSwitch.svelte';
 	import LegalLinks from '#lib/components/LegalLinks.svelte';
+	import Tabs from '#lib/components/Tabs.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { menu, navFor, type MenuEntry } from '#lib/modules.ts';
 	import type { LayoutProps } from './$types';
@@ -63,11 +64,10 @@
 
 	<main>
 		{#if game}
-			<nav class="tabs pages" aria-label={t(game.label)}>
-				{#each game.pages as p (p.href)}
-					<a href={p.href} class:active={active(p.href)}>{t(p.label)}</a>
-				{/each}
-			</nav>
+			<div class="pages">
+				<Tabs label={t(game.label)} tabs={game.pages.map((p) => ({ id: p.href, label: t(p.label), href: p.href }))}
+					active={game.pages.find((p) => active(p.href))?.href ?? null} />
+			</div>
 		{/if}
 		{@render children()}
 	</main>

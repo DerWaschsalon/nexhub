@@ -3,6 +3,7 @@
      Zeigen oder Antippen nennt den Effekt. Mit `compare` (Brett eines anderen Charakters) sind Knoten
      markiert, die der andere offen hat und dieser noch nicht. -->
 <script lang="ts">
+	import Tabs from '#lib/components/Tabs.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterData, DaevanionNode } from '../api.ts';
 	import { CHARACTER_ART } from '../assets.ts';
@@ -54,13 +55,10 @@
 </script>
 
 <div class="daevanion">
-	<div class="tabs" role="tablist">
-		{#each boards as b, i (b.id)}
-			<button type="button" role="tab" class:active={i === chosen} aria-selected={i === chosen} onclick={() => pick(i)}>
-				{b.name} <span class="count">{b.open_nodes}/{b.total_nodes}</span>
-			</button>
-		{/each}
-	</div>
+	<Tabs tabs={boards.map((b, i) => ({ id: String(i), label: b.name, count: `${b.open_nodes}/${b.total_nodes}` }))}
+		active={String(chosen)} onselect={(id) => pick(Number(id))}>
+		{#snippet tab(b)}{b.label} <span class="count">{b.count}</span>{/snippet}
+	</Tabs>
 
 	{#if board}
 		<div class="layout">

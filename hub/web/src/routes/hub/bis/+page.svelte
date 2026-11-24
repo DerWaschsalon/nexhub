@@ -5,6 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api } from '#lib/api.ts';
+	import Tabs from '#lib/components/Tabs.svelte';
 	import { formatDateTime, formatPct } from '#lib/format.ts';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import type { BisSlot, BisStats } from '#modules/bis/api.ts';
@@ -43,6 +44,13 @@
 	const bySlot = $derived(new Map((stats?.slots ?? []).map((s) => [s.item.slot_name, s])));
 	const pick = (slot: string) => (open = bySlot.get(slot) ?? null);
 	const choose = (key: string) => goto(`?k=${key}`, { replaceState: true });
+	// Reiter je Klasse; Klassen ohne gesammelte Spieler sind grau
+	const classTabs = $derived(
+		CLASS_KEYS.map((key) => {
+			const info = classInfo(key);
+			return { id: key, label: info?.label ?? key, icon: info?.icon, color: info?.color, disabled: !collected.has(key) };
+		})
+	);
 </script>
 
 <svelte:head><title>{t('bis.title')} · NexHub</title></svelte:head>
@@ -55,24 +63,19 @@
 {#if !data.classes.length}
 	<p class="notice">{t('bis.none')}</p>
 {:else}
-	<nav class="tabs">
-		{#each CLASS_KEYS as key (key)}
-			{@const info = classInfo(key)}
-			<button class:active={key === cls} disabled={!collected.has(key)} onclick={() => choose(key)}>
-				<img src={info?.icon} alt="" width="20" height="20" />
-				<span style:color={key === cls ? info?.color : undefined}>{info?.label}</span>
-			</button>
-		{/each}
-	</nav>
+	<Tabs tabs={classTabs} active={cls} onselect={choose} label={t('bis.title')}>
+		{#snippet tab(c)}
+			<img src={c.icon} alt="" width="20" height="20" />
+			<span style:color={c.id === cls ? c.color : undefined}>{c.label}</span>
+		{/snippet}
+	</Tabs>
 
 	{#if error}<p class="notice error" role="alert">{error}</p>{/if}
 
 	{#if stats && stats.cls === cls}
 		<div class="meta">
-			<nav class="tabs">
-				<button class:active={!hardOnly} onclick={() => (hardOnly = false)}>{t('bis.all')}</button>
-				<button class:active={hardOnly} onclick={() => (hardOnly = true)}>{t('bis.hardOnly')}</button>
-			</nav>
+			<Tabs tabs={[{ id: 'all', label: t('bis.all') }, { id: 'hard', label: t('bis.hardOnly') }]}
+				active={hardOnly ? 'hard' : 'all'} onselect={(id) => (hardOnly = id === 'hard')} />
 			<span class="chip accent">{t('bis.players', { n: stats.size })}</span>
 			{#if stats.raid}
 				<span class="dim small">
@@ -120,13 +123,9 @@
 </Modal>
 
 <style>
-	.tabs img {
+	img {
 		vertical-align: -5px;
 		margin-right: 6px;
-	}
-	.tabs button:disabled {
-		opacity: 0.35;
-		cursor: default;
 	}
 	.meta {
 		display: flex;

@@ -1,6 +1,7 @@
 <!-- Ein Bosskampf: Reiter Schaden (Verlauf + Rangliste), Fähigkeiten, Zeitleiste, Tode (mit Ursache und
      Warnung, wenn das Radar im NexBoard lief). -->
 <script lang="ts">
+	import Tabs from '#lib/components/Tabs.svelte';
 	import { formatDuration } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { playerId, type Fight } from '../api.ts';
@@ -33,16 +34,12 @@
 	</div>
 {/snippet}
 
-<div class="tabs" role="tablist">
-	{#each TABS as id (id)}
-		<button type="button" role="tab" aria-selected={tab === id} class:active={tab === id} onclick={() => (tab = id)}>
-			{t(`logs.tab.${id}`, { n: fight.deaths.length })}
-		</button>
-	{/each}
+<Tabs tabs={TABS.map((id) => ({ id, label: t(`logs.tab.${id}`, { n: fight.deaths.length }) }))} active={tab}
+	onselect={(id) => (tab = id as Tab)}>
 	<span class="chip result" class:ok={fight.killed} class:danger={!fight.killed}>
 		{t(fight.killed ? 'logs.fight.killed' : 'logs.fight.wipe')}
 	</span>
-</div>
+</Tabs>
 
 {#if tab === 'damage'}
 	<section class="glass pad">
