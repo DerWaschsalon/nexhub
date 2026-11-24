@@ -122,6 +122,14 @@ def pool(census: Census, item: dict, table: dict, cls: str) -> list[dict]:
     return out
 
 
+def bind_rate(item: dict) -> float | None:
+    """Seelenbindungsrate in Prozent; die NC-API liefert sie als Text. None: unbekannt oder unlesbar."""
+    try:
+        return float((item.get("detail") or {}).get("soul_bind_rate"))
+    except (TypeError, ValueError):
+        return None
+
+
 class Planner:
     """Plant die Würfe für die Teile eines Charakters gegen eine Zielnote."""
 
@@ -179,7 +187,7 @@ class Planner:
 
     def bound_reaches(self, item: dict, table: dict) -> bool:
         """Erreicht das Teil die Zielnote schon, wenn die vorhandenen Zeilen voll gebunden sind?"""
-        rate = (item.get("detail") or {}).get("soul_bind_rate")
+        rate = bind_rate(item)
         if rate is None or rate >= FULLY_BOUND:
             return False
         _, lines = score(self.census, item, table, self.cls)
