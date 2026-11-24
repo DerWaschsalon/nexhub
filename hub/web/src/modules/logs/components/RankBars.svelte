@@ -1,6 +1,7 @@
 <!-- Rangliste: Balken in Klassenfarbe, längster Balken = meister Schaden. Mit onSelect anklickbar. -->
 <script lang="ts">
-	import { formatCompact, formatNumber } from '#lib/format.ts';
+	import Num from '#lib/components/Num.svelte';
+	import { formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { playerId, type Player } from '../api.ts';
 	import { classColor } from '../classes.ts';
@@ -36,8 +37,8 @@
 	<span class="bar" aria-hidden="true">
 		<span style:width="{(100 * p.damage) / max}%" style:background={color}></span>
 	</span>
-	<span class="value num" title="{formatNumber(p.damage)} {t('logs.skills.col.damage')}">
-		{formatCompact(p.damage)}<small>{Math.round((100 * p.damage) / total)} %</small>
+	<span class="value num">
+		<Num value={p.damage} unit={t('logs.skills.col.damage')} /><small>{Math.round((100 * p.damage) / total)} %</small>
 	</span>
 	<span class="dps num">{formatNumber(p.dps)}<small>/s</small></span>
 {/snippet}

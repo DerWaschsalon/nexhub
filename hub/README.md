@@ -287,6 +287,8 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   (`modules/logs/data/figureZones.ts`, Rechtecke in Prozent des Bildes, Ringe an den Fingern, die Waffe als
   ein Block): Zeigen oder Tastaturfokus wählt Stelle und Platz gemeinsam, ein Klick öffnet den Gegenstand
   als Dialog, wenn das Detailfenster ausgeblendet ist.
+- Zahlen: Jede gekürzte Zahl („38,4K“) zeigt ihren exakten Wert im Tooltip, über `lib/components/Num.svelte`.
+  Gekürzt wird nur dort, nie von Hand mit `formatCompact` im Markup (Achsen von Diagrammen ausgenommen).
 - Schriften (Design-Regeln vom 11.11.2026): Unbounded für Überschriften, IBM Plex für Text, lokal über
   Fontsource (`app.css`, `--font-heading`, `--font-sans`, `--font-mono`); Inhaltsbreite `--page-width`.
 

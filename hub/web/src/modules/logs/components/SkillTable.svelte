@@ -2,7 +2,8 @@
      Fähigkeit, aufklappbar, wenn es mehr zu zeigen gibt (Spezialisierungen, Mehrfachtreffer). -->
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
-	import { formatCompact, formatNumber, formatPct } from '#lib/format.ts';
+	import Num from '#lib/components/Num.svelte';
+	import { formatNumber, formatPct } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { FightPlayer, FightSkill } from '../api.ts';
 	import { castsOf } from '../casts.ts';
@@ -22,7 +23,6 @@
 	const casts = $derived(castsOf(player).length);
 
 	const rate = (v: number) => (v ? formatPct(v) : '–');
-	const short = (v: number) => (v ? formatCompact(v) : '–');
 	// Quoten der API in Prozent der Treffer, hier als Anzahl wie bei AbyssLogs
 	const count = (v: number, of: number) => (v ? formatNumber(Math.round((v * of) / 100)) : '–');
 	const expandable = (s: FightSkill) => s.specs.length > 0 || s.multi_hits > 0;
@@ -66,7 +66,7 @@
 							</span>
 						</span>
 					</td>
-					<td class="right num" title={formatNumber(s.damage)}>{formatCompact(s.damage)}</td>
+					<td class="right num"><Num value={s.damage} /></td>
 					<td>
 						<span class="share">
 							<span class="bar" aria-hidden="true"><span style:width="{(100 * s.damage) / max}%" style:background={color}></span></span>
@@ -75,14 +75,16 @@
 					</td>
 					<td class="right num">{formatNumber(s.hits)}</td>
 					<td class="right num">{rate(s.crit)}</td>
-					<td class="right num">{short(s.min)}</td>
-					<td class="right num">{short(s.max)}</td>
-					<td class="right num">{short(s.avg)}</td>
+					<td class="right num"><Num value={s.min} dash /></td>
+					<td class="right num"><Num value={s.max} dash /></td>
+					<td class="right num"><Num value={s.avg} dash /></td>
 					<td class="right num">{count(s.back, s.hits)}</td>
 					<td class="right num">{count(s.parry, s.hits)}</td>
 					<td class="right num">{count(s.perfect, s.hits)}</td>
 					<td class="right num">{count(s.double, s.hits)}</td>
-					<td class="right num">{s.multi_hits ? `${s.multi_hits}× (${formatCompact(s.multi_damage)})` : '–'}</td>
+					<td class="right num">
+						{#if s.multi_hits}{s.multi_hits}× (<Num value={s.multi_damage} />){:else}–{/if}
+					</td>
 				</tr>
 				{#if isOpen}
 					<tr class="detail">
