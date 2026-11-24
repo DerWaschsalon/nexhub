@@ -127,7 +127,8 @@ class NexBoard:
         self.hub.deaths = self.radar.tode_zwischen
         loot = FeedBuffer("lootRoll", loot_drop)
         self.dps.capture.data_listeners.append(loot.on_capture)
-        self.hub.loot = loot.between
+        # nur der eigene Mitschnitt meldet Beute; mit dem A2Tools-Meter als Quelle gilt sie als nicht mitgeschrieben
+        self.hub.loot = lambda start_ms, end_ms: loot.between(start_ms, end_ms) if own() else None
         self._sync_radar()
         # Oberfläche des A2Tools-Meters mit dem Plugin-Host (eigener Port, siehe __main__); Testinstanzen
         # bekommen eigene Plugin-Ordner, damit sie die installierten Plugins nicht anfassen

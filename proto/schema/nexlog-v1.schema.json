@@ -437,12 +437,20 @@
       "type": "array"
     },
     "loot": {
-      "items": {
-        "$ref": "#/$defs/Loot"
-      },
-      "maxItems": 500,
-      "title": "Loot",
-      "type": "array"
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Loot"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Loot"
     }
   },
   "required": [

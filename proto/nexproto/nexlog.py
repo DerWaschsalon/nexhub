@@ -146,8 +146,10 @@ class NexLog(_Strict):
     hits: dict[str, FightHits] = Field(default_factory=dict, max_length=MAX_FIGHTS)
     # Neu: ältere Hubs kennen das Feld nicht und lehnen es ab, deshalb erst den Hub aktualisieren
     deaths: list[Death] = Field(default_factory=list, max_length=500)
+    # None: die Aufnahme meldet keine Beute (ältere NexBoard, fremdes Meter als Quelle); eine leere Liste
+    # heißt „mitgeschrieben, nichts gewürfelt“. Für Dropraten zählen nur Runs mit Liste.
     # Neu wie `deaths`: erst den Hub aktualisieren, dann die NexBoards
-    loot: list[Loot] = Field(default_factory=list, max_length=500)
+    loot: list[Loot] | None = Field(None, max_length=500)
 
     @model_validator(mode="after")
     def _consistent(self) -> NexLog:

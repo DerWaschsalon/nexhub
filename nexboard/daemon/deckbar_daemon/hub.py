@@ -110,7 +110,8 @@ def loot_drop(roll: dict, at_ms: int) -> dict | None:
 
 def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, capture: str | None,
                  deaths: list[dict] | None = None, loot: list[dict] | None = None) -> bytes:
-    """Run → gepacktes NexLog. Liest die Kampfdateien und Einzeltreffer des Mitschnitts von der Platte;
+    """Run → gepacktes NexLog. `loot` None heißt: Beute wurde nicht mitgeschrieben (eine leere Liste: nichts
+    gewürfelt). Liest die Kampfdateien und Einzeltreffer des Mitschnitts von der Platte;
     läuft in einem Thread (Packen großer Runs dauert bis ~0,1 s)."""
     from nexproto import (  # erst hier: fehlt das Paket, scheitert nur das Hochladen
         NexLog,
@@ -134,7 +135,7 @@ def build_nexlog(run: Run, history_dir: Path, you: dict | None, language: str, c
         "fights": fights,
         "hits": hits,
         "deaths": deaths or [],  # Todesursachen vom Radar, falls es lief
-        "loot": loot or [],  # Würfel-Beute aus dem Feed des Mitschnitts
+        "loot": loot,  # Würfel-Beute aus dem Feed des Mitschnitts; None, wenn er sie nicht mitschreibt
     }))
 
 
@@ -162,7 +163,7 @@ class Hub:
         self.language: Callable[[], str] = lambda: "en"
         self.capture_build: Callable[[], str | None] = lambda: None
         self.deaths: Callable[[int, int], list[dict]] = lambda start_ms, end_ms: []
-        self.loot: Callable[[int, int], list[dict]] = lambda start_ms, end_ms: []
+        self.loot: Callable[[int, int], list[dict] | None] = lambda start_ms, end_ms: None
 
     # ------------------------------------------------------------ Einstellungen
     def save(self, settings: HubSettings) -> None:
