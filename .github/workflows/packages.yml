@@ -3,6 +3,7 @@ name: Pakete
 # nexproto: Formate und alle daraus erzeugten Dateien (Schemas, C, JS, TS, Rust) aktuell
 # nexcore: Tests, Lint, strikte Typen und Abhängigkeitsrichtung
 # infra: Skripte mit eigener Logik (Changelog)
+# daemon: Tests des NexBoard-Daemons samt denen, die das Submodul capture/a2tools brauchen
 on:
   push:
     branches: [main]
@@ -38,3 +39,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uvx pytest -q infra/tests
+
+  daemon:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nexboard/daemon
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run python -m pytest -q
