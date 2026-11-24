@@ -41,8 +41,8 @@ class RadarModule(WebModule):
         self.spawn(self.radar.watch)
 
     def status(self) -> dict[str, Any]:
-        return {"laeuft": self.radar.laeuft, "spiel": self.radar.spiel, "aufnahme": self.radar.aufnahme,
-                "fehler": self.radar.fehler}
+        return {"laeuft": self.radar.running, "spiel": self.radar.game, "aufnahme": self.radar.recording,
+                "fehler": self.radar.error}
 
     def routes(self, router: web.UrlDispatcher) -> None:
         router.add_get("/api/radar", self.api_get)
@@ -61,7 +61,7 @@ class RadarModule(WebModule):
 
     async def api_put(self, request: web.Request) -> web.Response:
         try:
-            return web.json_response(await self.radar.speichern(await read_object(request)))
+            return web.json_response(await self.radar.save(await read_object(request)))
         except ValueError as e:
             raise ApiError(400, str(e)) from e
 
@@ -70,7 +70,7 @@ class RadarModule(WebModule):
         if "befehl" not in data:
             raise ApiError(400, "erwartet {befehl}")
         try:
-            await self.radar.befehl(str(data["befehl"]), str(data.get("ruf", "")))
+            await self.radar.command(str(data["befehl"]), str(data.get("ruf", "")))
         except ValueError as e:
             raise ApiError(400, str(e)) from e
         except RuntimeError as e:
@@ -78,16 +78,16 @@ class RadarModule(WebModule):
         return ok(**self.radar.info())
 
     async def api_fight(self, request: web.Request) -> web.Response:
-        return web.json_response({**self.radar.kampf(), **await self.boss_effects.aktuell()})
+        return web.json_response({**self.radar.fight_state(), **await self.boss_effects.aktuell()})
 
     async def api_field_bosses(self, request: web.Request) -> web.Response:
         return web.json_response({"feldbosse": self.radar.field_bosses()})
 
     async def api_map(self, request: web.Request) -> web.Response:
-        return web.json_response(self.radar.karte())
+        return web.json_response(self.radar.map())
 
     async def api_map_file(self, request: web.Request) -> web.FileResponse:
-        path = self.radar.kartendatei(request.match_info["art"])
+        path = self.radar.map_file(request.match_info["art"])
         if not path:
             raise web.HTTPNotFound()
         return web.FileResponse(path)

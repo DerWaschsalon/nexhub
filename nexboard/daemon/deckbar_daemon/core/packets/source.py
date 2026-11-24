@@ -6,6 +6,7 @@ Live-Weg des Radars über ein eigenes tcpdump, bis das Radar am Rust-Mitschnitt 
 from __future__ import annotations
 
 import logging
+import struct
 import subprocess
 import threading
 from collections.abc import Callable, Iterable
@@ -14,11 +15,13 @@ from pathlib import Path
 from typing import BinaryIO
 
 from .frames import StreamParser
+from .messages import Message
 from .tcp import Flow, TcpStream, server_segments, start_tcpdump
 
 log = logging.getLogger(__name__)
 
 Handler = Callable[[int, bytes], None]  # (Opcode, Nutzdaten)
+UNREADABLE = (ValueError, struct.error, IndexError)  # Nutzdaten passen nicht zur Nachricht
 RECORDINGS = Path.home() / ".local" / "share" / "aion2-radar" / "mitschnitte"  # nie ins Repo
 
 
@@ -26,6 +29,8 @@ class PacketSource:
     def __init__(self) -> None:
         self._for_all: list[Handler] = []
         self._by_opcode: dict[int, list[Handler]] = {}
+        self._typed: dict[int, dict[type[Message], list[Callable]]] = {}
+        self.packets = 0  # alle gesehenen Pakete, auch die ohne Abnehmer
 
     def subscribe(self, opcodes: Iterable[int] | None, handler: Handler) -> None:
         """Pakete dieser Opcodes an `handler`; None = jedes Paket (Werkzeuge, Lernmodus)."""
@@ -34,11 +39,27 @@ class PacketSource:
         for opcode in opcodes or ():
             self._by_opcode.setdefault(opcode, []).append(handler)
 
+    def on[M: Message](self, message: type[M], handler: Callable[[M], None]) -> None:
+        """Pakete als dekodierte Nachricht dieser Klasse an `handler`. Je Paket wird einmal je Klasse dekodiert,
+        gleich wie viele Abnehmer sie hat; Klassen und ihre Abnehmer kommen in der Reihenfolge der Anmeldung."""
+        for opcode in message.OPCODES:
+            readers = self._typed.setdefault(opcode, {})
+            readers.setdefault(message, []).append(handler)
+
     def publish(self, opcode: int, payload: bytes) -> None:
+        self.packets += 1
         for handler in self._for_all:
             handler(opcode, payload)
         for handler in self._by_opcode.get(opcode, ()):
             handler(opcode, payload)
+        for message, handlers in self._typed.get(opcode, {}).items():
+            try:
+                decoded = message.read(opcode, payload)
+            except UNREADABLE:
+                continue  # kaputte oder unbekannte Nachricht
+            if decoded is not None:
+                for typed_handler in handlers:
+                    typed_handler(decoded)
 
 
 class PcapSource(PacketSource):

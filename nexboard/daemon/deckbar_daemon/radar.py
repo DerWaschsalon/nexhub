@@ -1,39 +1,38 @@
 """AION 2 · Radar: läuft im Daemon, solange AION 2 läuft, und zeigt sich als Widgets im Overlay.
 
-Mitschnitt und Auswertung stecken in nexboard/radar (RadarDienst, ohne Fenster). Der Daemon ruft
-dessen Takt mehrmals pro Sekunde auf und schickt den Stand als Overlay-Ereignis „radar“. Das
-Radar-Widget zeigt sich dort nur, solange ein Cube in Sicht ist.
+Mitschnitt und Auswertung stecken in aion2/ (RadarService, ohne Fenster). Der Daemon ruft dessen Takt
+mehrmals pro Sekunde auf und schickt den Stand als Overlay-Ereignis „radar“. Das Radar-Widget zeigt sich
+dort nur, solange ein Cube in Sicht ist.
 
-Die Einstellungen stehen in ~/.config/aion2-radar.json. Standardwerte stehen in radar/standard.json, die
-Schalter der Warnungen ergeben sich aus radar/mechaniken.json und radar/ansagen.json (warnung.SCHALTER).
+Die Einstellungen stehen in ~/.config/aion2-radar.json über den Standardwerten aus aion2/data/defaults.json.
+Die Schlüssel von info() sind die der NexBoard-Seite.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import sys
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
+from .aion2 import field_bosses, settings
+from .aion2.callouts import page_list
+from .aion2.gamedata import load_state
+from .aion2.maps import GameMap
+from .aion2.rules import SWITCHES
+from .aion2.service import DEATHS_KEPT, RadarService
 from .config import _atomic_write
 from .game_process import aion2_running
 
-ORDNER = Path(__file__).resolve().parents[2] / "radar"  # nexboard/radar
-sys.path.insert(0, str(ORDNER))  # Paket „radar“ liegt dort, nicht im Daemon
-from radar import daten, konfig, uebersicht, warnung  # noqa: E402
-from radar.ansagen import seitenliste  # noqa: E402
-from radar.dienst import RadarDienst  # noqa: E402
-from radar.punkte import Karte  # noqa: E402
-
 log = logging.getLogger(__name__)
 
-SETTINGS_FILE = konfig.KONFIG  # ~/.config/aion2-radar.json
-TAKT_S = 0.2  # so oft zeichnen die Widgets neu, Warnungen zählen in Zehntelsekunden
+SETTINGS_FILE = settings.FILE  # ~/.config/aion2-radar.json
+TICK_S = 0.2  # so oft zeichnen die Widgets neu, Warnungen zählen in Zehntelsekunden
 # Charaktername und Sprache stehen in den allgemeinen Einstellungen (config.yaml); in die Datei des Radars
-# schreibt sie nur sync_profile(), bis das Radar mit Schritt 7 seine Einstellungen über den Daemon bekommt.
+# schreibt sie nur sync_profile(), bis jedes Modul seine Einstellungen über den Daemon bekommt.
 PROFILE_KEYS = ("name", "sprache")
 VOICE_LANGUAGES = ("de", "en")  # Ansagen und Warnungen gibt es nur auf Deutsch und Englisch
 # Voreinstellungen der Seite „Warnungen“: was jede setzt. Art der Ansage, Wellenton und die Einzelheiten je
@@ -43,187 +42,184 @@ WARNING_PRESETS: dict[str, dict[str, Any]] = {
     "wichtig": {"warn_an": True, "nur_mich": True},  # nur, was dich betrifft (Standard)
     "alles": {"warn_an": True, "nur_mich": False},  # auch Angriffe und Effekte auf andere Spieler
 }
-BEFEHLE = ("ton_testen", "warnung_testen", "aufnahme_start", "aufnahme_stopp", "neustart", "ansage_testen")
+OWN_PRESET = "eigene"
+RESTART = "neustart"
+# Knopf der NexBoard-Seite → was er am laufenden Dienst tut
+COMMANDS: dict[str, Callable[[RadarService, str], None]] = {
+    "ton_testen": lambda service, _: service.test_ping(),
+    "warnung_testen": lambda service, _: service.test_warning(),
+    "aufnahme_start": lambda service, _: service.start_recording(),
+    "aufnahme_stopp": lambda service, _: service.stop_recording(),
+    "ansage_testen": lambda service, call: service.test_callout(call),
+}
+NO_FIGHT = {"groggy": False, "warnungen": []}
+MAP_FILES = {"bild": lambda game_map: game_map.image, "symbol": lambda game_map: game_map.symbol}
 
 
-async def _aion2_laeuft() -> bool:
+async def _game_running() -> bool:
     return await asyncio.to_thread(aion2_running)
 
 
-def _json(pfad: Path) -> dict:
-    try:
-        inhalt = json.loads(pfad.read_text())
-    except (OSError, ValueError):
-        return {}
-    return inhalt if isinstance(inhalt, dict) else {}
-
-
 class Radar:
-    def __init__(self, veroeffentlichen: Callable[[dict], Awaitable[None]],
-                 spiel_laeuft: Callable[[], Awaitable[bool]] = _aion2_laeuft,
-                 dienst: Callable[[str], Any] = RadarDienst, abfrage_s: float = 5, nachlauf_s: float = 30) -> None:
-        self.veroeffentlichen = veroeffentlichen  # Overlay-Ereignis „radar“
-        self.spiel_laeuft = spiel_laeuft
-        self.neuer_dienst = dienst
-        self.abfrage_s = abfrage_s
-        self.nachlauf_s = nachlauf_s  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
-        self.meldungen = warnung.SCHALTER
-        self.ansagen = seitenliste()  # Boss-Ansagen je Schalter, für eigene Worte und ▶ auf der Seite
-        self.dienst: RadarDienst | None = None
-        self.spiel = False
-        # Tode mit Ursache (RadarDienst._tod); hier, damit sie ein Ende des Radars bis zum Hochladen ueberleben
-        self.tode: deque[dict] = deque(maxlen=200)
+    def __init__(self, publish: Callable[[dict], Awaitable[None]],
+                 game_running: Callable[[], Awaitable[bool]] = _game_running,
+                 service: Callable[[str], Any] = RadarService, poll_s: float = 5, linger_s: float = 30) -> None:
+        self.publish = publish  # Overlay-Ereignis „radar“
+        self.game_running = game_running
+        self.new_service = service
+        self.poll_s = poll_s
+        self.linger_s = linger_s  # Spiel weg: so lange warten (Absturz mit Neustart, Ladebildschirm)
+        self.callouts = page_list()  # Boss-Ansagen je Schalter, für eigene Worte und ▶ auf der Seite
+        self.service: RadarService | None = None
+        self.game = False
+        # Tode mit Ursache; hier, damit sie ein Ende des Radars bis zum Hochladen überleben
+        self.deaths: deque[dict] = deque(maxlen=DEATHS_KEPT)
 
     @property
-    def laeuft(self) -> bool:
-        return self.dienst is not None
+    def running(self) -> bool:
+        return self.service is not None
 
     @property
-    def fehler(self) -> str | None:
+    def error(self) -> str | None:
         """Warum der Mitschnitt des Radars nicht läuft (etwa tcpdump ohne Rechte), sonst None."""
-        return self.dienst.fehler if self.dienst else None
+        return self.service.error if self.service else None
 
     @property
-    def aufnahme(self) -> bool:
-        return bool(self.dienst and self.dienst.aufnahme)
+    def recording(self) -> bool:
+        return bool(self.service and self.service.recording)
 
-    def einstellungen(self) -> dict:
-        return konfig.mit_standard(_json(konfig.KONFIG))
+    def settings(self) -> dict:
+        return settings.with_defaults(settings.read_file())
 
     def warning_preset(self) -> str:
         """Welche Voreinstellung zu den Einstellungen passt; „eigene“, wenn keine."""
-        k = self.einstellungen()
+        current = self.settings()
         for name, values in WARNING_PRESETS.items():
-            if all(k[key] == value for key, value in values.items()):
+            if all(current[key] == value for key, value in values.items()):
                 return name
-        return "eigene"
+        return OWN_PRESET
 
     def info(self) -> dict:
-        return {"einstellungen": self.einstellungen(), "meldungen": self.meldungen, "ansagen": self.ansagen,
-                "karten": [k.name for k in Karte.alle()], "presets": WARNING_PRESETS,
+        return {"einstellungen": self.settings(), "meldungen": SWITCHES, "ansagen": self.callouts,
+                "karten": [m.name for m in GameMap.all()], "presets": WARNING_PRESETS,
                 "preset": self.warning_preset(),
-                "laeuft": self.laeuft, "aufnahme": self.aufnahme, "spiel": self.spiel, "fehler": self.fehler}
+                "laeuft": self.running, "aufnahme": self.recording, "spiel": self.game, "fehler": self.error}
 
-    def _pruefen(self, aenderung: dict) -> None:
-        for schluessel, wert in aenderung.items():
-            if schluessel in PROFILE_KEYS:
-                raise ValueError(f"{schluessel} kommt aus den allgemeinen Einstellungen")
-            if schluessel not in konfig.STANDARD:
-                raise ValueError(f"unbekannte Einstellung {schluessel}")
-            soll = type(konfig.STANDARD[schluessel])
-            erlaubt = (int, float) if soll is float else soll  # 1 statt 1.0 ist in Ordnung
-            if isinstance(wert, bool) != (soll is bool) or not isinstance(wert, erlaubt):
-                raise ValueError(f"{schluessel}: erwartet {soll.__name__}")
+    def _validate(self, change: dict) -> None:
+        for key, value in change.items():
+            if key in PROFILE_KEYS:
+                raise ValueError(f"{key} kommt aus den allgemeinen Einstellungen")
+            if key not in settings.DEFAULTS:
+                raise ValueError(f"unbekannte Einstellung {key}")
+            wanted = type(settings.DEFAULTS[key])
+            allowed = (int, float) if wanted is float else wanted  # 1 statt 1.0 ist in Ordnung
+            if isinstance(value, bool) != (wanted is bool) or not isinstance(value, allowed):
+                raise ValueError(f"{key}: erwartet {wanted.__name__}")
 
-    async def speichern(self, aenderung: dict) -> dict:
+    async def save(self, change: dict) -> dict:
         """Ändert nur, was die Seite schickt; fremde Schlüssel in der Datei bleiben."""
-        self._pruefen(aenderung)
-        self._schreiben(aenderung)
+        self._validate(change)
+        self._write(change)
         return self.info()
 
     def sync_profile(self, name: str, language: str) -> None:
         """Charaktername und Sprache aus den allgemeinen Einstellungen ans Radar geben. Den Namen liest
         das Radar nur beim Start, ein neuer startet es deshalb neu."""
-        sprache = language if language in VOICE_LANGUAGES else "en"
-        k = self.einstellungen()
-        if (k["name"], k["sprache"]) == (name, sprache):
+        voice = language if language in VOICE_LANGUAGES else "en"
+        current = self.settings()
+        if (current["name"], current["sprache"]) == (name, voice):
             return
-        self._schreiben({"name": name, "sprache": sprache})
-        if k["name"] != name and self.dienst:
-            self._beenden()
-            self._starten()
+        self._write({"name": name, "sprache": voice})
+        if current["name"] != name and self.service:
+            self._stop()
+            self._start()
 
-    def _schreiben(self, aenderung: dict) -> None:
-        inhalt = {**_json(konfig.KONFIG), **aenderung}
-        _atomic_write(konfig.KONFIG, json.dumps(inhalt, indent=2, ensure_ascii=False))
-        konfig.konfig_neu_laden()
-        if self.dienst:
-            self.dienst.neu_laden()
+    def _write(self, change: dict) -> None:
+        content = {**settings.read_file(), **change}
+        _atomic_write(settings.FILE, json.dumps(content, indent=2, ensure_ascii=False))
+        settings.reload()
+        if self.service:
+            self.service.reload()
 
-    async def befehl(self, name: str, ruf: str = "") -> None:
-        """Ein Knopf der NexBoard-Seite; `ruf` = Schlüssel der Boss-Ansage bei „ansage_testen“."""
-        if name not in BEFEHLE:
+    async def command(self, name: str, call: str = "") -> None:
+        """Ein Knopf der NexBoard-Seite; `call` = Schlüssel der Boss-Ansage bei „ansage_testen“."""
+        if name == RESTART:
+            self._stop()
+            if self.game:
+                self._start()
+            return
+        if name not in COMMANDS:
             raise ValueError(f"unbekannter Befehl {name}")
-        if name == "neustart":
-            self._beenden()
-            if self.spiel:
-                self._starten()
-            return
-        if not self.dienst:
+        if not self.service:
             raise RuntimeError("Radar läuft nicht")
-        aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
-                    "aufnahme_start": self.dienst.aufnahme_starten,
-                    "aufnahme_stopp": self.dienst.aufnahme_stoppen,
-                    "ansage_testen": lambda: self.dienst.ansage_testen(ruf)}
-        aktionen[name]()
+        COMMANDS[name](self.service, call)
 
-    def tode_zwischen(self, start_ms: int, ende_ms: int) -> list[dict]:
-        """Tode eines Runs (Zeiten in ms seit 1970), fuer das NexLog."""
-        return [t for t in self.tode if start_ms <= t["t_ms"] <= ende_ms]
+    def deaths_between(self, start_ms: int, end_ms: int) -> list[dict]:
+        """Tode eines Runs (Zeiten in ms seit 1970), für das NexLog."""
+        return [d for d in self.deaths if start_ms <= d["t_ms"] <= end_ms]
 
-    def kampf(self) -> dict:
-        """Kampfzustand für andere Programme auf diesem PC (GET /api/radar/kampf), siehe RadarDienst.kampf."""
-        return self.dienst.kampf() if self.dienst else {"groggy": False, "warnungen": []}
+    def fight_state(self) -> dict:
+        """Kampfzustand für andere Programme auf diesem PC (GET /api/radar/kampf)."""
+        return self.service.fight_state() if self.service else dict(NO_FIGHT)
 
     def field_bosses(self) -> list[dict]:
         """Feldbosse für die Seite „Termine“. Ohne laufendes Radar aus dem gespeicherten Stand."""
-        if self.dienst:
-            return uebersicht.feldbosse(self.dienst.zustand.feldbosse, self.dienst.zustand.zone)
-        return uebersicht.feldbosse(daten.laden("feldbosse.json"), None)
+        if self.service:
+            return field_bosses.overview(self.service.field_bosses.slots, self.service.world.zone)
+        return field_bosses.overview(load_state(field_bosses.STATE_FILE), None)
 
-    def karte(self) -> dict:
-        return self.dienst.karte() if self.dienst else {"name": ""}
+    def map(self) -> dict:
+        return self.service.map() if self.service else {"name": ""}
 
-    def kartendatei(self, art: str) -> Path | None:
+    def map_file(self, kind: str) -> Path | None:
         """Bild oder Teleporter-Symbol der gezeigten Karte, für die Overlay-Seite."""
-        name = self.karte()["name"]
-        if not name or art not in ("bild", "symbol"):
+        name = self.map()["name"]
+        if not name or kind not in MAP_FILES:
             return None
-        karte = Karte(name)
-        datei = karte.bild if art == "bild" else karte.symbol
-        return datei if datei.exists() else None
+        file = MAP_FILES[kind](GameMap(name))
+        return file if file.exists() else None
 
-    def _starten(self) -> None:
+    def _start(self) -> None:
         log.info("AION 2 läuft, starte Radar")
-        self.dienst = self.neuer_dienst(self.einstellungen()["name"])
-        self.dienst.tode = self.tode
-        self.dienst.starten()
+        self.service = self.new_service(self.settings()["name"])
+        self.service.deaths = self.deaths
+        self.service.start()
 
-    def _beenden(self) -> None:
-        if self.dienst:
+    def _stop(self) -> None:
+        if self.service:
             log.info("Radar wird beendet")
-            self.dienst.stoppen()
-            self.dienst = None
+            self.service.stop()
+            self.service = None
 
-    async def _spiel_pruefen(self, weg: float) -> float:
-        """Radar mit dem Spiel starten und nachlauf_s nach Spielende beenden. Gibt zurück, wie lange
-        das Spiel schon weg ist."""
-        if await self.spiel_laeuft():
-            if not self.spiel:
-                self.spiel = True
-                self._starten()
+    async def _check_game(self, gone: float) -> float:
+        """Radar mit dem Spiel starten und linger_s nach Spielende beenden. Gibt zurück, wie lange das
+        Spiel schon weg ist."""
+        if await self.game_running():
+            if not self.game:
+                self.game = True
+                self._start()
             return 0
-        if self.spiel:
-            weg += self.abfrage_s
-            if weg >= self.nachlauf_s:
-                self.spiel = False
-                self._beenden()
-                await self.veroeffentlichen({"aktiv": False})
-        return weg
+        if self.game:
+            gone += self.poll_s
+            if gone >= self.linger_s:
+                self.game = False
+                self._stop()
+                await self.publish({"aktiv": False})
+        return gone
 
     async def watch(self) -> None:
-        """Modul-Aufgabe: Spiel alle abfrage_s prüfen, dazwischen Takt und Stand fürs Overlay."""
-        weg, pruefen_um = 0.0, 0.0
+        """Modul-Aufgabe: Spiel alle poll_s prüfen, dazwischen Takt und Stand fürs Overlay."""
+        gone, check_at = 0.0, 0.0
         try:
             while True:
-                if time.monotonic() >= pruefen_um:
-                    pruefen_um = time.monotonic() + self.abfrage_s
-                    weg = await self._spiel_pruefen(weg)
-                if self.dienst:
-                    self.dienst.takt()
-                    await self.veroeffentlichen({"aktiv": True, **self.dienst.stand()})
-                await asyncio.sleep(TAKT_S)
+                if time.monotonic() >= check_at:
+                    check_at = time.monotonic() + self.poll_s
+                    gone = await self._check_game(gone)
+                if self.service:
+                    self.service.tick()
+                    await self.publish({"aktiv": True, **self.service.state()})
+                await asyncio.sleep(TICK_S)
         finally:
-            self.spiel = False
-            self._beenden()
-            await self.veroeffentlichen({"aktiv": False})
+            self.game = False
+            self._stop()
+            await self.publish({"aktiv": False})

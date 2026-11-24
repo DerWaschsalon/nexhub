@@ -174,14 +174,14 @@ def frames_in_block(data: bytes) -> Iterator[bytes]:
     return (content for _, content in _scan(data) if content is not None)
 
 
-def messages(content: bytes, depth: int = 0) -> Iterator[tuple[int, bytes]]:
+def frame_packets(content: bytes, depth: int = 0) -> Iterator[tuple[int, bytes]]:
     """Liefert (Opcode, Nutzdaten) aus einem Frame-Inhalt, LZ4 rekursiv entpackt."""
     if len(content) < 2 or depth > MAX_NESTING:
         return
     unpacked = _lz4_container(content)
     if unpacked is not None:
         for frame in frames_in_block(unpacked):
-            yield from messages(frame, depth + 1)
+            yield from frame_packets(frame, depth + 1)
         return
     yield struct.unpack_from("<H", content)[0], content[2:]
 
@@ -201,7 +201,7 @@ class StreamParser:
         used = 0
         for used, content in _scan(self.buffer, self._count):
             if content is not None:
-                yield from messages(content)
+                yield from frame_packets(content)
         del self.buffer[:used]
         if len(self.buffer) > 4 * MAX_UNPACKED:  # aus dem Takt geraten
             self.buffer.clear()

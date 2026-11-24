@@ -1,5 +1,5 @@
 """Übernimmt die Boss-Ansagen des A2Tools-Plugins „Boss Callouts“ (boss-telegraph) nach
-radar/ansagen.json. Den Schalter je Boss leitet radar/warnung.py daraus ab (schalter()).
+daemon/deckbar_daemon/aion2/data/callouts.json. Den Schalter je Boss leitet aion2/rules.py daraus ab (switches()).
 
 Das Plugin (taengu/A2Tools-Plugins, GPL-3.0) hat seine Liste aus den Spieltabellen erzeugt: je Boss
 die Zeilen, die das Spiel bei einem Skill einblendet, mit Skill-ID und Dauer der Cast-Leiste, dazu
@@ -10,15 +10,14 @@ Aufruf (im Ordner nexboard/radar): python -m werkzeuge.ansagen
 """
 import json
 import urllib.request
-from pathlib import Path
 
-from radar.warnung import ansage_gruppe
+from deckbar_daemon.aion2.gamedata import DATA
+from deckbar_daemon.aion2.rules import callout_group
 
 # Fester Stand, damit ein neuer Lauf nur auf Wunsch etwas ändert (nach einem Spielpatch erhöhen)
 STAND = "f206c25c4960d1180d143776e48e4360cdf44f78"
 QUELLE = ("https://raw.githubusercontent.com/taengu/A2Tools-Plugins/"
           f"{STAND}/plugins/boss-telegraph/bosses.js")
-ORDNER = Path(__file__).parents[1] / "radar"
 UMBENENNEN = {"Fire Temple": "Feuertempel"}  # wie in werkzeuge/bosse.py
 OHNE_DUNGEON = "Weltbosse und Sonstige"  # Bosse, denen das Plugin keinen Dungeon gibt
 # Auslöser im Plugin -> Art im Radar (leiste = 0x3809, skill = 0x3802, effekt = 0x382A)
@@ -56,7 +55,7 @@ class Umwandlung:
 
     def ruf(self, r: dict) -> dict:
         ruf = {"schluessel": r["k"], "art": ARTEN[r["t"]], "id": r["id"], "boss": r["b"],
-               "gruppe": ansage_gruppe(r["b"]), "vorlauf": r.get("lead", 0) / 1000, "zeile": self.text(r.get("line")),
+               "gruppe": callout_group(r["b"]), "vorlauf": r.get("lead", 0) / 1000, "zeile": self.text(r.get("line")),
                "anweisung": self.text(r.get("act")), "buff": self.text(r.get("n")),
                "braucht_boss": bool(r.get("bind")), "wellen": bool(r.get("waves")), "reihe": r.get("mark")}
         if r.get("phase"):
@@ -78,7 +77,7 @@ class Umwandlung:
 
 def main() -> None:
     daten = Umwandlung(laden()).alles()
-    (ORDNER / "ansagen.json").write_text(json.dumps(daten, indent=1, ensure_ascii=False) + "\n")
+    (DATA / "callouts.json").write_text(json.dumps(daten, indent=1, ensure_ascii=False) + "\n")
     print(f"{len(daten['rufe'])} Ansagen von {len(daten['bosse'])} Bossen übernommen")
 
 
