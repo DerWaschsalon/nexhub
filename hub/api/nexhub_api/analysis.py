@@ -48,8 +48,11 @@ def _dps(damage: int, ms: int) -> int:
 def summarize(log: NexLog) -> dict:
     """Bosse mit Dauer, Sieg und Schaden je Spieler, dazu die Summe über den Run.
 
-    {"fight_ms": …, "players": [{name, cls, damage, dps}],
-     "bosses": [{fight, name, mob, start_ms, duration_ms, killed, players: [...]}]}
+    {"fight_ms": …, "players": [{name, cls, damage, dps}], "loot_tracked": …,
+     "bosses": [{fight, name, mob, start_ms, duration_ms, killed, players: [...], loot: [{item_id, count}]}]}
+
+    `loot_tracked`: Die Aufnahme hat Würfel-Beute gemeldet (NexLog.loot ist eine Liste); nur solche Runs
+    zählen für Dropraten (loot.py).
     """
     bosses, totals = [], {}
     fight_ms = 0
@@ -66,7 +69,7 @@ def summarize(log: NexLog) -> dict:
         dealt = int(f.details.get("totalTargetDamage") or (f.model_extra or {}).get("totalDamage") or 0)
         bosses.append({"fight": f.id, "name": f.bossName, "mob": f.mobCode, "start_ms": f.startTimeMs,
                        "duration_ms": f.durationMs, "killed": max_hp > 0 and dealt >= max_hp * KILL_RATIO,
-                       "players": players})
+                       "players": players, "loot": []})
         fight_ms += f.durationMs
         for p in players:
             t = totals.setdefault((p["name"], p["cls"]), {"name": p["name"], "cls": p["cls"], "damage": 0})
@@ -74,7 +77,21 @@ def summarize(log: NexLog) -> dict:
     players = sorted(totals.values(), key=lambda p: -p["damage"])
     for p in players:
         p["dps"] = _dps(p["damage"], fight_ms)
-    return {"fight_ms": fight_ms, "players": players, "bosses": bosses}
+    _assign_loot(log, bosses)
+    return {"fight_ms": fight_ms, "players": players, "bosses": bosses, "loot_tracked": log.loot is not None}
+
+
+LOOT_CLOCK_MS = 2000  # Würfel-Ereignis und Kampfende kommen aus zwei Uhren
+
+
+def _assign_loot(log: NexLog, bosses: list[dict]) -> None:
+    """Jede Würfel-Beute zum zuletzt besiegten Boss davor. Beute ohne Boss davor (von Gegnern auf dem Weg)
+    gehört zu keinem und fällt weg."""
+    kills = sorted((b for b in bosses if b["killed"]), key=lambda b: b["start_ms"] + b["duration_ms"])
+    for drop in log.loot or []:
+        before = [b for b in kills if b["start_ms"] + b["duration_ms"] <= drop.t_ms + LOOT_CLOCK_MS]
+        if before:
+            before[-1]["loot"].append({"item_id": drop.item_id, "count": drop.count})
 
 
 def _rate(part: int, total: int) -> float:
