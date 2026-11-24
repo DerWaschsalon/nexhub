@@ -13,7 +13,7 @@ from typing import Protocol
 from nexproto.classes import JOB_CLASSES
 from nexproto.dungeons import EXTRA_DUNGEONS
 
-from .dps import a2tools_settings_path
+from .a2tools_meter import a2tools_settings_path
 
 log = logging.getLogger(__name__)
 

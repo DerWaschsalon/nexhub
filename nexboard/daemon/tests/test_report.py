@@ -3,7 +3,7 @@ import base64
 
 from test_runs import DUNGEON, fight
 
-from deckbar_daemon.dps import fight_view
+from deckbar_daemon.dps_view import fight_view
 from deckbar_daemon.report import run_report
 from deckbar_daemon.run_model import Run, parse_fight
 

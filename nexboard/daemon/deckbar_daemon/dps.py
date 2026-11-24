@@ -1,40 +1,29 @@
-"""AION-2-DPS: eigener Mitschnitt oder der Stream-Overlay-Server des A2Tools DPS Meter.
+"""AION-2-Kampfdaten: wählt die Quelle, führt den Status und reicht jeden Stand an die Kampferkennung.
 
-Quelle `capture` (Standard): Der Daemon startet mit dem Spiel `deckbar-capture` (capture/ im
-Repo, Kern des A2Tools-Meters ohne Oberfläche, siehe capture.py) und bekommt von dort die Zeilen.
+Quelle `capture` (Standard): Der Daemon startet mit dem Spiel `deckbar-capture` (capture/ im Repo, Kern des
+A2Tools-Meters ohne Oberfläche, siehe capture.py) und bekommt von dort die Zeilen.
+Quellen `auto`/`manual`: der Stream-Overlay-Server des A2Tools-Meters (a2tools_meter.py); bei „auto“ kommen
+Port und Schlüssel aus den Einstellungen des Meters.
 
-Quellen `auto`/`manual`: Das Meter (github.com/taengu/A2Tools-DPS-Meter) liest selbst die
-Spielpakete mit und bietet für OBS einen kleinen HTTP-Server an (Einstellungen → Stream-Overlay,
-Port 18731). `/overlay/events?key=…` liefert etwa dreimal pro Sekunde den aktuellen Stand als
-Server-Sent Events:
-
-    {"v":1,"target":"Boss","mode":"bossTargets","timeMs":83000,"hp":42.5,
-     "rows":[{"name":"…","cls":"cleric","dps":18432,"dmg":1529856,"pct":31.2,"you":true}]}
-
-Daraus wird der State-Schlüssel `dps` (gekürzt, siehe `compact`) und `dps_active`
-(gerade Schaden im Kampf). Endet ein Kampf, bekommen `fight_listeners` den letzten Stand mit
-Gruppen-Flag (`fight_view`, z. B. für den eigenen Charakter im NexLog, hub.py). Port und Schlüssel stehen in
-den Einstellungen des Meters (settings.json) und werden im Modus „auto“ von dort gelesen. Beide
-Quellen liefern dasselbe Zeilenformat, deckbar-capture baut es wie das Stream-Overlay
-(capture/src/view.rs).
+Aus jedem Stand wird der State `dps` (gekürzt, dps_view.compact) und `dps_active` (combat.py).
 """
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import os
-import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Literal
+from typing import Literal
 
 import aiohttp
 from nexcore.settings import ADVANCED, HIDDEN, SECRET, SettingsStore
-from nexproto.classes import CLASS_KEYS
 from pydantic import Field
 
+from .a2tools_meter import DEFAULT_PORT, READ_TIMEOUT_S, MeterStream, read_a2tools
 from .capture import Capture
+from .combat import CombatListener, CombatTracker
 from .config import _Strict
+from .dps_view import compact, fight_view
 from .state import State
 
 log = logging.getLogger(__name__)
@@ -42,17 +31,16 @@ log = logging.getLogger(__name__)
 SETTINGS_FILE = "aion2.dps.yaml"  # im Konfig-Ordner, benannt nach dem Modul
 SETTINGS_HEADER = "AION-2-DPS – wird von der Web-UI überschrieben."
 
-DEFAULT_PORT = 18731
-MAX_ROWS = 8
 RETRY_S = 3
-# Ohne Snapshot (auch ohne „: ping“ alle 15 s) gilt die Verbindung als tot
-READ_TIMEOUT_S = 40
 # Wie lange ohne neuen Schaden noch „im Kampf“, wenn return_after = 0
 DEFAULT_IDLE_S = 30
 
 Status = Literal["off", "no_meter", "overlay_off", "connecting", "bad_key", "connected",
                  "no_capture", "no_game", "no_caps", "capturing"]
 LIVE = ("connected", "capturing")
+# Phase des Mitschnitts (capture.py) → Status; alles andere heißt: er läuft
+CAPTURE_STATUS: dict[str, Status] = {"no_binary": "no_capture", "no_game": "no_game", "no_caps": "no_caps",
+                                     "crashed": "no_game", "starting": "connecting"}
 STATUS_TEXT = {
     "off": "ausgeschaltet",
     "no_capture": "deckbar-capture nicht gefunden",
@@ -88,122 +76,18 @@ class DpsSettings(_Strict):
                               description="Danach gilt der Kampf als vorbei und die Leiste zeigt wieder die erste Seite")
 
 
-def a2tools_settings_path() -> Path:
-    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
-    return Path(os.environ.get("DECKBAR_A2TOOLS_SETTINGS", Path(base) / "com.a2tools.dps-meter" / "settings.json"))
-
-
-def read_a2tools(path: Path | None = None) -> dict[str, Any]:
-    """Overlay-Einstellungen des Meters: installed, enabled, port, key."""
-    path = path or a2tools_settings_path()
-    try:
-        data = json.loads(path.read_text())
-    except FileNotFoundError:
-        return {"installed": False, "enabled": False, "port": DEFAULT_PORT, "key": ""}
-    except (OSError, ValueError):
-        data = {}
-    if not isinstance(data, dict):
-        data = {}
-    try:
-        port = int(str(data.get("dpsMeter.streamOverlayPort", DEFAULT_PORT)).strip())
-    except ValueError:
-        port = DEFAULT_PORT
-    return {
-        "installed": True,
-        "enabled": data.get("dpsMeter.streamOverlay") == "true",
-        "port": port,
-        "key": str(data.get("dpsMeter.streamOverlayKey") or ""),
-    }
-
-
-def _int(v: Any) -> int:
-    try:
-        return max(0, int(v))
-    except (TypeError, ValueError):
-        return 0
-
-
-def compact(snap: dict, limit: int = MAX_ROWS) -> dict:
-    """Snapshot des Meters → State-Wert `dps` (nur, was das Display braucht)."""
-    rows = []
-    for r in snap.get("rows") or []:
-        if not isinstance(r, dict) or len(rows) >= limit:
-            continue
-        cls = r.get("cls")
-        pct = r.get("pct")
-        rows.append({
-            "name": str(r.get("name") or "?")[:24],
-            "cls": cls if cls in CLASS_KEYS else None,
-            "dps": _int(r.get("dps")),
-            "dmg": _int(r.get("dmg")),
-            "pct": round(float(pct), 1) if isinstance(pct, (int, float)) else 0.0,
-            "you": bool(r.get("you")),
-        })
-    hp = snap.get("hp")
-    return {
-        "target": str(snap.get("target") or "")[:40],
-        "time": _int(snap.get("timeMs")) // 1000,
-        "hp": round(float(hp), 1) if isinstance(hp, (int, float)) else None,
-        "rows": rows,
-    }
-
-
-def fight_view(snap: dict) -> dict:
-    """Snapshot → Endstand eines Kampfs für Weitergaben (hub.py): alle Zeilen, mit Ziel-ID, Boss und
-    Gruppen-Flag. `party` ist None, wenn die Quelle es nicht kennt (A2Tools-Stream, altes deckbar-capture)."""
-    rows = []
-    for r in snap.get("rows") or []:
-        if not isinstance(r, dict):
-            continue
-        cls = r.get("cls")
-        party = r.get("party")
-        rows.append({
-            "name": str(r.get("name") or "?")[:32],
-            "cls": cls if cls in CLASS_KEYS else None,
-            "dps": _int(r.get("dps")),
-            "dmg": _int(r.get("dmg")),
-            "you": bool(r.get("you")),
-            "party": party if isinstance(party, bool) else None,
-        })
-    hp = snap.get("hp")
-    tid = snap.get("targetId")
-    return {
-        "target": str(snap.get("target") or "")[:80],
-        "target_id": tid if isinstance(tid, int) else None,
-        "boss": bool(snap.get("boss")),
-        "time": _int(snap.get("timeMs")) // 1000,
-        "hp": round(float(hp), 1) if isinstance(hp, (int, float)) else None,
-        "rows": rows,
-    }
-
-
-def total_damage(value: dict | None) -> int:
-    return sum(r["dmg"] for r in value["rows"]) if value else 0
-
-
-CombatListener = Callable[[bool], Awaitable[None]]
-FightListener = Callable[[dict], Awaitable[None]]
-
-
 class DpsFeed:
     def __init__(self, state: State, config_dir: Path, on_combat: CombatListener | None = None,
                  language: Callable[[], str] = lambda: "en") -> None:
-        self.state = state
         self.language = language  # Sprache der allgemeinen Einstellungen, gilt ab dem nächsten Start des Mitschnitts
-        self.on_combat = on_combat
         self.store = SettingsStore(config_dir / SETTINGS_FILE, DpsSettings, header=SETTINGS_HEADER)
         self.settings = self.store.value
         self.status: Status = "off"
         self.detail = ""
         self.port: int | None = None
         self.status_listeners: list[Callable[[], Awaitable[None]]] = []
-        # Kampfende: letzter Stand mit Zeilen (fight_view), z. B. für den Hub
-        self.fight_listeners: list[FightListener] = []
-        self.fight: dict | None = None
-        self._pending: set[asyncio.Task] = set()
+        self.combat = CombatTracker(state, lambda: self.idle_after, on_combat)
         self._wake = asyncio.Event()
-        self._last_total = 0
-        self._last_change = 0.0
         self.capture = Capture(self._on_view, self._on_capture_change)
 
     # ------------------------------------------------------------ Einstellungen
@@ -241,53 +125,10 @@ class DpsFeed:
             log.info("DPS-Meter: %s%s", STATUS_TEXT[status], f" ({detail})" if detail else "")
         self.status, self.detail = status, detail
         if status not in LIVE:
-            await self._apply(None)
+            await self.combat.apply(None)
         for fn in self.status_listeners:
             await fn()
         return True
-
-    async def _apply(self, value: dict | None, baseline: bool = False, fight: dict | None = None) -> None:
-        """Neuer Stand vom Meter; erkennt Kampfbeginn am wachsenden Gesamtschaden.
-        baseline: erster Stand nach dem Verbinden – ein alter Kampf zählt nicht als Beginn.
-        fight: derselbe Stand als fight_view (alle Zeilen), wird zum Endstand des Kampfs."""
-        was_active = bool(self.state.values.get("dps_active"))
-        if fight and fight["rows"] and not baseline:
-            self.fight = fight
-        total = total_damage(value)
-        # Schaden kam hinzu (auch: Meter hat zurückgesetzt und ein neuer Kampf läuft)
-        hit = total > 0 and total != self._last_total and not baseline
-        if hit:
-            self._last_change = time.monotonic()
-        self._last_total = total
-        active = value is not None and (was_active or hit)
-        self.state.update(dps=value, dps_active=active)
-        if active != was_active:
-            await self._combat(active)
-
-    async def check_idle(self) -> None:
-        if self.state.values.get("dps_active") and time.monotonic() - self._last_change >= self.idle_after:
-            self.state.update(dps_active=False)
-            await self._combat(False)
-
-    async def _combat(self, active: bool) -> None:
-        if self.on_combat:
-            await self.on_combat(active)
-        if active:
-            return
-        fight, self.fight = self.fight, None
-        if fight:
-            # entkoppelt: ein langsamer Zuhörer (Netz, bis 20 s) darf den Feed nicht anhalten
-            for fn in self.fight_listeners:
-                t = asyncio.ensure_future(self._notify_fight(fn, fight))
-                self._pending.add(t)
-                t.add_done_callback(self._pending.discard)
-
-    @staticmethod
-    async def _notify_fight(fn: FightListener, fight: dict) -> None:
-        try:
-            await fn(fight)
-        except Exception:
-            log.exception("Kampfende-Zuhörer")
 
     async def _sleep(self, seconds: float) -> None:
         """Wartet, wacht aber sofort auf, wenn sich die Einstellungen ändern."""
@@ -296,8 +137,9 @@ class DpsFeed:
         except TimeoutError:
             pass
 
-    # ------------------------------------------------------------ Verbindung
+    # ------------------------------------------------------------ Quelle: A2Tools-Meter
     def _target(self) -> tuple[int, str] | None:
+        """Port und Schlüssel des Stream-Overlays; None = Meter nicht installiert, Port -1 = Overlay aus."""
         s = self.settings
         if s.source == "manual":
             return s.port, s.key
@@ -308,26 +150,39 @@ class DpsFeed:
             return -1, ""
         return a2t["port"], a2t["key"]
 
-    # ------------------------------------------------------------ eigener Mitschnitt
+    async def _on_snapshot(self, snap: dict, first: bool) -> None:
+        await self.combat.apply(compact(snap), baseline=first, fight=fight_view(snap))
+
+    async def _meter_job(self, session: aiohttp.ClientSession) -> Awaitable[None] | None:
+        """Die nächste Verbindung zum Meter; None, wenn es gerade nichts zu verbinden gibt (dann ist der
+        Status gesetzt und es wurde schon gewartet)."""
+        target = self._target()
+        if target is None:
+            await self._set_status("no_meter", "nicht installiert")
+            await self._sleep(10)
+            return None
+        port, key = target
+        if port < 0:
+            await self._set_status("overlay_off")
+            await self._sleep(5)
+            return None
+        self.port = port
+        if self.status not in ("connected", "no_meter"):
+            await self._set_status("connecting")
+        return MeterStream(session, port, key, self._set_status, self._on_snapshot).run()
+
+    # ------------------------------------------------------------ Quelle: eigener Mitschnitt
     async def _on_view(self, view: dict | None, first: bool) -> None:
         if self.status == "capturing":
-            await self._apply(compact(view) if view else None, baseline=first,
-                              fight=fight_view(view) if view else None)
+            await self.combat.apply(compact(view) if view else None, baseline=first,
+                                    fight=fight_view(view) if view else None)
 
     async def _on_capture_change(self) -> None:
         c = self.capture
         if self.settings.source != "capture" or not self.settings.enabled:
             return
-        if c.phase == "no_binary":
-            changed = await self._set_status("no_capture")
-        elif c.phase == "no_game":
-            changed = await self._set_status("no_game")
-        elif c.phase == "no_caps":
-            changed = await self._set_status("no_caps")
-        elif c.phase == "crashed":
-            changed = await self._set_status("no_game", c.error)
-        elif c.phase == "starting":
-            changed = await self._set_status("connecting")
+        if c.phase in CAPTURE_STATUS:
+            changed = await self._set_status(CAPTURE_STATUS[c.phase], c.error if c.phase == "crashed" else "")
         else:
             port = c.status.get("port")
             changed = await self._set_status("capturing", f"Spielserver-Port {port}" if port else "wartet auf Kampfdaten")
@@ -335,54 +190,21 @@ class DpsFeed:
             for fn in self.status_listeners:
                 await fn()
 
+    # ------------------------------------------------------------ Ablauf
     async def watch(self) -> None:
-        async def idle_loop() -> None:
-            while True:
-                await asyncio.sleep(1)
-                await self.check_idle()
-
-        idle = asyncio.ensure_future(idle_loop())
+        """Läuft, solange das Modul an ist: hält die gewählte Quelle am Laufen und startet sie neu, wenn sie
+        endet oder sich die Einstellungen ändern."""
+        idle = asyncio.ensure_future(self._idle_loop())
         timeout = aiohttp.ClientTimeout(total=None, connect=3, sock_read=READ_TIMEOUT_S)
-        current: list[asyncio.Task] = []  # laufender Mitschnitt/Stream, bei Abbruch mitbeenden
+        current: list[asyncio.Task] = []  # laufende Quelle, bei Abbruch mitbeenden
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 while True:
                     self._wake.clear()
-                    if not self.settings.enabled:
-                        self.port = None
-                        await self._set_status("off")
-                        await self._wake.wait()
+                    job = await self._next_job(session)
+                    if job is None:
                         continue
-                    if self.settings.source == "capture":
-                        self.port = None
-                        job = asyncio.ensure_future(self.capture.run(self.settings.capture_bin, self.language()))
-                        wake = asyncio.ensure_future(self._wake.wait())
-                        current[:] = [job, wake]
-                        await asyncio.wait({job, wake}, return_when=asyncio.FIRST_COMPLETED)
-                        for t in (job, wake):
-                            t.cancel()
-                        await asyncio.gather(job, return_exceptions=True)  # Programm sauber beenden
-                        if not self._wake.is_set():
-                            await self._sleep(RETRY_S)
-                        continue
-                    target = self._target()
-                    if target is None:
-                        await self._set_status("no_meter", "nicht installiert")
-                        await self._sleep(10)
-                        continue
-                    port, key = target
-                    if port < 0:
-                        await self._set_status("overlay_off")
-                        await self._sleep(5)
-                        continue
-                    self.port = port
-                    # Einstellungen geändert → Verbindung sofort abbrechen und neu aufbauen
-                    stream = asyncio.ensure_future(self._stream(session, port, key))
-                    wake = asyncio.ensure_future(self._wake.wait())
-                    current[:] = [stream, wake]
-                    await asyncio.wait({stream, wake}, return_when=asyncio.FIRST_COMPLETED)
-                    for t in (stream, wake):
-                        t.cancel()
+                    await self._until_wake(job, current)
                     if not self._wake.is_set():
                         await self._sleep(RETRY_S)
         finally:
@@ -392,33 +214,29 @@ class DpsFeed:
                 t.cancel()
             await asyncio.gather(*current, return_exceptions=True)
 
-    async def _stream(self, session: aiohttp.ClientSession, port: int, key: str) -> None:
-        url = f"http://127.0.0.1:{port}/overlay/events"
-        if self.status not in ("connected", "no_meter"):
-            await self._set_status("connecting")
-        try:
-            async with session.get(url, params={"key": key}) as resp:
-                if resp.status == 403:
-                    await self._set_status("bad_key")
-                    return
-                if resp.status != 200 or not resp.content_type.startswith("text/event-stream"):
-                    await self._set_status("no_meter", f"Antwort {resp.status} auf Port {port}")
-                    return
-                await self._set_status("connected")
-                first = True
-                async for raw in resp.content:
-                    line = raw.decode(errors="replace").rstrip("\r\n")
-                    if not line.startswith("data:"):
-                        continue
-                    try:
-                        snap = json.loads(line[5:].strip())
-                    except ValueError:
-                        continue
-                    if isinstance(snap, dict):
-                        await self._apply(compact(snap), baseline=first, fight=fight_view(snap))
-                        first = False
-            await self._set_status("no_meter", "Verbindung beendet")
-        except aiohttp.ClientConnectorError:
-            await self._set_status("no_meter")
-        except (aiohttp.ClientError, TimeoutError) as e:
-            await self._set_status("no_meter", type(e).__name__)
+    async def _idle_loop(self) -> None:
+        while True:
+            await asyncio.sleep(1)
+            await self.combat.check_idle()
+
+    async def _next_job(self, session: aiohttp.ClientSession) -> Awaitable[None] | None:
+        """Was als Nächstes läuft: der Mitschnitt, eine Verbindung zum Meter, oder nichts (ausgeschaltet)."""
+        if not self.settings.enabled:
+            self.port = None
+            await self._set_status("off")
+            await self._wake.wait()
+            return None
+        if self.settings.source == "capture":
+            self.port = None
+            return self.capture.run(self.settings.capture_bin, self.language())
+        return await self._meter_job(session)
+
+    async def _until_wake(self, job: Awaitable[None], current: list[asyncio.Task]) -> None:
+        """Die Quelle laufen lassen, bis sie endet oder sich die Einstellungen ändern; dann sauber beenden."""
+        task = asyncio.ensure_future(job)
+        wake = asyncio.ensure_future(self._wake.wait())
+        current[:] = [task, wake]
+        await asyncio.wait({task, wake}, return_when=asyncio.FIRST_COMPLETED)
+        for t in (task, wake):
+            t.cancel()
+        await asyncio.gather(task, return_exceptions=True)

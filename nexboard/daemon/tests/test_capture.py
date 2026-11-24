@@ -8,7 +8,7 @@ import pytest
 
 from deckbar_daemon import capture
 from deckbar_daemon.capture import Capture, is_aion2_process
-from deckbar_daemon.dps import compact
+from deckbar_daemon.dps_view import compact
 
 FAKE = textwrap.dedent('''\
     import json, sys

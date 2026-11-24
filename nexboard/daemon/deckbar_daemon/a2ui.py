@@ -165,7 +165,7 @@ class A2Ui:
         except (OSError, ValueError) as e:
             log.warning("%s unlesbar: %s", self.settings_path, e)
         # Erster Start: Einstellungen des A2Tools-Meters übernehmen (Theme, Spielerlimit, Sprache …)
-        from .dps import a2tools_settings_path
+        from .a2tools_meter import a2tools_settings_path
         try:
             a2 = json.loads(a2tools_settings_path().read_text())
             data = {k: str(v) for k, v in a2.items() if not NO_IMPORT.search(k)} if isinstance(a2, dict) else {}

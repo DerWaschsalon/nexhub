@@ -7,7 +7,9 @@ from nexproto import device
 
 from deckbar_daemon import dps as dps_mod
 from deckbar_daemon.config import Layout
-from deckbar_daemon.dps import DpsFeed, DpsSettings, compact, read_a2tools
+from deckbar_daemon.a2tools_meter import read_a2tools
+from deckbar_daemon.dps import DpsFeed, DpsSettings
+from deckbar_daemon.dps_view import compact
 from deckbar_daemon.state import State
 
 SNAP = {
