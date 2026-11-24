@@ -1,8 +1,7 @@
 import struct
 import unittest
 
-from radar.mitschnitt import TcpStrom
-from radar.protokoll import StromZerleger, lz4_entpacken, nachrichten, uvarint
+from deckbar_daemon.core.packets import StreamParser, TcpStream, lz4_decompress, messages, uvarint
 from radar.zustand import RadarZustand
 
 
@@ -39,19 +38,19 @@ class Protokoll(unittest.TestCase):
     def test_lz4_mit_wiederholung(self):
         # Literal "ab", dann 6 Bytes ab Versatz 2 -> "abababab"
         block = bytes([0x22]) + b"ab" + b"\x02\x00"
-        self.assertEqual(lz4_entpacken(block, 8), b"abababab")
+        self.assertEqual(lz4_decompress(block, 8), b"abababab")
 
     def test_lz4_container(self):
         innen = frame(0x1234, b"xyz")
         block = bytes([len(innen) << 4]) + innen  # nur Literale
         inhalt = b"\xff\xff" + struct.pack("<I", len(innen)) + block
-        self.assertEqual(list(nachrichten(inhalt)), [(0x1234, b"xyz")])
+        self.assertEqual(list(messages(inhalt)), [(0x1234, b"xyz")])
 
     def test_frame_ueber_segmentgrenze(self):
         daten = frame(0x1111, b"a" * 50) + frame(0x2222, b"b")
-        z = StromZerleger()
-        erst = list(z.fuettern(daten[:20]))
-        rest = list(z.fuettern(daten[20:]))
+        z = StreamParser()
+        erst = list(z.feed(daten[:20]))
+        rest = list(z.feed(daten[20:]))
         self.assertEqual(erst, [])
         self.assertEqual([op for op, _ in rest], [0x1111, 0x2222])
 
@@ -59,7 +58,7 @@ class Protokoll(unittest.TestCase):
 class Tcp(unittest.TestCase):
     def test_reihenfolge_und_wiederholung(self):
         aus = []
-        s = TcpStrom(aus.append, lambda: None)
+        s = TcpStream(aus.append, lambda: None)
         s.segment(1000, 0x02, b"")       # SYN
         s.segment(1005, 0, b"world")     # zu frueh
         s.segment(1001, 0, b"hall")
@@ -86,11 +85,11 @@ class Zustand(unittest.TestCase):
         neu = []
         z.bei_neuem_cube.append(neu.append)
         char = frame(0x3633, varint(8956) + b"\x5f\x91\xe9\x28\x37\x07Navonex" + bytes(40))
-        strom = StromZerleger()
+        strom = StreamParser()
         daten = (char + bewegung(8956, 1000.0, 2000.0, 50.0)
                  + spawn(77, 1000295, 3000.0, 2000.0, 450.0)   # Cube, 20 m noerdlich, 4 m hoeher
                  + spawn(78, 1100133, 0.0, 0.0, 0.0))          # kein Cube
-        for op, p in strom.fuettern(daten):
+        for op, p in strom.feed(daten):
             z.verarbeiten(op, p)
         s = z.schnappschuss()
         self.assertEqual(s["eid"], 8956)
@@ -99,14 +98,14 @@ class Zustand(unittest.TestCase):
         self.assertEqual([c.eid for c in s["cubes"]], [77])
         self.assertEqual(len(neu), 1)
 
-        for op, p in strom.fuettern(frame(0x3635, varint(77))):
+        for op, p in strom.feed(frame(0x3635, varint(77))):
             z.verarbeiten(op, p)
         self.assertEqual(z.schnappschuss()["cubes"], [])
 
     def test_fremde_bewegung_ignoriert(self):
         z = RadarZustand()
         z.eigene_eid = 1
-        for op, p in StromZerleger().fuettern(bewegung(2, 5.0, 5.0, 5.0)):
+        for op, p in StreamParser().feed(bewegung(2, 5.0, 5.0, 5.0)):
             z.verarbeiten(op, p)
         self.assertIsNone(z.schnappschuss()["position"])
 

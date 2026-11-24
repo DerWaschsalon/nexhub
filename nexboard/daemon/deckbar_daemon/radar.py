@@ -81,7 +81,7 @@ class Radar:
     @property
     def fehler(self) -> str | None:
         """Warum der Mitschnitt des Radars nicht läuft (etwa tcpdump ohne Rechte), sonst None."""
-        return self.dienst.quelle.fehler if self.dienst else None
+        return self.dienst.fehler if self.dienst else None
 
     @property
     def aufnahme(self) -> bool:
@@ -153,7 +153,7 @@ class Radar:
             raise RuntimeError("Radar läuft nicht")
         aktionen = {"ton_testen": konfig.ton_abspielen, "warnung_testen": self.dienst.warnung_testen,
                     "aufnahme_start": self.dienst.aufnahme_starten,
-                    "aufnahme_stopp": self.dienst.quelle.aufnahme_stoppen,
+                    "aufnahme_stopp": self.dienst.aufnahme_stoppen,
                     "ansage_testen": lambda: self.dienst.ansage_testen(ruf)}
         aktionen[name]()
 
