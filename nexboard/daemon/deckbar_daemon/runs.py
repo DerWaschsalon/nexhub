@@ -1,4 +1,6 @@
-"""AION-2-Dungeon-Runs (Beobachten und Posten; Daten in run_model.py, Bild in run_image.py): nach jedem Run ein PNG mit der Schadensaufteilung pro Boss nach Discord.
+"""AION-2-Dungeon-Runs: Bosskämpfe beobachten und zu Runs zusammenfassen (Daten in run_model.py, Bild in
+run_image.py). Wohin ein beendeter Run geht, entscheiden die eingehängten Wege (`publishers`): das Bild per
+Discord-Webhook (run_webhook.py), der Upload an den NexHub (hub.py).
 
 Quelle ist nicht der Live-Stream (dps.py), sondern die Kampf-History im Format des A2Tools-Meters,
 geschrieben von deckbar-capture (Quelle `capture`) oder vom Meter selbst:
@@ -13,7 +15,7 @@ ergeben einen Run. Er endet,
   - wenn der nächste Kampf in einem anderen Dungeon stattfindet oder ein in diesem Run
     schon besiegter Boss wieder auftaucht,
   - oder nach `idle_minutes` ohne neuen Bosskampf.
-Gepostet wird jeder Run mit mindestens einem besiegten Boss, per Discord-Webhook.
+An die Wege geht jeder Run mit mindestens einem besiegten Boss.
 
 Das Meter speichert fremde Namen maskiert („Mo***n“: zwei Zeichen vorn, eins hinten), der
 Live-Stream (State `dps`) zeigt sie aber voll. Die NexBoard merkt sich die vollen Namen
@@ -28,19 +30,18 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Awaitable, Callable
 
-import aiohttp
 from nexcore.settings import ADVANCED, HIDDEN, SECRET, SettingsStore
 from pydantic import Field, field_validator
 
 from .config import _atomic_write, _Strict
-from .run_image import fmt_time, render_run, run_image
+from .run_image import fmt_time, render_run
 from .run_model import (
     Fight,
     Run,
+    RunPublisher,
     RunTracker,
     a2tools_dir,
     char_key,
@@ -103,33 +104,6 @@ class RunSettings(_Strict):
         return out
 
 
-def run_message(run: Run) -> str:
-    bosses = run.bosses()
-    fight_ms = sum(b.duration_ms for b in bosses)
-    return (f"**{run.name}** – {run.kills}/{len(bosses)} {'Boss' if len(bosses) == 1 else 'Bosse'} besiegt, "
-            f"Kampfzeit {fmt_time(fight_ms)} ({datetime.fromtimestamp(run.start_ms / 1000):%H:%M}–"
-            f"{datetime.fromtimestamp(run.end_ms / 1000):%H:%M})")
-
-
-async def post_discord(session: aiohttp.ClientSession, webhook: str, text: str, png: bytes, filename: str) -> None:
-    """PNG + Text an einen Discord-Webhook; wartet einmal, falls Discord bremst (429)."""
-    payload = {"content": text, "username": "NexBoard", "allowed_mentions": {"parse": []},
-               "attachments": [{"id": 0, "filename": filename}]}
-    for attempt in range(2):
-        form = aiohttp.FormData()
-        form.add_field("payload_json", json.dumps(payload), content_type="application/json")
-        form.add_field("files[0]", png, filename=filename, content_type="image/webp")
-        async with session.post(webhook, data=form) as resp:
-            if resp.status == 429 and attempt == 0:
-                retry = float((await resp.json(content_type=None) or {}).get("retry_after", 2))
-                await asyncio.sleep(min(retry, 30))
-                continue
-            if resp.status >= 300:
-                body = (await resp.text())[:200]
-                raise RuntimeError(f"Discord antwortet {resp.status}: {body}")
-            return
-
-
 # ---------------------------------------------------------------- Dienst
 class DungeonRuns:
     def __init__(self, config_dir: Path) -> None:
@@ -149,10 +123,10 @@ class DungeonRuns:
                 if is_end_boss(mob):
                     self.tracker.listed.add(dungeon)
         self.last: Run | None = None  # zuletzt beendeter Run (Vorschau, Testpost)
-        self.result = ""  # letzter Post: Erfolg oder Fehler, für die Web-UI
         self.listeners: list[Callable[[], Awaitable[None]]] = []
-        # Jeder beendete Run mit besiegtem Boss, Namen schon aufgelöst (z. B. NexHub, hub.py)
-        self.run_listeners: list[Callable[[Run], Awaitable[None]]] = []
+        # Wohin ein beendeter Run mit besiegtem Boss geht (Discord-Webhook, NexHub), Namen schon aufgelöst.
+        # Die Runs kennen ihre Wege nicht: app.py hängt sie ein.
+        self.publishers: list[RunPublisher] = []
         self._ready = False
         # Wo die History liegt, hängt an der DPS-Quelle (app.py setzt das)
         self.history_dir: Callable[[], Path] = lambda: a2tools_dir() / "history"
@@ -177,7 +151,7 @@ class DungeonRuns:
         if self.last:
             last = {"name": self.last.name, "end": self.last.end_ms, "kills": self.last.kills}
         return {"settings": s, "history": self.history_dir().is_dir(),
-                "last_run": last, "result": self.result, "open_run": bool(self.tracker.run),
+                "last_run": last, "open_run": bool(self.tracker.run),
                 "characters": self.characters()}
 
     def names(self) -> dict[str, str]:
@@ -366,15 +340,13 @@ class DungeonRuns:
         return closed
 
     async def watch(self) -> None:
-        timeout = aiohttp.ClientTimeout(total=30)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            for run in await self.start():
-                await self._finish(session, run, late=True)
-            while True:
-                await asyncio.sleep(POLL_S)
-                await self.poll(session)
+        for run in await self.start():
+            await self._finish(run, late=True)
+        while True:
+            await asyncio.sleep(POLL_S)
+            await self.poll()
 
-    async def poll(self, session: aiohttp.ClientSession) -> None:
+    async def poll(self) -> None:
         closed: list[Run] = []
         fights: list[Fight] = []
         if self._dirty or not self.event_driven():
@@ -397,9 +369,9 @@ class DungeonRuns:
         for entry in list(self.pending):
             if now - entry[1] >= SETTLE_RUN_S:
                 self.pending.remove(entry)
-                await self._finish(session, entry[0])
+                await self._finish(entry[0])
 
-    async def _finish(self, session: aiohttp.ClientSession, run: Run, late: bool = False) -> None:
+    async def _finish(self, run: Run, late: bool = False) -> None:
         self.done |= {f.id for f in run.fights}
         self.last_ms = run.end_ms
         self._write_state()
@@ -411,29 +383,13 @@ class DungeonRuns:
         if late and time.time() * 1000 - run.end_ms > LATE_POST_S * 1000:
             await self._notify()
             return
-        if self.settings.enabled and self.settings.webhook:
-            await self.post(session, run)
         run.rename(self.names())
-        for fn in self.run_listeners:
+        for publisher in self.publishers:
             try:
-                await fn(run)
-            except Exception:  # ein Zuhörer (Netz) darf das Auswerten nicht anhalten
-                log.exception("Run-Zuhörer")
+                await publisher.publish(run)
+            except Exception:  # ein Weg (Netz) darf das Auswerten nicht anhalten
+                log.exception("Run nicht veröffentlicht (%s)", type(publisher).__name__)
         await self._notify()
-
-    async def post(self, session: aiohttp.ClientSession, run: Run) -> bool:
-        run.rename(self.names())
-        try:
-            png = await run_image(run)
-            name = f"run-{datetime.fromtimestamp(run.start_ms / 1000):%Y%m%d-%H%M}.webp"
-            await post_discord(session, self.settings.webhook, run_message(run), png, name)
-        except (aiohttp.ClientError, TimeoutError, RuntimeError, OSError) as e:
-            self.result = f"Fehler beim Posten: {e}"
-            log.warning("Discord: %s", e)
-            return False
-        self.result = f"gepostet: {run.name}, {datetime.fromtimestamp(run.end_ms / 1000):%d.%m. %H:%M}"
-        log.info("Discord: %s", self.result)
-        return True
 
     def latest_run(self) -> Run | None:
         """Zuletzt beendeter Run – oder, falls seit dem Start keiner endete, der letzte aus der History."""
@@ -466,7 +422,7 @@ def _cli() -> None:
         sys.exit("keine Dungeon-Runs in der History")
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "run.webp")
     out.write_bytes(render_run(run))
-    print(run_message(run), "→", out)
+    print(run.name, "→", out)
 
 
 if __name__ == "__main__":

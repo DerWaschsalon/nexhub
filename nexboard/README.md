@@ -342,7 +342,9 @@ Nach jedem Dungeon-Run postet der Daemon ein Bild mit dem Schaden pro Spieler un
 Discord-Webhook (Modul „AION 2 · Dungeon-Runs“, gespeichert in `~/.config/deckbar/aion2.runs.yaml`).
 Quelle ist die Kampf-History, je nach DPS-Quelle die von `deckbar-capture` oder die des Meters. Ein Run endet, sobald der Endboss liegt, bei einem
 Dungeonwechsel oder nach einer einstellbaren Zeit ohne Bosskampf (Details in
-`daemon/deckbar_daemon/runs.py`, Daten in `run_model.py`, Bild in `run_image.py`). Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
+`daemon/deckbar_daemon/runs.py`, Daten in `run_model.py`, Bild in `run_image.py`). Wohin ein beendeter Run geht,
+sind eingehängte Wege mit derselben Schnittstelle (`RunPublisher` in `run_model.py`): der Webhook
+(`run_webhook.py`) und der NexHub (`hub.py`); ein neuer Weg ist eine Klasse mit `publish(run)` und eine Zeile in `app.py`. Die Vorschau und „Letzten Run jetzt posten“ helfen beim Einrichten.
 
 Die History maskiert fremde Namen. Die NexBoard lernt die vollen Namen aus dem Live-Stream und
 speichert sie nur lokal (`runs-state.json`). In der Web-UI lassen sie sich von Hand korrigieren.

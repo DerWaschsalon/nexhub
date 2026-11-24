@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
+from typing import Protocol
 
 from nexproto.classes import JOB_CLASSES
 from nexproto.dungeons import EXTRA_DUNGEONS
@@ -336,3 +337,10 @@ class RunTracker:
         if self.run and now_ms - self.run.end_ms > self.idle_ms:
             return [self._close(False)]
         return []
+
+
+class RunPublisher(Protocol):
+    """Ein Weg, den ein beendeter Run geht (Discord-Webhook, NexHub). DungeonRuns ruft jeden auf, ohne zu
+    wissen, was er tut; ob er gerade eingeschaltet ist, entscheidet der Weg selbst."""
+
+    async def publish(self, run: Run) -> None: ...

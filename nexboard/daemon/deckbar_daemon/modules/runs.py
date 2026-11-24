@@ -4,18 +4,18 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from aiohttp import ClientSession, ClientTimeout, web
+from aiohttp import web
 from nexcore import Context, ModuleInfo
 from nexcore.errors import ApiError
 from nexcore.settings import SettingsStore
 
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
+from ..run_webhook import WebhookPublisher
 from ..runs import DungeonRuns, render_run
 from ..state import State
 from .base import WebModule
 
-POST_TIMEOUT_S = 30
 NO_RUN = "noch kein Dungeon-Run in der History"
 
 
@@ -28,14 +28,16 @@ class RunsModule(WebModule):
     )
     ui_key = "runs"
 
-    def __init__(self, ctx: Context, live: LiveHub, runs: DungeonRuns, state: State) -> None:
+    def __init__(self, ctx: Context, live: LiveHub, runs: DungeonRuns, state: State,
+                 webhook: WebhookPublisher) -> None:
         super().__init__(ctx, live)
         self.runs = runs
+        self.webhook = webhook  # der Weg nach Discord: sein letztes Ergebnis und der Knopf „jetzt posten“
         runs.listeners.append(self.changed)
         state.subscribe(self.on_state)
 
     def ui_info(self) -> dict[str, Any]:
-        return self.runs.info()
+        return {**self.runs.info(), "result": self.webhook.result}
 
     @property
     def store(self) -> SettingsStore[Any]:
@@ -55,7 +57,7 @@ class RunsModule(WebModule):
         r = self.runs
         last = {"name": r.last.name, "end": r.last.end_ms, "kills": r.last.kills} if r.last else None
         return {"open_run": bool(r.tracker.run), "posting": bool(r.settings.enabled and r.settings.webhook),
-                "last": last, "result": r.result}
+                "last": last, "result": self.webhook.result}
 
     def routes(self, router: web.UrlDispatcher) -> None:
         router.add_get("/api/runs", self.api_get)
@@ -64,11 +66,11 @@ class RunsModule(WebModule):
         router.add_post("/api/runs/test", self.api_test)
 
     async def api_get(self, request: web.Request) -> web.Response:
-        return web.json_response(self.runs.info())
+        return web.json_response(self.ui_info())
 
     async def api_put(self, request: web.Request) -> web.Response:
         await self.update_settings(await read_object(request))
-        return ok(**self.runs.info())
+        return ok(**self.ui_info())
 
     async def latest_run(self) -> Any:
         run = await asyncio.to_thread(self.runs.latest_run)
@@ -86,9 +88,9 @@ class RunsModule(WebModule):
         if not self.runs.settings.webhook:
             raise ApiError(400, "keine Webhook-URL eingetragen")
         run = await self.latest_run()
-        async with ClientSession(timeout=ClientTimeout(total=POST_TIMEOUT_S)) as session:
-            sent = await self.runs.post(session, run)
+        run.rename(self.runs.names())
+        sent = await self.webhook.post(run)
         await self.changed()
         if not sent:
-            raise ApiError(502, self.runs.result)
-        return ok(**self.runs.info())
+            raise ApiError(502, self.webhook.result)
+        return ok(**self.ui_info())
