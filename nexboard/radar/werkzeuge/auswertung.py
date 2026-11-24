@@ -10,14 +10,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import struct
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from deckbar_daemon.core.packets import PcapSource, server_segments, uvarint
-from radar.warnung import WarnZentrale
-from radar.zustand import RadarZustand
+from deckbar_daemon.aion2.cast_trainer import CastTrainer
+from deckbar_daemon.aion2.fight import FightEvents
+from deckbar_daemon.aion2.mechanic_warnings import MechanicWarnings
+from deckbar_daemon.aion2.warning_board import WarningBoard
+from deckbar_daemon.aion2.world import World
+from deckbar_daemon.core.packets import PcapSource, server_segments
+from deckbar_daemon.core.packets.messages import Hit, Vitals
 
 KAEMPFE = Path.home() / ".local/share/deckbar/aion2/history"
 SKILLNAMEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n/skills/de.json")
@@ -47,38 +50,28 @@ def main() -> None:
     skillname = json.loads(SKILLNAMEN.read_text()) if SKILLNAMEN.exists() else {}
     skillname["1801116"] = "Regen des Hasses"  # die Ticks haben keinen eigenen Namen
 
-    # Mitschnitt einmal durch Radar-Zustand und Warnzentrale laufen lassen
-    zustand = RadarZustand(a.name)
+    # Mitschnitt einmal durch Welt und Warn-Anzeige laufen lassen
     uhr = [0.0]
-    zentrale = WarnZentrale(zustand, uhr=lambda: uhr[0])
-    zentrale.an = True
-    zustand.bei_cast.append(zentrale.cast)
+    quelle, welt = PcapSource(), World(a.name)
+    kampf = FightEvents(welt)
+    tafel = WarningBoard(welt, clock=lambda: uhr[0])
+    tafel.enabled = True
+    MechanicWarnings(tafel, kampf)
+    CastTrainer(tafel, kampf)
+    welt.attach(quelle)
+    kampf.attach(quelle)
     hp = defaultdict(list)        # entity -> [(zeit, hp)]
     treffer = defaultdict(list)   # ziel -> [(zeit, angreifer, skill)]
     warnungen = []                # [(zeit, [(titel, seit)])]
-
-    lesen = zustand.verarbeiten
-
-    def mitlesen(op: int, p: bytes) -> None:
-        lesen(op, p)
-        try:
-            eid, n = uvarint(p)
-            if op == 0x8D00 and p[n:n + 3] == b"\x02\x01\x00":
-                hp[eid].append((uhr[0], struct.unpack_from("<I", p, n + 3)[0]))
-            elif op == 0x3804:
-                angreifer, k = uvarint(p, n + 2)
-                treffer[eid].append((uhr[0], angreifer, struct.unpack_from("<I", p, n + 2 + k)[0]))
-        except (ValueError, struct.error):
-            pass
-    quelle = PcapSource()
-    quelle.subscribe(None, mitlesen)
+    quelle.on(Vitals, lambda m: m.hp is not None and hp[m.entity].append((uhr[0], m.hp)))
+    quelle.on(Hit, lambda m: treffer[m.entity].append((uhr[0], m.attacker, m.skill)))
     von = None
     with open(a.pcap, "rb") as f:
         for zeit, segment in server_segments(f):
             von = von or zeit
             uhr[0] = zeit
             quelle.feed(*segment)
-            warnungen.append((zeit, [(w.regel.titel, w.seit) for w in zentrale.schnappschuss()]))
+            warnungen.append((zeit, [(w.rule.title, w.since) for w in tafel.snapshot()]))
 
     vorwarnung = []
     ursachen = Counter()

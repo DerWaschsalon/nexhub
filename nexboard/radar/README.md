@@ -39,9 +39,9 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
 - **Lernhilfe:** Jeder Cast eines Bosses, zu dem es noch keine Cast-Warnung gibt, erscheint grau mit Namen aus den A2Tools-Daten
   (Schalter „Alle Boss-Casts zeigen“).
 - **Status auf dir** (`0x382A`): Ignus' Flammenbombe → „Verzögerte Explosion – DU!“ (3 s, danach Feuerpfütze).
-  Weitere Effekte als Einträge mit `wann.art: effekt` in `radar/mechaniken.json`, IDs aus A2Tools `abnormals`.
+  Weitere Effekte als Einträge mit `wann.art: effekt` in `mechanics.json`, IDs aus A2Tools `abnormals`.
 - **Boss groggy** (`0xE005`, Stagger-Leiste gebrochen): Ansage in allen Dungeons, etwa 5 s Zeit für vollen Schaden.
-- **Weitere Dungeons** (`radar/mechaniken.json`, 32 Mechaniken; 10 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie): Urugugu (Raur-Konter, Auldor-Sturmstreich,
+- **Weitere Dungeons** (`aion2/data/mechanics.json`, 32 Mechaniken; 10 davon aus eigenen Guides: Urugugu Raur-Zeitbombe und -Ansturm, Urahum-Flächen und Tankschlag, Auldor-Linien, -Sturzschlag, -Rundum und -Wirbel, Grimmhorn Kwapo-Donnergrollen, Duanka-Nekromantie): Urugugu (Raur-Konter, Auldor-Sturmstreich,
   Urahum-Gift und -Pfütze), Vakron-Himmelsinsel (Tiere, Thamon-Versteinerung, Vakron-Male), Krao-Höhle
   (Berk), Draupnir (Bakarma), Grimmhorn (Nuakum-Blutung), Deus (Nazmun-Bombe, Atiel-Kette), Arkanis,
   dazu Ignus' Flammenzone. Auslöser: Boss-Cast, Status auf dir, einem Mitspieler, jedem Spieler oder dem Boss,
@@ -50,10 +50,10 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
   Boss-Ansagen (unten). Mit Folge-Hinweis, wenn es vorbei ist („Abstand halten“). IDs und Zeiten nach
   [xinjalin/glass-cannon](https://github.com/xinjalin/glass-cannon) `gamedata/boss-mechanics.json`
   (MIT, Copyright (c) 2026 Xinjalin), Texte eigene; dort zum Teil nur als Hinweise ungeprüft, selbst bestätigt
-  sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechaniken.json`; ihr Schalter auf
+  sind Raur `15044501` und Urahum `16051103`. Neue Mechanik = ein Eintrag in `mechanics.json`; ihr Schalter auf
   der Seite entsteht daraus (`meldung`). Auch die älteren Regeln (Feuertempel, Albtraum, Urugugu) stehen dort,
   mit `zugleich`/`plan` für Vorhersagen und `fenster` für Kromedes Regen.
-- **Boss-Ansagen** (`radar/ansagen.py`, Daten `radar/ansagen.json`, ein Schalter je Boss): wie das Plugin
+- **Boss-Ansagen** (`aion2/callouts.py`, Daten `callouts.json`, ein Schalter je Boss): wie das Plugin
   „Boss Callouts“ von [taengu/A2Tools-Plugins](https://github.com/taengu/A2Tools-Plugins) (GPL-3.0, Zeilen
   (c) NCSOFT), 202 Ansagen von 54 Bossen, auch Ludra, Kelch von Muspel, Läuterungsstätte der Korrosion, Roter
   Spiegel und Versunkener Lebenstempel. Gesagt wird, was das Spiel zeigt: die Zeile des Bosses, bei Skills mit
@@ -70,7 +70,7 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
   Spielpatch `STAND` in `werkzeuge/ansagen.py` erhöhen und `python3 -m werkzeuge.ansagen` ausführen.
 - **Jetzt staggern** (Berk, Bakarma, Atiel): sobald die Stagger-Leiste brechbar wird, nach einer Pause oder wenn sie
   erst spät im Kampf erscheint. Endet mit „Boss groggy“, sonst nach 25 s.
-- **Blickrichtung aus der Minikarte** (`radar/minikarte.py`): Der Server schickt die eigene Blickrichtung nie und die Position nur bei Sprint, Sprung oder Kampf. Darum liest das Radar die Minikarte direkt aus dem Spielfenster (X11, `python-xlib`): Die Blickrichtung ist die Mitte zwischen den beiden weißen Linien des Sichtfelds. Einstellung `"minikarte": [x, y, Breite, Höhe]` in Pixeln des Spielfensters, quadratisch und mittig auf dem Pfeil (leer = aus).
+- **Blickrichtung aus der Minikarte** (`aion2/minimap.py`): Der Server schickt die eigene Blickrichtung nie und die Position nur bei Sprint, Sprung oder Kampf. Darum liest das Radar die Minikarte direkt aus dem Spielfenster (X11, `python-xlib`): Die Blickrichtung ist die Mitte zwischen den beiden weißen Linien des Sichtfelds. Einstellung `"minikarte": [x, y, Breite, Höhe]` in Pixeln des Spielfensters, quadratisch und mittig auf dem Pfeil (leer = aus).
 - **Fläche unter dir** (`0x3848`, Boden-Markierung, Aufbau nach glass-cannon): Markiert ein Monster eine Fläche, deren Mittelpunkt höchstens `flaeche_m` (Standard 6 m, in `~/.config/aion2-radar.json`) neben dir liegt, kommt „Fläche unter dir – DU!“ mit Countdown bis zum Einschlag. Größe und Form stehen nicht im Paket, deshalb der feste Abstand. Mehrere Markierungen einer Welle = eine Warnung. Gruppe `flaeche`, auch über `/api/radar/kampf`.
 - **Berserker-Zeit** (`0x8D21`): Countdown in der Vorschauzeile, solange der Boss im Kampf ist.
 - **Wenig LP** (`0x921B`): Mitspieler unter 25 % LP, einmal bis zur Erholung über 50 %. Schalter unter „alle Dungeons“.
@@ -100,34 +100,42 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
   Toden und dem Cast, der regelmäßig davor kommt.
 
 Start: über das NexBoard-Modul **AION 2 · Radar** (Web-UI, Seiten „Warnungen“ und „Radar & Karte“). Ist es an, startet der Daemon das Radar
-(`RadarDienst`), sobald AION 2 läuft, und beendet es 30 s nach Spielende. Den Stand schickt er etwa fünfmal pro
+(`RadarService`), sobald AION 2 läuft, und beendet es 30 s nach Spielende. Den Stand schickt er etwa fünfmal pro
 Sekunde als Overlay-Ereignis `radar`, gezeichnet von den Widgets `cube.js`, `map.js` und `warnings.js` unter `daemon/deckbar_daemon/web/overlay/widgets/`. Auf den Seiten
 stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den allgemeinen Einstellungen
 (der Daemon schreibt sie in die Datei des Radars). Standardwerte und Warnungsliste stehen in
-`radar/standard.json`; die Schalter der Warnungen ergeben sich aus `radar/mechaniken.json` und `radar/ansagen.json`
-(`warnung.schalter()`, liest auch die Seite).
+`aion2/data/defaults.json`; die Schalter der Warnungen ergeben sich aus `mechanics.json` und `callouts.json`
+(`rules.switches()`, liest auch die Seite).
+
+Der Code des Radars liegt im Daemon unter `daemon/deckbar_daemon/` (dieser Ordner hält nur noch Karten,
+Werkzeuge und den Goldtest):
 
 | Datei | Inhalt |
 |---|---|
-| `daemon/deckbar_daemon/core/packets/` | Kernbaustein des Daemons: Varint, LZ4, Frames (`frames.py`), pcap und TCP (`tcp.py`), Paketquellen mit `subscribe(opcodes, handler)` (`source.py`: `PcapSource`, `TcpdumpSource`) |
-| `radar/zustand.py` | wertet Nachrichten aus: Cubes, eigene ID, Position, Casts |
-| `radar/dienst.py` | RadarDienst: verbindet alles, Ton, Ansagen, Aufnahme, Stand fürs Overlay |
-| `radar/warnung.py` | Boss-Regeln, Warnungen, Ansagen |
-| `radar/konfig.py` | gemeinsame Einstellungen, Ton bei neuem Cube |
-| `radar/uebersicht.py` | Feldbosse für die Seite „Termine“, Feldboss- und Riss-Ansagen |
-| `radar/daten.py` | Namen (A2Tools, Vertraute), gespeicherte Zustände |
-| `radar/punkte.py` | Spawnpunkte, Eichung, Karten |
+| `core/packets/` | Kernbaustein: Varint, LZ4, Frames (`frames.py`), pcap und TCP (`tcp.py`), Paketquellen (`source.py`: `PcapSource`, `TcpdumpSource`) und je Opcode eine Nachricht, die ihre Nutzdaten einmal dekodiert (`messages.py`). Abnehmer melden sich mit der Klasse an: `source.on(Cast, handler)` |
+| `core/speech.py` | Sprachausgabe (Piper) und Töne |
+| `aion2/world.py` | `World`: eigene ID, Position und Laufrichtung, Zone, Dungeon, Namen, Bosse |
+| `aion2/cubes.py`, `party.py`, `field_bosses.py`, `stagger.py` | je ein Thema mit seinem Stand und seinen Signalen |
+| `aion2/fight.py` | was im Kampf passiert, als Signale: Casts, Leisten, Wellen, Effekte, Treffer, Flächen, Tode |
+| `aion2/rules.py`, `data/mechanics.json` | Regeln der Warnungen, Schalter der Seite, englische Texte |
+| `aion2/warning_board.py` | die Warn-Anzeige: laufende Warnungen, Vorhersagen, was gesprochen wird |
+| `aion2/mechanic_warnings.py`, `cast_trainer.py`, `stagger_calls.py`, `combat_aids.py` | die Auslöser: Mechaniken, Lernhilfe, „Jetzt staggern“/groggy, Kampfhilfen |
+| `aion2/callouts.py`, `data/callouts.json` | Boss-Ansagen |
+| `aion2/spawn_points.py`, `maps.py`, `minimap.py` | Spawnpunkte, Karten mit Eichung, Blickrichtung aus der Minikarte |
+| `aion2/settings.py`, `data/defaults.json` | Einstellungen und ihre Standardwerte |
+| `aion2/service.py` | `RadarService`: verdrahtet alles, Takt, Stand fürs Overlay |
+| `radar.py`, `modules/radar.py` | Anbindung an den Daemon: Start mit dem Spiel, Einstellungen, Routen |
 | `werkzeuge/cubekarte.py`, `karten/` | Kartenbild, Cube-Fundorte und Teleporter von aion2hub |
 | `werkzeuge/auswertung.py` | Kämpfe auswerten: Tode, Ursachen, Vorwarnzeiten |
 | `werkzeuge/analyse.py` | Opcode-Statistik eines Mitschnitts |
 | `werkzeuge/lernen.py` | Lernmodus: Boss-Skills einer Aufnahme auswerten |
-| `werkzeuge/bosse.py` | erzeugt `radar/bosse.json` und `radar/zonen.json` (Boss/Zone -> Dungeon) aus den A2Tools-Daten |
+| `werkzeuge/bosse.py` | erzeugt `bosses.json` und `zones.json` (Boss/Zone -> Dungeon) in `aion2/data/` aus den A2Tools-Daten |
 
 - Kämpfe auswerten: `python3 -m werkzeuge.auswertung mitschnitte/datei.pcap`
-- Für andere Programme auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true, "warnungen": [{"gruppe", "titel", "ich", "rest"}]}`: groggy, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s, hängt nicht an der Warnungsanzeige), dazu die gerade laufenden Warnungen (ohne Lernhilfe; auf der Seite abgeschaltete fehlen auch hier). Gruppen wie in `mechaniken.json`. Dazu `boss_effekte` und `eigene_effekte`, je `[{"id", "seit"}]`: Effekte, die gerade auf dem aktuellen Ziel des DPS-Meters bzw. auf dir liegen, aus dem Capture statt aus dem Radar (genauer Anfang und Ende, z. B. Lakshmis Schadensreflexion `16059101`, Präzision/„Letalität“ vom Markierungsschuss `140900171`; Code `nexboard/daemon/deckbar_daemon/boss_effekte.py`). Ohne laufendes Capture leer (`eigene_effekte` dann `null` = unbekannt, ebenso solange die eigene ID fehlt), nach 10 s ohne Treffer am Ziel gilt der Stand als veraltet.
-- Tests: `../daemon/.venv/bin/python -m pytest -q tests` (mit der .venv des Daemons, darin sind nexproto und
-  python-xlib). Dazu gehört der Goldtest (`tests/test_gold.py`): Er spielt jeden Mitschnitt aus
-  `~/.local/share/aion2-radar/mitschnitte/` durch den RadarDienst und durch `deckbar-capture --replay` und vergleicht
+- Für andere Programme auf diesem PC: `GET http://127.0.0.1:8765/api/radar/kampf` gibt `{"groggy": true, "warnungen": [{"gruppe", "titel", "ich", "rest"}]}`: groggy, solange die Stagger-Leiste eines Bosses gebrochen ist (bis eine neue Leiste kommt, höchstens 8 s, hängt nicht an der Warnungsanzeige), dazu die gerade laufenden Warnungen (ohne Lernhilfe; auf der Seite abgeschaltete fehlen auch hier). Gruppen wie in `mechanics.json`. Dazu `boss_effekte` und `eigene_effekte`, je `[{"id", "seit"}]`: Effekte, die gerade auf dem aktuellen Ziel des DPS-Meters bzw. auf dir liegen, aus dem Capture statt aus dem Radar (genauer Anfang und Ende, z. B. Lakshmis Schadensreflexion `16059101`, Präzision/„Letalität“ vom Markierungsschuss `140900171`; Code `nexboard/daemon/deckbar_daemon/boss_effekte.py`). Ohne laufendes Capture leer (`eigene_effekte` dann `null` = unbekannt, ebenso solange die eigene ID fehlt), nach 10 s ohne Treffer am Ziel gilt der Stand als veraltet.
+- Tests: die des Radars laufen mit denen des Daemons (`cd ../daemon && uv run python -m pytest -q`). Hier liegt der
+  Goldtest: `../daemon/.venv/bin/python -m pytest -q tests`. Er gehört (`tests/test_gold.py`): Er spielt jeden Mitschnitt aus
+  `~/.local/share/aion2-radar/mitschnitte/` durch den RadarService und durch `deckbar-capture --replay` und vergleicht
   das Ergebnis mit den Referenzen in `~/.local/share/aion2-radar/gold/`. Referenzen schreiben:
   `python -m werkzeuge.gold --schreiben radar` bzw. `--schreiben capture`. Sie bleiben auf dem Rechner, weil sie
   Namen anderer Spieler enthalten; ohne Mitschnitte wird der Test übersprungen.

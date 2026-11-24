@@ -45,3 +45,36 @@ def test_zweite_verbindung_hat_ihren_eigenen_strom():
     source.feed(other, 1, 0, frame(0x2222, b"zwei"))
     source.feed(FLOW, 4, 0, half[3:])
     assert seen == [b"zwei", b"eins"] and source.streams == 2
+
+
+def test_varint_lz4_und_container():
+    from deckbar_daemon.core.packets import frame_packets, lz4_decompress, uvarint
+    assert uvarint(b"\xfc\x45") == (8956, 2)
+    assert lz4_decompress(bytes([0x22]) + b"ab" + b"\x02\x00", 8) == b"abababab"  # 2 Literale, dann 6 kopiert
+    inner = frame(0x1234, b"xyz")
+    block = bytes([len(inner) << 4]) + inner  # nur Literale
+    assert list(frame_packets(b"\xff\xff" + struct.pack("<I", len(inner)) + block)) == [(0x1234, b"xyz")]
+
+
+def test_wiederholtes_segment_zaehlt_einmal():
+    from deckbar_daemon.core.packets import TcpStream
+    out = []
+    stream = TcpStream(out.append, lambda: None)
+    stream.segment(1000, 0x02, b"")  # SYN
+    stream.segment(1005, 0, b"world")  # zu früh
+    stream.segment(1001, 0, b"hall")
+    stream.segment(1001, 0, b"hall")  # Wiederholung
+    assert b"".join(out) == b"hallworld"
+
+
+def test_typisierte_nachricht_wird_einmal_dekodiert_und_kaputte_faellt_weg():
+    from deckbar_daemon.core.packets.messages import CastBar
+    source = PacketSource()
+    first, second = [], []
+    source.on(CastBar, first.append)
+    source.on(CastBar, second.append)
+    source.publish(0x3809, b"\x7f\x02" + struct.pack("<I", 1604670) + b"\x01\x02")
+    source.publish(0x3809, b"\x7f\x02\x01")  # zu kurz für den Skill
+    source.publish(0x3809, b"")  # nicht einmal eine Entity
+    assert first == [CastBar(127, 1604670, None)] and first[0] is second[0]
+    assert source.packets == 3

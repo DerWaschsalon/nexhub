@@ -1,6 +1,6 @@
 """Goldtest: spielt die Radar-Mitschnitte (pcap) ab und schreibt jedes Ergebnis als JSON-Zeile.
 
-Drei Spuren: „radar“ (jedes Ereignis des RadarDienstes), „capture“ (Ausgabe und Kampfdateien
+Drei Spuren: „radar“ (jedes Ereignis des RadarService), „capture“ (Ausgabe und Kampfdateien
 von deckbar-capture, also die DPS-Kette) und „runs“ (die Dungeon-Runs, die der Daemon aus diesen
 Kampfdateien bildet, mit Discord-Text und den Bildpunkten ihres Bildes). Der Umbau muss für jeden Mitschnitt dasselbe liefern wie
 der alte Code. Die Referenzen liegen neben den Mitschnitten, nicht im Repo: Sie enthalten Namen
@@ -14,7 +14,6 @@ Aufruf (aus nexboard/radar, mit der .venv des Daemons):
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import gzip
 import hashlib
 import io
@@ -29,6 +28,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
+from deckbar_daemon.aion2 import settings
+from deckbar_daemon.aion2.cubes import Cube
+from deckbar_daemon.aion2.service import RadarService
 from deckbar_daemon.core.packets import TcpStream, server_segments
 
 RADAR = Path(__file__).resolve().parent.parent
@@ -40,9 +42,10 @@ TAKT_S = 0.2  # so oft ruft der Daemon RadarDienst.takt() auf
 
 
 def wert(a: object) -> object:
-    """Argument eines Ereignisses als JSON. Cube.seit ist ohne Serverzeit die Wanduhr, fällt weg."""
-    if dataclasses.is_dataclass(a) and not isinstance(a, type):
-        return {k: wert(v) for k, v in dataclasses.asdict(a).items() if k != "seit"}
+    """Argument eines Ereignisses als JSON. Seit wann ein Cube steht, ist ohne Serverzeit die Wanduhr und
+    fällt weg; seine Felder heißen wie in den Referenzen."""
+    if isinstance(a, Cube):
+        return {alt: wert(getattr(a, neu)) for alt, neu in CUBE_FELDER.items()}
     if isinstance(a, float):
         return round(a, 3)
     if isinstance(a, (list, tuple)):
@@ -50,19 +53,30 @@ def wert(a: object) -> object:
     return a
 
 
-class Aufzeichnung:
-    """Hängt sich vor alle Haken des Radar-Zustands und schreibt mit, was die Warnzentrale meldet."""
+CUBE_FELDER = {"eid": "entity", "objekt_id": "object_id", "x": "x", "y": "y", "z": "z", "oeffner": "opener"}
 
-    def __init__(self, dienst) -> None:
+
+def signale(dienst: RadarService) -> dict:
+    """Name eines Ereignisses in den Referenzen → Signal, das es heute meldet."""
+    kampf = dienst.fight
+    return {"bei_neuem_cube": dienst.cubes.appeared, "bei_cast": kampf.cast, "bei_leiste": kampf.cast_bar,
+            "bei_welle": kampf.wave, "bei_effekt": kampf.effect, "bei_effekt_weg": kampf.effect_gone,
+            "bei_status": kampf.status, "bei_groggy": dienst.stagger.broken, "bei_hp": dienst.world.own_hp,
+            "bei_staggern": dienst.stagger.ready, "bei_treffer": kampf.hit, "bei_gruppe_lp": dienst.party.hp,
+            "bei_tod": kampf.death, "bei_flaeche": kampf.area}
+
+
+class Aufzeichnung:
+    """Hängt sich vor alle Abnehmer der Signale und schreibt mit, was die Warn-Anzeige meldet."""
+
+    def __init__(self, dienst: RadarService) -> None:
         self.dienst = dienst
         self.start: float | None = None
         self.jetzt = 0.0
         self.zeilen: list[str] = []
         self.warnungen: list[str] = []
-        # Jede Liste bei_* ist ein Haken; der Mitschreiber kommt vor die echten Empfänger
-        for name, empfaenger in vars(dienst.zustand).items():
-            if name.startswith("bei_"):
-                empfaenger.insert(0, self._mitschreiber(name))
+        for name, signal in signale(dienst).items():
+            signal.connect(self._mitschreiber(name), first=True)
 
     def _mitschreiber(self, name: str):
         def schreiben(*args: object) -> None:
@@ -77,19 +91,20 @@ class Aufzeichnung:
         return self.jetzt
 
     def takt(self) -> None:
-        """Der Teil von RadarDienst.takt(), der ohne Ton und Bildschirm auskommt."""
-        z = self.dienst.zentrale
-        self.dienst.ansagen.takt()
-        titel = [w.titel() for w in z.schnappschuss()]
+        """Der Teil von RadarService.tick(), der ohne Ton und Bildschirm auskommt."""
+        tafel = self.dienst.board
+        self.dienst.callouts.tick()
+        titel = [w.title() for w in tafel.snapshot()]
         if titel != self.warnungen:
             self.warnungen = titel
             self.notieren("warnungen", titel)
-        while z.laut:
-            self.notieren("laut", list(z.laut.pop(0)))
+        while tafel.sounds:
+            self.notieren("laut", list(tafel.sounds.pop(0)))
 
     def ende(self) -> None:
-        s = self.dienst.zustand.schnappschuss()
-        self.notieren("ende", {k: s[k] for k in ("nachrichten", "eid", "eid_sicher", "dungeon")})
+        welt = self.dienst.world
+        self.notieren("ende", {"nachrichten": self.dienst.source.packets, "eid": welt.own_id,
+                               "eid_sicher": welt.own_id_sure, "dungeon": welt.dungeon})
 
 
 def segmente(pcap: Path) -> Iterator[tuple[float, tuple]]:
@@ -99,15 +114,12 @@ def segmente(pcap: Path) -> Iterator[tuple[float, tuple]]:
 
 
 def radar_ereignisse(pcap: Path) -> list[str]:
-    """Einen Mitschnitt so schnell wie möglich durch den echten RadarDienst schicken."""
-    from radar import konfig
-    from radar.dienst import RadarDienst
-
+    """Einen Mitschnitt so schnell wie möglich durch den echten RadarService schicken."""
     # Standardwerte, aber alle Warnungen, auch die anderer Spieler: so viel Verhalten wie möglich
-    konfig._konfig = konfig.mit_standard({"nur_mich": False})
-    dienst = RadarDienst(spawn_log=None)
+    settings.use(settings.with_defaults({"nur_mich": False}))
+    dienst = RadarService(spawn_log=None)
     auf = Aufzeichnung(dienst)
-    dienst.zentrale.uhr = auf.uhr
+    dienst.board.clock = auf.uhr
     naechster_takt = 0.0
     with mock.patch("time.time", auf.uhr):
         for zeit, segment in segmente(pcap):
@@ -116,7 +128,7 @@ def radar_ereignisse(pcap: Path) -> list[str]:
             if zeit >= naechster_takt:
                 auf.takt()
                 naechster_takt = zeit + TAKT_S
-            dienst.quelle.feed(*segment)
+            dienst.source.feed(*segment)
         auf.takt()
         auf.ende()
     return auf.zeilen

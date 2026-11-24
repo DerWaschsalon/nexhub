@@ -19,9 +19,8 @@ import re
 import sys
 import urllib.request
 
+from deckbar_daemon.aion2.maps import GameMap
 from PySide6.QtGui import QImage, QPainter
-
-from radar.punkte import Karte
 
 SEITE = "https://aion2hub.com"
 KARTEN = {"Altgard": "World_D_A"}
@@ -80,14 +79,14 @@ def kartenbild(karte: str) -> QImage:
     return bild
 
 
-def eichen(karte: Karte, massstab: float) -> None:
+def eichen(karte: GameMap, massstab: float) -> None:
     """Feste Umrechnung Welt (cm) -> Kartenbild als drei Eichpunkte speichern."""
-    karte.eichung.zuruecksetzen()
+    karte.calibration.reset()
     for x, y in ((0, 0), (100_000, 0), (0, 100_000)):
         u = (MITTE_PX + x / 100) * massstab
         v = (MITTE_PX + y / 100) * massstab
-        karte.eichung.hinzufuegen(x, y, u, v)
-    karte.speichern()
+        karte.calibration.add(x, y, u, v)
+    karte.save()
 
 
 def main() -> int:
@@ -97,7 +96,7 @@ def main() -> int:
                     help="Eichung neu setzen (eigene Eichung weg)")
     a = ap.parse_args()
     karte_id = KARTEN[a.karte]
-    karte = Karte(a.karte)
+    karte = GameMap(a.karte)
     massstab = KACHEL_PX / KACHEL_ORIGINAL
 
     print("Cube-Fundorte und Teleporter laden …")
@@ -105,19 +104,19 @@ def main() -> int:
     funde = marker(skript, "hiddenCube")
     teleporter = marker(skript, "teleport")
     print(f"  {len(funde)} Cubes, {len(teleporter)} Teleporter")
-    if not karte.bild.exists():
+    if not karte.image.exists():
         print("Kartenbild laden …")
-        karte.ordner.mkdir(parents=True, exist_ok=True)
-        kartenbild(karte_id).save(str(karte.bild), "PNG")
+        karte.folder.mkdir(parents=True, exist_ok=True)
+        kartenbild(karte_id).save(str(karte.image), "PNG")
 
-    (karte.ordner / "fundorte.json").write_text(json.dumps([[u * massstab, v * massstab] for _, u, v in funde]))
-    (karte.ordner / "teleporter.json").write_text(
+    (karte.folder / "fundorte.json").write_text(json.dumps([[u * massstab, v * massstab] for _, u, v in funde]))
+    (karte.folder / "teleporter.json").write_text(
         json.dumps([[name, u * massstab, v * massstab] for name, u, v in teleporter], ensure_ascii=False))
-    QImage.fromData(laden(TELEPORTER_SYMBOL)).save(str(karte.ordner / "teleporter.png"), "PNG")
-    if a.neu or not karte.eichung.fertig:
+    QImage.fromData(laden(TELEPORTER_SYMBOL)).save(str(karte.folder / "teleporter.png"), "PNG")
+    if a.neu or not karte.calibration.ready:
         eichen(karte, massstab)
         print("Eichung gesetzt.")
-    print(f"Fertig: {karte.ordner}")
+    print(f"Fertig: {karte.folder}")
     return 0
 
 

@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import struct
 from collections import Counter, defaultdict
 from pathlib import Path
 from statistics import median
 
-from deckbar_daemon.core.packets import PcapSource, server_segments, uvarint
-from radar.zustand import BOSSE, OP_CAST, OP_NPC, RadarZustand
+from deckbar_daemon.aion2.gamedata import BOSSES
+from deckbar_daemon.core.packets import PcapSource, server_segments
+from deckbar_daemon.core.packets.messages import Cast, Hit, NpcSeen, Vitals
 
 NAMEN = Path("/usr/lib/A2Tools DPS Meter/data/i18n")
 
@@ -29,7 +29,6 @@ def main() -> None:
     npcname = {k: v["name"] for k, v in json.loads((NAMEN / "npcs/de.json").read_text()).items()}
 
     # Aufnahme einmal durchlesen und Boss-Casts, Treffer und Tode sammeln
-    zustand = RadarZustand()
     uhr = [0.0]
     boss_von: dict[int, int] = {}                 # Entity -> Boss-NPC-ID
     casts = defaultdict(list)                     # Boss-Entity -> [(zeit, skill)]
@@ -38,28 +37,29 @@ def main() -> None:
     hp: dict[int, int] = {}
     tode = Counter()                              # (Boss-Entity, skill) -> Anzahl
 
-    def mitlesen(op: int, p: bytes) -> None:
-        try:
-            eid, n = uvarint(p)
-            if op == OP_NPC and struct.unpack_from("<I", p, n + 3)[0] in BOSSE:
-                boss_von[eid] = struct.unpack_from("<I", p, n + 3)[0]
-            elif op == OP_CAST and eid in boss_von:
-                casts[eid].append((uhr[0], struct.unpack_from("<I", p, n + 1)[0]))
-            elif op == 0x3804:  # Treffer: Ziel, 2 Byte, Angreifer, Skill
-                angreifer, k = uvarint(p, n + 2)
-                if angreifer in boss_von:
-                    skill = struct.unpack_from("<I", p, n + 2 + k)[0]
-                    treffer[(angreifer, skill)].append(uhr[0])
-                    letzter_treffer[eid] = (angreifer, skill)
-            elif op == 0x8D00 and p[n:n + 3] == b"\x02\x01\x00":  # aktuelle HP
-                wert = struct.unpack_from("<I", p, n + 3)[0]
-                if wert == 0 and hp.get(eid) and eid in letzter_treffer:
-                    tode[letzter_treffer[eid]] += 1
-                hp[eid] = wert
-        except (ValueError, struct.error):
-            pass
+    def boss(m: NpcSeen) -> None:
+        if m.npc in BOSSES:
+            boss_von[m.entity] = m.npc
+
+    def cast(m: Cast) -> None:
+        if m.entity in boss_von and m.skill is not None:
+            casts[m.entity].append((uhr[0], m.skill))
+
+    def getroffen(m: Hit) -> None:
+        if m.attacker in boss_von:
+            treffer[(m.attacker, m.skill)].append(uhr[0])
+            letzter_treffer[m.entity] = (m.attacker, m.skill)
+
+    def punkte(m: Vitals) -> None:
+        if m.hp is None:
+            return
+        if m.hp == 0 and hp.get(m.entity) and m.entity in letzter_treffer:
+            tode[letzter_treffer[m.entity]] += 1
+        hp[m.entity] = m.hp
+
     quelle = PcapSource()
-    quelle.subscribe(None, mitlesen)
+    for nachricht, abnehmer in ((NpcSeen, boss), (Cast, cast), (Hit, getroffen), (Vitals, punkte)):
+        quelle.on(nachricht, abnehmer)
     with open(a.pcap, "rb") as f:
         for zeit, segment in server_segments(f):
             uhr[0] = zeit
@@ -69,7 +69,7 @@ def main() -> None:
         liste = casts[eid]
         if not liste:
             continue
-        print(f"\n{npcname.get(str(npc), npc)} ({BOSSE[npc]}), {len(liste)} Casts")
+        print(f"\n{npcname.get(str(npc), npc)} ({BOSSES[npc]}), {len(liste)} Casts")
         print(f"  {'Skill':9} {'Name':28} {'Casts':>5} {'Treffer nach':>12} {'Tode':>4}  davor")
         for skill, anzahl in Counter(s for _, s in liste).most_common():
             zeiten = [t for t, s in liste if s == skill]
