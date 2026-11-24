@@ -75,6 +75,7 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 | `armory` | Armory | `hub/armory/…`, geteilter Vergleich `(public)/v/<token>` – Profilansicht aus `logs` |
 | `schedule` | Termine | `hub/termine/`, öffentlich `(public)/termine/`: feste Termine aus `nexproto.termine` mit Countdown und Wochenplan, `GET /api/public/termine` |
 | `loot` | Beute | `hub/beute/`: Dropraten je Boss aus der Würfel-Beute der Runs (`loot.py`, `GET /api/loot`). Beim Hochladen ordnet `analysis.summarize` jede Beute dem zuletzt besiegten Boss zu (`summary.bosses[].loot`); gezählt werden nur Runs, deren Aufnahme Beute meldet (`summary.loot_tracked`). Ab 20 Siegen „1 zu N“ mit Wilson-Band (90 %), darunter nur die Zählung. Namen der Gegenstände fehlen noch (nur die Nummer) |
+| `feedback` | Feedback | `hub/feedback/`: Wünsche der Mitglieder mit Stimmen (`routes/feedback.py`, Tabellen `feedback`, `feedback_votes`). Für Mitglieder anonym, Admins sehen den Namen, setzen den Status und löschen. Höchstens 5 Einträge je Konto und Tag |
 | `devices` | Geräte | `hub/geraete/` |
 | `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 

@@ -13,6 +13,7 @@ from . import (
     bot,
     characters,
     devices,
+    feedback,
     loot,
     public,
     rating,
@@ -21,5 +22,8 @@ from . import (
     upgrades,
 )
 
-ROUTERS = [auth.router, account.router, devices.router, runs.router, loot.router, characters.router, armory.router,
-           upgrades.router, rating.router, bis.router, public.router, schedule.router, admin.router, bot.router]
+ROUTERS = [
+    auth.router, account.router, devices.router, runs.router, loot.router, characters.router, armory.router,
+    upgrades.router, rating.router, feedback.router, bis.router, public.router, schedule.router, admin.router,
+    bot.router,
+]
