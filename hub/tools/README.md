@@ -1,5 +1,20 @@
 # Werkzeuge für den Hub
 
+## Sichttest-Instanz (`sichttest.py`)
+
+Eine Wegwerf-Instanz des Hubs zum Ansehen im Browser, ohne Server, ohne Discord und ohne Netz: SQLite, die
+Nachbauten aus den Tests und Beispieldaten (ein Run mit Beute, ein Armory-Charakter mit Bewertung und
+Upgrade-Plan, BiS-Bestand).
+
+```
+cd hub/api && uv run python ../tools/sichttest.py        # API auf Port 8000, gibt die Cookie-Zeile aus
+cd hub/web && npx vite dev --port 8080 --strictPort      # Oberfläche auf http://localhost:8080
+```
+
+Die ausgegebene Zeile `document.cookie = '…'` in der Browser-Konsole auf `http://localhost:8080` ausführen,
+dann `/hub` öffnen; man ist als Admin „Testname“ angemeldet. `vite dev` geht auch mit Node 20, der Build nicht.
+Jeder Web-PR wird so angesehen, bevor er gemergt wird (`svelte-check` findet Laufzeitfehler nicht).
+
 ## Figur-Ebenen (`figure_layers.py`)
 
 In Armory und BiS-Listen leuchtet beim Zeigen auf die Klassenfigur der Gegenstand selbst, nicht ein Rechteck.
