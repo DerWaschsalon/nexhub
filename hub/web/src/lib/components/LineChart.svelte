@@ -217,7 +217,7 @@
 	i {
 		width: 10px;
 		height: 10px;
-		border-radius: 3px;
+		border-radius: var(--radius-xs);
 		flex-shrink: 0;
 		border: 2px solid transparent;
 	}

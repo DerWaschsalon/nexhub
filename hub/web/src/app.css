@@ -36,6 +36,7 @@
 	--fill-strong: rgba(255, 255, 255, 0.1);
 	--shade: rgba(0, 0, 0, 0.35);
 	--shade-strong: rgba(0, 0, 0, 0.6);
+	--shade-heavy: rgba(0, 0, 0, 0.78);
 	/* Farben aus dem Spiel: Zusatzwert, Gold/Verstärkung, Bonus */
 	--game-cyan: #3fd6e8;
 	--game-gold: #f2c522;
@@ -53,6 +54,7 @@
 	--black: #000;
 	--radius: 6px;
 	--radius-sm: 4px;
+	--radius-xs: 2px;
 	--font-heading: 'Unbounded Variable', system-ui, sans-serif;
 	--font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
@@ -68,6 +70,11 @@ html,
 body {
 	margin: 0;
 	min-height: 100%;
+}
+/* Der Inhaltsbereich jeder Seite ist der Container „page“: Komponenten brechen nach seiner Breite um
+   (@container page …), nicht nach der des Fensters. */
+main {
+	container: page / inline-size;
 }
 html {
 	/* vererbt sich auf alle Scrollbereiche */

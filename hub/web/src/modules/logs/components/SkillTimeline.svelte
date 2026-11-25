@@ -170,7 +170,7 @@
 	.target {
 		margin: 0;
 	}
-	@media (max-width: 900px) {
+	@container page (max-width: 600px) {
 		.layout {
 			grid-template-columns: minmax(0, 1fr);
 		}

@@ -162,7 +162,7 @@
 		position: absolute;
 		padding: 0;
 		border: 0;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		background: none;
 		cursor: pointer;
 	}

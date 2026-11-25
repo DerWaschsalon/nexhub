@@ -269,7 +269,7 @@
 		gap: 10px;
 	}
 	.item img {
-		border-radius: 6px;
+		border-radius: var(--radius);
 	}
 	.boards {
 		display: grid;

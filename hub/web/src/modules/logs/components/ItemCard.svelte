@@ -168,8 +168,8 @@
 		gap: 8px;
 		padding: 3px 8px 3px 4px;
 		border-left: 3px solid;
-		border-radius: 6px;
-		background: rgba(0, 0, 0, 0.2);
+		border-radius: var(--radius);
+		background: var(--shade);
 	}
 	li span {
 		flex: 1;
@@ -182,7 +182,7 @@
 		gap: 8px;
 	}
 	li img {
-		border-radius: 5px;
+		border-radius: var(--radius);
 	}
 	.godstone {
 		display: flex;

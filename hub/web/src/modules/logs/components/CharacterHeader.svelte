@@ -75,7 +75,7 @@
 		place-items: center;
 		width: 62px;
 		height: 62px;
-		border: 2px solid rgba(255, 255, 255, 0.5);
+		border: 2px solid color-mix(in srgb, var(--white) 50%, transparent);
 		border-radius: 50%;
 		font-weight: 700;
 	}

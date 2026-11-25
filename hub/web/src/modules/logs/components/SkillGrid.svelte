@@ -87,7 +87,7 @@
 		position: relative;
 		width: 56px;
 		height: 56px;
-		border-radius: 12px;
+		border-radius: var(--radius);
 		border: 2px solid var(--edge);
 		background: var(--shade);
 		display: flex;
@@ -96,7 +96,7 @@
 		overflow: hidden;
 	}
 	.icon img {
-		border-radius: 9px;
+		border-radius: var(--radius-sm);
 	}
 	.locked .icon img {
 		filter: grayscale(1) brightness(0.45);
@@ -113,7 +113,7 @@
 	}
 	.lock path {
 		fill: none;
-		stroke: rgba(255, 255, 255, 0.8);
+		stroke: color-mix(in srgb, var(--white) 80%, transparent);
 		stroke-width: 2;
 		stroke-linejoin: round;
 	}
@@ -123,8 +123,8 @@
 		bottom: 2px;
 		min-width: 20px;
 		padding: 0 4px;
-		border-radius: 6px;
-		background: rgba(0, 0, 0, 0.75);
+		border-radius: var(--radius);
+		background: var(--shade-heavy);
 		font-size: 11px;
 		font-weight: 700;
 		text-align: center;
@@ -135,7 +135,7 @@
 		top: 2px;
 		width: 16px;
 		height: 16px;
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 		background: var(--accent);
 		color: var(--on-accent);
 		font-size: 10px;

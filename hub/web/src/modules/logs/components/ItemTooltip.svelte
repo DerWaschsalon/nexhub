@@ -399,7 +399,7 @@
 		margin-top: 8px;
 	}
 	.rating small {
-		color: rgba(255, 255, 255, 0.75);
+		color: color-mix(in srgb, var(--white) 75%, transparent);
 		font-size: 12px;
 	}
 	.max {
@@ -480,7 +480,7 @@
 		font-size: 15px;
 	}
 	/* Handy: kleinerer Kopf, kleinere Schrift, schmalere Leiste zum Schließen */
-	@media (max-width: 600px) {
+	@container page (max-width: 550px) {
 		nav {
 			width: 40px;
 		}

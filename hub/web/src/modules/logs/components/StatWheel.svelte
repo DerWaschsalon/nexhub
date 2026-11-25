@@ -81,7 +81,7 @@
 		width: 100%;
 		height: 100%;
 		fill: none;
-		stroke: rgba(160, 190, 220, 0.16);
+		stroke: var(--edge);
 		stroke-width: 2;
 	}
 	svg .core {
@@ -97,7 +97,7 @@
 		align-items: center;
 		line-height: 1.15;
 		cursor: default;
-		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+		text-shadow: 0 1px 3px var(--shade-heavy);
 	}
 	strong {
 		color: var(--white);
@@ -123,6 +123,6 @@
 		font-weight: 700;
 		font-size: max(12px, 2.7cqw);
 		white-space: nowrap;
-		text-shadow: 0 0 8px color-mix(in srgb, var(--game-cyan) 35%, transparent), 0 1px 3px rgba(0, 0, 0, 0.8);
+		text-shadow: 0 0 8px color-mix(in srgb, var(--game-cyan) 35%, transparent), 0 1px 3px var(--shade-heavy);
 	}
 </style>
