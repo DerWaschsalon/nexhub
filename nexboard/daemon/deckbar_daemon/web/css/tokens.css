@@ -1,59 +1,100 @@
-/* Farben, Radien und Schrift der NexBoard-Oberflächen: die einzige Stelle für diese Werte.
-   Dunkel ist Standard; hell über data-theme="light" am <html>. „Wie das System“ löst main.js auf
-   (prefers-color-scheme), deshalb stehen die hellen Werte nur einmal hier. */
+/* Erzeugt von proto/nexproto/codegen.py, nicht von Hand ändern. Quelle: proto/nexproto/design.py */
 :root {
-  /* Schriften und enger Radius wie im NexHub (Design-Regeln vom 11.11.2026) */
-  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-heading: Unbounded, var(--font);
-  --radius-xl: 8px;
-  --radius-l: 6px;
-  --radius-m: 6px;
-  --radius-s: 4px;
-  --sidebar: 268px;
-  --ease: cubic-bezier(.2, .8, .2, 1);
-
-  /* dunkel (Standard) */
-  --bg: #05060d;
-  --text: #f3f5ff;
-  --text-2: rgba(243, 245, 255, .68);
-  --text-3: rgba(243, 245, 255, .45);
-  --glass: #0a0c17;
-  --glass-strong: #141829;
-  --glass-hover: #1b2036;
-  --glass-solid: #0d1020;
-  --line: rgba(255, 255, 255, .13);
-  --line-soft: rgba(255, 255, 255, .07);
-  --inset: rgba(0, 0, 0, .28);
-  --shadow: none;
-  --accent: #6ad3ff;
-  --accent-2: #a78bfa;
-  --on-accent: #03131b;
-  --ok: #34d17a;
-  --warn: #ffb020;
-  --bad: #ff5a52;
-  --info: #4ea8ff;
-  color-scheme: dark;
+	--bg: #05060d;
+	--text: #f4f5fa;
+	--dim: rgba(244, 245, 250, 0.66);
+	--faint: rgba(244, 245, 250, 0.45);
+	--accent: #6ad3ff;
+	--accent-2: #a78bfa;
+	--on-accent: #03131b;
+	--ok: #4ade80;
+	--warn: #fbbf24;
+	--danger: #ff6b6b;
+	--info: #4ea8ff;
+	--edge: rgba(255, 255, 255, 0.14);
+	--edge-soft: rgba(255, 255, 255, 0.08);
+	--surface: #0a0c17;
+	--surface-2: #141829;
+	--surface-3: #1b2036;
+	--glass: rgba(16, 20, 38, 0.62);
+	--glass-blur: 14px;
+	--glass-shine: rgba(255, 255, 255, 0.06);
+	--fill: rgba(255, 255, 255, 0.05);
+	--fill-strong: rgba(255, 255, 255, 0.1);
+	--shade: rgba(0, 0, 0, 0.35);
+	--shade-strong: rgba(0, 0, 0, 0.6);
+	--shade-heavy: rgba(0, 0, 0, 0.78);
+	--glow: #0c1030;
+	--white: #fff;
+	--black: #000;
+	--radius: 6px;
+	--radius-sm: 4px;
+	--radius-xs: 2px;
+	--font-heading: 'Unbounded Variable', Unbounded, system-ui, sans-serif;
+	--font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+	--ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+	color-scheme: dark;
 }
 
 :root[data-theme="light"] {
-  --bg: #e9edf7;
-  --text: #0e1324;
-  --text-2: rgba(14, 19, 36, .68);
-  --text-3: rgba(14, 19, 36, .46);
-  --glass: #fff;
-  --glass-strong: #f3f5fb;
-  --glass-hover: #e6eaf5;
-  --glass-solid: #fff;
-  --line: rgba(14, 19, 36, .1);
-  --line-soft: rgba(14, 19, 36, .06);
-  --inset: rgba(14, 19, 36, .06);
-  --shadow: none;
-  --accent: #0a84ff;
-  --accent-2: #7a5cff;
-  --on-accent: #fff;
-  --ok: #1fa95b;
-  --warn: #c77800;
-  --bad: #e5352c;
-  --info: #0a6fe0;
-  color-scheme: light;
+	--bg: #e9edf7;
+	--text: #0e1324;
+	--dim: rgba(14, 19, 36, 0.7);
+	--faint: rgba(14, 19, 36, 0.55);
+	--accent: #0a6fd6;
+	--accent-2: #6a4ce0;
+	--on-accent: #fff;
+	--ok: #17804a;
+	--warn: #9a5b00;
+	--danger: #c9241c;
+	--info: #0a6fe0;
+	--edge: rgba(14, 19, 36, 0.14);
+	--edge-soft: rgba(14, 19, 36, 0.08);
+	--surface: #fff;
+	--surface-2: #f3f5fb;
+	--surface-3: #e6eaf5;
+	--glass: rgba(255, 255, 255, 0.72);
+	--glass-shine: rgba(255, 255, 255, 0.6);
+	--fill: rgba(14, 19, 36, 0.04);
+	--fill-strong: rgba(14, 19, 36, 0.08);
+	--shade: rgba(14, 19, 36, 0.08);
+	--shade-strong: rgba(14, 19, 36, 0.3);
+	--shade-heavy: rgba(14, 19, 36, 0.6);
+	--glow: #cfd8f5;
+	color-scheme: light;
+}
+
+/* Hintergrund: ein ruhiger Schein von unten, keine Bewegung */
+.backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: -1;
+	background: radial-gradient(1200px 800px at 50% 120%, var(--glow), transparent 70%), var(--bg);
+}
+
+/* Glaskarte: durchscheinend mit feiner Kante und Lichtkante oben */
+.glass {
+	position: relative;
+	background: var(--glass);
+	border: 1px solid var(--edge-soft);
+	border-radius: var(--radius);
+	box-shadow: inset 0 1px 0 var(--glass-shine);
+	backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+	-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }

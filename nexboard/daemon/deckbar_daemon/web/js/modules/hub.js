@@ -72,7 +72,7 @@ function hubTab(ctx) {
         sw(st.discord, discord, { disabled: !st.upload && !st.discord })),
       settingsRow("Postausgang", h.outbox ? `${h.outbox} Run${h.outbox === 1 ? "" : "s"} warten auf den Hub` : "leer", null),
       el("p", { class: "hint small", style: "margin-top:10px" },
-        last ? el("span", { style: `color:${last.ok ? "var(--ok)" : "var(--bad)"}` }, `${fmtWhen(last.at)} · ${last.text} `) : el("span", { class: "faint", text: "Noch nichts hochgeladen." }),
+        last ? el("span", { style: `color:${last.ok ? "var(--ok)" : "var(--danger)"}` }, `${fmtWhen(last.at)} · ${last.text} `) : el("span", { class: "faint", text: "Noch nichts hochgeladen." }),
         last?.url ? el("a", { href: last.url, target: "_blank", rel: "noopener", text: "im Hub ansehen" }) : null),
       el("p", { class: "hint small", style: "margin-top:8px", text: PRIVACY }));
   };
