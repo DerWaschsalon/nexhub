@@ -29,9 +29,7 @@ h1, h2, h3 { font-family: var(--font-heading); letter-spacing: -.01em; }
 
 /* ------------------------------------------------------------ Formulare aus dem Schema (form.js) */
 details.advanced { margin-top: 14px; border-top: 1px solid var(--edge-soft); padding-top: 10px; }
-details.advanced > summary { cursor: pointer; color: var(--dim); font-weight: 600; list-style: none; }
-details.advanced > summary::before { content: "▸ "; }
-details.advanced[open] > summary::before { content: "▾ "; }
+details.advanced > summary { color: var(--dim); font-weight: 600; }
 details.advanced[open] > summary { margin-bottom: 10px; }
 
 /* ------------------------------------------------------------ Gerüst */
@@ -52,13 +50,23 @@ details.advanced[open] > summary { margin-bottom: 10px; }
 .brand small { color: var(--faint); font-size: 11.5px; }
 .nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; scrollbar-width: thin; }
 .nav h6 { margin: 14px 12px 6px; font-size: 10.5px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: var(--faint); }
-.nav a {
+.nav a, .nav button.group {
   position: relative; display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: var(--radius);
   color: var(--dim); text-decoration: none; transition: background .2s, color .2s;
 }
 .nav a .ic { font-size: 19px; width: 22px; text-align: center; }
 .nav a span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav a:hover { background: var(--surface-3); color: var(--text); }
+.nav a:hover, .nav button.group:hover { background: var(--surface-3); color: var(--text); }
+/* Gruppe eines Spiels: Kopf klappt die Seiten darunter auf, sie stehen eingerückt an einer feinen Linie */
+.nav button.group { width: 100%; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.nav button.group .ic { font-size: 19px; width: 22px; text-align: center; }
+.nav button.group .t { flex: 1; }
+.nav button.group .chevron { font-size: 17px; width: auto; transition: transform .2s; }
+.nav button.group[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+.nav button.group.within { color: var(--text); }
+.nav button.group.within > .ic:first-child { color: var(--accent); }
+.nav .group-pages { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px 22px; padding-left: 10px; border-left: 1px solid var(--edge-soft); }
+.nav a.sub { padding: 7px 12px; font-size: 13.5px; }
 .nav a.on {
   color: var(--text);
   background: var(--surface-2);
@@ -194,6 +202,9 @@ select option { background: var(--surface); color: var(--text); }
 .card { padding: 20px; border-radius: var(--radius); }
 .card > h2, .card-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .1px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+/* Karte als Akkordeon: zugeklappt bleibt nur der Kopf stehen */
+details.card:not([open]) > .card-head { margin-bottom: 0; }
+.card-head .grow { flex: 1; min-width: 0; }
 .card-head .sub { color: var(--faint); font-size: 12.5px; font-weight: 500; margin-top: 2px; }
 .card + .card { margin-top: 0; }
 .cards { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }

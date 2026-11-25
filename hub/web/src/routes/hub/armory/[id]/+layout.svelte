@@ -47,7 +47,6 @@
 <svelte:head><title>{c.name} · {t('armory.title')} · NexHub</title></svelte:head>
 
 <div class="bar">
-	<a class="back" href="/hub/armory">‹ {t('armory.back')}</a>
 	<span class="actions">
 		<a class="btn small" href="/hub/armory/vergleich?links={c.id}">{t('armory.compare')}</a>
 		<button class="btn small" onclick={refresh} disabled={c.status === 'offen'}>{t('armory.refresh')}</button>
@@ -78,9 +77,6 @@
 		justify-content: space-between;
 		gap: 10px;
 		margin-bottom: 14px;
-	}
-	.bar .back {
-		margin-bottom: 0;
 	}
 	.actions {
 		display: flex;

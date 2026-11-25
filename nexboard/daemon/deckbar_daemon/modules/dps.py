@@ -18,7 +18,7 @@ from .base import WebModule
 
 class DpsModule(WebModule):
     info = ModuleInfo(
-        "aion2.dps", "AION 2 · Kampfdaten", "ingame", "sword-cross",
+        "aion2.dps", "AION 2 · Kampfdaten", "aion2", "sword-cross",
         "Liest den Kampf passiv mit (deckbar-capture, Kern des A2Tools DPS Meter) und liefert DPS "
         "für Leiste, Overlay und Discord.",
         tags=("AION 2", "Live"),

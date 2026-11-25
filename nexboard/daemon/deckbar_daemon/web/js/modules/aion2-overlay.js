@@ -1,6 +1,6 @@
 /* Modul AION 2 · Overlay: Profile (Hauptbedienung), Widgets aller eingeschalteten Module, Steuerung, Darstellung.
    Jedes Widget wird nur hier ein- und ausgeschaltet; die Module stellen es auf ihrer eigenen Seite ein. */
-import { fill, el, api, S, on, field, input, select, button, chip, callout, card, settingsRow, sw, saver, seg, toast, modOn, collapsible } from "../core.js";
+import { fill, el, api, S, on, field, input, select, button, chip, callout, card, closedCard, settingsRow, sw, saver, seg, toast, modOn, collapsible } from "../core.js";
 
 const FX = { "": "aus", glanz: "Glanz", brennen: "Brennen", gold: "Gold", frost: "Frost", holo: "Holo", leere: "Leere" };
 // Ein Begriff je Sache: „Durchklicken an“ = Overlay nimmt keine Klicks an, „aus“ = Meter bedienbar
@@ -106,7 +106,7 @@ function profilesCard(o, put) {
       button(null, () => remove(name), "sm icon ghost", "delete", { title: "Löschen" }))));
   let neu = "";
   const visible = Object.keys(L.widgets).filter((id) => L.widgets[id].enabled);
-  return card("Profile", "Das aktive Profil merkt sich jedes Ein- und Ausschalten eines Widgets", null,
+  return closedCard("Profile", "Das aktive Profil merkt sich jedes Ein- und Ausschalten eines Widgets", null,
     ...rows,
     el("div", { class: "row wrap", style: "margin-top:14px" },
       input("", (v) => { neu = v.trim(); }, { placeholder: "Name ohne Leerzeichen, z. B. Raid", maxlength: 24 }),
@@ -169,7 +169,7 @@ function lookCard(o, save, view) {
   const set = (key, value) => { L[key] = value; save({ [key]: value }); };
   const advanced = collapsible("Erweitert", view,
     settingsRow("GPU-Beschleunigung", "Aus nur bei Darstellungsfehlern; wirkt nach „Overlay neu starten“", sw(L.gpu, (v) => set("gpu", v))));
-  return card("Darstellung", null, null,
+  return closedCard("Darstellung", null, null,
     el("div", { class: "grid" },
       field("Monitor", select(screens, L.screen, (v) => set("screen", v)), "Wirkt nach „Overlay neu starten“."),
       field("Beim Start", select(START_MODE, L.start_mode, (v) => set("start_mode", v))),

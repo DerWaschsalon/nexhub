@@ -13,7 +13,7 @@ from .base import WebModule
 
 class EffectsModule(WebModule):
     info = ModuleInfo(
-        "aion2.effects", "AION 2 · Effekte", "ingame", "auto-fix",
+        "aion2.effects", "AION 2 · Effekte", "aion2", "flash",
         "Gibt anderen Programmen auf diesem PC die Effekte, die gerade auf dem Boss und auf dir liegen, mit "
         "genauem Anfang und Ende aus den Kampfdaten (z. B. Schadensreflexion).",
         requires=("aion2.dps",), split_from="aion2.warnings", tags=("AION 2", "Desktop"),

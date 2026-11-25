@@ -52,7 +52,6 @@
 
 <svelte:head><title>{t('armory.compare.title')} · NexHub</title></svelte:head>
 
-<a class="back" href="/hub/armory">‹ {t('armory.back')}</a>
 
 <header class="page-head">
 	<h1>{t('armory.compare.title')}</h1>

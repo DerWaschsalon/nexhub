@@ -19,7 +19,7 @@ PUSH_S = 10  # so oft geht die Liste ans Overlay; Termine wechseln nur zur volle
 
 class ScheduleModule(WebModule):
     info = ModuleInfo(
-        "aion2.schedule", "AION 2 · Termine", "ingame", "calendar-clock",
+        "aion2.schedule", "AION 2 · Termine", "aion2", "calendar-clock",
         "Feste Termine der Server (Riss, Shugo-Fest, Resets …) und eigene Ereignisse mit Countdown, "
         "in der Web-UI und als Widget im Overlay.",
         tags=("AION 2",),

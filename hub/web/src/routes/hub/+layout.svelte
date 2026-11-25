@@ -1,26 +1,29 @@
-<!-- Login-Bereich: Seitenleiste mit Menü (Kern + Module, lib/modules.ts), Sprache und Konto;
-     rechts die jeweilige Seite. Gehört sie zu einem Spiel (AION 2 …), stehen dessen Seiten als
-     Reiter darüber. -->
+<!-- Login-Bereich: Seitenleiste mit Menü (Kern + Module, lib/modules.ts), Sprache und Konto; rechts die
+     jeweilige Seite mit Breadcrumb. Spiele und die Verwaltung sind aufklappbare Gruppen; bei schmalem
+     Fenster klappt die ganze Leiste hinter einem Menüknopf zusammen. -->
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { post } from '#lib/api.ts';
 	import Avatar from '#lib/components/Avatar.svelte';
 	import Brand from '#lib/components/Brand.svelte';
+	import Breadcrumb, { type Crumb } from '#lib/components/Breadcrumb.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import LangSwitch from '#lib/components/LangSwitch.svelte';
 	import LegalLinks from '#lib/components/LegalLinks.svelte';
-	import Tabs from '#lib/components/Tabs.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { menu, navFor, type MenuEntry } from '#lib/modules.ts';
 	import type { LayoutProps } from './$types';
+
+	const OPEN_KEY = 'nexhub.nav.open';
 
 	let { data, children }: LayoutProps = $props();
 
 	const items = $derived(navFor(data.me));
 	const entries = $derived(menu(items));
-	// das Spiel der aktuellen Seite, falls sie zu einem gehört: seine Seiten werden Reiter
-	const game = $derived(entries.find((e) => e.pages.some((p) => active(p.href))));
+	// Gruppe und Seite, zu der die aktuelle Adresse gehört
+	const group = $derived(entries.find((e) => e.pages.some((p) => active(p.href))));
+	const current = $derived(items.find((i) => active(i.href)));
 
 	// Übersicht nur bei genau /hub markieren, die anderen auch auf Unterseiten
 	function active(href: string): boolean {
@@ -28,7 +31,29 @@
 		return href === '/hub' ? path === href : path === href || path.startsWith(href + '/');
 	}
 
-	const entryActive = (e: MenuEntry) => e === game || (!e.pages.length && active(e.href));
+	// Aufgeklappte Gruppen merkt sich der Browser; die Gruppe der aktuellen Seite ist immer offen
+	let opened = $state<string[]>(JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]'));
+	const isOpen = (e: MenuEntry) => e === group || opened.includes(e.label);
+	function toggle(e: MenuEntry) {
+		opened = opened.includes(e.label) ? opened.filter((label) => label !== e.label) : [...opened, e.label];
+		localStorage.setItem(OPEN_KEY, JSON.stringify(opened));
+	}
+
+	// schmales Fenster: Menü hinter dem Knopf, nach jedem Seitenwechsel wieder zu
+	let menuOpen = $state(false);
+	afterNavigate(() => {
+		menuOpen = false;
+	});
+
+	const trail = $derived.by((): Crumb[] => {
+		if (!current) return [];
+		const detail = current.detail?.(page.data, page.url.pathname);
+		return [
+			...(group ? [{ label: t(group.label) }] : []),
+			{ label: t(current.label), href: current.href },
+			...(detail ? [{ label: detail }] : [])
+		];
+	});
 
 	async function logout() {
 		await post('/api/auth/logout');
@@ -38,37 +63,57 @@
 </script>
 
 <div class="shell">
-	<aside class="glass">
-		<Brand href="/hub" />
-		<nav class="menu">
-			{#each entries as e (e.label)}
-				<a href={e.href} class:active={entryActive(e)}>
-					<Icon name={e.icon} />
-					<span>{t(e.label)}</span>
-				</a>
-			{/each}
-		</nav>
-		<LangSwitch />
-		<div class="me">
-			<Avatar name={data.me.name} url={data.me.avatar_url} />
-			<div class="who">
-				<strong>{data.me.name}</strong>
-				<span class="chip accent">{t(`role.${data.me.role}`)}</span>
-			</div>
-			<button class="btn small" onclick={logout} title={t('shell.logout')} aria-label={t('shell.logout')}>
-				<Icon name="logout" size={16} />
+	<aside class="glass" class:open={menuOpen}>
+		<div class="top">
+			<Brand href="/hub" />
+			<button class="btn small burger" onclick={() => (menuOpen = !menuOpen)} aria-expanded={menuOpen}
+				aria-controls="hub-menu" aria-label={t('shell.menu')}>
+				<Icon name={menuOpen ? 'close' : 'menu'} />
 			</button>
 		</div>
-		<LegalLinks />
+		<div class="drawer" id="hub-menu">
+			<nav class="menu" aria-label={t('shell.menu')}>
+				{#each entries as e (e.label)}
+					{#if e.pages.length}
+						<button class="entry" class:within={e === group} onclick={() => toggle(e)} aria-expanded={isOpen(e)}>
+							<Icon name={e.icon} />
+							<span>{t(e.label)}</span>
+							<span class="chevron"><Icon name="chevron" size={16} /></span>
+						</button>
+						{#if isOpen(e)}
+							<div class="sub">
+								{#each e.pages as p (p.href)}
+									<a href={p.href} class:active={active(p.href)} aria-current={active(p.href) ? 'page' : undefined}>
+										{t(p.label)}
+									</a>
+								{/each}
+							</div>
+						{/if}
+					{:else}
+						<a class="entry" href={e.href} class:active={active(e.href)} aria-current={active(e.href) ? 'page' : undefined}>
+							<Icon name={e.icon} />
+							<span>{t(e.label)}</span>
+						</a>
+					{/if}
+				{/each}
+			</nav>
+			<LangSwitch />
+			<div class="me">
+				<Avatar name={data.me.name} url={data.me.avatar_url} />
+				<div class="who">
+					<strong>{data.me.name}</strong>
+					<span class="chip accent">{t(`role.${data.me.role}`)}</span>
+				</div>
+				<button class="btn small" onclick={logout} title={t('shell.logout')} aria-label={t('shell.logout')}>
+					<Icon name="logout" size={16} />
+				</button>
+			</div>
+			<LegalLinks />
+		</div>
 	</aside>
 
 	<main>
-		{#if game}
-			<div class="pages">
-				<Tabs label={t(game.label)} tabs={game.pages.map((p) => ({ id: p.href, label: t(p.label), href: p.href }))}
-					active={game.pages.find((p) => active(p.href))?.href ?? null} />
-			</div>
-		{/if}
+		{#if trail.length > 1}<Breadcrumb {trail} />{/if}
 		{@render children()}
 	</main>
 </div>
@@ -92,46 +137,99 @@
 		gap: 24px;
 		padding: 20px 14px;
 	}
-	aside > :global(.brand) {
+	.top {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		padding: 0 8px;
+	}
+	.burger {
+		display: none;
+	}
+	.drawer {
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
+		flex: 1;
+		min-height: 0;
 	}
 	.menu {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
 	}
-	.menu a {
+	.entry {
 		display: flex;
 		align-items: center;
 		gap: 12px;
+		width: 100%;
 		padding: 10px 12px;
 		border-radius: var(--radius);
 		color: var(--dim);
-		text-decoration: none;
+		background: none;
+		font: inherit;
 		font-weight: 550;
+		text-align: left;
+		text-decoration: none;
 		border: 1px solid transparent;
+		cursor: pointer;
 		transition:
 			background 0.15s,
 			color 0.15s;
 	}
-	.menu a:hover {
+	.entry:hover,
+	.sub a:hover {
 		color: var(--text);
 		background: var(--fill);
 	}
-	.menu a.active {
+	.entry.active,
+	.sub a.active {
 		color: var(--text);
 		background: var(--fill-strong);
 		border-color: var(--edge-soft);
 	}
-	.menu a.active :global(svg) {
+	.entry.within,
+	.entry.active :global(svg),
+	.entry.within :global(svg:first-child) {
+		color: var(--text);
+	}
+	.entry.active :global(svg),
+	.entry.within > :global(svg) {
 		color: var(--accent);
 	}
-	aside > :global(.lang) {
+	.chevron {
+		display: grid;
+		margin-left: auto;
+		transition: transform 0.15s;
+	}
+	.entry[aria-expanded='true'] .chevron {
+		transform: rotate(180deg);
+	}
+	/* Seiten einer Gruppe: eingerückt an einer feinen Linie */
+	.sub {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin: 0 0 6px 20px;
+		padding-left: 10px;
+		border-left: 1px solid var(--edge-soft);
+	}
+	.sub a {
+		padding: 7px 12px;
+		border-radius: var(--radius);
+		border: 1px solid transparent;
+		color: var(--dim);
+		font-size: 14px;
+		text-decoration: none;
+	}
+	.drawer > :global(.lang) {
 		align-self: flex-start;
 		margin-left: 8px;
 	}
-	aside > :global(.legal) {
+	.drawer > :global(.legal) {
 		margin: -14px 8px 0;
 	}
 	.me {
@@ -160,11 +258,8 @@
 		padding: 12px 8px;
 		min-width: 0;
 	}
-	.pages {
-		margin-bottom: 16px;
-	}
 
-	/* Schmal: Leiste wird zur Kopfzeile, Menü scrollt seitlich */
+	/* Schmal: Die Leiste wird zur Kopfzeile mit Menüknopf, das Menü klappt darunter auf */
 	@media (max-width: 820px) {
 		.shell {
 			/* minmax(0, …): breite Tabellen scrollen in ihrer Karte statt die Seite zu verbreitern */
@@ -174,38 +269,25 @@
 		aside {
 			position: static;
 			height: auto;
-			flex-direction: row;
-			flex-wrap: wrap;
-			align-items: center;
-			gap: 10px;
+			gap: 0;
 			padding: 10px 12px;
-			border-radius: var(--radius);
 		}
-		.menu {
-			order: 3;
-			flex-basis: 100%;
-			flex-direction: row;
-			overflow-x: auto;
-			scrollbar-width: none;
-		}
-		.menu a {
-			white-space: nowrap;
-			padding: 8px 12px;
-		}
-		aside > :global(.lang) {
-			margin-left: auto;
-		}
-		aside > :global(.legal) {
-			order: 4;
-			flex-basis: 100%;
-			margin: 0 4px;
-		}
-		.me {
-			border: 0;
+		.top {
 			padding: 0;
 		}
-		.who {
+		.burger {
+			display: inline-flex;
+		}
+		.drawer {
 			display: none;
+			gap: 16px;
+			padding-top: 12px;
+		}
+		aside.open .drawer {
+			display: flex;
+		}
+		.drawer > :global(.legal) {
+			margin: 0 8px;
 		}
 		main {
 			padding: 4px 0;

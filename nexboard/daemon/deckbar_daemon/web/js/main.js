@@ -3,7 +3,7 @@
    Ein Modul kann mehrere Seiten haben (Radar: Warnungen, Radar & Karte); die Seitenleiste zeigt Seiten. */
 import {
   fill, $, el, icon, glyph, api, S, on, emit, connectLive, loadIcons, mod, modOn, setModule, modIcon, toast,
-  setSaveState, sw, field, select, button, chip, callout, card, settingsRow, seg, throttle, dpsDiff,
+  setSaveState, sw, field, select, button, chip, callout, card, closedCard, settingsRow, seg, throttle, dpsDiff,
 } from "./core.js";
 import { schemaForm } from "./form.js";
 import { setupPage } from "./setup.js";
@@ -31,7 +31,12 @@ const UI = {
 const PAGES = new Map(Object.entries(UI).flatMap(([mid, ui]) => ui.pages.map((page) => [page.id, { page, mid }])));
 // Module ohne eigene Seite nennen die Seite, auf der sie stehen (home)
 const firstPage = (mid) => UI[mid]?.pages[0]?.id ?? UI[mid]?.home ?? mid;
-const shortName = (m) => m.name.replace(/^AION 2 · /, "");
+// In der Gruppe eines Spiels steht dessen Name nicht noch einmal vor jeder Seite
+const shortName = (m) => m.name.replace(/^(AION 2|PoE 1) · /, "");
+// Bereiche mit einem Spiel dahinter und die Symbole der aufklappbaren Gruppen
+const GAMES = ["aion2", "poe1"];
+const GROUP_ICON = { aion2: "sword-cross", poe1: "gamepad-variant", system: "cog" };
+const NAV_OPEN_KEY = "nexboard.nav.open";
 const SYSTEM = [
   { id: "setup", name: "Einrichtung", icon: "star-four-points" },
   { id: "modules", name: "Module", icon: "puzzle" },
@@ -81,6 +86,7 @@ function render() {
     const m = mod(mid);
     title = page.name || shortName(m);
     crumb = S.modules.categories[m.category] || "Module";
+    if (crumb === title) crumb = BRAND; // Bereich mit nur einer Seite (Touch-Leiste, NexHub)
     const pageTabs = page.tabs || [];
     const tab = pageTabs.some((t) => t.id === route.tab) ? route.tab : pageTabs[0]?.id;
     if (pageTabs.length > 1) tabs = seg(pageTabs, tab, (id) => go(page.id, id));
@@ -117,21 +123,49 @@ function badgeFor(m) {
   return el("span", { class: `badge ${st}`, title: st });
 }
 
+/** Aufgeklappte Gruppen merkt sich der Browser. */
+function openGroups() {
+  try { return new Set(JSON.parse(localStorage.getItem(NAV_OPEN_KEY) || "[]")); } catch { return new Set(); }
+}
+
+function toggleGroup(cat) {
+  const open = openGroups();
+  if (open.has(cat)) open.delete(cat); else open.add(cat);
+  localStorage.setItem(NAV_OPEN_KEY, JSON.stringify([...open]));
+  renderNav();
+}
+
+/** Seiten eines Bereichs: die der eingeschalteten Module, bei System dazu die festen Seiten. */
+function pagesOf(cat) {
+  const pages = Object.keys(UI).map((mid) => mod(mid)).filter((m) => m?.enabled && m.category === cat)
+    .flatMap((m) => UI[m.id].pages.map((p) => ({ id: p.id, name: p.name || shortName(m), icon: p.icon || m.icon, badge: badgeFor(m) })));
+  return cat === "system" ? [...SYSTEM, ...pages] : pages;
+}
+
+/** Bereich der aktuellen Seite (für die Seitenleiste und den Breadcrumb im Kopf). */
+function categoryOf(pageId) {
+  return Object.keys(S.modules?.categories || {}).find((cat) => pagesOf(cat).some((p) => p.id === pageId));
+}
+
+/** Ein Bereich mit einer Seite ist ein Link; mit mehreren eine Gruppe, die auf- und zuklappt. Die Gruppe der
+    aktuellen Seite ist immer offen. */
 function renderNav() {
   const nav = $("nav");
   if (!S.modules) return;
-  const link = (id, name, ic, extra) => el("a", { href: `#/${id === "dashboard" ? "" : id}`, class: route.page === id ? "on" : "" }, icon(ic), el("span", { class: "t", text: name }), extra);
-  const pageLinks = (cat) => Object.entries(UI).map(([mid]) => mod(mid))
-    .filter((m) => m?.enabled && m.category === cat)
-    .flatMap((m) => UI[m.id].pages.map((p) => link(p.id, p.name || shortName(m), p.icon || m.icon, badgeFor(m))));
-  const items = [link("dashboard", "Übersicht", "view-dashboard")];
+  const link = (p, sub) => el("a", { href: `#/${p.id === "dashboard" ? "" : p.id}`, class: `${route.page === p.id ? "on" : ""} ${sub ? "sub" : ""}`.trim(), "aria-current": route.page === p.id ? "page" : null },
+    sub ? null : icon(p.icon), el("span", { class: "t", text: p.name }), p.badge);
+  const open = openGroups();
+  const current = categoryOf(route.page);
+  const items = [link({ id: "dashboard", name: "Übersicht", icon: "view-dashboard" })];
   for (const [cat, label] of Object.entries(S.modules.categories)) {
-    if (cat === "system") continue;
-    const links = pageLinks(cat);
-    if (links.length) items.push(el("h6", { text: label }), ...links);
+    const pages = pagesOf(cat);
+    if (pages.length === 1) items.push(link({ ...pages[0], name: label }));
+    if (pages.length < 2) continue;
+    const isOpen = cat === current || open.has(cat);
+    items.push(el("button", { type: "button", class: `group ${cat === current ? "within" : ""}`.trim(), "aria-expanded": String(isOpen), onclick: () => toggleGroup(cat) },
+      icon(GROUP_ICON[cat] || "puzzle"), el("span", { class: "t", text: label }), icon("chevron-down", "chevron")));
+    if (isOpen) items.push(el("div", { class: "group-pages" }, pages.map((p) => link(p, true))));
   }
-  items.push(el("h6", { text: "System" }), ...pageLinks("system"));
-  for (const s of SYSTEM) items.push(link(s.id, s.name, s.icon));
   fill(nav, ...items);
 }
 
@@ -156,7 +190,7 @@ function dashboard(ctx) {
         S.updates?.available ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null,
         modOn("aion2.overlay") ? button("Overlay bearbeiten", () => (S.overlay?.socket ? overlayCommand("edit") : go("aion2.overlay")), "sm", "cursor-move") : null)));
     // frische Installation (noch nichts für ein Spiel eingeschaltet): auf die Einrichtung hinweisen
-    if (!enabled.some((m) => m.category === "ingame")) {
+    if (!enabled.some((m) => GAMES.includes(m.category))) {
       parts.push(callout("info", "star-four-points", "Neu hier? Die Einrichtung schaltet in drei Schritten ein, was du brauchst.",
         button("Einrichtung starten", () => go("setup"), "sm primary", "arrow-right")));
     }
@@ -189,7 +223,7 @@ function dashboard(ctx) {
 function tile(m) {
   const ui = UI[m.id];
   return el("a", { class: "tile glass", href: `#/${firstPage(m.id)}` },
-    el("div", { class: "tile-head" }, modIcon(m), el("div", { class: "t" }, el("b", { text: m.name }), el("small", { text: m.tags.join(" · ") })), icon("chevron-right", "faint")),
+    el("div", { class: "tile-head" }, modIcon(m), el("div", { class: "t" }, el("b", { text: shortName(m) }), el("small", { text: m.tags.filter((tag) => tag !== S.modules.categories[m.category]).join(" · ") })), icon("chevron-right", "faint")),
     el("div", { class: "body" }, ui?.card ? ui.card(m) : null));
 }
 
@@ -201,7 +235,8 @@ function modulesPage(ctx) {
     const sections = Object.entries(S.modules.categories).map(([cat, label]) => {
       const mods = S.modules.modules.filter((m) => m.category === cat);
       if (!mods.length) return null;
-      return card(label, null, null, el("div", {}, mods.map((m) => el("div", { class: "mod-row" },
+      // Spiele stehen offen, der Rest klappt auf
+      return (GAMES.includes(cat) ? card : closedCard)(label, null, null, el("div", {}, mods.map((m) => el("div", { class: "mod-row" },
         modIcon(m, m.enabled ? "" : "off"),
         el("div", { class: "txt" },
           el("div", { class: "row", style: "gap:8px" }, el("b", { text: m.name }), m.enabled ? chip("aktiv", "ok") : null),

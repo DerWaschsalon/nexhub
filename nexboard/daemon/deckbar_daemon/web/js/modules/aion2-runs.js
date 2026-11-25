@@ -1,5 +1,5 @@
 /* Modul AION 2 · Dungeon-Runs: Discord-Webhook, Vorschau, Namen der Mitspieler. */
-import { fill, el, icon, api, S, on, button, chip, callout, card, saver, toast, fmtWhen, CLASS_LABELS } from "../core.js";
+import { fill, el, icon, api, S, on, button, chip, callout, card, closedCard, saver, toast, fmtWhen, CLASS_LABELS } from "../core.js";
 import { moduleSettings } from "../form.js";
 
 // So maskiert das A2Tools-Meter (wie mask() in runs.py)
@@ -38,7 +38,7 @@ function runsTab(ctx) {
           }, "", "send")),
         r.result ? el("p", { class: "hint small", style: "margin-top:12px", text: r.result }) : null,
         (img = el("img", { class: "preview-img", hidden: true, alt: "Vorschau des letzten Runs", style: "margin-top:14px", onerror: () => { img.hidden = true; toast("Noch kein Dungeon-Run in der History", true); } }))),
-      card("Namen der Mitspieler", "Das Meter speichert fremde Namen maskiert", null,
+      closedCard("Namen der Mitspieler", "Das Meter speichert fremde Namen maskiert", null,
         el("p", { class: "hint small", style: "margin-bottom:14px", text: "Echte Namen lernt die NexBoard während des Kampfs aus der Live-Anzeige (grau vorausgefüllt). Eintragen musst du nur, was falsch oder leer ist." }),
         namesGrid(r, saveNames)));
   };

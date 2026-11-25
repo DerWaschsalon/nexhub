@@ -3,12 +3,14 @@
 // Profil selbst ist dieselbe Ansicht wie bei den Mitspielern eines Runs (modules/logs/components).
 import type { HubModule } from '#lib/module.ts';
 import MyCharacters from './components/MyCharacters.svelte';
+import { t } from '#lib/i18n.svelte.ts';
 import { TEXTS } from './texts.ts';
 
 export default {
 	id: 'armory',
 	nav: [
-		{ href: '/hub/armory', label: 'armory.nav', icon: 'shield', game: 'game.aion2', overview: MyCharacters }
+		{ href: '/hub/armory', label: 'armory.nav', icon: 'shield', game: 'game.aion2', overview: MyCharacters,
+			detail: (data, path) => data.character?.name ?? (path.endsWith('/vergleich') ? t('armory.compare.title') : undefined) }
 	],
 	texts: TEXTS
 } satisfies HubModule;
