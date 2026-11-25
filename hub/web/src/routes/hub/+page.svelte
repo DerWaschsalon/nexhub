@@ -13,6 +13,8 @@
 	const tiles = $derived(menu(navFor(data.me).filter((item) => item.href !== '/hub')));
 </script>
 
+<svelte:head><title>{t('nav.overview')} · NexHub</title></svelte:head>
+
 <header class="page-head">
 	<h1>{t('overview.hello', { name: data.me.name })}</h1>
 	<p>{t('overview.text')}</p>

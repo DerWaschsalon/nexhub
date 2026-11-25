@@ -20,6 +20,8 @@
 	});
 </script>
 
+<svelte:head><title>{t('login.title')} · NexHub</title></svelte:head>
+
 <section class="glass pad card">
 	<h1>{t('login.title')}</h1>
 	<p class="dim">{t('login.text')}</p>

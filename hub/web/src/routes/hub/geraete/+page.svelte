@@ -50,6 +50,8 @@
 	}
 </script>
 
+<svelte:head><title>{t('devices.title')} · NexHub</title></svelte:head>
+
 <header class="page-head">
 	<h1>{t('devices.title')}</h1>
 	<p>{t('devices.intro')}</p>

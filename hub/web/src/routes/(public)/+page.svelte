@@ -5,6 +5,8 @@
 	let { data }: PageProps = $props();
 </script>
 
+<svelte:head><title>NexHub</title></svelte:head>
+
 <section class="hero">
 	<h1>{t('home.title')}</h1>
 	<p class="dim">{t('home.text')}</p>
