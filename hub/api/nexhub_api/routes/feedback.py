@@ -28,7 +28,7 @@ PER_DAY = 5
 Status = Literal["neu", "gesehen", "geplant", "erledigt", "abgelehnt"]
 
 
-class Entry(BaseModel):
+class FeedbackEntry(BaseModel):
     id: int
     title: str
     body: str
@@ -49,11 +49,11 @@ class NewStatus(BaseModel):
     status: Status
 
 
-async def _entry(db: DB, row: Feedback, user: User) -> Entry:
+async def _entry(db: DB, row: Feedback, user: User) -> FeedbackEntry:
     votes = await db.scalar(select(func.count()).select_from(FeedbackVote).where(FeedbackVote.feedback_id == row.id))
     voted = await db.get(FeedbackVote, (row.id, user.id)) is not None
     author = (await db.get(User, row.user_id)).name if user.role == "admin" else None
-    return Entry(id=row.id, title=row.title, body=row.body, status=row.status, created_at=aware(row.created_at),
+    return FeedbackEntry(id=row.id, title=row.title, body=row.body, status=row.status, created_at=aware(row.created_at),
                  votes=votes or 0, voted=voted, mine=row.user_id == user.id, author=author)
 
 
@@ -65,7 +65,7 @@ async def _get(db: DB, feedback_id: int) -> Feedback:
 
 
 @router.get("/api/feedback")
-async def list_feedback(user: CurrentUser, db: DB) -> list[Entry]:
+async def list_feedback(user: CurrentUser, db: DB) -> list[FeedbackEntry]:
     """Die meisten Stimmen zuerst, bei Gleichstand der neuere."""
     rows = (await db.scalars(select(Feedback).order_by(Feedback.created_at.desc()))).all()
     entries = [await _entry(db, row, user) for row in rows]
@@ -73,7 +73,7 @@ async def list_feedback(user: CurrentUser, db: DB) -> list[Entry]:
 
 
 @router.post("/api/feedback", status_code=201)
-async def add_feedback(body: NewEntry, user: CurrentUser, db: DB) -> Entry:
+async def add_feedback(body: NewEntry, user: CurrentUser, db: DB) -> FeedbackEntry:
     since = datetime.now(UTC) - timedelta(days=1)
     today = await db.scalar(select(func.count()).select_from(Feedback).where(
         Feedback.user_id == user.id, Feedback.created_at >= since))
@@ -89,7 +89,7 @@ async def add_feedback(body: NewEntry, user: CurrentUser, db: DB) -> Entry:
 
 
 @router.post("/api/feedback/{feedback_id}/vote")
-async def vote(feedback_id: int, user: CurrentUser, db: DB) -> Entry:
+async def vote(feedback_id: int, user: CurrentUser, db: DB) -> FeedbackEntry:
     row = await _get(db, feedback_id)
     if await db.get(FeedbackVote, (row.id, user.id)) is None:
         db.add(FeedbackVote(feedback_id=row.id, user_id=user.id))
@@ -98,7 +98,7 @@ async def vote(feedback_id: int, user: CurrentUser, db: DB) -> Entry:
 
 
 @router.delete("/api/feedback/{feedback_id}/vote")
-async def unvote(feedback_id: int, user: CurrentUser, db: DB) -> Entry:
+async def unvote(feedback_id: int, user: CurrentUser, db: DB) -> FeedbackEntry:
     row = await _get(db, feedback_id)
     mine = (FeedbackVote.feedback_id == row.id, FeedbackVote.user_id == user.id)
     await db.execute(delete(FeedbackVote).where(*mine))
@@ -107,7 +107,7 @@ async def unvote(feedback_id: int, user: CurrentUser, db: DB) -> Entry:
 
 
 @router.put("/api/admin/feedback/{feedback_id}")
-async def set_status(feedback_id: int, body: NewStatus, admin: AdminUser, db: DB) -> Entry:
+async def set_status(feedback_id: int, body: NewStatus, admin: AdminUser, db: DB) -> FeedbackEntry:
     row = await _get(db, feedback_id)
     row.status, row.updated_at = body.status, datetime.now(UTC)
     await db.commit()

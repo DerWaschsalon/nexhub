@@ -1,4 +1,5 @@
 // Zugriff auf die Hub-API. Cookies gehen automatisch mit, die Seite läuft auf derselben Adresse.
+import type * as Api from './api-types.ts';
 import { error } from '@sveltejs/kit';
 
 export class ApiError extends Error {
@@ -54,49 +55,15 @@ export const loadMe = (f: Fetch = fetch): Promise<Me | null> => apiOrNull<Me>('/
 
 // Antworten der API (Pydantic-Modelle in hub/api/nexhub_api/routes/)
 
-export type Role = 'admin' | 'member';
-
-export type Me = { discord_id: string; name: string; avatar_url: string | null; role: Role };
-
-export type Operator = { name: string; address: string[]; email: string | null };
-
+export type Role = Api.Me['role'];
+export type Me = Api.Me;
+export type Operator = Api.Operator;
 /** Für alle sichtbar: Login eingerichtet? Wer betreibt den Hub (Impressum, aus .env)? */
-export type PublicInfo = { login: boolean; operator: Operator | null; hoster: string | null };
-
-export type Account = {
-	id: number;
-	discord_id: string;
-	name: string;
-	avatar_url: string | null;
-	role: Role;
-	created_at: string;
-	last_login_at: string;
-	blocked: boolean;
-	sessions: number;
-};
-
-export type Status = {
-	version: string;
-	db_revision: string;
-	login: boolean;
-	member_check: boolean;
-	accounts: number;
-	active_sessions: number;
-};
-
+export type PublicInfo = Api.Info;
+export type Account = Api.AccountOut;
+export type Status = Api.Status;
 /** Antwort von GET /api/admin/stats: Tagesreihen (ein Wert je Tag in `days`) und Summen */
-export type Stats = {
-	days: string[];
-	runs: number[];
-	accounts: number[];
-	total_runs: number;
-	total_accounts: number;
-	characters: number;
-	devices: number;
-	devices_active: number;
-	devices_by_version: Record<string, number>;
-	bis: { cls: string; players: number; counted_at: string | null }[];
-};
+export type Stats = Api.Stats;
 
 /** JSON senden (PUT/POST/DELETE) und die Antwort zurückgeben. */
 export function send<T>(path: string, method: string, body?: unknown): Promise<T> {

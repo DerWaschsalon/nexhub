@@ -312,13 +312,13 @@ async def remove(character_id: int, user: CurrentUser, db: DB) -> None:
     await db.commit()
 
 
-class Started(BaseModel):
+class ArmoryRefreshStarted(BaseModel):
     started: bool
 
 
 @router.post("/{character_id}/refresh", status_code=202)
 async def refresh(character_id: int, request: Request, user: CurrentUser, db: DB,
-                  background: BackgroundTasks) -> Started:
+                  background: BackgroundTasks) -> ArmoryRefreshStarted:
     armory = _armory(request)
     row, _ = await character_or_404(db, character_id)
     if row.status == "offen" or character_id in armory.running:
@@ -329,7 +329,7 @@ async def refresh(character_id: int, request: Request, user: CurrentUser, db: DB
     row.status = "offen"
     await db.commit()
     background.add_task(armory.refresh, row.id)
-    return Started(started=True)
+    return ArmoryRefreshStarted(started=True)
 
 
 def _may_manage(row: Character, user: User) -> bool:

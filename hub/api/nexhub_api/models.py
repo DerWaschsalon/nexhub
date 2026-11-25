@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -12,6 +13,11 @@ BigID = BigInteger().with_variant(Integer, "sqlite")
 
 class Base(DeclarativeBase):
     pass
+
+
+# Erlaubte Werte von User.role und RunCharacter.status/Character.status (in der Datenbank Text)
+Role = Literal["admin", "member"]
+CharacterStatus = Literal["offen", "ok", "nicht_gefunden", "name_maskiert", "fehler"]
 
 
 class User(Base):

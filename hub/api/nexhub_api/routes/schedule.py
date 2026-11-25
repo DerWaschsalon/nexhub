@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/public", tags=["öffentlich"])
 WEEK_S = WEEK_MIN * 60
 
 
-class Entry(BaseModel):
+class ScheduleEntry(BaseModel):
     key: str
     name_en: str
     name_de: str
@@ -35,14 +35,14 @@ class Planned(BaseModel):
 class Schedule(BaseModel):
     now: float
     server_zone: str  # IANA-Name der Server-Uhr, für die Anzeige „Serverzeit“
-    events: list[Entry]
+    events: list[ScheduleEntry]
     week: list[Planned]  # Wochentermine der nächsten sieben Tage, nach Beginn
 
 
 @router.get("/termine")
 async def schedule() -> Schedule:
     now = time.time()
-    events = [Entry(key=event.key, name_en=event.name_en, name_de=event.name_de, start=start,
+    events = [ScheduleEntry(key=event.key, name_en=event.name_en, name_de=event.name_de, start=start,
                     open_until=open_until, place=event.place)
               for event, start, open_until in upcoming(now)]
     week = [Planned(key=event.key, start=start)

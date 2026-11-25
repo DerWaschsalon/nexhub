@@ -63,7 +63,11 @@ Ein **Modul** bringt nur seinen Inhalt mit, in `web/src/modules/<id>/`:
   Daten selbst holt (z. B. `logs/components/RecentRuns.svelte`)
 - `texts.ts`: `defineTexts(en, de)` – svelte-check meldet, wenn auf Deutsch ein Schlüssel fehlt;
   Schlüssel mit dem Modulnamen davor (`logs.…`)
-- Typen der API, Komponenten mit eigenem `<style>` (Svelte begrenzt das auf die Komponente), Daten
+- Typen der API: die Antworten selbst kommen erzeugt aus `lib/api-types.ts` (aus den Modellen der Routen,
+  `uv run python -m nexhub_api.web_types` in `hub/api`; ein Test meldet, wenn die Datei veraltet ist). Von Hand
+  steht im Modul nur, was die API als freies JSON durchreicht (Zusammenfassung eines Runs, Momentaufnahme
+  eines Charakters), und ein Name, der zum Modul passt (`LootBoss` statt `Boss`)
+- Komponenten mit eigenem `<style>` (Svelte begrenzt das auf die Komponente), Daten
 
 Seiten liegen unter `web/src/routes/hub/<pfad>/` (SvelteKit verlangt sie dort) und holen Komponenten
 aus dem Modul (`#modules/<id>/…`). Eigene Farben, Schriften oder Menüs bringt ein Modul nicht mit:
@@ -372,6 +376,7 @@ Alles über Umgebungsvariablen, auf dem Server in `/srv/nexhub/.env` (Vorlage
 ```
 cd hub/api && uv sync
 uv run pytest -q                                   # Tests (SQLite)
+uv run python -m nexhub_api.web_types              # nach Änderungen an Routen/Modellen: Typen fürs Web
 TEST_DATABASE_URL=postgresql+asyncpg://… uv run pytest -q   # dieselben Tests gegen Postgres
 
 cd hub/web && npm ci                               # braucht Node ≥ 22.17
