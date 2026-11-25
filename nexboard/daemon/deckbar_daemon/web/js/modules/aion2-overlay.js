@@ -145,15 +145,18 @@ function controlCard(o, redraw) {
   const restart = async () => {
     try { S.overlay = await api("POST", "/api/overlay/restart"); toast("Overlay startet neu"); redraw(); } catch (e) { toast(e.message, true); }
   };
+  // Befehle gehen an das laufende Overlay-Programm; ohne es bleiben die Knöpfe aus, statt erst beim Klick zu scheitern
+  const off = { disabled: !o.socket, title: o.socket ? null : "Das Overlay läuft gerade nicht" };
   return card("Steuerung", "Startet mit AION 2 und läuft dann als eigenes Programm im Tray", unitChip(o),
     el("div", { class: "row wrap" },
-      button("Bearbeiten", () => cmd("edit"), "primary", "cursor-move"),
-      button("Zeigen/Verbergen", () => cmd("toggle"), "", "eye"),
-      button("Durchklicken an", () => cmd("lock"), "", "lock"),
-      button("Durchklicken aus", () => cmd("click"), "", "lock-open"),
+      button("Bearbeiten", () => cmd("edit"), "primary", "cursor-move", off),
+      button("Zeigen/Verbergen", () => cmd("toggle"), "", "eye", off),
+      button("Durchklicken an", () => cmd("lock"), "", "lock", off),
+      button("Durchklicken aus", () => cmd("click"), "", "lock-open", off),
       button("Overlay neu starten", restart, "ghost", "restart")),
-    el("p", { class: "hint small", style: "margin-top:14px" },
-      "Im Bearbeiten-Modus Widgets ziehen, Mausrad = Größe, Esc = fertig. Das Meter lässt sich jederzeit an Kopf- oder Fußzeile verschieben."),
+    el("p", { class: "hint small", style: "margin-top:14px" }, o.socket
+      ? "Im Bearbeiten-Modus Widgets ziehen, Mausrad = Größe, Esc = fertig. Das Meter lässt sich jederzeit an Kopf- oder Fußzeile verschieben."
+      : "Das Overlay läuft nur, solange AION 2 läuft. Anordnen kannst du die Widgets auch ohne Spiel oben in der Vorschau."),
     el("div", { class: "row wrap", style: "margin-top:14px" },
       button("Tastenkürzel einrichten", openShortcuts, "sm", "open-in-new"),
       el("span", { class: "hint small", text: SHORTCUT_HINT })));

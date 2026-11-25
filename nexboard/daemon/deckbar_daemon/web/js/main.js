@@ -188,7 +188,7 @@ function dashboard(ctx) {
       el("div", { class: "row wrap" },
         modOn("deck") ? chip(devs ? `${devs} Gerät${devs === 1 ? "" : "e"} verbunden` : "Kein Gerät verbunden", devs ? "ok" : "") : null,
         S.updates?.available ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null,
-        modOn("aion2.overlay") ? button("Overlay bearbeiten", () => overlayCommand("edit"), "sm", "cursor-move") : null)));
+        modOn("aion2.overlay") ? button("Overlay bearbeiten", () => (S.overlay?.socket ? overlayCommand("edit") : go("aion2.overlay")), "sm", "cursor-move") : null)));
     // frische Installation (noch nichts für ein Spiel eingeschaltet): auf die Einrichtung hinweisen
     if (!enabled.some((m) => GAMES.includes(m.category))) {
       parts.push(callout("info", "star-four-points", "Neu hier? Die Einrichtung schaltet in drei Schritten ein, was du brauchst.",
@@ -264,14 +264,12 @@ function modulesPage(ctx) {
 /* ================================================================ Einstellungen */
 function settingsPage(ctx) {
   const box = el("div", { class: "stack" });
-  let restartNeeded = [];
   const view = {}; // „Erweitert“ bleibt beim Neuzeichnen offen
   const save = async (patch) => {
     setSaveState("Speichere …");
     try {
       const res = await api("PUT", "/api/settings", patch);
-      S.settings = { settings: res.settings, schema: res.schema, config_dir: res.config_dir, restart_fields: res.restart_fields };
-      restartNeeded = [...new Set([...restartNeeded, ...res.restart])];
+      S.settings = { settings: res.settings, schema: res.schema, config_dir: res.config_dir, restart_fields: res.restart_fields, restart: res.restart };
       setSaveState("Gespeichert ✓");
       draw();
     } catch (e) {
@@ -283,6 +281,7 @@ function settingsPage(ctx) {
     const st = S.settings?.settings;
     if (!st) return;
     const theme = storedTheme();
+    const restartNeeded = S.settings.restart || []; // gespeichert, gilt aber erst nach einem Neustart
     const patch = (p) => { Object.assign(st, p); save(p); };
     fill(box,
       restartNeeded.length ? callout("warn", "restart", el("span", { text: `Wirkt erst nach einem Neustart des Daemons: ${restartNeeded.join(", ")}` }),
@@ -290,17 +289,27 @@ function settingsPage(ctx) {
       card("Allgemein", "Port, Token, USB und mDNS stehen unter „Erweitert“", null,
         schemaForm(S.settings.schema, st, patch, view),
         el("div", { class: "grid" }, field("Darstellung", select({ auto: "Wie das System", dark: "Dunkel", light: "Hell" }, theme, (v) => setTheme(v)), "Gilt nur für diesen Browser")),
-        settingsRow("Geräte-Token im Klartext", "Für secrets.h der Firmware", button("Anzeigen", showToken, "sm", "eye"))),
+        settingsRow("Geräte-Token im Klartext", "Für secrets.h der Firmware", token
+          ? el("div", { class: "row" }, el("input", { class: "input mono", readonly: true, value: token, "aria-label": "Geräte-Token", style: "min-width:260px" }),
+            button("Kopieren", copyToken, "sm", "content-copy"), button("Verbergen", () => { token = null; draw(); }, "sm ghost", "eye-off"))
+          : button("Anzeigen", showToken, "sm", "eye"))),
       card("Daemon", S.settings.config_dir ? `Konfiguration: ${S.settings.config_dir}` : null, null,
         el("div", { class: "row wrap" },
           button("Daemon neu starten", restartDaemon, "", "restart"),
           el("span", { class: "hint small", text: `Version ${S.status?.version || "?"}` }))));
   };
+  let token = null; // nur solange „Anzeigen“ gedrückt wurde
   async function showToken() {
     try {
-      const r = await api("POST", "/api/settings/token");
-      prompt("Geräte-Token (für secrets.h der Firmware):", r.token);
+      token = (await api("POST", "/api/settings/token")).token;
+      draw();
     } catch (e) { toast(e.message, true); }
+  }
+  async function copyToken() {
+    try {
+      await navigator.clipboard.writeText(token);
+      toast("Token kopiert");
+    } catch { toast("Kopieren ging nicht, bitte von Hand markieren", true); }
   }
   ctx.onUnmount(on("settings", draw));
   draw();
