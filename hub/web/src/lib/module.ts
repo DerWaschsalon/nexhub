@@ -15,9 +15,11 @@ export type NavItem = {
 	icon: IconName;
 	/** nur für Admins sichtbar; die API prüft das zusätzlich */
 	admin?: boolean;
-	/** Spiel (Textschlüssel, z. B. 'game.aion2'): Einträge desselben Spiels stehen im Menü als ein
-	 *  Eintrag, ihre Seiten als Reiter über dem Inhalt (lib/modules.ts menu) */
+	/** Spiel (Textschlüssel, z. B. 'game.aion2'): Einträge desselben Spiels stehen im Menü als eine
+	 *  aufklappbare Gruppe (lib/modules.ts menu); Admin-Seiten bilden die Gruppe „Verwaltung“ */
 	game?: string;
+	/** Name der Unterseite für den Breadcrumb (z. B. der geöffnete Run), aus den geladenen Daten der Seite */
+	detail?: (data: Record<string, any>, path: string) => string | undefined;
 	/** Vorschau in der Kachel auf der Übersicht (routes/hub/+page.svelte); holt ihre Daten selbst */
 	overview?: Component;
 };

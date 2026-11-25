@@ -101,6 +101,36 @@ RULES = """\
 	outline-offset: 2px;
 }
 
+/* Akkordeon (<details class="fold">): Die Überschrift bleibt stehen, ein Klick zeigt den Inhalt darunter */
+details.fold > summary {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	cursor: pointer;
+	list-style: none;
+}
+details.fold > summary::-webkit-details-marker {
+	display: none;
+}
+details.fold > summary::after {
+	content: "";
+	flex-shrink: 0;
+	width: 8px;
+	height: 8px;
+	margin: 0 4px 4px auto;
+	border-right: 2px solid var(--dim);
+	border-bottom: 2px solid var(--dim);
+	transform: rotate(45deg);
+	transition: transform 0.15s var(--ease);
+}
+details.fold[open] > summary::after {
+	margin-bottom: -4px;
+	transform: rotate(-135deg);
+}
+details.fold > summary:hover::after {
+	border-color: var(--text);
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,

@@ -17,7 +17,7 @@ from .base import WebModule
 
 class OverlayModule(WebModule):
     info = ModuleInfo(
-        "aion2.overlay", "AION 2 · Overlay", "ingame", "layers-triple",
+        "aion2.overlay", "AION 2 · Overlay", "aion2", "layers-triple",
         "Meter und Widgets über dem Spiel: frei verschiebbar, klickdurchlässig, mit Profilen, Boss-Leiste, "
         "Terminen und Namenseffekt.",
         requires=("aion2.dps",), tags=("AION 2", "Desktop"),

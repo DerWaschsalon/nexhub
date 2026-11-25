@@ -27,7 +27,7 @@ MANAGEMENT = frozenset({"plugin_list", "plugin_catalog", "plugin_install", "plug
 
 class PluginsModule(WebModule):
     info = ModuleInfo(
-        "aion2.plugins", "AION 2 · Plugins", "ingame", "puzzle-outline",
+        "aion2.plugins", "AION 2 · Plugins", "aion2", "puzzle-outline",
         "Plugins aus dem signierten Katalog von A2Tools: installieren mit Zustimmung zu ihren Rechten, "
         "Fenster und Widgets im Overlay.",
         requires=("aion2.overlay",), default=True, tags=("AION 2", "Desktop"),

@@ -26,7 +26,7 @@ class ClientSettings(_Strict):
 class PoeClientModule(WebModule):
     game: ClassVar[PoeGame] = POE1
     info = ModuleInfo(
-        "poe1.client", "PoE 1 · Spiel", "ingame", "gamepad-variant",
+        "poe1.client", "PoE 1 · Spiel", "poe1", "gamepad-variant",
         "Erkennt Path of Exile und liest Zonenwechsel und Aufstiege aus Client.txt. Grundlage der PoE-Module.",
         tags=("PoE 1",),
     )

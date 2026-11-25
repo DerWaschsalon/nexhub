@@ -38,7 +38,7 @@ COMMANDS = ("next", "back", "skip", "reset")
 class PoeLevelingModule(WebModule):
     game = POE1
     info = ModuleInfo(
-        "poe1.leveling", "PoE 1 · Leveling-Guide", "ingame", "format-list-bulleted",
+        "poe1.leveling", "PoE 1 · Leveling-Guide", "poe1", "format-list-bulleted",
         "Act Tracker nach Exile-UI: aktueller Schritt mit Gems aus dem PoB-Build auf der Touch-Leiste, "
         "schaltet beim Betreten der Zielzone selbst weiter.",
         requires=("poe1.client",), tags=("PoE 1", "Leiste"),

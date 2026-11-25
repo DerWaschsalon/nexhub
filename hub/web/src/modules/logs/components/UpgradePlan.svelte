@@ -2,6 +2,7 @@
      dann je Teil die Würfe, sortiert nach Punkten je Versuch; das erste ist „Als Nächstes“. Darunter die
      Teile, die nur noch gebunden werden müssen, das Ziel nicht erreichen oder schon dort sind. -->
 <script lang="ts">
+	import Fold from '#lib/components/Fold.svelte';
 	import Tabs from '#lib/components/Tabs.svelte';
 	import { formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
@@ -34,15 +35,17 @@
 	</li>
 {/snippet}
 
-{#snippet group(title: string, pieces: PlanPiece[], note?: string)}
+<!-- Teile, an denen nichts zu würfeln ist: als Akkordeon, damit der Plan oben im Blick bleibt -->
+{#snippet group(id: string, title: string, pieces: PlanPiece[], note?: string)}
 	{#if pieces.length}
-		<section class="panel">
-			<h3>{title}</h3>
-			{#if note}<p class="dim note">{note}</p>{/if}
-			<ul class="pieces">
-				{#each pieces as p (p.slot)}{@render piece(p)}{/each}
-			</ul>
-		</section>
+		<div class="fold-row">
+			<Fold id="upgrades.{id}" title={title} hint={String(pieces.length)}>
+				{#if note}<p class="dim note">{note}</p>{/if}
+				<ul class="pieces">
+					{#each pieces as p (p.slot)}{@render piece(p)}{/each}
+				</ul>
+			</Fold>
+		</div>
 	{/if}
 {/snippet}
 
@@ -87,17 +90,18 @@
 	<p class="dim">{t('logs.upgrades.none')}</p>
 {/each}
 
-{@render group(t('logs.upgrades.bindOnly'), plan.bind)}
+{@render group('bind', t('logs.upgrades.bindOnly'), plan.bind)}
 {#if plan.unreachable.length}
-	<section class="panel">
-		<h3>{t('logs.upgrades.unreachable', { goal: plan.goal })}</h3>
-		<ul class="pieces">
-			{#each plan.unreachable as p (p.slot)}{@render piece(p, t(`logs.upgrades.reason.${p.reason}`))}{/each}
-		</ul>
-	</section>
+	<div class="fold-row">
+		<Fold id="upgrades.unreachable" title={t('logs.upgrades.unreachable', { goal: plan.goal })} hint={String(plan.unreachable.length)}>
+			<ul class="pieces">
+				{#each plan.unreachable as p (p.slot)}{@render piece(p, t(`logs.upgrades.reason.${p.reason}`))}{/each}
+			</ul>
+		</Fold>
+	</div>
 {/if}
-{@render group(t('logs.upgrades.done', { goal: plan.goal }), plan.done)}
-{@render group(t('logs.upgrades.arcana'), plan.arcana, t('logs.upgrades.arcanaHint'))}
+{@render group('done', t('logs.upgrades.done', { goal: plan.goal }), plan.done)}
+{@render group('arcana', t('logs.upgrades.arcana'), plan.arcana, t('logs.upgrades.arcanaHint'))}
 
 <style>
 	.head {
@@ -118,6 +122,9 @@
 	h3 {
 		font-size: 15px;
 		margin: 0 0 8px;
+	}
+	.fold-row {
+		margin-bottom: 12px;
 	}
 	.section {
 		margin: 18px 0 10px;

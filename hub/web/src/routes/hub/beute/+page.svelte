@@ -1,6 +1,7 @@
 <!-- Modul Beute: Dungeon wählen, dann je Boss die Gegenstände mit „bei wie vielen Siegen“ und, ab genug
      Siegen, der Rate „1 zu N“ mit dem Band, in dem die wahre Rate wahrscheinlich liegt. -->
 <script lang="ts">
+	import Fold from '#lib/components/Fold.svelte';
 	import Tabs from '#lib/components/Tabs.svelte';
 	import { formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
@@ -34,8 +35,8 @@
 	</div>
 
 	{#each dungeon.bosses as boss (boss.mob)}
-		<section class="glass pad">
-			<h2>{boss.name} <small class="dim">{t('loot.kills', { n: boss.kills })}</small></h2>
+		<div class="boss">
+			<Fold id="loot.{boss.mob}" title={boss.name} hint={t('loot.kills', { n: boss.kills })} open>
 			{#if !boss.items.length}
 				<p class="dim">{t('loot.noDrops')}</p>
 			{:else}
@@ -66,7 +67,8 @@
 					</table>
 				</div>
 			{/if}
-		</section>
+			</Fold>
+		</div>
 	{/each}
 {/if}
 
@@ -78,16 +80,7 @@
 		gap: 10px;
 		margin-bottom: 14px;
 	}
-	section {
+	.boss {
 		margin-bottom: 14px;
-	}
-	h2 {
-		font-size: 17px;
-		margin: 0 0 10px;
-	}
-	h2 small {
-		margin-left: 8px;
-		font-size: 13px;
-		font-weight: 450;
 	}
 </style>

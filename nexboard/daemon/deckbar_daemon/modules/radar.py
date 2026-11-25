@@ -47,7 +47,7 @@ class RadarPart(WebModule):
 
 class RadarModule(RadarPart):
     info = ModuleInfo(
-        "aion2.radar", "AION 2 · Radar", "ingame", "radar",
+        "aion2.radar", "AION 2 · Radar", "aion2", "radar",
         "Hidden Cubes und Karte als Widgets im Overlay, mit Ton bei einem neuen Cube. Läuft mit AION 2 und "
         "liest den Server-Verkehr passiv mit (tcpdump).",
         tags=("AION 2", "Desktop"),
@@ -97,7 +97,7 @@ class RadarModule(RadarPart):
 
 class WarningsModule(RadarPart):
     info = ModuleInfo(
-        "aion2.warnings", "AION 2 · Boss-Warnungen", "ingame", "bell-alert",
+        "aion2.warnings", "AION 2 · Boss-Warnungen", "aion2", "bell-alert",
         "Warnt vor Boss-Mechaniken und sagt an, was zu tun ist: Mechaniken je Dungeon, Boss-Ansagen, „Jetzt "
         "staggern“, Fläche unter dir, wenig HP. Als Widget im Overlay und gesprochen.",
         split_from="aion2.radar", tags=("AION 2", "Desktop"),
@@ -123,7 +123,7 @@ class WarningsModule(RadarPart):
 
 class FieldBossModule(RadarPart):
     info = ModuleInfo(
-        "aion2.field_bosses", "AION 2 · Feldbosse", "ingame", "timer-outline",
+        "aion2.field_bosses", "AION 2 · Feldbosse", "aion2", "timer-outline",
         "Respawn-Timer der Feldbosse auf der Seite Termine, mit Ansage 5 Minuten vorher und beim Respawn; "
         "dazu die Ansage für den Riss.",
         requires=("aion2.schedule",), split_from="aion2.radar", tags=("AION 2",),

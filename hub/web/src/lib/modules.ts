@@ -29,17 +29,20 @@ export const NAV: NavItem[] = [
 /** Was dieses Konto im Menü sieht: Admin-Seiten nur für Admins. */
 export const navFor = (me: Me): NavItem[] => NAV.filter((i) => !i.admin || me.role === 'admin');
 
-/** Ein Eintrag der Seitenleiste: eine Seite, oder ein Spiel mit seinen Seiten (`pages`). */
+/** Ein Eintrag der Seitenleiste: eine Seite, oder eine Gruppe mit ihren Seiten (`pages`). */
 export type MenuEntry = NavItem & { pages: NavItem[] };
 
-/** Fasst die Einträge eines Spiels zu einem zusammen. Er führt zur ersten Seite des Spiels und
- *  trägt deren Symbol; die Seiten selbst zeigt das Layout als Reiter über dem Inhalt. */
+const ADMIN_GROUP = 'nav.admin';
+const ADMIN_ICON = 'server';
+
+/** Fasst die Seiten eines Spiels und die Admin-Seiten je zu einer aufklappbaren Gruppe zusammen. */
 export function menu(items: NavItem[]): MenuEntry[] {
 	const entries: MenuEntry[] = [];
 	for (const item of items) {
-		const game = item.game ? entries.find((e) => e.label === item.game) : undefined;
-		if (game) game.pages.push(item);
-		else if (item.game) entries.push({ ...item, label: item.game, pages: [item] });
+		const group = item.game ?? (item.admin ? ADMIN_GROUP : undefined);
+		const entry = group ? entries.find((e) => e.label === group) : undefined;
+		if (entry) entry.pages.push(item);
+		else if (group) entries.push({ ...item, label: group, icon: item.game ? item.icon : ADMIN_ICON, pages: [item] });
 		else entries.push({ ...item, pages: [] });
 	}
 	return entries;

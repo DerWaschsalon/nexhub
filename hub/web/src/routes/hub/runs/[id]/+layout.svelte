@@ -35,8 +35,6 @@
 
 <svelte:head><title>{run.dungeon} · NexHub</title></svelte:head>
 
-<a class="back" href="/hub/runs">‹ {t('logs.run.allRuns')}</a>
-
 <RunView {run} base="/hub/runs/{run.id}" fight={page.params.fight ?? null}>
 	{#snippet actions()}
 		<a class="btn small" href="/api/runs/{run.id}/nexlog" download>{t('logs.download')}</a>

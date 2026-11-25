@@ -223,11 +223,35 @@ export function callout(kind, ic, content, ...actions) {
   return el("div", { class: `callout ${kind}` }, icon(ic), el("div", { class: "grow" }, content), ...actions);
 }
 
+const FOLD_KEY = "nexboard.fold";
+
+function foldStates() {
+  try { return JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); } catch { return {}; }
+}
+
+/** Karte. Mit Überschrift ist sie ein Akkordeon: Ein Klick auf den Kopf klappt sie zu und auf; der Browser
+    merkt sich das je Seite und Karte. */
 export function card(title, sub, actions, ...body) {
-  const head = title || actions
-    ? el("div", { class: "card-head" }, el("div", {}, title ? el("h2", { text: title }) : null, sub ? el("div", { class: "sub", text: sub }) : null), actions ? el("div", { class: "row" }, actions) : null)
-    : null;
-  return el("section", { class: "card glass" }, head, ...body);
+  return foldCard(true, title, sub, actions, ...body);
+}
+
+/** Wie card(), aber anfangs zugeklappt: für Abschnitte, die man selten braucht. */
+export function closedCard(title, sub, actions, ...body) {
+  return foldCard(false, title, sub, actions, ...body);
+}
+
+function foldCard(openByDefault, title, sub, actions, ...body) {
+  const text = el("div", { class: "grow" }, title ? el("h2", { text: title }) : null, sub ? el("div", { class: "sub", text: sub }) : null);
+  if (!title) return el("section", { class: "card glass" }, actions ? el("div", { class: "card-head" }, text, el("div", { class: "row" }, actions)) : null, ...body);
+  const key = `${location.hash.replace(/^#\/?/, "").split("/")[0]}:${title}`;
+  // ein Knopf im Kopf soll nur seine Aktion auslösen, nicht auch auf- oder zuklappen
+  const buttons = actions ? el("div", { class: "row", onclick: (e) => e.preventDefault() }, actions) : null;
+  const box = el("details", { class: "card glass fold", open: foldStates()[key] ?? openByDefault },
+    el("summary", { class: "card-head" }, text, buttons), el("div", { class: "fold-body" }, ...body));
+  box.addEventListener("toggle", () => {
+    localStorage.setItem(FOLD_KEY, JSON.stringify({ ...foldStates(), [key]: box.open }));
+  });
+  return box;
 }
 
 export function settingsRow(title, text, control) {
@@ -236,7 +260,7 @@ export function settingsRow(title, text, control) {
 
 /** Zugeklappter Abschnitt (z. B. „Erweitert“); view merkt sich über Neuzeichnen hinweg, ob er offen ist. */
 export function collapsible(label, view, ...kids) {
-  const box = el("details", { class: "advanced", open: !!view.open }, el("summary", { text: label }), ...kids);
+  const box = el("details", { class: "fold advanced", open: !!view.open }, el("summary", { text: label }), ...kids);
   box.addEventListener("toggle", () => { view.open = box.open; });
   return box;
 }

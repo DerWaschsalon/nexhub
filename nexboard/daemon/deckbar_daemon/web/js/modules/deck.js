@@ -2,7 +2,7 @@
    Jede Änderung wird nach kurzer Pause gespeichert; der Daemon schickt sie sofort an alle Geräte. */
 import {
   fill, $, el, icon, glyph, deckIcons, api, S, on, sendLive, toast, setSaveState, field, input as inputEl, select as selectEl,
-  button, chip, callout, card, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, classColor, modOn, throttle, dpsDiff,
+  button, chip, callout, card, closedCard, settingsRow, seg, sw, fmtAmount, fmtWhen, clampInt, classColor, modOn, throttle, dpsDiff,
 } from "../core.js";
 import { moduleSettings } from "../form.js";
 import { LABEL_MAX, SCREEN_H, SCREEN_W } from "../nexproto.js";
@@ -811,7 +811,7 @@ function devicesTab(ctx) {
             el("td", {}, el("b", { text: d.sim ? "Simulator" : d.id })), el("td", { text: d.model || "–" }), el("td", { text: d.fw || "–" }),
             el("td", { class: "mono", text: d.remote }), el("td", { text: d.page || "–" }), el("td", { text: fmtWhen(d.connected_at) })))))
           : el("div", { class: "empty" }, icon("tablet"), "Kein Gerät verbunden.", el("p", { class: "hint small", text: "Die Leiste verbindet sich per WLAN (mDNS) oder USB-Kabel. Der Simulator: simulator/build/deckbar-sim." }))),
-      card("Layout-Datei", null, null,
+      closedCard("Layout-Datei", null, null,
         el("p", { class: "hint", text: `${S.status.layout_path || "layout.yaml"} – auch von Hand editierbar, Änderungen werden live übernommen.` })));
   };
   ctx.onUnmount(on("devices", draw));
