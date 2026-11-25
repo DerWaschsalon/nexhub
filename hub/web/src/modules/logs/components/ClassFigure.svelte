@@ -181,8 +181,8 @@
 		pointer-events: none;
 		background: radial-gradient(
 			closest-side,
-			#fff,
-			color-mix(in srgb, var(--glow) 70%, #fff) 25%,
+			var(--white),
+			color-mix(in srgb, var(--glow) 70%, var(--white)) 25%,
 			color-mix(in srgb, var(--glow) 45%, transparent) 55%,
 			transparent
 		);
@@ -207,7 +207,7 @@
 		}
 	}
 	.zone:not(.own):focus-visible {
-		outline: 1px solid color-mix(in srgb, var(--glow) 70%, #fff);
+		outline: 1px solid color-mix(in srgb, var(--glow) 70%, var(--white));
 	}
 	.base {
 		position: relative;
@@ -240,14 +240,14 @@
 	}
 	/* Licht in der Klassenfarbe, liegt hinter der Figur; aus weitem Schein zieht es sich ans Teil */
 	.halo {
-		filter: drop-shadow(0 0 30px color-mix(in srgb, var(--glow) 90%, #fff)) drop-shadow(0 0 60px var(--glow))
+		filter: drop-shadow(0 0 30px color-mix(in srgb, var(--glow) 90%, var(--white))) drop-shadow(0 0 60px var(--glow))
 			drop-shadow(0 0 90px color-mix(in srgb, var(--glow) 60%, transparent));
 		transition:
 			opacity 0.35s ease-out,
 			filter 0.5s ease-out;
 	}
 	.halo.lit {
-		filter: drop-shadow(0 0 4px color-mix(in srgb, var(--glow) 90%, #fff)) drop-shadow(0 0 14px var(--glow))
+		filter: drop-shadow(0 0 4px color-mix(in srgb, var(--glow) 90%, var(--white))) drop-shadow(0 0 14px var(--glow))
 			drop-shadow(0 0 30px color-mix(in srgb, var(--glow) 60%, transparent));
 	}
 	/* das Teil selbst nur aufgehellt, ohne Rand: ein Rand zeichnete die Schnittkanten zu den Nachbarteilen nach */

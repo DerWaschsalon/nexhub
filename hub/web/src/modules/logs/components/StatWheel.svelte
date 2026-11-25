@@ -38,9 +38,9 @@
 	<svg viewBox="0 0 {WHEEL.width} {WHEEL.height}" aria-hidden="true">
 		<defs>
 			<radialGradient id="wheel-core">
-				<stop offset="0" stop-color="#e8fbff" />
-				<stop offset="0.25" stop-color="#7fe6ff" stop-opacity="0.8" />
-				<stop offset="1" stop-color="#3fd6e8" stop-opacity="0" />
+				<stop offset="0" style:stop-color="var(--game-cyan-pale)" />
+				<stop offset="0.25" style:stop-color="var(--game-cyan-light)" stop-opacity="0.8" />
+				<stop offset="1" style:stop-color="var(--game-cyan)" stop-opacity="0" />
 			</radialGradient>
 		</defs>
 		{#each WHEEL_SPOKES as deg (deg)}
@@ -100,7 +100,7 @@
 		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 	}
 	strong {
-		color: #fff;
+		color: var(--white);
 		font-size: max(13px, 2.7cqw);
 		font-weight: 700;
 	}

@@ -42,6 +42,15 @@
 	--game-gold-soft: #f2d55f;
 	--game-green: #8fd16a;
 	--game-plain: #d8dde6;
+	--game-cyan-light: #7fe6ff;
+	--game-cyan-pale: #e8fbff;
+	--game-teal: #2ec4c9;
+	--game-amplify: #f0a030;
+	--game-line: #c9dcf5;
+	--game-board: #111315;
+	/* reines Weiß und Schwarz: hervorgehobener Text, Aufhellen und Abdunkeln in color-mix */
+	--white: #fff;
+	--black: #000;
 	--radius: 6px;
 	--radius-sm: 4px;
 	--font-heading: 'Unbounded Variable', system-ui, sans-serif;

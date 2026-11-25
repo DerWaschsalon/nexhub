@@ -136,7 +136,7 @@
 		gap: clamp(2px, 0.7vw, 8px);
 		padding: clamp(6px, 1.5vw, 14px);
 		border-radius: var(--radius-sm);
-		background: #111315;
+		background: var(--game-board);
 	}
 	.node {
 		display: block;
