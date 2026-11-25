@@ -21,8 +21,8 @@ DAY_MS = 86_400_000
 
 def boss(mob: int, players: list[tuple[str, str | None, float]], killed: bool = True, fight: str = "f1") -> dict:
     return {"fight": fight, "name": f"Boss {mob}", "mob": mob, "start_ms": 0, "duration_ms": 120_000,
-            "killed": killed, "players": [{"name": n, "cls": c, "damage": int(d * 120), "dps": d} for n, c, d in players],
-            "loot": []}
+            "killed": killed, "loot": [],
+            "players": [{"name": n, "cls": c, "damage": int(d * 120), "dps": d} for n, c, d in players]}
 
 
 def summary(*bosses: dict) -> dict:
