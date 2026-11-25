@@ -64,14 +64,14 @@ beendet“). Dagegen der pacman-Hook: `sudo install -Dm644 tcpdump-cap.hook /etc
   erst, wenn das Wesen einen Skill dieses Bosses eingesetzt hat. Auf der NexBoard-Seite: Art der Ansage (kurze
   Ansage und Satz des Bosses, nur kurze Ansage, nur Satz), Piepton bei jeder Welle und je Boss eine aufklappbare
   Liste seiner Rufe: Haken (ganz aus, auch der Countdown), eigene Worte (statt des Rufs gesagt und gezeigt,
-  `eigene_worte` in `~/.config/aion2-radar.json`), zurück zur Vorgabe und ▶ (spielt den Ruf wie im Kampf, die
+  `own_words` in `aion2.warnings.yaml`), zurück zur Vorgabe und ▶ (spielt den Ruf wie im Kampf, die
   Phase auf 5 s gekürzt, Befehl `ansage_testen`). Bedientexte wie im Plugin. Gesprochen wird
   nacheinander: höchstens zwei Sätze warten, eine Warnung bricht eine noch laufende Boss-Zeile ab. Nach einem
   Spielpatch `STAND` in `werkzeuge/ansagen.py` erhöhen und `python3 -m werkzeuge.ansagen` ausführen.
 - **Jetzt staggern** (Berk, Bakarma, Atiel): sobald die Stagger-Leiste brechbar wird, nach einer Pause oder wenn sie
   erst spät im Kampf erscheint. Endet mit „Boss groggy“, sonst nach 25 s.
-- **Blickrichtung aus der Minikarte** (`aion2/minimap.py`): Der Server schickt die eigene Blickrichtung nie und die Position nur bei Sprint, Sprung oder Kampf. Darum liest das Radar die Minikarte direkt aus dem Spielfenster (X11, `python-xlib`): Die Blickrichtung ist die Mitte zwischen den beiden weißen Linien des Sichtfelds. Einstellung `"minikarte": [x, y, Breite, Höhe]` in Pixeln des Spielfensters, quadratisch und mittig auf dem Pfeil (leer = aus).
-- **Fläche unter dir** (`0x3848`, Boden-Markierung, Aufbau nach glass-cannon): Markiert ein Monster eine Fläche, deren Mittelpunkt höchstens `flaeche_m` (Standard 6 m, in `~/.config/aion2-radar.json`) neben dir liegt, kommt „Fläche unter dir – DU!“ mit Countdown bis zum Einschlag. Größe und Form stehen nicht im Paket, deshalb der feste Abstand. Mehrere Markierungen einer Welle = eine Warnung. Gruppe `flaeche`, auch über `/api/radar/kampf`.
+- **Blickrichtung aus der Minikarte** (`aion2/minimap.py`): Der Server schickt die eigene Blickrichtung nie und die Position nur bei Sprint, Sprung oder Kampf. Darum liest das Radar die Minikarte direkt aus dem Spielfenster (X11, `python-xlib`): Die Blickrichtung ist die Mitte zwischen den beiden weißen Linien des Sichtfelds. Einstellung `minimap: [x, y, Breite, Höhe]` (in `aion2.radar.yaml`) in Pixeln des Spielfensters, quadratisch und mittig auf dem Pfeil (leer = aus).
+- **Fläche unter dir** (`0x3848`, Boden-Markierung, Aufbau nach glass-cannon): Markiert ein Monster eine Fläche, deren Mittelpunkt höchstens `area_m` (Standard 6 m, in `aion2.warnings.yaml`) neben dir liegt, kommt „Fläche unter dir – DU!“ mit Countdown bis zum Einschlag. Größe und Form stehen nicht im Paket, deshalb der feste Abstand. Mehrere Markierungen einer Welle = eine Warnung. Gruppe `flaeche`, auch über `/api/radar/kampf`.
 - **Berserker-Zeit** (`0x8D21`): Countdown in der Vorschauzeile, solange der Boss im Kampf ist.
 - **Wenig LP** (`0x921B`): Mitspieler unter 25 % LP, einmal bis zur Erholung über 50 %. Schalter unter „alle Dungeons“.
 - **Cube-Schlüssel:** verbrauchte Schlüssel (`0x363A`, Item 630900003) in der Statuszeile.
@@ -103,8 +103,9 @@ Start: über die NexBoard-Module **AION 2 · Radar** (Seite „Radar & Karte“)
 (`RadarService`), sobald AION 2 läuft, und beendet es 30 s nach Spielende. Den Stand schickt er etwa fünfmal pro
 Sekunde als Overlay-Ereignis `radar`, gezeichnet von den Widgets `cube.js`, `map.js` und `warnings.js` unter `daemon/deckbar_daemon/web/overlay/widgets/`. Auf den Seiten
 stehen alle Einstellungen des Radars; Charaktername und Sprache kommen aus den allgemeinen Einstellungen
-(der Daemon schreibt sie in die Datei des Radars). Standardwerte und Warnungsliste stehen in
-`aion2/data/defaults.json`; die Schalter der Warnungen ergeben sich aus `mechanics.json` und `callouts.json`
+(der Daemon gibt sie dem Dienst mit). Jedes der drei Module hat seine Einstellungen in
+`~/.config/deckbar/aion2.<radar|warnings|field_bosses>.yaml` (Modelle mit Standardwerten in `aion2/settings.py`,
+Route `/api/m/<Modul>/settings`); die frühere `~/.config/aion2-radar.json` wird beim ersten Start übernommen. Die Schalter der Warnungen ergeben sich aus `mechanics.json` und `callouts.json`
 (`rules.switches()`, liest auch die Seite).
 
 Der Code des Radars liegt im Daemon unter `daemon/deckbar_daemon/` (dieser Ordner hält nur noch Karten,
@@ -122,7 +123,7 @@ Werkzeuge und den Goldtest):
 | `aion2/mechanic_warnings.py`, `cast_trainer.py`, `stagger_calls.py`, `combat_aids.py` | die Auslöser: Mechaniken, Lernhilfe, „Jetzt staggern“/groggy, Kampfhilfen |
 | `aion2/callouts.py`, `data/callouts.json` | Boss-Ansagen |
 | `aion2/spawn_points.py`, `maps.py`, `minimap.py` | Spawnpunkte, Karten mit Eichung, Blickrichtung aus der Minikarte |
-| `aion2/settings.py`, `data/defaults.json` | Einstellungen und ihre Standardwerte |
+| `aion2/settings.py` | Einstellungen der drei Module mit Standardwerten, Übersetzung der früheren Datei |
 | `aion2/service.py` | `RadarService`: verdrahtet alles, Takt, Stand fürs Overlay |
 | `radar.py`, `modules/radar.py` | Anbindung an den Daemon: Start mit dem Spiel, Einstellungen, Routen |
 | `werkzeuge/cubekarte.py`, `karten/` | Kartenbild, Cube-Fundorte und Teleporter von aion2hub |
@@ -139,4 +140,4 @@ Werkzeuge und den Goldtest):
   das Ergebnis mit den Referenzen in `~/.local/share/aion2-radar/gold/`. Referenzen schreiben:
   `python -m werkzeuge.gold --schreiben radar` bzw. `--schreiben capture`. Sie bleiben auf dem Rechner, weil sie
   Namen anderer Spieler enthalten; ohne Mitschnitte wird der Test übersprungen.
-- Daten: `~/.local/share/aion2-radar/` (Spawnpunkte, Karten, Spawn-Log), Einstellungen `~/.config/aion2-radar.json`.
+- Daten: `~/.local/share/aion2-radar/` (Spawnpunkte, Karten, Spawn-Log), Einstellungen `~/.config/deckbar/aion2.*.yaml`.

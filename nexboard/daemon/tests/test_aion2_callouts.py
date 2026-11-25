@@ -49,7 +49,7 @@ def shown(bench: Bench) -> list[tuple[str, str, float]]:
 
 
 def test_nur_mich_schweigt_bei_fremdem_ziel(bench):
-    bench.settings["nur_mich"] = True
+    bench.settings.only_me = True
     bench.world.own_id, bench.world.players[9] = ME, "Andere"
     bench.callouts.bar(70, VIOLET, 9)
     bench.callouts.effect(9, 1, FRENZY, 5.0)
@@ -60,7 +60,7 @@ def test_nur_mich_schweigt_bei_fremdem_ziel(bench):
     bench.now += 5
     bench.callouts.bar(70, VIOLET, 70)  # auf sich selbst: Fläche, Angriff auf alle
     assert len(shown(bench)) == 1
-    bench.settings["nur_mich"] = False
+    bench.settings.only_me = False
     bench.now += 5
     bench.callouts.bar(70, VIOLET, 9)
     assert len(shown(bench)) == 1
@@ -73,12 +73,12 @@ def test_leiste_mit_anweisung_und_zeile(bench):
 
 
 def test_stil_nur_zeile_und_nur_anweisung(bench):
-    bench.settings["ansage_stil"] = "zeile"
+    bench.settings.style = "zeile"
     bench.callouts.bar(70, VIOLET)
     assert bench.sounds == [("ansage", "Violettes Licht schießt empor!")]
     bench.sounds.clear()
     bench.now += 5
-    bench.settings["ansage_stil"] = "anweisung"
+    bench.settings.style = "anweisung"
     bench.callouts.bar(70, VIOLET)
     assert bench.sounds == [("ansage", "Lila — keine Magieangriffe")]
 
@@ -111,7 +111,7 @@ def test_piep_je_welle(bench):
         bench.now = 100 + after
         bench.callouts.wave(80, JUMP)
     assert bench.sounds == [("welle", "")] * 3
-    bench.settings["wellen_ton"] = False
+    bench.settings.wave_sound = False
     bench.now += 0.5
     bench.callouts.skill(80, JUMP)
     bench.now += 1.7
@@ -147,24 +147,24 @@ def test_doppelter_ausloeser_einmal(bench):
 
 
 def test_abgeschalteter_boss_und_anderer_dungeon(bench):
-    bench.settings["meldung_aus"] = ["ansage_thamon"]
+    bench.settings.off = ["ansage_thamon"]
     bench.callouts.bar(70, VIOLET)
     assert shown(bench) == []
-    bench.settings["meldung_aus"] = []
+    bench.settings.off = []
     bench.world.dungeon = "Draupnir"
     bench.callouts.bar(70, VIOLET)
     assert shown(bench) == []
 
 
 def test_eigene_worte_statt_des_rufs(bench):
-    bench.settings["eigene_worte"] = {"thamon-violet": "Lila, Magie stopp"}
+    bench.settings.own_words = {"thamon-violet": "Lila, Magie stopp"}
     bench.callouts.bar(70, VIOLET)
     assert shown(bench) == [("Lila, Magie stopp", "Thamon", 1.79)]
     assert bench.sounds == [("ansage", "Lila, Magie stopp")]
 
 
 def test_abgehakter_ruf_ganz_aus_aber_vorschau_geht(bench):
-    bench.settings["ruf_aus"] = ["thamon-violet"]
+    bench.settings.calls_off = ["thamon-violet"]
     bench.callouts.bar(70, VIOLET)
     bench.callouts.effect(70, 3, VIOLET_BUFF, 10)  # auch sein Countdown
     assert shown(bench) == []

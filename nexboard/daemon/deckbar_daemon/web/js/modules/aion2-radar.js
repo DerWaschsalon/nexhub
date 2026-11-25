@@ -1,5 +1,6 @@
 /* Die Module des Radars: AION 2 · Radar (Seite „Radar & Karte“), AION 2 · Boss-Warnungen (Seite „Warnungen“)
-   und AION 2 · Feldbosse (steht auf der Seite Termine). Sie teilen sich Einstellungen und Dienst.
+   und AION 2 · Feldbosse (steht auf der Seite Termine). Sie teilen sich einen Dienst (Stand unter /api/radar);
+   jedes hat eigene Einstellungen unter /api/m/<Modul>/settings.
    Das Radar selbst läuft im Daemon und zeigt sich als Widgets im Overlay (Cube-Radar, Karte, Boss-Warnungen);
    ein- und ausschalten, Deckkraft und Position dort unter Overlay. Charaktername und Sprache stehen
    unter System → Einstellungen. */
@@ -43,19 +44,18 @@ async function rufTesten(schluessel) {
 const offen = new Set();
 
 /** Die Rufe eines Bosses: Haken, Art, Vorgabe, eigene Worte, zurück zur Vorgabe, abspielen. */
-function rufListe(r, gruppe, setzen) {
+function rufListe(r, k, gruppe, setzen) {
   const rufe = r.ansagen[gruppe];
-  const k = r.einstellungen;
   const zeilen = rufe.map((ruf) => {
-    const eigene = k.eigene_worte[ruf.schluessel] || "";
+    const eigene = k.own_words[ruf.schluessel] || "";
     const worte = (text) => {
-      const neu = { ...k.eigene_worte };
+      const neu = { ...k.own_words };
       if (text.trim()) neu[ruf.schluessel] = text.trim(); else delete neu[ruf.schluessel];
-      setzen("eigene_worte", neu);
+      setzen("own_words", neu);
     };
     return el("tr", {},
-      el("td", {}, sw(!k.ruf_aus.includes(ruf.schluessel), (an) =>
-        setzen("ruf_aus", an ? k.ruf_aus.filter((x) => x !== ruf.schluessel) : [...k.ruf_aus, ruf.schluessel]))),
+      el("td", {}, sw(!k.calls_off.includes(ruf.schluessel), (an) =>
+        setzen("calls_off", an ? k.calls_off.filter((x) => x !== ruf.schluessel) : [...k.calls_off, ruf.schluessel]))),
       el("td", { class: "small muted", text: ruf.art }),
       el("td", {}, el("div", { text: ruf.vorgabe }), ruf.zeile ? el("div", { class: "small muted", text: ruf.zeile }) : null),
       el("td", {}, input(eigene, worte, { lazy: true, placeholder: "Eigene Worte", maxlength: 120, title: EIGENE_HINWEIS })),
@@ -85,10 +85,17 @@ function auffrischen(ctx, box, holen, draw) {
   holen().then(draw);
 }
 
-/** setzen(Schlüssel, Wert) für eine Seite: sofort im Stand, gespeichert gesammelt nach kurzer Pause. */
-function radarSaver() {
-  const save = saver("PUT", "/api/radar", (res) => { S.radar = res; }, 300, "Radar gespeichert");
-  return (key, value) => { S.radar.einstellungen[key] = value; save({ [key]: value }); };
+/** Einstellungen eines Moduls: load() holt sie, set(Schlüssel, Wert) gilt sofort und speichert gesammelt
+    nach kurzer Pause. */
+function moduleSettings(id) {
+  const path = `/api/m/${id}/settings`;
+  const settings = { values: null };
+  const save = saver("PUT", path, (res) => { settings.values = res.settings; }, 300, "Radar gespeichert");
+  settings.load = async () => {
+    try { settings.values = (await api("GET", path)).settings; } catch { /* bleibt */ }
+  };
+  settings.set = (key, value) => { settings.values[key] = value; save({ [key]: value }); };
+  return settings;
 }
 
 /** Knopf für einen Befehl ans laufende Radar. */
@@ -97,19 +104,18 @@ function knopf(r, text, name, ic, erledigt) {
 }
 
 /** Warnungen des gewählten Dungeons: je Gruppe anzeigen und Ton, je Boss die Rufe. */
-function dungeonTable(r, setzen, draw) {
-  const k = r.einstellungen;
+function dungeonTable(r, k, setzen, draw) {
   const neuZeichnen = (schluessel, wert) => { setzen(schluessel, wert); draw(); };  // „Zurück“-Knopf erscheint
   const dungeons = r.meldungen.dungeons || {};
-  const eigene = dungeons[k.meldungen_dungeon] || {};
+  const eigene = dungeons[k.dungeon] || {};
   const gruppen = { ...(Object.keys(eigene).length ? eigene : { casts: "Alle Boss-Casts zeigen (Lernhilfe)" }), ...r.meldungen.alle };
   const zeilen = Object.entries(gruppen).map(([gruppe, name]) => el("tr", {},
-    el("td", {}, el("div", { text: name }), r.ansagen?.[gruppe] ? rufListe(r, gruppe, neuZeichnen) : null),
-    el("td", {}, sw(!k.meldung_aus.includes(gruppe), (an) =>
-      setzen("meldung_aus", an ? k.meldung_aus.filter((g) => g !== gruppe) : [...k.meldung_aus, gruppe]))),
-    el("td", {}, select(TON, k.warnton[gruppe] || "ansage", (art) => setzen("warnton", { ...k.warnton, [gruppe]: art })))));
+    el("td", {}, el("div", { text: name }), r.ansagen?.[gruppe] ? rufListe(r, k, gruppe, neuZeichnen) : null),
+    el("td", {}, sw(!k.off.includes(gruppe), (an) =>
+      setzen("off", an ? k.off.filter((g) => g !== gruppe) : [...k.off, gruppe]))),
+    el("td", {}, select(TON, k.sounds[gruppe] || "ansage", (art) => setzen("sounds", { ...k.sounds, [gruppe]: art })))));
   return [
-    field("Dungeon", select(Object.fromEntries(Object.keys(dungeons).map((d) => [d, d])), k.meldungen_dungeon, (v) => neuZeichnen("meldungen_dungeon", v))),
+    field("Dungeon", select(Object.fromEntries(Object.keys(dungeons).map((d) => [d, d])), k.dungeon, (v) => neuZeichnen("dungeon", v))),
     el("div", { style: "overflow-x:auto" }, el("table", { class: "list" },
       el("thead", {}, el("tr", {}, ["Meldung", "Anzeigen", "Ton"].map((h) => el("th", { text: h })))),
       el("tbody", {}, zeilen))),
@@ -119,38 +125,42 @@ function dungeonTable(r, setzen, draw) {
 function warnungen(ctx) {
   const box = el("div", { class: "stack" });
   const view = {};
-  const setzen = radarSaver();
+  const settings = moduleSettings("aion2.warnings");
+  const setzen = settings.set;
   const draw = () => {
-    const r = S.radar;
-    if (!r) return;
-    const k = r.einstellungen;
+    const r = S.radar, k = settings.values;
+    if (!r || !k) return;
     const preset = async (id) => {
-      try { S.radar = await api("PUT", "/api/radar", r.presets[id]); draw(); } catch (e) { toast(e.message, true); }
+      try {
+        settings.values = (await api("PUT", "/api/m/aion2.warnings/settings", r.presets[id])).settings;
+        await refresh();
+        draw();
+      } catch (e) { toast(e.message, true); }
     };
     fill(box,
       card("Boss-Warnungen", PRESET_HELP[r.preset] || "Eigene Einstellungen", knopf(r, "Testen", "warnung_testen", "bell-ring", "Testwarnung gezeigt"),
         seg(PRESETS, r.preset, preset),
         collapsible("Erweitert", view,
-          settingsRow("Art der Ansage", "Kurze Ansage: die Farbe oder was zu tun ist, mit Countdown, ohne den Satz des Bosses.", select(STIL, k.ansage_stil, (v) => setzen("ansage_stil", v))),
-          settingsRow("Piepton bei jeder Welle", "Vakrons Sprung", sw(k.wellen_ton, (v) => setzen("wellen_ton", v))),
-          ...dungeonTable(r, setzen, draw),
-          settingsRow("Lernmodus: Dungeons aufnehmen", "Jeder Lauf wird eine eigene Aufnahme, zum Lernen neuer Mechaniken. Braucht viel Platz.", sw(k.aufnahme_auto, (v) => setzen("aufnahme_auto", v))),
+          settingsRow("Art der Ansage", "Kurze Ansage: die Farbe oder was zu tun ist, mit Countdown, ohne den Satz des Bosses.", select(STIL, k.style, (v) => setzen("style", v))),
+          settingsRow("Piepton bei jeder Welle", "Vakrons Sprung", sw(k.wave_sound, (v) => setzen("wave_sound", v))),
+          ...dungeonTable(r, k, setzen, draw),
+          settingsRow("Lernmodus: Dungeons aufnehmen", "Jeder Lauf wird eine eigene Aufnahme, zum Lernen neuer Mechaniken. Braucht viel Platz.", sw(k.auto_record, (v) => setzen("auto_record", v))),
           el("div", { class: "row wrap" }, r.aufnahme ? knopf(r, "Aufnahme stoppen", "aufnahme_stopp", "stop", "Aufnahme gestoppt")
             : knopf(r, "Aufnahme starten", "aufnahme_start", "record", "Aufnahme läuft")))));
   };
+  settings.load().then(draw);
   auffrischen(ctx, box, refresh, draw);
-  draw();
   return box;
 }
 
 function radarUndKarte(ctx) {
   const box = el("div", { class: "stack" });
   const view = {};
-  const setzen = radarSaver();
+  const settings = moduleSettings("aion2.radar");
+  const setzen = settings.set;
   const draw = () => {
-    const r = S.radar;
-    if (!r) return;
-    const k = r.einstellungen;
+    const r = S.radar, k = settings.values;
+    if (!r || !k) return;
     const karten = Object.fromEntries([["", "automatisch"], ...r.karten.map((n) => [n, n])]);
     fill(box,
       el("div", { class: "cols" },
@@ -158,20 +168,20 @@ function radarUndKarte(ctx) {
           el("div", { class: "row wrap" },
             button("Radar neu starten", () => befehl("neustart", "Radar startet neu"), "sm", "restart", { disabled: !r.spiel }),
             knopf(r, "Ton testen", "ton_testen", "volume-high", "Ton gespielt")),
-          settingsRow("Ton bei neuem Cube", null, sw(k.ton, (v) => setzen("ton", v))),
-          settingsRow("Reichweite", null, select(REICHWEITEN, String(k.reichweite), (v) => setzen("reichweite", Number(v)))),
-          settingsRow("Ausrichtung drehen", null, select(DREHUNG, String(k.drehung), (v) => setzen("drehung", Number(v)))),
-          settingsRow("Spiegeln (Ost/West)", null, sw(k.spiegeln, (v) => setzen("spiegeln", v))),
+          settingsRow("Ton bei neuem Cube", null, sw(k.sound, (v) => setzen("sound", v))),
+          settingsRow("Reichweite", null, select(REICHWEITEN, String(k.range_m), (v) => setzen("range_m", Number(v)))),
+          settingsRow("Ausrichtung drehen", null, select(DREHUNG, String(k.rotation), (v) => setzen("rotation", Number(v)))),
+          settingsRow("Spiegeln (Ost/West)", null, sw(k.mirror, (v) => setzen("mirror", v))),
           collapsible("Erweitert", view,
-            settingsRow("Laufrichtung oben", "Dreht das Radar mit, statt Norden oben. Ungeprüft.", sw(k.kurs_oben, (v) => setzen("kurs_oben", v))),
-            settingsRow("Paketquelle", "Gilt für Radar, Warnungen und Feldbosse. Der Mitschnitt der Kampfdaten liest die Pakete ohnehin; damit entfällt das zweite Mitlesen. Noch nicht im Spiel bestätigt.", select(QUELLE, k.quelle, (v) => setzen("quelle", v))))),
+            settingsRow("Laufrichtung oben", "Dreht das Radar mit, statt Norden oben. Ungeprüft.", sw(k.heading_up, (v) => setzen("heading_up", v))),
+            settingsRow("Paketquelle", "Gilt für Radar, Warnungen und Feldbosse. Der Mitschnitt der Kampfdaten liest die Pakete ohnehin; damit entfällt das zweite Mitlesen. Noch nicht im Spiel bestätigt.", select(QUELLE, k.source, (v) => setzen("source", v))))),
         card("Karte", "Cube-Fundorte, Teleporter, gesehene Spawnpunkte und deine Position", null,
-          settingsRow("Karte", null, select(karten, k.karte_name || "", (v) => setzen("karte_name", v))),
-          settingsRow("Spieler folgen", "Ziehen pausiert es, Doppelklick auf die Karte folgt wieder", sw(k.karte_folgen, (v) => setzen("karte_folgen", v))),
-          settingsRow("Overlay bei offener Ingame-Karte ausblenden", "Erkennt die Karte an der Feldboss-Abfrage, etwa 1 s Verzögerung", sw(k.bei_karte_ausblenden, (v) => setzen("bei_karte_ausblenden", v))))));
+          settingsRow("Karte", null, select(karten, k.map_name, (v) => setzen("map_name", v))),
+          settingsRow("Spieler folgen", "Ziehen pausiert es, Doppelklick auf die Karte folgt wieder", sw(k.map_follow, (v) => setzen("map_follow", v))),
+          settingsRow("Overlay bei offener Ingame-Karte ausblenden", "Erkennt die Karte an der Feldboss-Abfrage, etwa 1 s Verzögerung", sw(k.hide_with_map, (v) => setzen("hide_with_map", v))))));
   };
+  settings.load().then(draw);
   auffrischen(ctx, box, refresh, draw);
-  draw();
   return box;
 }
 

@@ -128,7 +128,7 @@ class NexBoard:
         self.runs.publishers += [self.webhook, self.hub]  # erst das Bild nach Discord, dann der NexHub
         self.overlay = Overlay(c, manage_unit=self.real_config)
         self.overlay.game_check = self._game_running
-        self.radar = Radar(self._publish_radar, game_running=self._game_running, capture=self.dps.capture)
+        self.radar = Radar(self._publish_radar, c, game_running=self._game_running, capture=self.dps.capture)
         self.hub.deaths = self.radar.deaths_between
         loot = FeedBuffer("lootRoll", loot_drop)
         self.dps.capture.data_listeners.append(loot.on_capture)
@@ -145,9 +145,8 @@ class NexBoard:
         self.bus.on(LANGUAGE, self.a2.apply_language)
 
     def _sync_radar(self) -> None:
-        """Name und Sprache ans Radar. Seine Datei liegt fest in ~/.config, Testinstanzen fassen sie nicht an."""
-        if self.real_config:
-            self.radar.sync_profile(self.settings.character_name, self.settings.language)
+        """Name und Sprache der allgemeinen Einstellungen ans Radar."""
+        self.radar.sync_profile(self.settings.character_name, self.settings.language)
 
     def _initial_modules(self) -> set[str]:
         """Erster Start mit Modulen: was bisher eingerichtet war, bleibt an (Umstieg ohne Überraschung)."""

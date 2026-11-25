@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .gamedata import BOSSES, CALLOUTS, MECHANICS
-from .settings import settings
 
 Color = tuple[int, int, int]
 COLORS: dict[str, Color] = {"GRUEN": (0, 230, 118), "LILA": (186, 85, 255), "ORANGE": (255, 120, 0),
@@ -114,6 +113,20 @@ for _m in (*MECHANICS["alle"], *_MECHANICS):
     ENGLISH.update(_m["en"])
 
 
+_language = "de"
+
+
+def language() -> str:
+    """Sprache der Warnungen und Ansagen: de oder en."""
+    return _language
+
+
+def use_language(code: str) -> None:
+    """Die Sprache der allgemeinen Einstellungen übernehmen (setzt der RadarService)."""
+    global _language
+    _language = code
+
+
 def tr(text: str) -> str:
     """Text in der eingestellten Sprache."""
-    return ENGLISH.get(text, text) if settings()["sprache"] == "en" else text
+    return ENGLISH.get(text, text) if _language == "en" else text

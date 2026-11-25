@@ -13,6 +13,7 @@ from deckbar_daemon.aion2.fight import FightEvents
 from deckbar_daemon.aion2.mechanic_warnings import MechanicWarnings
 from deckbar_daemon.aion2.party import PartyTracker
 from deckbar_daemon.aion2.rules import STAGGER_RULES
+from deckbar_daemon.aion2.settings import Settings, WarningSettings
 from deckbar_daemon.aion2.stagger import StaggerTracker
 from deckbar_daemon.aion2.stagger_calls import StaggerCalls
 from deckbar_daemon.aion2.warning_board import WarningBoard
@@ -44,7 +45,7 @@ def xyz(x: float, y: float, z: float = 0.0) -> bytes:
 
 
 class Bench:
-    def __init__(self, own_id: int | None = ME, callouts: dict | None = None, **settings) -> None:
+    def __init__(self, own_id: int | None = ME, callouts: dict | None = None, **warnings) -> None:
         self.now = 100.0
         self.source = PacketSource()
         self.world = World()
@@ -54,11 +55,10 @@ class Bench:
         self.field_bosses = FieldBossTracker(self.world)  # speichert nichts
         self.fight = FightEvents(self.world)
         self.stagger = StaggerTracker(self.world, set(STAGGER_RULES))
-        self.board = WarningBoard(self.world, clock=lambda: self.now)
-        self.board.enabled = True
-        # Standard der Tests, nicht die eigenen Einstellungen
-        self.board.settings = {"meldung_aus": [], "warnton": {}, "sprache": "de", "ansage_stil": "beides",
-                               "wellen_ton": True, "eigene_worte": {}, "ruf_aus": [], **settings}
+        # Standard der Tests: nichts aus, auch Angriffe auf andere, keine stillen Gruppen
+        settings = Settings(warnings=WarningSettings(**{"only_me": False, **warnings}))
+        settings.warnings.sounds = warnings.get("sounds", {})
+        self.board = WarningBoard(self.world, settings, clock=lambda: self.now)
         self.mechanics = MechanicWarnings(self.board, self.fight)
         self.trainer = CastTrainer(self.board, self.fight)
         self.callouts = Callouts(self.board, self.fight, callouts) if callouts else None
@@ -68,8 +68,8 @@ class Bench:
             part.attach(self.source)
 
     @property
-    def settings(self) -> dict:
-        return self.board.settings
+    def settings(self) -> WarningSettings:
+        return self.board.settings.warnings
 
     @property
     def sounds(self) -> list[tuple[str, str]]:

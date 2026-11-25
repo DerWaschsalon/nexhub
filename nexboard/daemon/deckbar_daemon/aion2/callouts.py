@@ -18,7 +18,8 @@ from __future__ import annotations
 
 from .fight import FightEvents
 from .gamedata import CALLOUTS
-from .rules import COLORS, Rule
+from .rules import COLORS, Rule, language
+from .settings import WarningSettings
 from .warning_board import WAVE, WarningBoard
 
 REPEAT_S = 1.2  # derselbe Auslöser desselben Wesens so kurz danach: nur einmal
@@ -74,8 +75,8 @@ class Callouts:
             fight.effect_gone.connect(self.effect_gone)
 
     @property
-    def settings(self) -> dict:
-        return self.board.settings
+    def settings(self) -> WarningSettings:
+        return self.board.settings.warnings
 
     # ---------- Eingänge (aus dem Mitschnitt-Thread) ----------
     def bar(self, caster: int, skill: int, target: int | None = None) -> None:
@@ -102,7 +103,7 @@ class Callouts:
         if not w or now - w[1] > WAVES_FOR_S or now - w[2] < WAVE_GAP_S:
             return
         w[2] = now
-        if self._on(w[0]) and self.settings["wellen_ton"]:
+        if self._on(w[0]) and self.settings.wave_sound:
             self.board.sounds.append((WAVE, ""))  # kurzer Piepton
 
     def test(self, key: str) -> None:
@@ -168,7 +169,7 @@ class Callouts:
 
     def _on(self, call: dict) -> bool:
         """Boss nicht abgeschaltet (Schalter je Boss), Ruf nicht abgehakt, passender Dungeon."""
-        return call["schluessel"] not in self.settings["ruf_aus"] and self.board.group_on(call["gruppe"])
+        return call["schluessel"] not in self.settings.calls_off and self.board.group_on(call["gruppe"])
 
     def _call(self, call: dict, being: int, now: float) -> None:
         big, small, say = self._words(call)
@@ -184,7 +185,7 @@ class Callouts:
         own = self._own_words(call)
         if own:
             return own, "", (own,)  # eigene Worte gelten statt des Rufs, egal welcher Stil
-        style = self.settings["ansage_stil"]
+        style = self.settings.style
         line, instruction = self._text(call.get("zeile")), self._text(call.get("anweisung"))
         buff = self._text(call.get("buff")) if call["art"] == EFFECT else ""
         if style == "zeile":
@@ -216,7 +217,7 @@ class Callouts:
         now = self.board.clock()
         phase = call["phase"]
         duration = min(max(duration or phase["sekunden"], PHASE_S[0]), PHASE_S[1])
-        line_only = self.settings["ansage_stil"] == "zeile"
+        line_only = self.settings.style == "zeile"
         shown = (line_only and self._text(phase.get("name"))) or self._text(phase.get("anzeige")) \
             or self._text(call.get("anweisung"))
         fresh = (being, instance) not in self.phases
@@ -239,14 +240,14 @@ class Callouts:
     # ---------- Hilfen ----------
     def _own_words(self, call: dict) -> str:
         """Eigene Worte für diesen Ruf von der NexBoard-Seite, sonst leer."""
-        return str(self.settings["eigene_worte"].get(call["schluessel"], "")).strip()
+        return str(self.settings.own_words.get(call["schluessel"], "")).strip()
 
     def _boss(self, call: dict) -> str:
         return self._text(self.bosses[call["boss"]]["name"])
 
     def _text(self, texts: dict | None) -> str:
         """Der Text in der eingestellten Sprache (Deutsch oder Englisch)."""
-        return texts[self.settings["sprache"]] if texts else ""
+        return texts[language()] if texts else ""
 
 
 def short_texts(language: str, data: dict = CALLOUTS) -> list[str]:

@@ -10,7 +10,7 @@ ANNA = 9
 
 @pytest.fixture
 def bench() -> Bench:
-    b = Bench(warnton={"schwert": "aus"})
+    b = Bench(sounds={"schwert": "aus"})
     b.world.players.update({ME: "Ich", ANNA: "Anna"})
     b.world.bosses.update({70: RAUR, 71: THAMON, 72: BERK})
     return b
@@ -29,7 +29,7 @@ def test_regen_kuendigt_flamme_an_und_todesmal_ersetzt_sie(bench):
 
 
 def test_abgeschaltete_meldung_kommt_nicht(bench):
-    bench.settings["meldung_aus"] = ["flamme"]
+    bench.settings.off = ["flamme"]
     bench.cast(1, RAIN, 1)
     assert bench.titles() == ["Regen des Hasses"]
 
@@ -82,7 +82,7 @@ def test_todesmal_auf_mir_und_auf_anderen(bench):
 
 
 def test_nur_mich_schweigt_bei_anderen(bench):
-    bench.settings["nur_mich"] = True
+    bench.settings.only_me = True
     bench.cast(1, MARK_OF_DEATH, ANNA)
     bench.party.hp.emit(ANNA, 0.1)
     assert (bench.titles(), bench.sounds) == ([], [])
@@ -116,7 +116,7 @@ def test_zikel_blutung_nur_auf_mir_und_linie_nur_im_albtraum(bench):
 
 def test_zikel_graue_schlaege_ohne_ton(bench):
     bench.world.dungeon = "Albtraum"
-    bench.settings["warnton"] = {"zikel_angriffe": "aus"}
+    bench.settings.sounds = {"zikel_angriffe": "aus"}
     bench.cast(1, 1802435, ME)
     assert (bench.titles(), bench.sounds) == (["Schlag"], [])
 

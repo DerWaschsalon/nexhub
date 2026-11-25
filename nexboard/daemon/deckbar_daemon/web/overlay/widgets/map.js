@@ -158,7 +158,7 @@ export default {
         loading ??= loadMiniMap();
         return;
       }
-      const follow = radar.einstellungen?.karte_folgen;
+      const follow = radar.einstellungen?.map_follow;
       if (follow !== followSetting) { // auf der NexBoard-Seite umgestellt
         followSetting = follow;
         map.follow = !!follow;

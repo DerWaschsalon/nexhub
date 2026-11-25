@@ -1,19 +1,18 @@
 """Radar: Einstellungen prüfen und mischen, Befehle, Start und Ende mit dem Spiel, Stand fürs Overlay."""
 import asyncio
-import json
 
 import pytest
+from pydantic import ValidationError
 
 from deckbar_daemon import radar as modul
-from deckbar_daemon.aion2 import settings
 from deckbar_daemon.radar import Radar
 
 
 class FakeService:
     """Steht statt des echten RadarService (der würde tcpdump starten)."""
 
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, name: str, settings=None, language: str = "de") -> None:
+        self.name, self.settings, self.language = name, settings, language
         self.calls: list[str] = []
         self.recording = False
         self.error = None  # Mitschnitt läuft
@@ -24,7 +23,8 @@ class FakeService:
     def stop(self) -> None:
         self.calls.append("stop")
 
-    def reload(self) -> None:
+    def reload(self, language: str | None = None) -> None:
+        self.language = language or self.language
         self.calls.append("reload")
 
     def test_warning(self) -> None:
@@ -48,16 +48,22 @@ class FakeService:
 
 @pytest.fixture
 def konfig(tmp_path):
-    """Die Einstellungsdatei des Tests (conftest lenkt sie nach tmp_path um)."""
-    return settings.FILE
+    """Ordner der Einstellungen des Tests."""
+    return tmp_path / "config"
 
 
-def radar(**kw) -> tuple[Radar, list]:
+def radar(folder, **kw) -> tuple[Radar, list]:
     sent: list = []
 
     async def publish(state: dict) -> None:
         sent.append(state)
-    return Radar(publish, service=FakeService, **kw), sent
+    folder.mkdir(exist_ok=True)
+    return Radar(publish, folder, service=FakeService, **kw), sent
+
+
+def save(r: Radar, part: str, patch: dict) -> None:
+    """Wie die Route /api/m/<Modul>/settings: prüfen, dann speichern."""
+    r.save(part, r.stores[part].merge(patch))
 
 
 def spiel(running):
@@ -75,44 +81,50 @@ async def warten_bis(bedingung, s: float = 3.0) -> None:
     raise AssertionError("Bedingung nicht erfüllt")
 
 
-async def test_speichern_mischt_und_behaelt_fremde_schluessel(konfig):
-    r, _ = radar()
-    konfig.write_text(json.dumps({"x": 5, "karte_x": 9}))
-    info = await r.save({"reichweite": 300, "ton": False})
-    assert info["einstellungen"]["reichweite"] == 300
-    assert json.loads(konfig.read_text()) == {"x": 5, "karte_x": 9, "reichweite": 300, "ton": False}
+def test_speichern_je_modul_in_eigener_datei(konfig):
+    r, _ = radar(konfig)
+    save(r, "radar", {"range_m": 300, "sound": False})
+    save(r, "field_bosses", {"announce": False})
+    assert r.settings.radar.range_m == 300 and not r.settings.radar.sound and not r.settings.field_bosses.announce
+    assert "range_m: 300" in (konfig / "aion2.radar.yaml").read_text()
+    neu, _ = radar(konfig)  # nach einem Neustart wieder da
+    assert neu.settings.radar.range_m == 300 and not neu.settings.field_bosses.announce
 
 
-@pytest.mark.parametrize("patch", [{"quatsch": 1}, {"x": 10}, {"reichweite": "weit"}, {"ton": 1}, {"reichweite": True},
-                                   {"name": "X"}, {"sprache": "en"}])  # Name und Sprache: nur allgemein
-async def test_speichern_lehnt_falsches_ab(konfig, patch):
-    r, _ = radar()
-    konfig.write_text('{"reichweite": 50}')
-    with pytest.raises(ValueError):
-        await r.save(patch)
-    assert konfig.read_text() == '{"reichweite": 50}'
+@pytest.mark.parametrize("patch", [{"quatsch": 1}, {"range_m": "weit"}, {"source": "wlan"}, {"reichweite": 50}])
+def test_speichern_lehnt_falsches_ab(konfig, patch):
+    r, _ = radar(konfig)
+    with pytest.raises(ValidationError):
+        save(r, "radar", patch)
+    assert r.settings.radar.range_m == 150 and not (konfig / "aion2.radar.yaml").exists()
 
 
 def test_kaputte_oder_fehlende_datei_gibt_standard(konfig):
-    r, _ = radar()
-    assert r.info()["einstellungen"]["reichweite"] == 150
-    konfig.write_text("{{")
-    info = r.info()
-    assert info["einstellungen"]["name"] == "" and not info["laeuft"]
-    assert "Feuertempel" in info["meldungen"]["dungeons"]
+    konfig.mkdir()
+    (konfig / "aion2.radar.yaml").write_text("{{")
+    r, _ = radar(konfig)
+    assert r.settings.radar.range_m == 150 and not r.info()["laeuft"]
+    assert "Feuertempel" in r.info()["meldungen"]["dungeons"]
+    assert r.settings.warnings.sounds["casts"] == "aus"  # Standard-Töne, auch ohne eigene
 
 
-async def test_befehle_ohne_radar_und_unbekannt():
-    r, _ = radar()
+def test_eigene_toene_behalten_die_standard_toene(konfig):
+    r, _ = radar(konfig)
+    save(r, "warnings", {"sounds": {"flamme": "piep"}})
+    assert r.settings.warnings.sounds == {"schwert": "aus", "casts": "aus", "zikel_angriffe": "aus", "flamme": "piep"}
+
+
+async def test_befehle_ohne_radar_und_unbekannt(konfig):
+    r, _ = radar(konfig)
     with pytest.raises(RuntimeError):
         await r.command("warnung_testen")
     with pytest.raises(ValueError):
         await r.command("rm -rf")
 
 
-async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel():
+async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel(konfig):
     spiel_an = True
-    r, gesendet = radar(game_running=spiel(lambda: spiel_an), poll_s=0.05, linger_s=0.2)
+    r, gesendet = radar(konfig, game_running=spiel(lambda: spiel_an), poll_s=0.05, linger_s=0.2)
     aufgabe = asyncio.create_task(r.watch())
     await warten_bis(lambda: r.running and gesendet)
     assert gesendet[-1] == {"aktiv": True, "cubes": []}
@@ -121,7 +133,7 @@ async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel():
     await r.command("ansage_testen", "thamon-red")
     await r.command("aufnahme_start")
     assert r.recording
-    await r.save({"ton": False})
+    save(r, "radar", {"sound": False})
     assert service.calls == ["start", "test_warning", "test_callout thamon-red", "reload"]
     assert {"schluessel": "thamon-red", "art": "Zauber", "vorgabe": "Rot — keine physischen Angriffe",
             "zeile": "Es glüht rot auf!"} in r.info()["ansagen"]["ansage_thamon"]
@@ -137,7 +149,7 @@ async def test_startet_mit_spiel_meldet_stand_und_endet_nach_dem_spiel():
 
 
 async def test_neuer_charaktername_startet_das_radar_neu(konfig):
-    r, _ = radar(game_running=spiel(lambda: True), poll_s=0.05)
+    r, _ = radar(konfig, game_running=spiel(lambda: True), poll_s=0.05)
     aufgabe = asyncio.create_task(r.watch())
     await warten_bis(lambda: r.running)
     alt = r.service
@@ -145,35 +157,37 @@ async def test_neuer_charaktername_startet_das_radar_neu(konfig):
     assert r.service is not alt and alt.calls[-1] == "stop" and r.service.name == "Gamunex"
     neu = r.service
     r.sync_profile("Gamunex", "fr")  # Ansagen gibt es nur deutsch und englisch: englisch, kein Neustart
-    assert r.service is neu and json.loads(konfig.read_text()) == {"name": "Gamunex", "sprache": "en"}
+    assert r.service is neu and neu.language == "en" and neu.calls[-1] == "reload"
     aufgabe.cancel()
     with pytest.raises(asyncio.CancelledError):
         await aufgabe
 
 
 async def test_voreinstellung_der_warnungen(konfig):
-    r, _ = radar()
+    r, _ = radar(konfig)
     assert r.info()["preset"] == "wichtig"  # Standardwerte des Radars
-    await r.save(modul.WARNING_PRESETS["alles"])
+    save(r, "warnings", modul.WARNING_PRESETS["alles"])
     assert r.info()["preset"] == "alles"
     assert modul.WARNING_PRESETS.keys() == {"aus", "wichtig", "alles"}
-    await r.save({"warn_an": False})
+    save(r, "warnings", {"enabled": False})
     assert r.info()["preset"] == "aus"
+    save(r, "warnings", {"enabled": True, "only_me": True, "off": ["flamme"]})
+    assert r.info()["preset"] == "wichtig"  # Einzelheiten unter „Erweitert“ ändern die Voreinstellung nicht
 
 
-def test_feldbosse_und_karte_ohne_laufendes_radar():
-    r, _ = radar()
+def test_feldbosse_und_karte_ohne_laufendes_radar(konfig):
+    r, _ = radar(konfig)
     assert isinstance(r.field_bosses(), list)
     assert r.map() == {"name": ""} and r.map_file("bild") is None
 
 
-def test_kampf_ohne_laufendes_radar():
-    r, _ = radar()
+def test_kampf_ohne_laufendes_radar(konfig):
+    r, _ = radar(konfig)
     assert r.fight_state() == {"groggy": False, "warnungen": []}
 
 
-def test_tode_ueberleben_das_radar_und_gehoeren_zum_run():
-    r, _ = radar()
+def test_tode_ueberleben_das_radar_und_gehoeren_zum_run(konfig):
+    r, _ = radar(konfig)
     r._start()
     assert r.service.deaths is r.deaths  # der Dienst schreibt in die Liste des Daemons
     r.deaths.extend([{"t_ms": 100, "name": "A", "skill": 1}, {"t_ms": 500, "name": "B", "skill": 2}])
@@ -181,9 +195,9 @@ def test_tode_ueberleben_das_radar_und_gehoeren_zum_run():
     assert r.deaths_between(0, 200) == [{"t_ms": 100, "name": "A", "skill": 1}]
 
 
-async def test_radar_laeuft_solange_ein_teil_an_ist():
+async def test_radar_laeuft_solange_ein_teil_an_ist(konfig):
     """Die Module Radar, Boss-Warnungen und Feldbosse teilen sich einen Dienst."""
-    r, _ = radar(game_running=spiel(lambda: True), poll_s=0.05)
+    r, _ = radar(konfig, game_running=spiel(lambda: True), poll_s=0.05)
     r.enable("warnings")
     r.enable("radar")
     await warten_bis(lambda: r.running)
@@ -225,19 +239,14 @@ async def test_quelle_capture_nimmt_den_mitschnitt_und_ein_wechsel_startet_neu(k
     made = []
 
     class Service(FakeService):
-        def __init__(self, name: str, source=None) -> None:
-            super().__init__(name)
+        def __init__(self, name: str, source=None, **kw) -> None:
+            super().__init__(name, **kw)
             made.append(source)
-    sent: list = []
-
-    async def publish(state: dict) -> None:
-        sent.append(state)
-    r = Radar(publish, game_running=spiel(lambda: True), service=Service, poll_s=0.05, capture=Capture())
+    r, _ = radar(konfig, game_running=spiel(lambda: True), poll_s=0.05, capture=Capture())
+    r.new_service = Service
     r.enable("radar")
     await warten_bis(lambda: r.running)
     assert made == [None]  # Standard: eigenes Mitlesen
-    await r.save({"quelle": "capture"})
+    save(r, "radar", {"source": "capture"})
     assert len(made) == 2 and made[1].capture is r.capture
-    with pytest.raises(ValueError):
-        await r.save({"quelle": "funk"})
     await r.disable("radar")
