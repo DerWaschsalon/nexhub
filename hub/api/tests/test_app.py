@@ -1,6 +1,6 @@
 import logging
 
-from nexhub_api.logs import HideSecretQuery
+from nexhub_api.logging_setup import HideSecretQuery
 
 from .conftest import BASE, log_in
 

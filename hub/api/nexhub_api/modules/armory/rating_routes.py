@@ -3,18 +3,18 @@
     GET /api/rating/rules   nur mit Login
 
 Die Seite erklärt die Rechnung in Worten; die Zahlen dazu stehen nur im Code (rating.py, upgrades.py,
-bis_collector.py) und kommen von hier, damit die Erklärung nicht veraltet.
+bis/collector.py) und kommen von hier, damit die Erklärung nicht veraltet.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..abysslogs import REGION
-from ..bis_collector import POOL_SIZE
-from ..deps import CurrentUser
-from ..rating import BOUNDS
-from ..upgrades import DEFAULT_GOAL, GOALS, MAX_REROLLS, TIER_BEST, TIER_GOOD
+from ...deps import CurrentUser
+from ..bis.abysslogs import REGION
+from ..bis.collector import POOL_SIZE
+from ..bis.rating import BOUNDS
+from .upgrades import DEFAULT_GOAL, GOALS, MAX_REROLLS, TIER_BEST, TIER_GOOD
 
 router = APIRouter(prefix="/api/rating", tags=["armory"])
 

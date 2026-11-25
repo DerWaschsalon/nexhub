@@ -1,6 +1,6 @@
 """Auswertung der BiS-Listen: was die Top-Spieler einer Klasse je Platz tragen, als Anteile.
 
-Rein, ohne Netz und Datenbank. Eingabe ist der Bestand einer Klasse (bis_collector.py) in einer Sprache:
+Rein, ohne Netz und Datenbank. Eingabe ist der Bestand einer Klasse (bis/collector.py) in einer Sprache:
 je Spieler {"equipment": [...], "skills": [...]} im Format von aion2.py. Gezählt wird „kommt vor“, nicht die
 Summe: wer Krit doppelt auf einem Teil hat, zählt für den Anteil einmal.
 

@@ -1,7 +1,7 @@
 """Seite „Termine“: der Zeitplan aus nexproto.termine, ohne Login."""
 from datetime import UTC, datetime
 
-from nexhub_api.routes import schedule
+from nexhub_api.modules.schedule import routes as schedule
 
 
 def test_zeitplan_ohne_login(client, monkeypatch):

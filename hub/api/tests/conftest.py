@@ -9,10 +9,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from nexhub_api.bis_collector import BisCollector
 from nexhub_api.config import Settings
 from nexhub_api.db import migrate
 from nexhub_api.main import create_app
+from nexhub_api.modules.bis.collector import BisCollector
 
 from .fake_abyss import HOST as ABYSS_HOST
 from .fake_abyss import FakeAbyss

@@ -13,7 +13,7 @@ Der Bestand hat höchstens POOL_SIZE Spieler je Klasse, jeden genau einmal (Schl
 Charakter-ID, kein Name). Wer schon drin ist, wird aktualisiert; ein Neuer ersetzt bei vollem Bestand den
 ältesten. So ergibt sich ein gleitender Durchschnitt statt eines harten Tageswechsels.
 
-Aus dem Bestand rechnen die BiS-Listen (bis_stats.py, routes/bis.py) und die Zählung für die Bewertung
+Aus dem Bestand rechnen die BiS-Listen (bis/stats.py, modules/bis/routes.py) und die Zählung für die Bewertung
 der Armory (census.py).
 """
 from __future__ import annotations
@@ -29,8 +29,8 @@ from nexproto.classes import CLASS_KEYS
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from ...aion2 import FORMAT, LANGS, NC, NCError, NotFound, combat_power
 from .abysslogs import REGION, AbyssError, top_players
-from .aion2 import FORMAT, LANGS, NC, NCError, NotFound, combat_power
 from .models import BisQueue, BisSample
 
 log = logging.getLogger(__name__)

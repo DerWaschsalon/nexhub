@@ -1,5 +1,5 @@
 """Ratgeber der Armory: Hinweise aus einer Momentaufnahme, ohne Netz."""
-from nexhub_api.ratgeber import hints
+from nexhub_api.modules.armory.ratgeber import hints
 
 
 def item(slot: str = "MainHand", **detail) -> dict:

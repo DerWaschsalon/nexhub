@@ -1,29 +1,5 @@
-"""Alle Bereiche der API. Ein neuer Bereich = eine Datei hier mit `router` + Eintrag in ROUTERS.
+"""Routen des Kerns: Anmeldung, eigenes Konto, Verwaltung der Konten, öffentliche Angaben zum Hub.
+Alles andere gehört zu einem Modul (modules/<id>/)."""
+from . import account, admin, auth, public
 
-Konvention für Pfade:
-    /api/public/…  ohne Login (öffentlicher Bereich)
-    /api/…         mit Login (CurrentUser), /api/admin/… nur Admins
-"""
-from . import (
-    account,
-    admin,
-    armory,
-    auth,
-    bis,
-    bot,
-    characters,
-    devices,
-    feedback,
-    loot,
-    public,
-    rating,
-    runs,
-    schedule,
-    upgrades,
-)
-
-ROUTERS = [
-    auth.router, account.router, devices.router, runs.router, loot.router, characters.router, armory.router,
-    upgrades.router, rating.router, feedback.router, bis.router, public.router, schedule.router, admin.router,
-    bot.router,
-]
+ROUTERS = (auth.router, account.router, public.router, admin.router)

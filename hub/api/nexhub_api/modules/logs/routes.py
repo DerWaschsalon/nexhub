@@ -32,12 +32,13 @@ from nexproto.runreport import RunReport
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 
-from .. import characters
-from ..analysis import fight_detail, summarize
-from ..bot_client import tell_bot
-from ..config import Settings
-from ..deps import DB, CurrentDevice, CurrentUser, SettingsDep
-from ..models import Run, RunCharacter, User
+from ...bot_client import tell_bot
+from ...config import Settings
+from ...deps import DB, CurrentDevice, CurrentUser, SettingsDep
+from ...models import User
+from . import characters
+from .analysis import fight_detail, summarize
+from .models import Run, RunCharacter
 
 log = logging.getLogger(__name__)
 

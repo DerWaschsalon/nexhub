@@ -1,6 +1,6 @@
 """Zählung der Top-Spieler je Klasse für die Bewertung der Ausrüstung (rating.py), einmal je Stunde.
 
-Gezählt wird der Bestand der BiS-Listen (bis_collector.py): bis zu 200 Top-Spieler je Klasse, rollierend
+Gezählt wird der Bestand der BiS-Listen (bis/collector.py): bis zu 200 Top-Spieler je Klasse, rollierend
 über den Tag gesammelt. Armory und BiS-Listen sehen so dieselben Spieler. Gespeichert wird nur die Zählung
 (rating.count_players), keine Namen und keine Profile.
 
@@ -20,14 +20,15 @@ from nexproto.classes import CLASSES
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from ...aion2 import CLASS_KEYS, localized
+from ...db import aware
+from ..bis.abysslogs import REGION
+from ..bis.collector import pool
+from ..bis.models import BisSample
+from ..bis.rating import add_tops, count_players
+from ..bis.stats import MIN_SAMPLE
 from . import metabot
-from .abysslogs import REGION
-from .aion2 import CLASS_KEYS, localized
-from .bis_collector import pool
-from .bis_stats import MIN_SAMPLE
-from .db import aware
-from .models import BisSample, Character, ClassCensus, ItemRolls
-from .rating import add_tops, count_players
+from .models import Character, ClassCensus, ItemRolls
 
 log = logging.getLogger(__name__)
 

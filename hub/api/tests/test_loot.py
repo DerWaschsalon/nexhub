@@ -1,6 +1,6 @@
 """Beute: Zuordnung zum Boss beim Hochladen, Dropraten mit Band (loot.py), Seite nur mit Login."""
-from nexhub_api import loot
-from nexhub_api.loot import MIN_KILLS
+from nexhub_api.modules.loot import table as loot
+from nexhub_api.modules.loot.table import MIN_KILLS
 
 from .conftest import ADMIN, MEMBER
 from .test_devices import pair

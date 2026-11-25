@@ -1,8 +1,8 @@
-// Antworten der Hub-API für Runs (hub/api/nexhub_api/routes/runs.py und public.py).
+// Antworten der Hub-API für Runs (hub/api/nexhub_api/modules/logs/routes.py und public.py).
 
 import type * as Api from '#lib/api-types.ts';
 
-/** Obergrenze von GET /api/runs (routes/runs.py) */
+/** Obergrenze von GET /api/runs (modules/logs/routes.py) */
 export const RUN_LIMIT = 500;
 
 export type Player = { name: string; cls: string | null; damage: number; dps: number };
@@ -79,7 +79,7 @@ export type Fight = {
 	buffs: Buff[];
 };
 
-// Charakterprofile (hub/api/nexhub_api/routes/characters.py, Format aus aion2.py)
+// Charakterprofile (hub/api/nexhub_api/modules/logs/character_routes.py, Format aus aion2.py)
 
 export type CharacterStatus = Api.CharacterOut['status'];
 

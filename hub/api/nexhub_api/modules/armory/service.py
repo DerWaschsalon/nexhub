@@ -15,8 +15,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .aion2 import NC
-from .characters import fill
+from ...aion2 import NC
+from ..logs.characters import fill
 from .models import Character, CharacterDay
 
 log = logging.getLogger(__name__)
@@ -77,3 +77,11 @@ class Armory:
                 except Exception:  # ein kaputter Charakter hält die anderen nicht auf
                     log.exception("Armory: Charakter %d nicht abgerufen", character_id)
             await asyncio.sleep(CHECK_EVERY)
+
+
+async def armory_ids(db: AsyncSession, keys: list[tuple[int, str]]) -> dict[tuple[int, str], int]:
+    """(Server, Name) → Kennung in der Armory, für die Mitspieler eines Runs (Modul Logs)."""
+    rows = (await db.execute(select(Character.id, Character.server_id, Character.name).where(
+        Character.name.in_([name for _, name in keys])))).all()
+    found = {(server, name): cid for cid, server, name in rows}
+    return {key: found[key] for key in keys if key in found}

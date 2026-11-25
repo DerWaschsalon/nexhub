@@ -54,7 +54,7 @@ export type Rating = {
 /** Bewertung eines Charakters: je Ausrüstungsplatz, dazu woher die Vergleichsgruppe stammt */
 export type Ratings = { size: number; group: string; items: Rating[] };
 
-/** Antwort von GET /api/rating/rules: die Zahlen hinter Note und Upgrade-Plan (routes/rating.py) */
+/** Antwort von GET /api/rating/rules: die Zahlen hinter Note und Upgrade-Plan (modules/armory/rating_routes.py) */
 export type RatingRules = Api.Rules;
 
 /** Farbe je Note, von BiS (orange) bis D (grau) */

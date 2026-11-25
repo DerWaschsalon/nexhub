@@ -24,16 +24,19 @@ Die Web-Seiten leiten nur um; die eigentliche Prüfung macht die API bei jeder A
 api/nexhub_api/
   config.py      Einstellungen aus Umgebungsvariablen
   db.py          Datenbankverbindung, Migrationen beim Start
-  models.py      Tabellen (users, sessions); Änderungen nur mit Migration
-  migrations/    Alembic, eine Datei pro Schema-Stand
-  deps.py        Bausteine für Routen: DB, CurrentUser, AdminUser, …
+  models.py      Tabellen des Kerns (users, sessions, devices); Änderungen nur mit Migration
+  migrations/    Alembic, eine Datei pro Schema-Stand (eine Kette für Kern und Module)
+  deps.py        Bausteine für Routen: DB, CurrentUser, AdminUser, CurrentDevice, …
   discord.py     Discord-OAuth2
-  analysis.py    Zusammenfassung eines NexLogs (Bosse, Schaden je Spieler)
-  logs.py        Logging, Zugriffslog ohne OAuth-Code
   aion2.py       Client für Charakterdaten der AION-2-Website
-  characters.py  Momentaufnahmen der Mitspieler je Run (Abruf im Hintergrund)
-  routes/        ein Modul pro Bereich: auth, account, devices, runs, characters, public, admin
-  main.py        App zusammenbauen, Herkunftsprüfung, Web-Seiten ausliefern
+  bot_client.py  Meldungen an den Bot
+  logging_setup.py  Logging, Zugriffslog ohne OAuth-Code
+  routes/        Routen des Kerns: auth, account, admin (Konten, System), public (Angaben zum Hub)
+  module.py      Was ein Modul ist: ApiModule (Kennung, Routen, requires, Start) und Runtime
+  modules/       je Modul ein Ordner mit Routen, Fachlogik und Tabellen (models.py), Kennung wie im Web:
+                 logs, armory, bis, loot, schedule, devices, feedback, bot, dazu stats (Admin-Statistik)
+  web_types.py   erzeugt die Typen des Webs aus den Modellen der Routen
+  main.py        App zusammenbauen: Routen des Kerns und der Module, Herkunftsprüfung, Web-Seiten ausliefern
 web/src/
   app.css        Design („Liquid Glass“): Farben als Variablen, Bausteine .glass .btn .chip .table .tabs
   lib/           Kern: api.ts (Anfragen), i18n.svelte.ts (Sprache), format.ts (Zahlen, Zeiten),
@@ -79,7 +82,7 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 | `armory` | Armory | `hub/armory/…`, geteilter Vergleich `(public)/v/<token>` – Profilansicht aus `logs` |
 | `schedule` | Termine | `hub/termine/`, öffentlich `(public)/termine/`: feste Termine aus `nexproto.termine` mit Countdown und Wochenplan, `GET /api/public/termine` |
 | `loot` | Beute | `hub/beute/`: Dropraten je Boss aus der Würfel-Beute der Runs (`loot.py`, `GET /api/loot`). Beim Hochladen ordnet `analysis.summarize` jede Beute dem zuletzt besiegten Boss zu (`summary.bosses[].loot`); gezählt werden nur Runs, deren Aufnahme Beute meldet (`summary.loot_tracked`). Ab 20 Siegen „1 zu N“ mit Wilson-Band (90 %), darunter nur die Zählung. Namen der Gegenstände fehlen noch (nur die Nummer) |
-| `feedback` | Feedback | `hub/feedback/`: Wünsche der Mitglieder mit Stimmen (`routes/feedback.py`, Tabellen `feedback`, `feedback_votes`). Für Mitglieder anonym, Admins sehen den Namen, setzen den Status und löschen. Höchstens 5 Einträge je Konto und Tag |
+| `feedback` | Feedback | `hub/feedback/`: Wünsche der Mitglieder mit Stimmen (`modules/feedback/routes.py`, Tabellen `feedback`, `feedback_votes`). Für Mitglieder anonym, Admins sehen den Namen, setzen den Status und löschen. Höchstens 5 Einträge je Konto und Tag |
 | `devices` | Geräte | `hub/geraete/` |
 | `bot` | Bot (Admin) | `hub/admin/bot/…` – Texte vom Bot, bisher nur Deutsch |
 
@@ -87,10 +90,13 @@ Was mehrere brauchen, kommt in den Kern (`app.css`, `lib/components/`).
 
 Beispiel „Geräte“:
 
-1. **API:** `api/nexhub_api/routes/devices.py` mit `router = APIRouter(prefix="/api/devices")`,
-   in `routes/__init__.py` in `ROUTERS` eintragen. Zugriff über Parameter: `user: CurrentUser`
-   oder `admin: AdminUser`.
-2. **Tabellen:** Modell in `models.py`, dann Migration (`uv run alembic revision -m "…"` mit
+1. **API:** Ordner `api/nexhub_api/modules/devices/`: `routes.py` mit
+   `router = APIRouter(prefix="/api/devices")`, in `__init__.py` `MODULE = ApiModule("devices", (routes.router,))`,
+   dazu eine Zeile in `modules/__init__.py` (`MODULES`). Zugriff über Parameter: `user: CurrentUser` oder
+   `admin: AdminUser`. Baut das Modul auf einem anderen auf, nennt es das in `requires`; nur den Kern und diese
+   Module darf es importieren (`tests/test_module_boundaries.py`). Braucht ein Modul etwas von einem, das auf
+   ihm aufbaut, meldet das obere es beim Start an (`start(state, runtime)`, Beispiel: `state.armory_ids`).
+2. **Tabellen:** Modelle in `modules/<id>/models.py`, dann Migration (`uv run alembic revision -m "…"` mit
    gesetzter `DATABASE_URL`, Ergebnis von Hand prüfen).
 3. **Web:** Modul `web/src/modules/devices/` (`module.ts` mit Menüeintrag, `texts.ts`, `api.ts`
    mit den Typen), in `lib/modules.ts` in `MODULES` eintragen; Seite unter
@@ -104,7 +110,7 @@ Was öffentlich sein soll, bekommt eine Route unter `/api/public/…` und eine S
 ## Geräte koppeln
 
 NexBoards melden sich mit eigenem Token, nicht mit dem Discord-Login. Gekoppelt wird nach
-RFC 8628 („Device Authorization Grant“, wie beim Fernseher), Code in `routes/devices.py`:
+RFC 8628 („Device Authorization Grant“, wie beim Fernseher), Code in `modules/devices/routes.py`:
 
 1. Daemon: `POST /api/devices/pair` → geheimer `device_code`, kurzer `user_code` (`BCDF-GHJK`,
    nur Konsonanten), Link auf `/hub/geraete?code=…`. Gilt 10 Minuten, höchstens 50 offene.
@@ -119,7 +125,7 @@ sagt dem Gerät, wem es gehört; `DELETE /api/devices/me` koppelt es ab. Im Hub:
 ## Runs
 
 Gekoppelte NexBoards laden nach jedem Run ein NexLog hoch (Format: [`proto/README.md`](../proto/README.md)),
-Code in `routes/runs.py`:
+Code in `modules/logs/routes.py`:
 
 - `POST /api/runs` (Gerät, Body = gzip-Datei, höchstens 8 MB): prüft mit `nexproto.unpack`, legt die
   Datei unverändert unter `<HUB_DATA_DIR>/runs/<id>.nexlog.gz` ab und speichert Eckdaten plus eine
@@ -129,7 +135,7 @@ Code in `routes/runs.py`:
 - `DELETE /api/runs/{id}`: wer hochgeladen hat, oder ein Admin.
 - Teilen: `POST /api/runs/{id}/share` erzeugt einen Link `/r/<token>` (16 Zufallsbytes),
   `DELETE …/share` zieht ihn zurück; neu teilen gibt einen neuen Link. Gleiche Rechte wie Löschen.
-  Die öffentliche Ansicht (`GET /api/public/runs/{token}`, `routes/public.py`) zeigt Eckdaten und
+  Die öffentliche Ansicht (`GET /api/public/runs/{token}`, `modules/logs/shared_routes.py`) zeigt Eckdaten und
   Zusammenfassung mit Mitspielernamen, aber kein Discord-Konto und nicht die Rohdatei, und bittet
   Suchmaschinen, sie nicht aufzunehmen (`X-Robots-Tag`, `<meta name="robots">`).
 
@@ -163,7 +169,7 @@ Cookies, Protokolle, Inhalte von fremden Servern, Löschfristen), die Seite mit 
 
 Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nach dem Vorbild von
 [nuriland/aion2-api](https://github.com/nuriland/aion2-api) (MIT). Code in `aion2.py` (Client),
-`characters.py` (Abruf) und `routes/characters.py`:
+`characters.py` (Abruf) und `modules/logs/character_routes.py`:
 
 - Nach dem Upload eine Zeile `run_characters` je Spieler (Name über `names`, Server aus `serverId`
   je Actor der Kampfdatei). Im Hintergrund: Suche nach Name und Server, dann Profil, Ausrüstung und
@@ -196,7 +202,7 @@ Zu jedem Run holt der Hub die Mitspieler von der offiziellen AION-2-Website, nac
 ## Armory
 
 Mitglieder tragen ihre Charaktere ein, alle Angemeldeten sehen alle. Code in `armory.py` (Abruf,
-täglicher Lauf) und `routes/armory.py`. Abruf und Speicherformat sind dieselben wie
+täglicher Lauf) und `modules/armory/routes.py`. Abruf und Speicherformat sind dieselben wie
 bei den Charakterprofilen oben: `models.Snapshot` (gemeinsame Spalten von `run_characters` und
 `characters`), `characters.fill` (Abruf und Fehlerbehandlung) und die Typen aus `modules/logs`.
 
@@ -252,7 +258,7 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   noch einmal aufaddiert (bis 29 statt 20), das ist entfernt.
 - BiS-Listen (Vorbild archon.gg), Modul `modules/bis`, Seite `/hub/bis`, API `GET /api/bis` und
   `GET /api/bis/{cls}?lang=de&tier=Hard`:
-  - **Sammler** (`bis_collector.py`, Takt alle 5 Minuten, 4 Spieler je Takt): Ist die Warteschlange
+  - **Sammler** (`bis/collector.py`, Takt alle 5 Minuten, 4 Spieler je Takt): Ist die Warteschlange
     (`bis_queue`) leer, kommen je Klasse 200 Namen aus dem neuesten Raid mit genug Einträgen bei Abyss Logs
     hinein (`abysslogs.top_players`, Hard zuerst, mit Normal aufgefüllt). Je Takt die besten offenen Namen
     über alle Klassen: Server über die NC-Suche, Ausrüstung mit Werten und Skills in beiden Sprachen über
@@ -262,7 +268,7 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
   - **Bestand** (`bis_samples`): höchstens 200 je Klasse, jeder Spieler einmal (SHA-256 aus Server und
     Charakter-ID, kein Name); ein Neuer ersetzt bei vollem Bestand den ältesten. Daraus rechnen die
     BiS-Listen und die Zählung für die Bewertung, Armory und BiS-Listen sehen also dieselben Spieler.
-  - **Auswertung** (`bis_stats.py`, rein): je Platz der typische Gegenstand im Format der Armory
+  - **Auswertung** (`bis/stats.py`, rein): je Platz der typische Gegenstand im Format der Armory
     (häufigster Gegenstand, Median der Verzauberung, Zusatzwerte mit Median, häufige Manasteine,
     Göttersteine, Skills), dazu der Anteil je Zeile im Format von `rating.py` und die drei häufigsten
     Gegenstände; Skills und Stigmen mit Anteil und Median der Stufe. Unter 10 % fällt weg.
@@ -312,7 +318,7 @@ Manasteine, Gottstein, Skills und das Set. Seltenheitsfarben wie im Spiel in `gr
 
 Der Bereich „Bot“ (`/hub/admin/bot/…`, nur Admins) steuert TheWashBot und ersetzt dessen altes
 Web-Dashboard. Der Bot läuft als eigener Dienst; der Hub fragt seine Steuer-API
-(`bot/bot/admin/control.py` und `routes()` der Module) im internen Docker-Netz, Code in `routes/bot.py`:
+(`bot/bot/admin/control.py` und `routes()` der Module) im internen Docker-Netz, Code in `modules/bot/routes.py`:
 
 - `/api/admin/bot/<pfad>` → `<BOT_CONTROL_URL>/control/<pfad>` mit `Authorization: Bearer
   <BOT_CONTROL_KEY>`. Prüfen, speichern und Discord-Rechte setzen macht der Bot; der Hub prüft nur
@@ -330,7 +336,7 @@ Web-Dashboard. Der Bot läuft als eigener Dienst; der Hub fragt seine Steuer-API
   Run-Bericht an `POST /api/runs/{id}/report` (geprüft mit `nexproto.runreport.RunReport`); der Hub leitet
   ihn mit `guild_id` (`HUB_GUILD_ID`) und Link zum Run an den Bot weiter, der ihn postet.
 - `POST …/run-link` (vom Hub selbst, nicht durchgereicht): Nach einem neuen Upload mit Kill meldet
-  `routes/runs.py` Dungeon, Start und Link, der Bot hängt „Im NexHub ansehen“ an den Discord-Post. Nur
+  `modules/logs/routes.py` Dungeon, Start und Link, der Bot hängt „Im NexHub ansehen“ an den Discord-Post. Nur
   noch für NexBoards, die ihren Run selbst an den Bot schicken.
 - Eigene Seiten haben, was kein einfaches Formular ist: Verifizierung, Level-Belohnungen,
   Ankündigungen, eigene Befehle, Benachrichtigungen, Sichtbarkeit (Rolle × Kanal).

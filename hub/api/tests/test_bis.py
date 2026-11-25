@@ -1,4 +1,4 @@
-"""BiS-Listen: Sammler (bis_collector.py), Auswertung (bis_stats.py) und Route. Abyss Logs und NC nachgebaut
+"""BiS-Listen: Sammler (bis/collector.py), Auswertung (bis/stats.py) und Route. Abyss Logs und NC nachgebaut
 (fake_abyss.py, fake_nc.py), nur erfundene Daten."""
 import asyncio
 import json
@@ -8,12 +8,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from nexhub_api import bis_collector
 from nexhub_api.aion2 import NC
-from nexhub_api.bis_collector import BisCollector, pool
-from nexhub_api.bis_stats import aggregate
-from nexhub_api.models import BisQueue
-from nexhub_api.routes import bis as bis_route
+from nexhub_api.modules.bis import collector as bis_collector
+from nexhub_api.modules.bis import routes as bis_route
+from nexhub_api.modules.bis.collector import BisCollector, pool
+from nexhub_api.modules.bis.models import BisQueue
+from nexhub_api.modules.bis.stats import aggregate
 
 from .conftest import MEMBER
 from .fake_nc import search_row

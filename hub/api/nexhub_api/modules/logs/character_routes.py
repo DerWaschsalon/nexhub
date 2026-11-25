@@ -13,16 +13,18 @@ Geteilte Links (routes/public.py) zeigen keine Profile.
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..characters import has_item_ids
-from ..deps import DB, CurrentUser
-from ..models import Character, CharacterStatus, RunCharacter
-from .runs import _get, _may_manage
+from ...deps import DB, CurrentUser
+from .characters import has_item_ids
+from .models import CharacterStatus, RunCharacter
+from .routes import _get, _may_manage
 
 router = APIRouter(prefix="/api/runs", tags=["characters"])
 
@@ -40,7 +42,7 @@ class CharacterOut(BaseModel):
     combat_power: int | None
     item_level: int | None
     fetched_at: datetime | None
-    armory_id: int | None = None  # derselbe Charakter in der Armory (routes/armory.py)
+    armory_id: int | None = None  # derselbe Charakter in der Armory (siehe armory_ids)
 
 
 class CharacterDetail(CharacterOut):
@@ -53,25 +55,33 @@ def _out(row: RunCharacter) -> dict:
                 combat_power=row.combat_power, item_level=row.item_level, fetched_at=row.fetched_at)
 
 
+Key = tuple[int, str]  # (Server, Name): Namen sind je Server eindeutig
+Lookup = Callable[[AsyncSession, list[Key]], Awaitable[dict[Key, int]]]
+
+
+async def armory_ids(request: Request, db: DB, rows: Sequence[RunCharacter]) -> dict[Key, int]:
+    """Dieselben Charaktere in der Armory. Die Suche legt das Modul Armory in state.armory_ids ab; ohne es
+    gibt es keine Verweise."""
+    lookup: Lookup | None = getattr(request.app.state, "armory_ids", None)
+    return await lookup(db, [(row.server_id, row.name) for row in rows]) if lookup else {}
+
+
 @router.get("/{run_id}/characters")
-async def list_characters(run_id: int, user: CurrentUser, db: DB) -> list[CharacterOut]:
+async def list_characters(run_id: int, request: Request, user: CurrentUser, db: DB) -> list[CharacterOut]:
     await _get(db, run_id)
     found = (await db.scalars(select(RunCharacter).where(RunCharacter.run_id == run_id)
                               .order_by(RunCharacter.name))).all()
-    # Namen sind je Server eindeutig
-    armory = {(server, name): cid for cid, server, name in (await db.execute(
-        select(Character.id, Character.server_id, Character.name).where(
-            Character.name.in_([row.name for row in found])))).all()}
+    armory = await armory_ids(request, db, found)
     return [CharacterOut(**_out(row), armory_id=armory.get((row.server_id, row.name))) for row in found]
 
 
 @router.get("/{run_id}/characters/{char_id}")
-async def get_character(run_id: int, char_id: int, user: CurrentUser, db: DB) -> CharacterDetail:
+async def get_character(run_id: int, char_id: int, request: Request, user: CurrentUser,
+                        db: DB) -> CharacterDetail:
     row = await db.scalar(select(RunCharacter).where(RunCharacter.run_id == run_id, RunCharacter.id == char_id))
     if row is None:
         raise HTTPException(404, "Spieler nicht in diesem Run")
-    armory_id = await db.scalar(select(Character.id).where(Character.server_id == row.server_id,
-                                                           Character.name == row.name))
+    armory_id = (await armory_ids(request, db, [row])).get((row.server_id, row.name))
     return CharacterDetail(**_out(row), armory_id=armory_id, data=row.data, error=row.error)
 
 

@@ -13,12 +13,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from .aion2 import NC
-from .armory import Armory
-from .bis_collector import BisCollector
-from .census import Census
-from .characters import Fetcher
 from .config import Settings
 from .deps import DB, SESSION_COOKIE
+from .module import Runtime
+from .modules import MODULES
 from .routes import ROUTERS
 
 log = logging.getLogger(__name__)
@@ -36,19 +34,11 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
         app.state.http = http or httpx.AsyncClient(timeout=10)
         if not settings.discord_configured:
             log.warning("DISCORD_CLIENT_ID/DISCORD_CLIENT_SECRET fehlen – Login ist aus")
-        app.state.characters, app.state.armory, tasks = None, None, []
-        if settings.hub_aion2_enabled:
-            nc = NC(app.state.http, settings.hub_aion2_pause)
-            app.state.characters = Fetcher(app.state.sessionmaker, nc)
-            app.state.armory = Armory(app.state.sessionmaker, nc)
-            census = Census(app.state.sessionmaker, app.state.http)
-            collector = BisCollector(app.state.sessionmaker, nc, app.state.http)
-            # liegengebliebene Abrufe vom letzten Lauf, der tägliche Armory-Abruf, der Sammler der BiS-Listen
-            # und die Zählung daraus; laufen neben dem Webserver
-            tasks = [asyncio.create_task(app.state.characters.resume()),
-                     asyncio.create_task(app.state.armory.daily()),
-                     asyncio.create_task(collector.run()),
-                     asyncio.create_task(census.daily())]
+        nc = NC(app.state.http, settings.hub_aion2_pause) if settings.hub_aion2_enabled else None
+        runtime = Runtime(settings, app.state.sessionmaker, app.state.http, nc)
+        # was die Module neben dem Webserver laufen lassen (tägliche Abrufe, Sammler)
+        tasks = [asyncio.create_task(job) for module in MODULES if module.start
+                 for job in module.start(app.state, runtime)]
         yield
         for task in tasks:
             task.cancel()  # ein Neustart soll nicht auf NC warten; der Rest kommt beim nächsten Start
@@ -59,7 +49,7 @@ def create_app(settings: Settings | None = None, http: httpx.AsyncClient | None 
     app = FastAPI(title="NexHub", version=settings.hub_version, lifespan=lifespan,
                   docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
     app.state.settings = settings
-    for router in ROUTERS:
+    for router in (*ROUTERS, *(router for module in MODULES for router in module.routers)):
         app.include_router(router)
 
     @app.middleware("http")

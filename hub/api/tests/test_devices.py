@@ -1,5 +1,5 @@
 
-from nexhub_api.routes.devices import ALPHABET, MAX_OPEN_PAIRINGS, normalize_code
+from nexhub_api.modules.devices.routes import ALPHABET, MAX_OPEN_PAIRINGS, normalize_code
 
 from .conftest import ADMIN, BASE, MEMBER
 
@@ -70,7 +70,7 @@ def test_bestaetigen_braucht_login_und_gueltigen_code(client, as_user):
 
 
 def test_abgelaufene_kopplung(client, as_user, monkeypatch):
-    import nexhub_api.routes.devices as devices
+    import nexhub_api.modules.devices.routes as devices
     monkeypatch.setattr(devices, "PAIRING_TTL_S", -1)
     p = start(client)
     member = as_user(MEMBER)

@@ -1,9 +1,9 @@
 """BiS-Listen: was die Top-Spieler je Klasse tragen, nur mit Login wie die Armory.
 
     GET /api/bis                          Klassen mit Bestand: Anzahl, davon Hard, neueste Stichprobe
-    GET /api/bis/{cls}?lang=de&tier=Hard  Auswertung einer Klasse (bis_stats.py), wahlweise nur ein Modus
+    GET /api/bis/{cls}?lang=de&tier=Hard  Auswertung einer Klasse (bis/stats.py), wahlweise nur ein Modus
 
-Der Bestand kommt vom Sammler (bis_collector.py); dieselben Spieler zählt census.py für die Armory.
+Der Bestand kommt vom Sammler (bis/collector.py); dieselben Spieler zählt census.py für die Armory.
 """
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from nexproto.classes import CLASS_KEYS
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from ..aion2 import LANGS, localized
-from ..bis_collector import pool
-from ..bis_stats import MIN_SAMPLE, aggregate
-from ..deps import DB, CurrentUser
-from ..models import BisSample
+from ...aion2 import LANGS, localized
+from ...deps import DB, CurrentUser
+from .collector import pool
+from .models import BisSample
+from .stats import MIN_SAMPLE, aggregate
 
 router = APIRouter(prefix="/api/bis", tags=["bis"])
 

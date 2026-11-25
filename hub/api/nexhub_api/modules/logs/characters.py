@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
 
-from .aion2 import LANGS, NC, NCError, NotFound, combat_power, item_level, localized
+from ...aion2 import LANGS, NC, NCError, NotFound, combat_power, item_level, localized
 from .models import RunCharacter, Snapshot
 
 log = logging.getLogger(__name__)

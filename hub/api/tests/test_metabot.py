@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from nexhub_api import metabot
+from nexhub_api.modules.armory import metabot
 
 from .fake_metabot import BOW_DE, BOW_EN, FakeMetaBot, page
 
