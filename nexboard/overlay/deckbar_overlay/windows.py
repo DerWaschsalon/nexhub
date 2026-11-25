@@ -72,6 +72,11 @@ class A2Window(QWebEngineView):
         channel.registerObject("host", self.host)
         page.setWebChannel(channel)
         self.setPage(page)
+        if plugin:
+            # Ein Plugin läuft versteckt weiter. Qt verwirft versteckte Seiten aber nach etwa 20 Minuten,
+            # danach blieb z. B. das Ping-Widget auf seinem letzten Wert stehen. Also sofort wieder wecken
+            # (eine verworfene Seite lädt dabei neu, das Plugin startet frisch).
+            page.lifecycleStateChanged.connect(self._stay_awake)
         self.setContextMenuPolicy(Qt.NoContextMenu)
         self.url = QUrl(overlay.url)
         if plugin:
@@ -82,6 +87,13 @@ class A2Window(QWebEngineView):
         # Daemon noch nicht da (Autostart vor dem Daemon, Neustart): später erneut laden
         self.loadFinished.connect(lambda ok: ok or QTimer.singleShot(3000, lambda: self.load(self.url)))
         self.load(self.url)
+
+    def _stay_awake(self, state: QWebEnginePage.LifecycleState) -> None:
+        """Eingefrorene oder verworfene Plugin-Seite wieder aktiv machen (siehe __init__). Verzögert, also
+        nicht aus dem laufenden Zustandswechsel heraus."""
+        active = QWebEnginePage.LifecycleState.Active
+        if state != active:
+            QTimer.singleShot(0, lambda: self.page().setLifecycleState(active))
 
     def emit(self, name: str, payload=None) -> None:
         self.host.event.emit(name, json.dumps(payload) if payload is not None else "")
