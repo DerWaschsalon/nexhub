@@ -16,6 +16,7 @@ from nexcore import atomic_write
 from nexproto.termine import EVENTS
 
 from . import dps, runs, schedule
+from .aion2.settings import from_old
 from .modules import deck
 
 log = logging.getLogger(__name__)
@@ -105,6 +106,24 @@ def _adopt_character_name(config_dir: Path, backup: Backup, radar_settings: Path
     return ["character_name"]
 
 
+def _split_radar_settings(config_dir: Path, radar_settings: Path | None) -> list[str]:
+    """Die gemeinsame Datei des Radars (deutsche Schlüssel) → je Modul eine Datei. Die alte bleibt liegen."""
+    files = {part: config_dir / f"aion2.{part}.yaml" for part in ("radar", "warnings", "field_bosses")}
+    if not radar_settings or not radar_settings.exists() or any(file.exists() for file in files.values()):
+        return []
+    try:
+        old = json.loads(radar_settings.read_text())
+    except (OSError, ValueError):
+        return []
+    parts = {part: values for part, values in from_old(old).items() if values} if isinstance(old, dict) else {}
+    if not parts:
+        return []
+    for part, values in parts.items():
+        _write_yaml(files[part], values)
+    log.info("Einstellungen des Radars auf drei Module verteilt (alte Datei bleibt: %s)", radar_settings)
+    return [radar_settings.name]
+
+
 def _move_timer_events(config_dir: Path, backup: Backup) -> list[str]:
     """Event-Timer des Overlays → Modul Termine: eigene Ereignisse bleiben, die alten und neuen
     Voreinstellungen fallen weg (die festen Termine kommen jetzt aus nexproto)."""
@@ -131,4 +150,5 @@ def migrate(config_dir: Path, radar_settings: Path | None = None) -> list[str]:
     (nur beim Daemon mit der echten Konfiguration, Testinstanzen lesen sie nicht)."""
     backup = Backup(config_dir)
     return (_rename_files(config_dir, backup) + _move_keys(config_dir, backup)
-            + _adopt_character_name(config_dir, backup, radar_settings) + _move_timer_events(config_dir, backup))
+            + _adopt_character_name(config_dir, backup, radar_settings)
+            + _split_radar_settings(config_dir, radar_settings) + _move_timer_events(config_dir, backup))

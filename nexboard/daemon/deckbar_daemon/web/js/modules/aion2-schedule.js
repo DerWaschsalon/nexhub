@@ -3,6 +3,7 @@
 import { fill, el, api, S, on, input, select, button, chip, card, settingsRow, sw, toast, clampInt, modOn } from "../core.js";
 
 const SETTINGS = "/api/m/aion2.schedule/settings";
+const FIELD_BOSS_SETTINGS = "/api/m/aion2.field_bosses/settings";
 const REFRESH_MS = 5000;
 const EVERY = { 60: "stündlich", 120: "alle 2 h", 180: "alle 3 h", 240: "alle 4 h", 360: "alle 6 h", 720: "alle 12 h", 1440: "täglich", 10080: "wöchentlich" };
 const WEEK = 10080;
@@ -84,25 +85,22 @@ function listCard(entries, settings, save) {
     table(["", "Termin", "Uhrzeit", "Status"], rows));
 }
 
-function fieldBossCard(bosses) {
-  const announce = S.radar?.einstellungen.feldboss_ansage ?? true;
+function fieldBossCard(bosses, settings, save) {
   const rows = bosses.map((b) => el("tr", {}, el("td", { text: b.name }), el("td", { text: String(b.karte) }), el("td", { class: b.farbe, text: b.status })));
   return card("Feldbosse", "Respawn-Timer aus dem Radar; die der aktuellen Karte zuerst", null,
-    settingsRow("Ansage 5 Minuten vorher", "Feldbosse der aktuellen Karte und der Riss", sw(announce, async (v) => {
-      try { S.radar = await api("PUT", "/api/radar", { feldboss_ansage: v }); } catch (e) { toast(e.message, true); }
-    })),
+    settingsRow("Ansage 5 Minuten vorher", "Feldbosse der aktuellen Karte und der Riss", sw(settings.announce, (v) => save({ announce: v }))),
     rows.length ? table(["Feldboss", "Karte", "Status"], rows) : el("p", { class: "hint", text: "Noch keine Feldbosse gesehen." }));
 }
 
 function schedulePage(ctx) {
   const box = el("div", { class: "stack" });
-  let entries = null, settings = null, bosses = [];
+  let entries = null, settings = null, bosses = [], bossSettings = null;
   const load = async () => {
     try {
       entries = (await api("GET", "/api/schedule")).entries;
       if (!modOn("aion2.field_bosses")) return;
       bosses = (await api("GET", "/api/radar/feldbosse")).feldbosse;
-      S.radar ??= await api("GET", "/api/radar"); // für den Schalter der Feldboss-Ansage
+      bossSettings ??= (await api("GET", FIELD_BOSS_SETTINGS)).settings;
     } catch { /* bleibt */ }
   };
   const save = async (patch) => {
@@ -112,10 +110,16 @@ function schedulePage(ctx) {
       draw();
     } catch (e) { toast(e.message, true); }
   };
+  const saveBosses = async (patch) => {
+    try {
+      bossSettings = (await api("PUT", FIELD_BOSS_SETTINGS, patch)).settings;
+      draw();
+    } catch (e) { toast(e.message, true); }
+  };
   const draw = () => {
     if (!entries || !settings) return;
     fill(box, listCard(entries, settings, save), ownEventsCard(settings, save),
-      modOn("aion2.field_bosses") ? fieldBossCard(bosses) : null);
+      modOn("aion2.field_bosses") && bossSettings ? fieldBossCard(bosses, bossSettings, saveBosses) : null);
   };
   // nicht neu zeichnen, während ein Feld in Benutzung ist
   const busy = () => box.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName);

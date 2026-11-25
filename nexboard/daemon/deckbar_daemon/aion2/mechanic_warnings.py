@@ -46,7 +46,7 @@ class MechanicWarnings:
     def windows(self, now: float) -> list[tuple[str, float]]:
         """Vorschau für Skills mit Zeitfenster: frühestens in … bzw. jederzeit möglich."""
         lines = []
-        planned, off = self.board.planned_groups(), self.board.settings["meldung_aus"]
+        planned, off = self.board.planned_groups(), self.board.settings.warnings.off
         for skill, window in WINDOWS.items():
             group = CAST_RULES[skill].group
             if group in off:

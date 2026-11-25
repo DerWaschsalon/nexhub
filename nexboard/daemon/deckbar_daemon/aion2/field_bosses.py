@@ -15,8 +15,8 @@ from nexproto.termine import EVENT_BY_KEY, next_start
 from ..core.packets import PacketSource
 from ..core.packets.messages import FieldBossList, NpcSeen
 from .gamedata import BOSSES, field_boss_npcs, load_state, npc_name, save_state
-from .rules import tr
-from .settings import settings
+from .rules import language, tr
+from .settings import Settings
 from .world import World
 
 STATE_FILE = "feldbosse.json"
@@ -78,7 +78,7 @@ def rift(now: float) -> tuple[float, bool]:
 
 
 def slot_name(slot_id: str, slot: dict) -> str:
-    return npc_name(slot["npc"], settings()["sprache"]) if slot.get("npc") else f"{tr('Feldboss')} {int(slot_id) % 100}"
+    return npc_name(slot["npc"], language()) if slot.get("npc") else f"{tr('Feldboss')} {int(slot_id) % 100}"
 
 
 def slot_status(slot: dict, now: float) -> tuple[str, str, float]:
@@ -107,13 +107,14 @@ def overview(slots: dict[str, dict], zone: int | None) -> list[dict]:
 class FieldBossCalls:
     """Ansage 5 Minuten vor dem Respawn und beim Respawn, nur für die aktuelle Karte; dazu der Riss."""
 
-    def __init__(self, tracker: FieldBossTracker, say: Callable[[str], None]) -> None:
+    def __init__(self, tracker: FieldBossTracker, say: Callable[[str], None], settings: Settings) -> None:
         self.tracker = tracker
+        self.settings = settings
         self.say = say
         self.announced: set[tuple] = set()
 
     def tick(self) -> None:
-        if not settings()["feldboss_ansage"]:
+        if not self.settings.field_bosses.announce:
             return
         now = time.time()
         opens, _ = rift(now)

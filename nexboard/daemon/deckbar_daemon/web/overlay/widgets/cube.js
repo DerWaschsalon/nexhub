@@ -10,20 +10,20 @@ const EDGE = 10; // Abstand der Punkte zum Kreisrand
 const EXAMPLE = {
   aktiv: true, position: [0, 0, 0], kurs: null, gruppe: [], feldbosse: [], status: "",
   cubes: [{ x: 3000, y: -3000, z: 400, alter: 75, oeffner: "" }],
-  einstellungen: { reichweite: 100, drehung: 0, spiegeln: false, kurs_oben: false },
+  einstellungen: { range_m: 100, rotation: 0, mirror: false, heading_up: false },
 };
 
 /** Drehung des Radars: fest eingestellt, oder so, dass die Laufrichtung oben ist (radar.kurs). */
 function rotation(radar) {
   const e = radar.einstellungen;
-  if (!e.kurs_oben || !radar.kurs) return (e.drehung * Math.PI) / 180;
+  if (!e.heading_up || !radar.kurs) return (e.rotation * Math.PI) / 180;
   const [kx, ky] = radar.kurs;
-  return -Math.atan2(e.spiegeln ? -kx : kx, -ky);
+  return -Math.atan2(e.mirror ? -kx : kx, -ky);
 }
 
 /** Weltversatz → Bildschirmversatz. Norden ist Welt −y, Osten +x; dazu Drehen und Spiegeln. */
 function toScreen(radar, dx, dy) {
-  const sx = radar.einstellungen.spiegeln ? -dx : dx;
+  const sx = radar.einstellungen.mirror ? -dx : dx;
   const w = rotation(radar);
   return [sx * Math.cos(w) - dy * Math.sin(w), sx * Math.sin(w) + dy * Math.cos(w)];
 }
@@ -121,13 +121,13 @@ export default {
       drawGround(c, m, r);
       const [nx, ny] = toScreen(shown, 0, -1);
       label(c, "N", m + nx * (r - 9), m + ny * (r - 9), COLOR.quiet, 10);
-      label(c, `${shown.einstellungen.reichweite} m`, m, m + r - 16, COLOR.quiet, 10);
+      label(c, `${shown.einstellungen.range_m} m`, m, m + r - 16, COLOR.quiet, 10);
       if (!shown.position) {
         text.textContent = `${shown.cubes.length} Cube(s), eigene Position fehlt`;
         text.className = "cube-text";
         return;
       }
-      const unit = reach / (shown.einstellungen.reichweite * 100); // Pixel je cm
+      const unit = reach / (shown.einstellungen.range_m * 100); // Pixel je cm
       const nearest = drawCubes(c, shown, m, reach, unit);
       drawOthers(c, shown, m, reach, unit);
       c.strokeStyle = COLOR.cube;

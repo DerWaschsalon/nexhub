@@ -56,3 +56,15 @@ def test_eigene_event_timer_ziehen_zu_den_terminen(tmp_path):
         "events": [{"name": "Gilde", "every": 1440, "at": 1200, "tz": "local"}]}
     assert json.loads((tmp_path / "overlay" / "layout.json").read_text()) == {"widgets": {"timers": {"enabled": True}}}
     assert migrate(tmp_path) == []
+
+
+def test_alte_radar_datei_wird_auf_die_drei_module_verteilt(tmp_path):
+    radar = tmp_path / "aion2-radar.json"
+    radar.write_text(json.dumps({"reichweite": 300, "nur_mich": False, "warnton": {"flamme": "piep"},
+                                 "feldboss_ansage": False, "sprache": "en", "fremd": 1}))
+    assert migrate(tmp_path, radar) == ["aion2-radar.json"]
+    assert yaml.safe_load((tmp_path / "aion2.radar.yaml").read_text()) == {"range_m": 300}
+    warnings = yaml.safe_load((tmp_path / "aion2.warnings.yaml").read_text())
+    assert warnings == {"only_me": False, "sounds": {"flamme": "piep"}}
+    assert yaml.safe_load((tmp_path / "aion2.field_bosses.yaml").read_text()) == {"announce": False}
+    assert radar.exists() and migrate(tmp_path, radar) == []  # nur einmal; spätere Änderungen bleiben

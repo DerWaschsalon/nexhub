@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .rules import DUNGEON_GROUPS, ON_YOU, TO, TRAINER_GROUP, YOU_SUFFIX, Rule, tr
-from .settings import settings
+from .settings import Settings
 from .world import World
 
 KEEP_S = 1.2  # so lange bleibt eine abgelaufene Warnung noch stehen
@@ -36,22 +36,23 @@ class Warning:
 
 
 class WarningBoard:
-    def __init__(self, world: World, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, world: World, settings: Settings | None = None,
+                 clock: Callable[[], float] = time.time) -> None:
         self.world = world
         self.clock = clock
         self.lock = threading.Lock()
         self.active: list[Warning] = []
         self.planned: list[tuple[float, Rule]] = []  # (fällig um, Regel)
         self.sounds: list[tuple[str, str]] = []  # (Art, Text): spielt der Dienst in seinem Takt ab
-        self.settings = settings()
-        self.enabled: bool = self.settings["warn_an"]
+        self.settings = settings or Settings()
+        self.enabled: bool = self.settings.warnings.enabled
         self.previews: list[Preview] = []  # weitere Zeilen der Vorschau (Zeitfenster, Berserker)
 
     # ------------------------------------------------------------ Fragen der Auslöser
     def foreign(self, target: int | None) -> bool:
         """Einstellung „Nur was mich betrifft“ und das Ziel ist ein anderer Spieler. Kein Ziel, der Boss
         selbst oder ein unbekanntes Wesen zählen nicht als fremd (Flächen, Angriffe auf alle)."""
-        return bool(self.settings.get("nur_mich")) and target is not None and target != self.world.own_id \
+        return self.settings.warnings.only_me and target is not None and target != self.world.own_id \
             and target in self.world.players
 
     def group_on(self, group: str) -> bool:
@@ -104,7 +105,7 @@ class WarningBoard:
             self._add(r, now)
 
     def _add(self, rule: Rule, start: float, me: bool = False, target: str = "") -> None:
-        if rule.group in self.settings["meldung_aus"]:
+        if rule.group in self.settings.warnings.off:
             return  # auf der NexBoard-Seite abgeschaltet
         old = [w for w in self.active if w.rule.group == rule.group and w.rest(start) > -KEEP_S]
         if any(w.rule == rule and start - w.start < SAME_S for w in old):
@@ -113,7 +114,7 @@ class WarningBoard:
         self.active = [w for w in self.active if w.rule.group != rule.group]
         warning = Warning(rule, start, me, since, target)
         self.active.append(warning)
-        kind = self.settings["warnton"].get(rule.group, SPEAK)
+        kind = self.settings.warnings.sounds.get(rule.group, SPEAK)
         if kind == SPEAK and rule.speak is not None:
             # erster Text wichtig, die weiteren dürfen abgebrochen werden
             self.sounds += [(SPEAK if i == 0 else LINE, text) for i, text in enumerate(rule.speak) if text]
@@ -146,7 +147,7 @@ class WarningBoard:
         now = self.clock()
         with self.lock:
             lines = [(r.title.replace(" kommt", "").replace(" erwartet", ""), due + r.lead - now)
-                     for due, r in self.planned if r.group not in self.settings["meldung_aus"]]
+                     for due, r in self.planned if r.group not in self.settings.warnings.off]
         for source in self.previews:
             lines += source(now)
         return sorted(lines, key=lambda line: line[1])

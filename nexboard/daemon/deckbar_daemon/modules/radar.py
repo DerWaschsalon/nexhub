@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 from aiohttp import web
-from nexcore import Context, ModuleInfo
+from nexcore import Context, ModuleInfo, SettingsStore
 from nexcore.errors import ApiError
+from pydantic import BaseModel
 
 from ..aion2.service import CUBES, FIELD_BOSSES, WARNINGS
 from ..boss_effekte import BossEffekte
@@ -32,6 +33,13 @@ class RadarPart(WebModule):
     async def stop(self) -> None:
         await self.radar.disable(self.part)
 
+    @property
+    def store(self) -> SettingsStore[Any]:
+        return self.radar.stores[self.part]
+
+    def save_settings(self, value: BaseModel) -> None:
+        self.radar.save(self.part, value)
+
     def status(self) -> dict[str, Any]:
         return {"laeuft": self.radar.running, "spiel": self.radar.game, "aufnahme": self.radar.recording,
                 "fehler": self.radar.error}
@@ -53,9 +61,8 @@ class RadarModule(RadarPart):
     )
 
     def routes(self, router: web.UrlDispatcher) -> None:
-        """Einstellungen und Knöpfe aller Radar-Module (eine Datei, eine Route)."""
+        """Stand und Knöpfe aller Radar-Module (ein gemeinsamer Dienst)."""
         router.add_get("/api/radar", self.api_get)
-        router.add_put("/api/radar", self.api_put)
         router.add_post("/api/radar/befehl", self.api_command)
 
     def overlay_routes(self, router: web.UrlDispatcher) -> None:
@@ -65,12 +72,6 @@ class RadarModule(RadarPart):
 
     async def api_get(self, request: web.Request) -> web.Response:
         return web.json_response(self.radar.info())
-
-    async def api_put(self, request: web.Request) -> web.Response:
-        try:
-            return web.json_response(await self.radar.save(await read_object(request)))
-        except ValueError as e:
-            raise ApiError(400, str(e)) from e
 
     async def api_command(self, request: web.Request) -> web.Response:
         data = await read_object(request)

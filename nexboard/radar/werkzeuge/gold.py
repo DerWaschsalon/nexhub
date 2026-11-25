@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
-from deckbar_daemon.aion2 import settings
+from deckbar_daemon.aion2.settings import Settings, WarningSettings
 from deckbar_daemon.aion2.cubes import Cube
 from deckbar_daemon.aion2.service import RadarService
 from deckbar_daemon.core.packets import TcpStream, server_segments
@@ -116,8 +116,7 @@ def segmente(pcap: Path) -> Iterator[tuple[float, tuple]]:
 def radar_ereignisse(pcap: Path) -> list[str]:
     """Einen Mitschnitt so schnell wie möglich durch den echten RadarService schicken."""
     # Standardwerte, aber alle Warnungen, auch die anderer Spieler: so viel Verhalten wie möglich
-    settings.use(settings.with_defaults({"nur_mich": False}))
-    dienst = RadarService(spawn_log=None)
+    dienst = RadarService(spawn_log=None, settings=Settings(warnings=WarningSettings(only_me=False)))
     auf = Aufzeichnung(dienst)
     dienst.board.clock = auf.uhr
     naechster_takt = 0.0

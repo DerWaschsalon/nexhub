@@ -14,11 +14,11 @@ from aiohttp import web
 from nexproto.hubapi import log_request_ids
 from pydantic import ValidationError
 
+from .aion2.settings import OLD_FILE as RADAR_SETTINGS
 from .app import NexBoard, build_app
 from .config import config_dir, is_default_config, load_settings
 from .core.http import local_only
 from .migrate import migrate
-from .radar import SETTINGS_FILE as RADAR_SETTINGS
 
 log = logging.getLogger("deckbar")
 SHUTDOWN_TIMEOUT = 2  # so lange auf noch laufende Anfragen warten (aiohttp-Standard: 60 s)

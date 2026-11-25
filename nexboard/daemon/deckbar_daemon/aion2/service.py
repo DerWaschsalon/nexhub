@@ -23,8 +23,18 @@ from .gamedata import STORE
 from .maps import GameMap
 from .mechanic_warnings import MechanicWarnings
 from .party import PartyTracker
-from .rules import CAST_RULES, EVERYWHERE, ON_YOU, PROBE_SKILL, STAGGER_RULES, STATUS_RULES, TRAINER_GROUP, tr
-from .settings import reload, settings
+from .rules import (
+    CAST_RULES,
+    EVERYWHERE,
+    ON_YOU,
+    PROBE_SKILL,
+    STAGGER_RULES,
+    STATUS_RULES,
+    TRAINER_GROUP,
+    tr,
+    use_language,
+)
+from .settings import Settings
 from .spawn_points import SpawnPoints
 from .stagger import StaggerTracker
 from .stagger_calls import StaggerCalls
@@ -39,24 +49,28 @@ DEATHS_KEPT = 200
 CUBES, WARNINGS, FIELD_BOSSES = "radar", "warnings", "field_bosses"
 PARTS = frozenset({CUBES, WARNINGS, FIELD_BOSSES})
 SHOWN_WARNINGS = 3
+WIDGET_SETTINGS = {"range_m", "rotation", "mirror", "map_follow", "heading_up"}  # was die Widgets brauchen
 
 
 class RadarService:
-    def __init__(self, name: str = "", spawn_log: Path | None = SPAWN_LOG, source: PacketSource | None = None) -> None:
-        self.settings = settings()
+    def __init__(self, name: str = "", spawn_log: Path | None = SPAWN_LOG, source: PacketSource | None = None,
+                 settings: Settings | None = None, language: str = "de") -> None:
+        self.settings = settings or Settings()  # dasselbe Objekt hält der Daemon und setzt neue Werte ein
+        self.language = language
+        use_language(language)
         self.parts: set[str] = set(PARTS)  # was davon an ist; der Daemon setzt hier seine Modulschalter ein
         if spawn_log:
             spawn_log.parent.mkdir(parents=True, exist_ok=True)
-        self.source = source or TcpdumpSource()  # woher die Pakete kommen (Einstellung quelle)
+        self.source = source or TcpdumpSource()  # woher die Pakete kommen (Einstellung source)
         self.recorder = Recorder()
-        self.speech = Speech(lambda: self.settings["sprache"])
+        self.speech = Speech(lambda: self.language)
         self.world = World(name)
         self.cubes = CubeTracker(self.world, spawn_log)
         self.party = PartyTracker(self.world)
         self.field_bosses = FieldBossTracker(self.world, persist=True)
         self.fight = FightEvents(self.world)
         self.stagger = StaggerTracker(self.world, set(STAGGER_RULES))
-        self.board = WarningBoard(self.world)
+        self.board = WarningBoard(self.world, self.settings)
         self._apply_switches()
         # Reihenfolge = Reihenfolge der Warnungen zu demselben Cast: erst die eigenen Regeln, dann die Ansagen
         self.mechanics = MechanicWarnings(self.board, self.fight)
@@ -64,7 +78,7 @@ class RadarService:
         self.callouts = Callouts(self.board, self.fight)
         self.stagger_calls = StaggerCalls(self.board, self.stagger)
         self.aids = CombatAids(self.board, self.fight, self.party)
-        self.field_boss_calls = FieldBossCalls(self.field_bosses, self.speech.say)
+        self.field_boss_calls = FieldBossCalls(self.field_bosses, self.speech.say, self.settings)
         for part in (self.world, self.cubes, self.party, self.field_bosses, self.fight, self.stagger, self.aids):
             part.attach(self.source)
         self.spawn_points = SpawnPoints()  # jeder gesehene Cube wird als Spawnpunkt gemerkt
@@ -87,21 +101,23 @@ class RadarService:
         self.recorder.stop()
         self.source.stop()
 
-    def reload(self) -> None:
-        """Einstellungen von der NexBoard-Seite und Modulschalter übernehmen."""
-        reload()
+    def reload(self, language: str | None = None) -> None:
+        """Geänderte Einstellungen, Modulschalter und (falls angegeben) die Sprache übernehmen."""
+        if language:
+            self.language = language
+            use_language(language)
         self._apply_switches()
         self._prepare_speech()  # falls die Sprache gewechselt hat
 
     def _apply_switches(self) -> None:
-        self.board.enabled = self.settings["warn_an"] and WARNINGS in self.parts
+        self.board.enabled = self.settings.warnings.enabled and WARNINGS in self.parts
 
     def _prepare_speech(self) -> None:
         """Alle festen Ansagen vorab erzeugen, damit sie im Kampf sofort kommen."""
         rules = [*CAST_RULES.values(), *STATUS_RULES.values(), EVERYWHERE["groggy"], EVERYWHERE["hp"]]
         texts = {tr(title) for rule in rules for title in rule.all_titles()}
         texts |= {tr(rule.title) + tr(ON_YOU) for rule in rules if rule.on_you}
-        self.speech.prepare(texts | set(short_texts(self.settings["sprache"])))
+        self.speech.prepare(texts | set(short_texts(self.language)))
 
     def test_callout(self, key: str) -> None:
         """▶ einer Boss-Ansage auf der NexBoard-Seite."""
@@ -154,7 +170,7 @@ class RadarService:
             self._dungeon = dungeon
             if not dungeon:
                 self.stop_recording()
-            elif self.settings["aufnahme_auto"]:
+            elif self.settings.warnings.auto_record:
                 self.recorder.start(dungeon)  # Lernmodus: jeder Lauf eine eigene Datei
         if int(time.time()) != self._second:
             self._second = int(time.time())
@@ -162,7 +178,7 @@ class RadarService:
                 self.field_boss_calls.tick()
         if self._ping_due:
             self._ping_due = False
-            if self.settings["ton"] and CUBES in self.parts:
+            if self.settings.radar.sound and CUBES in self.parts:
                 self.speech.ping()
         self._read_minimap()
         self.callouts.tick()  # abgelaufene Phasen: „Wieder angreifen“
@@ -177,9 +193,9 @@ class RadarService:
                 self.speech.alarm()
 
     def _read_minimap(self) -> None:
-        """Blickrichtung aus der Minikarte (Einstellung minikarte = [x, y, Breite, Höhe]), fünfmal pro
+        """Blickrichtung aus der Minikarte (Einstellung minimap = [x, y, Breite, Höhe]), fünfmal pro
         Sekunde. Sie ersetzt die Laufrichtung aus zwei Positionen, die beim normalen Laufen fehlt."""
-        area = self.settings["minikarte"]
+        area = self.settings.radar.minimap
         if len(area) != 4 or time.time() - self._minimap_read < MINIMAP_S:
             return
         self._minimap_read = time.time()
@@ -214,12 +230,11 @@ class RadarService:
             "warnungen": [self._warning(w, now) for w in self.board.snapshot()[-SHOWN_WARNINGS:]],
             "vorschau": [[tr(text), rest] for text, rest in self.board.preview()],
             "jetzt_text": tr("JETZT"),
-            "karte": self.settings["karte_name"] or "",
+            "karte": self.settings.radar.map_name,
             "zone": world.zone,  # Zonen-ID = Karten-ID der Weltkarten, danach wählt das Widget das Kartenbild
-            "karte_offen": self.field_bosses.map_open and self.settings["bei_karte_ausblenden"],  # Overlay ausblenden
+            "karte_offen": self.field_bosses.map_open and self.settings.radar.hide_with_map,  # Overlay ausblenden
             "punkte": len(self.spawn_points.points),  # ändert sich die Zahl, lädt die Karte die Punkte neu
-            "einstellungen": {k: self.settings[k]
-                              for k in ("reichweite", "drehung", "spiegeln", "karte_folgen", "kurs_oben")},
+            "einstellungen": self.settings.radar.model_dump(include=WIDGET_SETTINGS),
         }
 
     @staticmethod
@@ -251,7 +266,7 @@ class RadarService:
         """Die eingestellte Karte (sonst die einzige vorhandene) mit Eichung, Fundorten, Teleportern und den
         gesehenen Spawnpunkten."""
         maps = GameMap.all()
-        name = self.settings["karte_name"] or (maps[0].name if len(maps) == 1 else "")
+        name = self.settings.radar.map_name or (maps[0].name if len(maps) == 1 else "")
         game_map = next((m for m in maps if m.name == name), None)
         if not game_map:
             return {"name": ""}
