@@ -1,6 +1,6 @@
-"""Effekte auf dem Boss aus dem Capture (für /api/radar/kampf). Welche laufen, rechnet das Capture
+"""Effekte auf dem Boss aus dem Mitschnitt (für /api/m/aion2.effects). Welche laufen, rechnet der Mitschnitt
 (capture/src/effects.rs, dort auch die Tests dazu); hier nur Zwischenspeicher und Fehlerfälle."""
-from deckbar_daemon.boss_effekte import LEER, BossEffekte
+from deckbar_daemon.effects import EMPTY, ActiveEffects
 
 ANTWORT = {"boss_effekte": [{"id": 16059101, "seit": 2.3}], "eigene_effekte": [{"id": 140900171, "seit": 1.3}]}
 
@@ -18,21 +18,21 @@ class FakeCapture:
 async def test_fragt_capture_hoechstens_alle_02_s():
     uhr = [1000.0]
     cap = FakeCapture()
-    effekte = BossEffekte(cap, uhr=lambda: uhr[0])
-    assert await effekte.aktuell() == ANTWORT
+    effekte = ActiveEffects(cap, clock=lambda: uhr[0])
+    assert await effekte.current() == ANTWORT
     uhr[0] += 0.1
-    await effekte.aktuell()
+    await effekte.current()
     assert cap.cmds == ["active_effects"]  # 0,1 s später: aus dem Zwischenspeicher
     uhr[0] += 0.2
-    await effekte.aktuell()
+    await effekte.current()
     assert cap.cmds == ["active_effects"] * 2
 
 
 async def test_capture_aus_oder_fehler_leer():
-    assert await BossEffekte(FakeCapture(running=False)).aktuell() == LEER
+    assert await ActiveEffects(FakeCapture(running=False)).current() == EMPTY
 
     class Kaputt(FakeCapture):
         async def request(self, cmd, timeout=5, **args):
             raise TimeoutError
 
-    assert await BossEffekte(Kaputt()).aktuell() == LEER
+    assert await ActiveEffects(Kaputt()).current() == EMPTY
