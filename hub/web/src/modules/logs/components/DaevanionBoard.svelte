@@ -155,7 +155,7 @@
 		opacity: 0.9;
 		outline: 2px solid var(--danger);
 		outline-offset: -2px;
-		border-radius: 10px;
+		border-radius: var(--radius);
 	}
 	.node img {
 		display: block;

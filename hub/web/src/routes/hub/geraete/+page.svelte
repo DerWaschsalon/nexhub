@@ -137,7 +137,7 @@
 		font: inherit;
 		font-size: 16px;
 		color: var(--text);
-		background: rgba(0, 0, 0, 0.3);
+		background: var(--shade);
 		border: 1px solid var(--edge);
 		border-radius: var(--radius-sm);
 		padding: 10px 12px;

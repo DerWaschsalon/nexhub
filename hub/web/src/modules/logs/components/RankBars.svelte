@@ -135,7 +135,7 @@
 		font-weight: 450;
 		color: var(--faint);
 	}
-	@media (max-width: 720px) {
+	@container page (max-width: 670px) {
 		.row {
 			grid-template-columns: 20px minmax(0, 1fr) 80px;
 			grid-template-areas: 'rank name value' 'bar bar bar';

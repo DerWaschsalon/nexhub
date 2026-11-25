@@ -217,7 +217,7 @@
 		min-width: 30px;
 		text-align: center;
 		padding: 2px 6px;
-		border-radius: 7px;
+		border-radius: var(--radius);
 		font-size: 12px;
 		font-weight: 650;
 		color: var(--faint);
@@ -228,7 +228,7 @@
 		background: var(--accent);
 		border-color: transparent;
 	}
-	@media (max-width: 900px) {
+	@container page (max-width: 600px) {
 		.detail-body {
 			padding-left: 0;
 		}

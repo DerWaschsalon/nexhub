@@ -196,12 +196,12 @@
 	.bar .notice {
 		padding: 6px 12px;
 	}
-	@media (max-width: 700px) {
+	@container page (max-width: 650px) {
 		.grid {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
-	@media (max-width: 600px) {
+	@container page (max-width: 550px) {
 		dl {
 			grid-template-columns: minmax(0, 1fr);
 		}

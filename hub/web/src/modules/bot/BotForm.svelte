@@ -78,7 +78,7 @@
 			animation: none;
 		}
 	}
-	@media (max-width: 700px) {
+	@container page (max-width: 650px) {
 		.grid {
 			grid-template-columns: minmax(0, 1fr);
 		}

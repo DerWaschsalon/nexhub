@@ -87,7 +87,7 @@
 	.track {
 		position: relative;
 		height: 22px;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		background: var(--fill);
 	}
 	.axis .track {
@@ -111,7 +111,7 @@
 		bottom: 3px;
 		width: 3px;
 		margin-left: -1px;
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		background: var(--lane-color, var(--accent));
 		box-shadow: 0 0 6px -1px var(--lane-color, var(--accent));
 	}
@@ -119,7 +119,7 @@
 		position: absolute;
 		top: 4px;
 		bottom: 4px;
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 		background: linear-gradient(90deg, var(--accent), var(--accent-2));
 	}
 	.value {
@@ -127,7 +127,7 @@
 		font-size: 13px;
 		font-weight: 600;
 	}
-	@media (max-width: 900px) {
+	@container page (max-width: 600px) {
 		.lane,
 		.with-value .lane {
 			grid-template-columns: 110px minmax(0, 1fr) auto;

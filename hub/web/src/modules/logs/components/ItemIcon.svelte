@@ -40,13 +40,13 @@
 		align-items: center;
 		justify-content: center;
 		border: 2px solid;
-		border-radius: 10px;
-		background: rgba(0, 0, 0, 0.32);
+		border-radius: var(--radius);
+		background: var(--shade);
 		flex-shrink: 0;
 	}
 	img {
 		object-fit: contain;
-		border-radius: 7px;
+		border-radius: var(--radius-sm);
 	}
 	.enchant,
 	.exceed {
@@ -55,8 +55,8 @@
 		font-weight: 700;
 		line-height: 1;
 		padding: 2px 4px;
-		border-radius: 6px;
-		background: rgba(0, 0, 0, 0.75);
+		border-radius: var(--radius);
+		background: var(--shade-heavy);
 	}
 	.enchant {
 		right: 1px;
@@ -70,7 +70,7 @@
 	/* Platz im Ausrüstungsfenster: eckig, Seltenheit als Verlauf, Zahlen ohne Kasten */
 	.filled {
 		border-width: 1.5px;
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		background: radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--grade) 62%, var(--black)),
 			color-mix(in srgb, var(--grade) 28%, var(--black)));
 	}

@@ -169,7 +169,7 @@
 		width: 18px;
 		height: 18px;
 		border-color: transparent;
-		background: radial-gradient(circle at 35% 30%, #c5efff, var(--accent) 60%);
+		background: radial-gradient(circle at 35% 30%, var(--game-cyan-pale), var(--accent) 60%);
 		box-shadow: 0 0 12px -2px color-mix(in srgb, var(--accent) 70%, transparent);
 	}
 	.cell:disabled {

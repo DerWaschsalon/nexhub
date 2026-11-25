@@ -39,6 +39,6 @@
 		overscroll-behavior: contain;
 	}
 	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.45);
+		background: var(--shade);
 	}
 </style>

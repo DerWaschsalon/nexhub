@@ -26,7 +26,7 @@
 <style>
 	.icon {
 		flex-shrink: 0;
-		border-radius: 7px;
+		border-radius: var(--radius);
 		border: 1px solid var(--edge-soft);
 		background: var(--shade);
 	}

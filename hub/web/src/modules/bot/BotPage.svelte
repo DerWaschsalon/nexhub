@@ -288,7 +288,7 @@
 		overflow: hidden;
 		clip: rect(0 0 0 0);
 	}
-	@media (max-width: 600px) {
+	@container page (max-width: 550px) {
 		dl {
 			grid-template-columns: minmax(0, 1fr);
 			gap: 2px 0;

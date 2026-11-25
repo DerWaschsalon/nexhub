@@ -23,7 +23,7 @@
 		gap: 4px;
 		margin: 0;
 	}
-	@media (max-width: 560px) {
+	@container page (max-width: 510px) {
 		dl {
 			grid-template-columns: 1fr;
 		}

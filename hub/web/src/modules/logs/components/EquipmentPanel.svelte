@@ -86,10 +86,10 @@
 		place-items: center;
 		width: 64px;
 		height: 64px;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		background: var(--fill);
 		border: 1px solid var(--fill);
-		color: rgba(255, 255, 255, 0.25);
+		color: color-mix(in srgb, var(--white) 25%, transparent);
 		font-size: 11px;
 	}
 </style>
