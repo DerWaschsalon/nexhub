@@ -9,7 +9,7 @@ from sqlalchemy import and_, delete, func, select, text
 
 from ..db import aware
 from ..deps import DB, AdminUser, SettingsDep, require_admin
-from ..models import BisSample, Character, ClassCensus, Device, Run, Session, User
+from ..models import BisSample, Character, ClassCensus, Device, Role, Run, Session, User
 from ..stats import last_days, per_day
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
@@ -20,7 +20,7 @@ class AccountOut(BaseModel):
     discord_id: str
     name: str
     avatar_url: str | None
-    role: str
+    role: Role
     created_at: datetime
     last_login_at: datetime
     blocked: bool

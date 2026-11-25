@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..deps import CurrentUser
+from ..models import Role
 
 router = APIRouter(prefix="/api/me", tags=["konto"])
 
@@ -14,7 +15,7 @@ class Me(BaseModel):
     discord_id: str
     name: str
     avatar_url: str | None
-    role: str
+    role: Role
 
 
 @router.get("")

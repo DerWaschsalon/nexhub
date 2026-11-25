@@ -21,7 +21,7 @@ from sqlalchemy import select
 
 from ..characters import has_item_ids
 from ..deps import DB, CurrentUser
-from ..models import Character, RunCharacter
+from ..models import Character, CharacterStatus, RunCharacter
 from .runs import _get, _may_manage
 
 router = APIRouter(prefix="/api/runs", tags=["characters"])
@@ -36,7 +36,7 @@ class CharacterOut(BaseModel):
     name: str
     cls: str | None
     server_id: int
-    status: str
+    status: CharacterStatus
     combat_power: int | None
     item_level: int | None
     fetched_at: datetime | None
@@ -75,12 +75,13 @@ async def get_character(run_id: int, char_id: int, user: CurrentUser, db: DB) ->
     return CharacterDetail(**_out(row), armory_id=armory_id, data=row.data, error=row.error)
 
 
-class Started(BaseModel):
+class RefreshStarted(BaseModel):
     started: int
 
 
 @router.post("/{run_id}/characters/refresh", status_code=202)
-async def refresh(run_id: int, request: Request, user: CurrentUser, db: DB, background: BackgroundTasks) -> Started:
+async def refresh(run_id: int, request: Request, user: CurrentUser, db: DB,
+                  background: BackgroundTasks) -> RefreshStarted:
     run, _ = await _get(db, run_id)
     if not _may_manage(run, user):
         raise HTTPException(403, "Nur wer hochgeladen hat, oder ein Admin")
@@ -96,12 +97,12 @@ async def refresh(run_id: int, request: Request, user: CurrentUser, db: DB, back
         row.status, row.error = "offen", None
     await db.commit()
     background.add_task(fetcher.run, run_id)
-    return Started(started=len(rows))
+    return RefreshStarted(started=len(rows))
 
 
 @router.post("/{run_id}/characters/{char_id}/details", status_code=202)
 async def load_details(run_id: int, char_id: int, request: Request, user: CurrentUser, db: DB,
-                       background: BackgroundTasks) -> Started:
+                       background: BackgroundTasks) -> RefreshStarted:
     fetcher = request.app.state.characters
     if fetcher is None:
         raise HTTPException(503, "Charakterprofile sind ausgeschaltet")
@@ -118,4 +119,4 @@ async def load_details(run_id: int, char_id: int, request: Request, user: Curren
     row.data = {**row.data, "details": {"state": "laden"}}
     await db.commit()
     background.add_task(fetcher.details, row.id)
-    return Started(started=1)
+    return RefreshStarted(started=1)

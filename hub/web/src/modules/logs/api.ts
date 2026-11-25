@@ -1,5 +1,7 @@
 // Antworten der Hub-API für Runs (hub/api/nexhub_api/routes/runs.py und public.py).
 
+import type * as Api from '#lib/api-types.ts';
+
 /** Obergrenze von GET /api/runs (routes/runs.py) */
 export const RUN_LIMIT = 500;
 
@@ -17,31 +19,15 @@ export type Boss = {
 
 export type Summary = { fight_ms: number; players: Player[]; bosses: Boss[] };
 
-export type RunListItem = {
-	id: number;
-	dungeon: string;
-	difficulty: string | null;
-	start_ms: number;
-	end_ms: number;
-	complete: boolean;
-	bosses_total: number;
-	bosses_killed: number;
-	fights: number;
-	hits: number;
-	character: string | null;
-	uploader: string;
-	created_at: string;
-	/** Namen aus der Zusammenfassung, für Suche und Filter (modules/logs/filter.ts) */
-	players: string[];
-	bosses: string[];
-};
+/** Run in der Liste; players und bosses sind die Namen aus der Zusammenfassung, für Suche und Filter */
+export type RunListItem = Api.RunOut;
 
 /** Was jede Run-Ansicht braucht – im Hub und auf einer geteilten Seite. */
 export type Run = Omit<RunListItem, 'id' | 'uploader' | 'created_at' | 'players' | 'bosses'> &
 	Partial<Pick<RunListItem, 'uploader'>> & { summary: Summary };
 
 /** Run im Hub (mit Login): dazu Teilen und Löschen. */
-export type RunDetail = RunListItem & Run & { size: number; can_delete: boolean; share_url: string | null };
+export type RunDetail = Omit<Api.RunDetail, 'summary'> & { summary: Summary };
 
 export type FightSkill = {
 	code: number | null;
@@ -95,20 +81,10 @@ export type Fight = {
 
 // Charakterprofile (hub/api/nexhub_api/routes/characters.py, Format aus aion2.py)
 
-export type CharacterStatus = 'offen' | 'ok' | 'nicht_gefunden' | 'name_maskiert' | 'fehler';
+export type CharacterStatus = Api.CharacterOut['status'];
 
-export type CharacterListItem = {
-	id: number;
-	name: string;
-	cls: string | null;
-	server_id: number;
-	status: CharacterStatus;
-	combat_power: number | null;
-	item_level: number | null;
-	fetched_at: string | null;
-	/** derselbe Charakter in der Armory (nur in der Spielerliste eines Runs) */
-	armory_id?: number | null;
-};
+/** armory_id: derselbe Charakter in der Armory (nur in der Spielerliste eines Runs gesetzt) */
+export type CharacterListItem = Api.CharacterOut;
 
 export type CharacterItem = {
 	/** Gegenstands-ID (ab Format 2), nötig zum Nachladen der Werte */
@@ -212,4 +188,4 @@ export function localized(data: CharacterSnapshot, lang: string): CharacterData 
 	return (lang === 'de' ? data.de : data.en) ?? data.en ?? (data.de as CharacterData);
 }
 
-export type CharacterDetail = CharacterListItem & { data: CharacterSnapshot | null; error: string | null };
+export type CharacterDetail = Omit<Api.CharacterDetail, 'data'> & { data: CharacterSnapshot | null };

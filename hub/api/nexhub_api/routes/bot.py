@@ -25,7 +25,8 @@ PATH = re.compile(r"[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*")
 MAX_BODY = 256 * 1024
 
 
-@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+# Nicht im Schema: Die Antworten legt der Bot fest, und eine Funktion für vier Methoden gäbe doppelte Kennungen
+@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"], include_in_schema=False)
 async def forward(path: str, request: Request, admin: AdminUser, settings: SettingsDep) -> Response:
     if not settings.bot_configured:
         raise HTTPException(503, "Bot ist nicht mit dem Hub verbunden (BOT_CONTROL_URL/BOT_CONTROL_KEY fehlen)")
