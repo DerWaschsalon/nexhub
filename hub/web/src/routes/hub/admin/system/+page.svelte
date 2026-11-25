@@ -7,6 +7,8 @@
 	const s = $derived(data.status);
 </script>
 
+<svelte:head><title>{t('system.title')} · NexHub</title></svelte:head>
+
 <header class="page-head">
 	<h1>{t('system.title')}</h1>
 	<p>{t('system.intro')} <code>/srv/nexhub/.env</code></p>

@@ -34,6 +34,8 @@
 	const show = (values: string[], current: string) => values.length > 1 || current !== '';
 </script>
 
+<svelte:head><title>{t('logs.list.title')} · NexHub</title></svelte:head>
+
 <header class="page-head">
 	<h1>{t('logs.list.title')}</h1>
 	<p>{t('logs.list.intro')}</p>

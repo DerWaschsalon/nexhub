@@ -8,6 +8,8 @@
 	const s = $derived(data.status!);
 </script>
 
+<svelte:head><title>Bot · NexHub</title></svelte:head>
+
 <section class="glass pad hero">
 	{#if s.avatar_url}<img src={s.avatar_url} alt="" width="56" height="56" />{/if}
 	<div>

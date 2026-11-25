@@ -27,6 +27,8 @@
 	}
 </script>
 
+<svelte:head><title>{t('accounts.title')} · NexHub</title></svelte:head>
+
 <header class="page-head">
 	<h1>{t('accounts.title')}</h1>
 	<p>{t('accounts.intro')}</p>

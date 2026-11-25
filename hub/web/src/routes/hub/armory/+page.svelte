@@ -41,6 +41,8 @@
 	}
 </script>
 
+<svelte:head><title>{t('armory.title')} · NexHub</title></svelte:head>
+
 <header class="page-head">
 	<h1>{t('armory.title')}</h1>
 	<p>{t('armory.intro')}</p>
