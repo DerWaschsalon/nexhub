@@ -54,7 +54,7 @@
 		font-family: var(--font-heading);
 		font-size: 20px;
 		font-weight: 400;
-		color: #fff;
+		color: var(--white);
 	}
 	.body {
 		padding: 0 12px 12px;

@@ -30,7 +30,7 @@
 	h4 {
 		font-size: 15px;
 		margin: 0 0 10px;
-		color: #fff;
+		color: var(--white);
 	}
 	.row {
 		display: flex;
@@ -53,7 +53,7 @@
 		cursor: pointer;
 	}
 	.arcana strong {
-		color: #fff;
+		color: var(--white);
 	}
 	.arcana small {
 		font-size: 12px;

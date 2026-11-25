@@ -104,6 +104,6 @@
 	.underline > .active {
 		color: var(--text);
 		background: none;
-		border-bottom-color: var(--game-line, #c9dcf5);
+		border-bottom-color: var(--game-line);
 	}
 </style>

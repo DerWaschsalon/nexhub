@@ -5,7 +5,7 @@
 	let { letter, score, small = false }: { letter: string; score?: number; small?: boolean } = $props();
 </script>
 
-<span class="badge" class:small style:--c={LETTER_COLOR[letter] ?? '#9aa0a6'}>
+<span class="badge" class:small style:--c={LETTER_COLOR[letter] ?? LETTER_COLOR.C}>
 	<b>{letter}</b>{#if score !== undefined && !small}<small>{Math.round(score)}</small>{/if}
 </span>
 

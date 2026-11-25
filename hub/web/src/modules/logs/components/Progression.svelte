@@ -97,7 +97,7 @@
 	h4 {
 		font-size: 15px;
 		margin: 0 0 10px;
-		color: #fff;
+		color: var(--white);
 	}
 	.row {
 		display: flex;
@@ -214,7 +214,7 @@
 		z-index: 1;
 		border: 0;
 		background: none;
-		color: #fff;
+		color: var(--white);
 		font-size: 30px;
 		line-height: 1;
 		cursor: pointer;

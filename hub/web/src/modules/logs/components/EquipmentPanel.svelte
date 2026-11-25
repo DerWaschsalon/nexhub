@@ -73,7 +73,7 @@
 	button.lit,
 	button:focus-visible {
 		filter: brightness(1.2);
-		outline: 1px solid #fff;
+		outline: 1px solid var(--white);
 	}
 	.note {
 		position: absolute;

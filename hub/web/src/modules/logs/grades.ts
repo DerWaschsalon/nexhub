@@ -9,6 +9,9 @@ const GRADES: Record<string, string> = {
   Special: "#38d39f",
 };
 
+/** Farbe für Gegenstände ohne bekannte Stufe */
+export const NO_GRADE = GRADES.Common;
+
 export const gradeColor = (
   grade: string | null | undefined,
   fallback = "var(--edge)",

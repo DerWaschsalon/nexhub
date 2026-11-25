@@ -71,8 +71,8 @@
 	.filled {
 		border-width: 1.5px;
 		border-radius: 2px;
-		background: radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--grade) 62%, #000),
-			color-mix(in srgb, var(--grade) 28%, #000));
+		background: radial-gradient(circle at 40% 30%, color-mix(in srgb, var(--grade) 62%, var(--black)),
+			color-mix(in srgb, var(--grade) 28%, var(--black)));
 	}
 	.filled img {
 		border-radius: 0;
@@ -83,8 +83,8 @@
 		padding: 0;
 		background: none;
 		font-size: 15px;
-		color: #fff;
-		text-shadow: 0 1px 3px #000, 0 0 2px #000;
+		color: var(--white);
+		text-shadow: 0 1px 3px var(--black), 0 0 2px var(--black);
 	}
 	.filled .exceed {
 		top: auto;
@@ -96,8 +96,8 @@
 		height: 20px;
 		padding: 0;
 		border-radius: 50%;
-		background: #2ec4c9;
-		color: #fff;
+		background: var(--game-teal);
+		color: var(--white);
 		font-size: 12px;
 	}
 </style>

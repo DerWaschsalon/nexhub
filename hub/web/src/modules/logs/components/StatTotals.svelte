@@ -42,6 +42,6 @@
 	dd {
 		margin: 0;
 		font-weight: 700;
-		color: #fff;
+		color: var(--white);
 	}
 </style>

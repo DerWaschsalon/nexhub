@@ -224,7 +224,7 @@
 		border: 1px solid var(--edge-soft);
 	}
 	.slots span.on {
-		color: #071019;
+		color: var(--on-accent);
 		background: var(--accent);
 		border-color: transparent;
 	}

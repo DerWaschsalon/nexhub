@@ -8,7 +8,7 @@
 	import type { Snippet } from 'svelte';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { CharacterItem } from '../api.ts';
-	import { gradeColor } from '../grades.ts';
+	import { gradeColor, NO_GRADE } from '../grades.ts';
 	import type { RatedLine, Rating } from '../rating.ts';
 	import RatingBadge from './RatingBadge.svelte';
 	import UpgradeSteps from './UpgradeSteps.svelte';
@@ -60,7 +60,7 @@
 	<span class="share" title={t('logs.rating.shareHint')}><i style:width="{share * 100}%"></i>{Math.round(share * 100)}%</span>
 {/snippet}
 
-<div class="frame" style:--grade={gradeColor(item.grade, '#9aa0a6')}>
+<div class="frame" style:--grade={gradeColor(item.grade, NO_GRADE)}>
 	<article>
 		<header class="hero">
 			<div class="heading">
@@ -119,7 +119,7 @@
 			{#if d.stones.length}
 				<ul class="block stones">
 					{#each d.stones as s, i (i)}
-						<li style:--stone={gradeColor(s.grade, '#d8dde6')}>
+						<li style:--stone={gradeColor(s.grade, 'var(--game-plain)')}>
 							{#if s.icon}<img src={s.icon} alt="" width="30" height="30" loading="lazy" referrerpolicy="no-referrer" onerror={hide} />{/if}
 							<span>{s.name}{s.value}</span>{@render ratedTail(rated('stone', s.name))}
 						</li>
@@ -192,7 +192,7 @@
 		background: var(--surface-3);
 		border: 1px solid var(--fill-strong);
 		box-shadow: 0 16px 50px var(--shade-strong);
-		color: #e8ecf2;
+		color: var(--text);
 	}
 	article {
 		flex: 1;
@@ -212,7 +212,7 @@
 		height: 56px;
 		border: 0;
 		background: none;
-		color: #fff;
+		color: var(--white);
 		font-size: 34px;
 		line-height: 1;
 		cursor: pointer;
@@ -225,8 +225,8 @@
 		padding: 16px 18px;
 		overflow: hidden;
 		background:
-			linear-gradient(170deg, transparent 72%, color-mix(in srgb, var(--grade) 70%, #fff) 72.5%, transparent 80%),
-			linear-gradient(120deg, color-mix(in srgb, var(--grade) 55%, #000), color-mix(in srgb, var(--grade) 30%, #000) 70%);
+			linear-gradient(170deg, transparent 72%, color-mix(in srgb, var(--grade) 70%, var(--white)) 72.5%, transparent 80%),
+			linear-gradient(120deg, color-mix(in srgb, var(--grade) 55%, var(--black)), color-mix(in srgb, var(--grade) 30%, var(--black)) 70%);
 		border-bottom: 3px solid var(--grade);
 	}
 	.heading {
@@ -240,20 +240,20 @@
 		font-family: var(--font-heading);
 		font-size: 23px;
 		font-weight: 400;
-		color: color-mix(in srgb, var(--grade) 45%, #fff);
+		color: color-mix(in srgb, var(--grade) 45%, var(--white));
 	}
 	.kind {
 		margin: 0 0 4px;
-		color: color-mix(in srgb, var(--grade) 45%, #fff);
+		color: color-mix(in srgb, var(--grade) 45%, var(--white));
 	}
 	.heading span {
-		color: #fff;
+		color: var(--white);
 	}
 	.heading strong {
 		font-family: var(--font-heading);
 		font-size: 23px;
 		font-weight: 400;
-		color: #fff;
+		color: var(--white);
 	}
 	.hero img {
 		width: 120px;
@@ -280,7 +280,7 @@
 		font-weight: 700;
 	}
 	.amplify {
-		color: #f0a030;
+		color: var(--game-amplify);
 	}
 	.rate {
 		display: flex;
@@ -380,7 +380,7 @@
 	.set .set-head {
 		justify-content: space-between;
 		margin-bottom: 8px;
-		color: #fff;
+		color: var(--white);
 	}
 	.set-head span {
 		color: var(--dim);
