@@ -176,7 +176,8 @@ def test_parse_im_run(as_user, database_url):
     run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 250)])))
     body = member.get(f"/api/parses/runs/{run_id}").json()
     p = body["fights"]["f1"]["A"]
-    assert (p["eu"], p["eu_n"]) == (50, 4) and p["eu_at"]
+    assert (p["eu"], p["eu_n"]) == (50, 4)
+    assert p["eu_at"].endswith(("Z", "+00:00"))  # mit Zeitzone, sonst liest der Browser Ortszeit
     assert body["guild_min"] == 10
 
 

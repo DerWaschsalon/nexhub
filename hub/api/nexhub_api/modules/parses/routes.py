@@ -10,7 +10,7 @@ Nur getötete Bosse. Je Kampf (`fight`) und Spielername:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
@@ -40,6 +40,11 @@ class RunParses(BaseModel):
     fights: dict[str, dict[str, Parse]]
 
 
+def _utc(at: datetime) -> datetime:
+    """SQLite gibt Zeitpunkte ohne Zone zurück; gespeichert sind sie in UTC."""
+    return at if at.tzinfo else at.replace(tzinfo=UTC)
+
+
 async def _parses(db: DB, run: Run) -> RunParses:
     killed = [b for b in run.summary.get("bosses", []) if b.get("killed")]
     mobs = {b["mob"] for b in killed}
@@ -58,7 +63,7 @@ async def _parses(db: DB, run: Run) -> RunParses:
             mates = guild.get((b["mob"], p.get("cls")), [])
             out[name] = Parse(eu=percentile(p["dps"], board.dps) if board else None,
                               eu_n=len(board.dps) if board else None,
-                              eu_at=board.fetched_at if board else None,
+                              eu_at=_utc(board.fetched_at) if board else None,
                               guild=percentile(p["dps"], mates) if len(mates) >= GUILD_MIN else None,
                               guild_n=len(mates))
     return RunParses(guild_min=GUILD_MIN, fights=fights)

@@ -2,9 +2,10 @@
      Warnung, wenn das Radar im NexBoard lief). -->
 <script lang="ts">
 	import Tabs from '#lib/components/Tabs.svelte';
+	import type { Snippet } from 'svelte';
 	import { formatDuration } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
-	import { playerId, type Fight } from '../api.ts';
+	import { playerId, type Fight, type Player } from '../api.ts';
 	import { skillName } from '../names.svelte.ts';
 	import BuffTimeline from './BuffTimeline.svelte';
 	import DpsChart from './DpsChart.svelte';
@@ -13,7 +14,8 @@
 	import SkillTable from './SkillTable.svelte';
 	import SkillTimeline from './SkillTimeline.svelte';
 
-	let { fight }: { fight: Fight } = $props();
+	/** badge: Zusatz je Spieler in der Rangliste, von der Seite mitgegeben (z. B. der Parse) */
+	let { fight, badge }: { fight: Fight; badge?: Snippet<[Player]> } = $props();
 
 	type Tab = 'damage' | 'skills' | 'timeline' | 'deaths';
 	const TABS: Tab[] = ['damage', 'skills', 'timeline', 'deaths'];
@@ -49,7 +51,7 @@
 	<section class="glass pad">
 		<h2>{t('logs.rank.title')}</h2>
 		<p class="dim hint">{t('logs.rank.hint')}</p>
-		<RankBars players={fight.players} selected={player} onSelect={(n) => (player = player === n ? null : n)} />
+		<RankBars players={fight.players} selected={player} onSelect={(n) => (player = player === n ? null : n)} {badge} />
 	</section>
 {:else if tab === 'skills' && selected}
 	<section class="glass pad">
