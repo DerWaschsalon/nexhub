@@ -2,6 +2,7 @@
 RadarService (ein Mitschnitt, eine Welt); er läuft, solange eines von ihnen an ist."""
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar
 
 from aiohttp import web
@@ -10,7 +11,6 @@ from nexcore.errors import ApiError
 from pydantic import BaseModel
 
 from ..aion2.service import CUBES, FIELD_BOSSES, WARNINGS
-from ..boss_effekte import BossEffekte
 from ..core.http import ok, read_object
 from ..core.live import LiveHub
 from ..overlay_layout import WidgetSpec
@@ -108,16 +108,17 @@ class WarningsModule(RadarPart):
                    "Warnungen"),
     )
 
-    def __init__(self, ctx: Context, live: LiveHub, radar: Radar, boss_effects: BossEffekte) -> None:
+    def __init__(self, ctx: Context, live: LiveHub, radar: Radar,
+                 effects: Callable[[], Awaitable[dict[str, Any]]]) -> None:
         super().__init__(ctx, live, radar)
-        self.boss_effects = boss_effects
+        self.effects = effects  # Übergang: die Route nannte bisher auch die Effekte (jetzt /api/m/aion2.effects)
 
     def routes(self, router: web.UrlDispatcher) -> None:
         router.add_get("/api/radar/kampf", self.api_fight)
 
     async def api_fight(self, request: web.Request) -> web.Response:
-        """Für andere Programme auf diesem PC: Boss groggy, laufende Warnungen, Effekte auf Boss und dir."""
-        return web.json_response({**self.radar.fight_state(), **await self.boss_effects.aktuell()})
+        """Für andere Programme auf diesem PC: Boss groggy und laufende Warnungen."""
+        return web.json_response({**self.radar.fight_state(), **await self.effects()})
 
 
 class FieldBossModule(RadarPart):

@@ -20,7 +20,6 @@ from nexcore.settings import MASK, SettingsStore, is_mask
 
 from . import __version__
 from .a2ui import A2Ui
-from .boss_effekte import BossEffekte
 from .capture_process import history_root
 from .config import Settings, is_default_config, save_settings
 from .core.http import api_errors, local_only, ok, read_object
@@ -28,6 +27,7 @@ from .core.live import LiveHub
 from .core.topics import LANGUAGE
 from .dps import SETTINGS_FILE as dps_settings_file
 from .dps import DpsFeed
+from .effects import ActiveEffects
 from .feed_buffer import FeedBuffer
 from .game_process import aion2_running
 from .hub import Hub, loot_drop
@@ -35,6 +35,7 @@ from .modules import CATEGORIES
 from .modules.base import WebModule
 from .modules.deck import DeckModule
 from .modules.dps import DpsModule
+from .modules.effects import EffectsModule
 from .modules.hub import HubModule
 from .modules.overlay import OverlayModule
 from .modules.plugins import PluginsModule
@@ -78,6 +79,7 @@ class NexBoard:
         self.bar = DeckModule(ctx, self.live, lambda: self.settings, self.state, config_dir, WEB_DIR,
                               mdns and settings.mdns)
         self.radar_module = RadarModule(ctx, self.live, self.radar)
+        effects = EffectsModule(ctx, self.live, ActiveEffects(self.dps.capture))
         poe1 = PoeClientModule(ctx, self.live, config_dir)
         updates = UpdatesModule(ctx, self.live, Updates(state_path=config_dir / "updates-state.json"), self.state,
                                 lambda: [d.fw for d in self.bar.devices.devices])
@@ -91,8 +93,9 @@ class NexBoard:
             RunsModule(ctx, self.live, self.runs, self.state, self.webhook),
             ScheduleModule(ctx, self.live, Schedule(config_dir, lambda: self.settings.language)),
             self.radar_module,
-            WarningsModule(ctx, self.live, self.radar, BossEffekte(self.dps.capture)),
+            WarningsModule(ctx, self.live, self.radar, effects.current),
             FieldBossModule(ctx, self.live, self.radar),
+            effects,
             poe1,
             PoeLevelingModule(ctx, self.live, self.state, poe1.session, config_dir),
             HubModule(ctx, self.live, self.hub),

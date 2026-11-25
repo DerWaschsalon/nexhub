@@ -23,7 +23,7 @@ export const BRAND = "NexBoard";
 // Kampfdaten, Plugins)
 const UI = {
   "aion2.overlay": overlay, "aion2.warnings": warnings, "aion2.radar": radar, "aion2.field_bosses": fieldBosses,
-  "aion2.schedule": schedule, "aion2.dps": dps, "aion2.plugins": plugins,
+  "aion2.schedule": schedule, "aion2.dps": dps, "aion2.effects": { pages: [], home: "aion2.dps" }, "aion2.plugins": plugins,
   "poe1.leveling": poe1Leveling, "poe1.client": poe1Client, deck, "aion2.runs": runs, hub, updates,
 };
 // Seiten-ID → { page, mid }; die erste Seite eines Moduls trägt meist seine ID

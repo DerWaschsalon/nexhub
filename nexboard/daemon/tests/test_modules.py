@@ -21,8 +21,8 @@ def test_dependency_graph(tmp_path):
     assert m.requirements("aion2.radar") == m.requirements("aion2.warnings") == set()
     assert m.requirements("aion2.plugins") == {"aion2.overlay", "aion2.dps"}
     assert m.order == ["deck", "aion2.dps", "aion2.overlay", "aion2.plugins", "aion2.runs", "aion2.schedule",
-                       "aion2.radar", "aion2.warnings", "aion2.field_bosses", "poe1.client", "poe1.leveling", "hub",
-                       "updates"]
+                       "aion2.radar", "aion2.warnings", "aion2.field_bosses", "aion2.effects", "poe1.client",
+                       "poe1.leveling", "hub", "updates"]
     assert m.requirements("poe1.leveling") == {"poe1.client"}
     for mid, info in m.infos.items():
         assert all(r in m.infos for r in info.requires), mid
@@ -117,3 +117,31 @@ async def test_api_plugins_nur_verwalten(client):
     assert r.status == 400
     r = await client.get("/api/plugins/texts")
     assert r.status == 200 and "permStorage" in await r.json()
+
+
+async def test_api_effekte_nur_bei_eingeschaltetem_modul(client):
+    """Effekte auf Boss und dir: eigene Route; die Kampf-Route des Radars nennt sie übergangsweise weiter."""
+    answer = {"boss_effekte": [{"id": 16059101, "seit": 2.3}], "eigene_effekte": []}
+
+    class Capture:
+        running = True
+
+        async def request(self, cmd: str, timeout: float = 5, **args):
+            return answer
+    module = client.deck.modules.modules["aion2.effects"]
+    module.effects.capture = Capture()
+    assert await (await client.get("/api/m/aion2.effects")).json() == {"boss_effekte": [], "eigene_effekte": None}
+    r = await client.put("/api/modules/aion2.effects", json={"enabled": True})
+    assert (await r.json())["changed"] == ["aion2.dps", "aion2.effects"]  # braucht die Kampfdaten
+    await module.activate()  # der Daemon des Tests läuft nicht, Module starten deshalb nicht von selbst
+    assert await (await client.get("/api/m/aion2.effects")).json() == answer
+    fight = await (await client.get("/api/radar/kampf")).json()
+    assert fight == {"groggy": False, "warnungen": [], **answer}
+
+
+def test_effekte_erben_den_schalter_der_warnungen(tmp_path):
+    known = "[deck, aion2.dps, aion2.overlay, aion2.plugins, aion2.warnings]"
+    (tmp_path / "modules.yaml").write_text(f"enabled: [aion2.dps, aion2.warnings]\nknown: {known}\n")
+    assert "aion2.effects" in board(tmp_path).modules.enabled
+    (tmp_path / "modules.yaml").write_text(f"enabled: [aion2.warnings]\nknown: {known}\n")
+    assert "aion2.effects" not in board(tmp_path).modules.enabled  # ohne Kampfdaten gäbe es nichts zu melden
