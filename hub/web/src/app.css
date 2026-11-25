@@ -1,11 +1,9 @@
 /*
- * NexHub-Design: dunkle, ruhige Flächen mit engem Radius.
- * Farben und Maße stehen als Variablen oben; Bausteine (.glass, .btn, .chip, .table) darunter.
- * Nach den Design-Regeln gibt es je Seite höchstens einen großen Effekt; die Bausteine selbst bleiben
- * ohne Unschärfe, Verlauf und Leuchten. .glass heißt aus Gewohnheit so und ist die normale Karte.
- * Seiten benutzen diese Klassen und bringen nur noch ihr eigenes Layout mit.
- * Schriften wie in den Design-Regeln vom 11.11.2026 („Ban the AI Look“): Unbounded für Überschriften,
- * IBM Plex für Text, lokal eingebunden (Fontsource), keine Anfrage an fremde Server.
+ * NexHub-Design. Farben, Flächen, Radien, Schriften, die Glaskarte (.glass), Hintergrund und Fokus kommen aus
+ * tokens.css (erzeugt aus proto/nexproto/design.py, gleich in der NexBoard). Hier stehen die Farben aus dem
+ * Spiel und die Bausteine des Hubs (.btn, .chip, .table, .tabs, .panel). Seiten benutzen diese Klassen und
+ * bringen nur ihr eigenes Layout mit. Je Seite höchstens ein großer Effekt.
+ * Schriften lokal eingebunden (Fontsource), keine Anfrage an fremde Server.
  */
 @import '@fontsource-variable/unbounded';
 @import '@fontsource/ibm-plex-sans/400.css';
@@ -13,30 +11,9 @@
 @import '@fontsource/ibm-plex-sans/600.css';
 @import '@fontsource/ibm-plex-sans/700.css';
 @import '@fontsource/ibm-plex-mono/500.css';
+@import './tokens.css';
 
 :root {
-	--bg: #05060d;
-	--text: #f4f5fa;
-	--dim: rgba(244, 245, 250, 0.64);
-	--faint: rgba(244, 245, 250, 0.4);
-	--accent: #6ad3ff;
-	--accent-2: #a78bfa;
-	--ok: #4ade80;
-	--warn: #fbbf24;
-	--danger: #ff6b6b;
-	--edge: rgba(255, 255, 255, 0.14);
-	--edge-soft: rgba(255, 255, 255, 0.08);
-	/* Flächen: Karte, Fläche in der Karte (.panel, Eingaben), gewählt/gehovert */
-	--surface: #0a0c17;
-	--surface-2: #141829;
-	--surface-3: #1b2036;
-	--on-accent: #03131b;
-	/* helle Schleier auf Flächen (Zeile, Hover) und dunkle Abdeckung (Bild, Schatten) */
-	--fill: rgba(255, 255, 255, 0.05);
-	--fill-strong: rgba(255, 255, 255, 0.1);
-	--shade: rgba(0, 0, 0, 0.35);
-	--shade-strong: rgba(0, 0, 0, 0.6);
-	--shade-heavy: rgba(0, 0, 0, 0.78);
 	/* Farben aus dem Spiel: Zusatzwert, Gold/Verstärkung, Bonus */
 	--game-cyan: #3fd6e8;
 	--game-gold: #f2c522;
@@ -49,18 +26,8 @@
 	--game-amplify: #f0a030;
 	--game-line: #c9dcf5;
 	--game-board: #111315;
-	/* reines Weiß und Schwarz: hervorgehobener Text, Aufhellen und Abdunkeln in color-mix */
-	--white: #fff;
-	--black: #000;
-	--radius: 6px;
-	--radius-sm: 4px;
-	--radius-xs: 2px;
-	--font-heading: 'Unbounded Variable', system-ui, sans-serif;
-	--font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 	/* Inhaltsbreite des Hubs: auf breiten Bildschirmen die Mitte, nicht der ganze Monitor */
 	--page-width: 1680px;
-	color-scheme: dark;
 }
 
 * {
@@ -78,7 +45,7 @@ main {
 }
 html {
 	/* vererbt sich auf alle Scrollbereiche */
-	scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+	scrollbar-color: color-mix(in srgb, var(--white) 25%, transparent) transparent;
 }
 body {
 	background: var(--bg);
@@ -98,29 +65,10 @@ h3 {
 a {
 	color: var(--accent);
 }
-:focus-visible {
-	outline: 2px solid var(--accent);
-	outline-offset: 2px;
-}
 .dim {
 	color: var(--dim);
 }
 
-/* Hintergrund: ein ruhiger Schein von unten, keine Bewegung */
-.backdrop {
-	position: fixed;
-	inset: 0;
-	z-index: -1;
-	background: radial-gradient(1200px 800px at 50% 120%, #0c1030, transparent 70%), var(--bg);
-}
-
-/* Karte: deckende Fläche mit feiner Kante */
-.glass {
-	position: relative;
-	background: var(--surface);
-	border: 1px solid var(--edge-soft);
-	border-radius: var(--radius);
-}
 .pad {
 	padding: 24px;
 }
@@ -172,8 +120,8 @@ a {
 }
 .btn.danger {
 	color: #ffd4d4;
-	border-color: rgba(255, 107, 107, 0.35);
-	background: rgba(255, 107, 107, 0.12);
+	border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+	background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 .btn.small {
 	padding: 5px 12px;
@@ -191,38 +139,38 @@ a {
 	font-weight: 600;
 	padding: 2px 8px;
 	border-radius: var(--radius-sm);
-	background: rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--white) 8%, transparent);
 	border: 1px solid var(--edge-soft);
 	color: var(--dim);
 	white-space: nowrap;
 }
 .chip.accent {
 	color: var(--accent);
-	background: rgba(106, 211, 255, 0.12);
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .chip.ok {
 	color: var(--ok);
-	background: rgba(74, 222, 128, 0.12);
+	background: color-mix(in srgb, var(--ok) 12%, transparent);
 }
 .chip.warn {
 	color: var(--warn);
-	background: rgba(251, 191, 36, 0.12);
+	background: color-mix(in srgb, var(--warn) 12%, transparent);
 }
 .chip.danger {
 	color: var(--danger);
-	background: rgba(255, 107, 107, 0.12);
+	background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 /* Hinweis- und Fehlerkästen */
 .notice {
 	padding: 12px 16px;
 	border-radius: var(--radius);
-	border: 1px solid rgba(251, 191, 36, 0.35);
-	background: rgba(251, 191, 36, 0.1);
+	border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+	background: color-mix(in srgb, var(--warn) 10%, transparent);
 }
 .notice.error {
-	border-color: rgba(255, 107, 107, 0.4);
-	background: rgba(255, 107, 107, 0.1);
+	border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+	background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 /* Tabellen in Glaskarten; auf schmalen Bildschirmen seitlich scrollbar statt gequetscht */
@@ -279,7 +227,7 @@ a {
 	/* 16px: sonst zoomt iOS beim Antippen hinein */
 	font-size: 16px;
 	color: var(--text);
-	background: rgba(0, 0, 0, 0.3);
+	background: color-mix(in srgb, var(--black) 30%, transparent);
 	border: 1px solid var(--edge);
 	border-radius: var(--radius);
 	padding: 10px 12px;
@@ -295,7 +243,7 @@ select.input optgroup {
 .input:focus {
 	outline: none;
 	border-color: var(--accent);
-	box-shadow: 0 0 0 3px rgba(106, 211, 255, 0.18);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .check {
 	display: flex;
@@ -312,8 +260,8 @@ select.input optgroup {
 	accent-color: var(--accent);
 }
 .notice.ok {
-	border-color: rgba(74, 222, 128, 0.4);
-	background: rgba(74, 222, 128, 0.1);
+	border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+	background: color-mix(in srgb, var(--ok) 10%, transparent);
 }
 
 /* Zahlen in Spalten untereinander; .right für rechtsbündige Tabellenzellen */
@@ -352,7 +300,7 @@ select.input optgroup {
 .tabs > a:hover,
 .tabs > button:hover {
 	color: var(--text);
-	background: rgba(255, 255, 255, 0.06);
+	background: color-mix(in srgb, var(--white) 6%, transparent);
 }
 .tabs > .active {
 	color: var(--text);

@@ -1,5 +1,6 @@
 """Erzeugt aus nexproto alles, was Programme ohne Python brauchen: JSON-Schemas, die Konstanten der
-Firmware (C), der Daemon-Web-UI (JavaScript), des Hub-Webs (TypeScript) und des Mitschnitts (Rust).
+Firmware (C), der Daemon-Web-UI (JavaScript), des Hub-Webs (TypeScript) und des Mitschnitts (Rust), dazu
+das gemeinsame Aussehen beider Web-Oberflächen (tokens.css aus design.py).
 
     uv run python -m nexproto.codegen     schreibt alle Dateien neu
 
@@ -13,7 +14,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from . import device
+from . import design, device
 from .classes import CLASSES, UNKNOWN_COLOR
 from .nexlog import NexLog
 
@@ -112,6 +113,8 @@ TARGETS: dict[str, Callable[[], str]] = {
     "nexboard/daemon/deckbar_daemon/web/js/nexproto.js": js_module,
     "hub/web/src/lib/nexproto.ts": ts_module,
     "nexboard/capture/src/proto_gen.rs": rust_module,
+    "hub/web/src/tokens.css": lambda: design.tokens_css(HEADER),
+    "nexboard/daemon/deckbar_daemon/web/css/tokens.css": lambda: design.tokens_css(HEADER),
 }
 
 
