@@ -20,7 +20,7 @@ from nexcore.settings import MASK, SettingsStore, is_mask
 
 from . import __version__
 from .a2ui import A2Ui
-from .capture_process import history_root
+from .capture_process import find_binary, history_root
 from .config import Settings, is_default_config, save_settings
 from .core.http import api_errors, local_only, ok, read_object
 from .core.live import LiveHub
@@ -47,12 +47,14 @@ from .modules.schedule import ScheduleModule
 from .modules.updates import UpdatesModule
 from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
+from .proc import have
 from .radar import Radar
 from .run_model import a2tools_dir
 from .run_webhook import WebhookPublisher
 from .runs import SETTINGS_FILE as runs_settings_file
 from .runs import DungeonRuns
 from .schedule import Schedule
+from .setup import Checks, Setup
 from .state import State
 from .updates import Updates
 
@@ -105,6 +107,8 @@ class NexBoard:
         self.modules = Registry(self.bus, self.web_modules, config_dir / "modules.yaml", self._initial_modules,
                                 introduced=frozenset({"aion2.plugins"}))
         self.bus.on(CHANGED, self._modules_changed)
+        self.setup = Setup(self.modules, self._setup_checks(), self._choose_overlay_profile,
+                           prepare=self.overlay.refresh_unit)
         for module in self.web_modules:
             self.overlay.register(module.info.id, module.overlay_widgets)
         self.overlay.module_on = self.modules.on
@@ -151,6 +155,20 @@ class NexBoard:
     def _sync_radar(self) -> None:
         """Name und Sprache der allgemeinen Einstellungen ans Radar."""
         self.radar.sync_profile(self.settings.character_name, self.settings.language)
+
+    def _setup_checks(self) -> Checks:
+        """Was die Ersteinrichtung auf diesem PC prüft (Voraussetzungen in setup.py)."""
+        return {
+            "tools": lambda: all(self.bar.details()["tools"].values()),
+            "capture": lambda: find_binary(self.dps.settings.capture_bin) is not None,
+            "overlay": lambda: bool(self.overlay.unit.get("installed")),
+            "tcpdump": lambda: have("tcpdump"),
+            "character": lambda: bool(self.settings.character_name),
+        }
+
+    async def _choose_overlay_profile(self, name: str) -> None:
+        if name in self.overlay.layout.profiles:
+            await self.overlay.update({"profile": name})
 
     def _initial_modules(self) -> set[str]:
         """Erster Start mit Modulen: was bisher eingerichtet war, bleibt an (Umstieg ohne Überraschung)."""
@@ -244,6 +262,7 @@ class NexBoard:
         router.add_put("/api/settings", self.api_put_settings)
         router.add_post("/api/settings/token", self.api_get_token)
         router.add_post("/api/restart", self.api_restart)
+        self.setup.routes(router)
         router.add_get("/api/m/{id}/settings", self.api_get_module_settings)
         router.add_put("/api/m/{id}/settings", self.api_put_module_settings)
         for module in self.web_modules:

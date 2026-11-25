@@ -6,6 +6,7 @@ import {
   setSaveState, sw, field, select, button, chip, callout, card, settingsRow, seg, throttle, dpsDiff,
 } from "./core.js";
 import { schemaForm } from "./form.js";
+import { setupPage } from "./setup.js";
 import deck from "./modules/deck.js";
 import dps from "./modules/aion2-dps.js";
 import overlay, { cmd as overlayCommand } from "./modules/aion2-overlay.js";
@@ -32,6 +33,7 @@ const PAGES = new Map(Object.entries(UI).flatMap(([mid, ui]) => ui.pages.map((pa
 const firstPage = (mid) => UI[mid]?.pages[0]?.id ?? UI[mid]?.home ?? mid;
 const shortName = (m) => m.name.replace(/^AION 2 · /, "");
 const SYSTEM = [
+  { id: "setup", name: "Einrichtung", icon: "star-four-points" },
   { id: "modules", name: "Module", icon: "puzzle" },
   { id: "settings", name: "Einstellungen", icon: "cog" },
 ];
@@ -62,6 +64,10 @@ function render() {
     title = "Übersicht";
     crumb = BRAND;
     content = dashboard(ctx);
+  } else if (route.page === "setup") {
+    title = "Einrichtung";
+    crumb = "System";
+    content = setupPage(ctx, go);
   } else if (route.page === "modules") {
     title = "Module";
     crumb = "System";
@@ -149,6 +155,11 @@ function dashboard(ctx) {
         modOn("deck") ? chip(devs ? `${devs} Gerät${devs === 1 ? "" : "e"} verbunden` : "Kein Gerät verbunden", devs ? "ok" : "") : null,
         S.updates?.available ? el("a", { href: "#/updates", class: "chip info", style: "text-decoration:none" }, el("span", { class: "dot" }), "Update verfügbar") : null,
         modOn("aion2.overlay") ? button("Overlay bearbeiten", () => overlayCommand("edit"), "sm", "cursor-move") : null)));
+    // frische Installation (noch nichts für ein Spiel eingeschaltet): auf die Einrichtung hinweisen
+    if (!enabled.some((m) => m.category === "ingame")) {
+      parts.push(callout("info", "star-four-points", "Neu hier? Die Einrichtung schaltet in drei Schritten ein, was du brauchst.",
+        button("Einrichtung starten", () => go("setup"), "sm primary", "arrow-right")));
+    }
     for (const [cat, label] of Object.entries(S.modules.categories)) {
       const mods = enabled.filter((m) => m.category === cat);
       if (!mods.length) continue;

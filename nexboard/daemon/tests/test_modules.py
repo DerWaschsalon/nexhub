@@ -150,3 +150,14 @@ def test_effekte_erben_den_schalter_der_warnungen(tmp_path):
 async def test_web_ui_wird_nach_einem_update_neu_geladen(client):
     r = await client.get("/static/js/main.js")
     assert r.status == 200 and r.headers["Cache-Control"] == "no-cache" and "ETag" in r.headers
+
+
+async def test_api_einrichtung(client):
+    info = await (await client.get("/api/setup")).json()
+    assert [t["id"] for t in info["templates"]] == ["bar", "pve", "pvp", "radar"] and info["templates"][0]["active"]
+    r = await client.post("/api/setup", json={"templates": ["radar"]})
+    data = await r.json()
+    assert data["changed"] == ["aion2.radar", "aion2.schedule", "aion2.field_bosses", "aion2.dps", "aion2.overlay"]
+    assert {"aion2.radar", "aion2.overlay"} <= client.deck.modules.enabled and data["templates"][3]["active"]
+    assert (await client.post("/api/setup", json={"templates": "radar"})).status == 400
+    assert (await client.post("/api/setup", json={"templates": ["x"]})).status == 400
