@@ -13,6 +13,8 @@ from nexhub_api.modules.parses.calc import guild_bests, needed_pairs, percentile
 from nexhub_api.modules.parses.fetcher import ParseFetcher
 from nexhub_api.modules.parses.models import ParseBoard
 
+from .conftest import MEMBER
+
 NOW_MS = int(time.time() * 1000)
 DAY_MS = 86_400_000
 
@@ -145,3 +147,80 @@ def test_hoechstens_fuenf_je_takt(fake, database_url):
         await add_run(sm, summary(*[boss(9100 + i, [("A", "ranger", 100)], fight=f"f{i}") for i in range(7)]))
         return await fetcher.tick(), await fetcher.tick()
     assert fetch(database_url, fake, work) == (5, 2)
+
+
+def db_do(database_url, work):
+    async def go():
+        engine = create_async_engine(database_url)
+        result = await work(async_sessionmaker(engine, expire_on_commit=False))
+        await engine.dispose()
+        return result
+    return asyncio.run(go())
+
+
+def add_board(database_url, boss: int, cls: str, dps: list[float]) -> None:
+    async def work(sm):
+        async with sm() as db:
+            db.add(ParseBoard(boss=boss, cls=cls, region="eu", total=len(dps), dps=dps, fetched_at=datetime.now(UTC)))
+            await db.commit()
+    db_do(database_url, work)
+
+
+def new_run(database_url, s: dict, share_token: str | None = None) -> int:
+    return db_do(database_url, lambda sm: add_run(sm, s, share_token=share_token))
+
+
+def test_parse_im_run(as_user, database_url):
+    member = as_user(MEMBER)
+    add_board(database_url, 1, "ranger", [100, 200, 300, 400])
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 250)])))
+    body = member.get(f"/api/parses/runs/{run_id}").json()
+    p = body["fights"]["f1"]["A"]
+    assert (p["eu"], p["eu_n"]) == (50, 4) and p["eu_at"]
+    assert body["guild_min"] == 10
+
+
+def test_gilde_erst_ab_zehn(as_user, database_url):
+    member = as_user(MEMBER)
+    ids = [new_run(database_url, summary(boss(1, [(f"C{i}", "ranger", 100 + i)]))) for i in range(9)]
+    p = member.get(f"/api/parses/runs/{ids[-1]}").json()["fights"]["f1"]["C8"]
+    assert p["guild"] is None and p["guild_n"] == 9
+    ids.append(new_run(database_url, summary(boss(1, [("C9", "ranger", 50)]))))
+    p = member.get(f"/api/parses/runs/{ids[8]}").json()["fights"]["f1"]["C8"]
+    assert p["guild_n"] == 10 and p["guild"] == 100
+    assert member.get(f"/api/parses/runs/{ids[9]}").json()["fights"]["f1"]["C9"]["guild"] == 10
+
+
+def test_noch_nicht_geladen_und_nicht_gewertet(as_user, database_url):
+    member = as_user(MEMBER)
+    add_board(database_url, 2, "ranger", [])
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 250)], fight="f1"),
+                                           boss(2, [("A", "ranger", 250)], fight="f2")))
+    fights = member.get(f"/api/parses/runs/{run_id}").json()["fights"]
+    assert fights["f1"]["A"]["eu_at"] is None and fights["f1"]["A"]["eu"] is None
+    assert fights["f2"]["A"]["eu_n"] == 0 and fights["f2"]["A"]["eu"] is None and fights["f2"]["A"]["eu_at"]
+
+
+def test_wipe_ohne_klasse_und_doppelter_name(as_user, database_url):
+    member = as_user(MEMBER)
+    add_board(database_url, 1, "ranger", [100])
+    run_id = new_run(database_url, summary(
+        boss(1, [("A", "ranger", 250), ("A", "ranger", 120), ("B", None, 90)], fight="f1"),
+        boss(3, [("A", "ranger", 250)], killed=False, fight="f2")))
+    r = member.get(f"/api/parses/runs/{run_id}")
+    assert r.status_code == 200
+    fights = r.json()["fights"]
+    assert "f2" not in fights
+    assert fights["f1"]["B"]["eu"] is None and fights["f1"]["B"]["guild_n"] == 0
+    assert set(fights["f1"]) == {"A", "B"}
+
+
+def test_zugriff(client, as_user, database_url):
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 250)])), share_token="t0ken")
+    assert client.get(f"/api/parses/runs/{run_id}").status_code == 401
+    assert as_user(MEMBER).get("/api/parses/runs/999999").status_code == 404
+    r = client.get("/api/public/parses/shared/t0ken")
+    assert r.status_code == 200 and "A" in r.json()["fights"]["f1"]
+    assert r.headers["X-Robots-Tag"].startswith("noindex")
+    assert client.get("/api/public/parses/shared/falsch").status_code == 404
+    assert client.get("/api/public/parses/shared/" + "x" * 40).status_code == 404

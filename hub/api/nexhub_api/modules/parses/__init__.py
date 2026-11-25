@@ -15,4 +15,4 @@ def start(state: State, runtime: Runtime) -> list[Coroutine[Any, Any, None]]:
     return [ParseFetcher(runtime.sessionmaker, runtime.http).run()]
 
 
-MODULE = ApiModule("parses", (routes.router,), requires=("logs", "bis"), start=start)
+MODULE = ApiModule("parses", (routes.router, routes.public_router), requires=("logs", "bis"), start=start)
