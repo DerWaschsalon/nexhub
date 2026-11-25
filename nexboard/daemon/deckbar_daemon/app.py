@@ -131,6 +131,7 @@ class NexBoard:
         self.runs.publishers += [self.webhook, self.hub]  # erst das Bild nach Discord, dann der NexHub
         self.overlay = Overlay(c, manage_unit=self.real_config)
         self.overlay.game_check = self._game_running
+        self.overlay.page_port = self.overlay_port
         self.radar = Radar(self._publish_radar, c, game_running=self._game_running, capture=self.dps.capture)
         self.hub.deaths = self.radar.deaths_between
         loot = FeedBuffer("lootRoll", loot_drop)
@@ -249,6 +250,11 @@ class NexBoard:
             module.routes(router)
         router.add_static("/static/", WEB_DIR)
 
+    @property
+    def overlay_port(self) -> int:
+        """Die Overlay-Seite und die Meter-Oberfläche laufen auf dem Port nach dem der Web-UI."""
+        return self.settings.port + 1
+
     def overlay_routes(self, app: web.Application) -> None:
         """Routen der Overlay-Seite (eigener Port): Overlay und die Karte des Radars."""
         self.overlay.add_routes(app)
@@ -343,5 +349,12 @@ def build_app(deck: NexBoard) -> web.Application:
         await deck.bar.art.close()
         await deck.hub.close()
 
+    async def revalidate_static(request: web.Request, response: web.StreamResponse) -> None:
+        """Skripte und Styles der Web-UI immer nachfragen lassen (ETag): sonst zeigt der Browser nach einem
+        Update noch eine Weile die alte Oberfläche."""
+        if request.path.startswith("/static/"):
+            response.headers.setdefault("Cache-Control", "no-cache")
+
+    app.on_response_prepare.append(revalidate_static)
     app.on_cleanup.append(cleanup)
     return app

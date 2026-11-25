@@ -336,3 +336,13 @@ dialog .dlg { padding: 18px; border-radius: var(--radius-xl); background: var(--
 .gem { font-size: 12.5px; padding: 2px 8px; border-radius: 999px; background: var(--inset); }
 .gem.support { color: var(--text-2); }
 code.grow { overflow-wrap: anywhere; font-size: 12px; }
+
+/* Vorschau des Overlays: die Overlay-Seite in Monitorgröße, verkleinert auf die Kartenbreite. Der Hintergrund
+   steht für das Spiel dahinter. */
+.overlay-preview {
+  position: relative; overflow: hidden; border-radius: var(--radius-m); border: 1px solid var(--line-soft);
+  background: radial-gradient(120% 90% at 50% 0%, #2a3a52 0%, #131a26 55%, #0b0f17 100%);
+}
+/* color-scheme wie die Overlay-Seite (hell): sonst malt der Browser dem iframe einen deckenden Grund */
+.overlay-preview iframe { display: block; border: 0; transform-origin: 0 0; background: transparent; color-scheme: light; }
+.overlay-preview + .hint { margin-top: 12px; }

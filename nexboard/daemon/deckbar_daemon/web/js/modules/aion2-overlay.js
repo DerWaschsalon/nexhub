@@ -1,6 +1,6 @@
 /* Modul AION 2 · Overlay: Profile (Hauptbedienung), Widgets aller eingeschalteten Module, Steuerung, Darstellung.
    Jedes Widget wird nur hier ein- und ausgeschaltet; die Module stellen es auf ihrer eigenen Seite ein. */
-import { fill, el, api, S, on, field, input, select, button, chip, callout, card, settingsRow, sw, saver, toast, modOn, collapsible } from "../core.js";
+import { fill, el, api, S, on, field, input, select, button, chip, callout, card, settingsRow, sw, saver, seg, toast, modOn, collapsible } from "../core.js";
 
 const FX = { "": "aus", glanz: "Glanz", brennen: "Brennen", gold: "Gold", frost: "Frost", holo: "Holo", leere: "Leere" };
 // Ein Begriff je Sache: „Durchklicken an“ = Overlay nimmt keine Klicks an, „aus“ = Meter bedienbar
@@ -14,6 +14,59 @@ async function openShortcuts() {
     await api("POST", "/api/overlay/shortcuts");
     toast("Kurzbefehle geöffnet");
   } catch (e) { toast(e.message, true); }
+}
+
+// Die Overlay-Seite läuft nur auf diesem PC; von einem anderen Gerät aus gibt es keine Vorschau
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+const FALLBACK_SCREEN = { width: 1920, height: 1080 };
+const PREVIEW_MODES = [
+  { id: "edit", label: "Anordnen", icon: "cursor-move" },
+  { id: "click", label: "Wie im Spiel", icon: "eye" },
+];
+const PREVIEW_HELP = {
+  edit: "Zeigt alle Widgets mit Beispieldaten. Hier ziehen und mit dem Mausrad vergrößern; das laufende Overlay übernimmt es sofort.",
+  click: "Zeigt, was das Overlay gerade zeigt. Ohne laufendes Spiel bleiben die meisten Widgets leer.",
+};
+
+/** Der Monitor, auf dem das Overlay liegt (eingestellt, sonst der Hauptmonitor). */
+function overlayScreen(o) {
+  const screens = (o.screens || []).filter((s) => s.width && s.height);
+  return screens.find((s) => s.name === o.layout.screen) || screens.find((s) => s.primary) || screens[0] || FALLBACK_SCREEN;
+}
+
+/** Vorschau: die Overlay-Seite selbst in der Größe des Monitors, verkleinert auf die Breite der Karte.
+    Sie bleibt beim Neuzeichnen der Seite stehen (ein neu eingehängtes iframe lädt neu); update(o) passt nur
+    Größe und Adresse an. */
+function overlayPreview() {
+  const frame = el("iframe", { title: "Vorschau des Overlays", tabindex: "-1" });
+  const stage = el("div", { class: "overlay-preview" }, frame);
+  const head = el("div", { class: "row wrap" });
+  const help = el("p", { class: "hint small" });
+  const root = card("Vorschau", "So liegen die Widgets auf deinem Monitor", head, stage, help);
+  let mode = "edit", size = FALLBACK_SCREEN, port = null;
+  const fit = () => {
+    const k = stage.clientWidth / size.width;
+    frame.style.transform = `scale(${k})`;
+    stage.style.height = `${Math.round(size.height * k)}px`;
+  };
+  const load = () => {
+    const src = `http://${location.hostname}:${port}/__deckbar__/overlay/?mode=${mode}`;
+    if (frame.src !== src) frame.src = src;
+    fill(head, seg(PREVIEW_MODES, mode, (next) => { mode = next; load(); }));
+    help.textContent = PREVIEW_HELP[mode];
+  };
+  new ResizeObserver(fit).observe(stage);
+  const update = (o) => {
+    root.hidden = !o.page_port || !LOCAL_HOSTS.includes(location.hostname);
+    if (root.hidden) return;
+    size = overlayScreen(o);
+    port = o.page_port;
+    frame.style.width = `${size.width}px`;
+    frame.style.height = `${size.height}px`;
+    fit();
+    load();
+  };
+  return { root, update };
 }
 
 /** Befehl an das laufende Overlay-Programm (auch von Übersicht und Kampfdaten). */
@@ -124,12 +177,15 @@ function lookCard(o, save, view) {
 
 function overlayPage(ctx) {
   const box = el("div", { class: "stack" });
+  const preview = overlayPreview();
+  const page = el("div", { class: "stack" }, preview.root, box);
   const save = saver("PUT", "/api/overlay", (res) => { S.overlay = res; }, 400, "Overlay gespeichert");
   const views = {}; // aufgeklappte Abschnitte bleiben beim Neuzeichnen offen
   const view = {};
   const draw = () => {
     const o = S.overlay;
     if (!o) return;
+    preview.update(o);
     const setWidget = (id, patch) => {
       const { options, ...rest } = patch;
       Object.assign(o.layout.widgets[id], rest);
@@ -151,7 +207,7 @@ function overlayPage(ctx) {
   ctx.onUnmount(on("modules", draw));
   refresh().then(draw);
   draw();
-  return box;
+  return page;
 }
 
 export default {

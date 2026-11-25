@@ -145,3 +145,8 @@ def test_effekte_erben_den_schalter_der_warnungen(tmp_path):
     assert "aion2.effects" in board(tmp_path).modules.enabled
     (tmp_path / "modules.yaml").write_text(f"enabled: [aion2.warnings]\nknown: {known}\n")
     assert "aion2.effects" not in board(tmp_path).modules.enabled  # ohne Kampfdaten gäbe es nichts zu melden
+
+
+async def test_web_ui_wird_nach_einem_update_neu_geladen(client):
+    r = await client.get("/static/js/main.js")
+    assert r.status == 200 and r.headers["Cache-Control"] == "no-cache" and "ETag" in r.headers

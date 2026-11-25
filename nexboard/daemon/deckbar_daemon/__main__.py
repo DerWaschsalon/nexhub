@@ -50,9 +50,9 @@ async def serve(args: argparse.Namespace) -> NexBoard:
                               shutdown_timeout=SHUTDOWN_TIMEOUT)
     await a2_runner.setup()
     try:
-        await web.TCPSite(a2_runner, "127.0.0.1", settings.port + 1).start()
+        await web.TCPSite(a2_runner, "127.0.0.1", deck.overlay_port).start()
     except OSError as e:
-        log.warning("Overlay-Oberfläche nicht verfügbar (Port %d): %s", settings.port + 1, e)
+        log.warning("Overlay-Oberfläche nicht verfügbar (Port %d): %s", deck.overlay_port, e)
     log.info("NexBoard-Daemon läuft auf %s:%d – Web-UI: %s", settings.host, settings.port, url)
 
     await deck.modules.start()
