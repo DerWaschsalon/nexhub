@@ -68,7 +68,8 @@ RESTART_DELAY_S = 0.3  # Antwort noch zustellen, dann SIGTERM an sich selbst
 
 class NexBoard:
     def __init__(self, settings: Settings, config_dir: Path, mdns: bool = True) -> None:
-        self.settings = settings
+        self.settings = settings  # was gerade gilt
+        self.saved_settings = settings  # was in config.yaml steht; weicht ab, bis ein Neustart es übernimmt
         self.config_dir = config_dir
         self.restart_requested = False
         # Nur der Daemon mit der echten Konfiguration steuert den Overlay-Dienst (nicht Testinstanzen)
@@ -245,11 +246,17 @@ class NexBoard:
     def modules_info(self) -> dict[str, Any]:
         return {"categories": CATEGORIES, "modules": self.modules.info()}
 
+    def pending_restart(self) -> list[str]:
+        """Gespeicherte Einstellungen, die erst nach einem Neustart gelten."""
+        running, saved = self.settings.model_dump(), self.saved_settings.model_dump()
+        return [key for key in RESTART_FIELDS if saved[key] != running[key]]
+
     def settings_info(self) -> dict[str, Any]:
-        s = self.settings.model_dump()
+        """Die Seite zeigt, was gespeichert ist; `restart` nennt, was davon noch nicht gilt."""
+        s = self.saved_settings.model_dump()
         s["token"] = MASK
         return {"settings": s, "schema": Settings.model_json_schema(), "config_dir": str(self.config_dir),
-                "restart_fields": list(RESTART_FIELDS)}
+                "restart_fields": list(RESTART_FIELDS), "restart": self.pending_restart()}
 
     # ---------------------------------------------------------------- Web-API
     def routes(self, router: web.UrlDispatcher) -> None:
@@ -325,30 +332,29 @@ class NexBoard:
 
     async def api_put_settings(self, request: web.Request) -> web.Response:
         """Allgemeine Einstellungen (config.yaml). Port, Adresse und Token wirken erst nach einem Neustart."""
-        merged = self.settings.model_dump()
+        merged = self.saved_settings.model_dump()
         for key, value in (await read_object(request)).items():
             if key == "token" and (not value or is_mask(value)):
                 continue
             merged[key] = value
-        restart = await self._apply_settings(Settings.model_validate(merged))
-        return ok(restart=restart, **self.settings_info())
+        await self._apply_settings(Settings.model_validate(merged))
+        return ok(**self.settings_info())
 
     async def set_language(self, language: str) -> None:
         """Sprachwahl im A2Tools-Meter: dieselbe Einstellung wie in der Web-UI (System → Allgemein)."""
-        await self._apply_settings(Settings.model_validate({**self.settings.model_dump(), "language": language}))
+        await self._apply_settings(Settings.model_validate({**self.saved_settings.model_dump(), "language": language}))
 
-    async def _apply_settings(self, settings: Settings) -> list[str]:
-        """Speichern und übernehmen, was sofort wirken kann; zurück kommt, was erst nach einem Neustart wirkt."""
+    async def _apply_settings(self, settings: Settings) -> None:
+        """Speichern und übernehmen, was sofort wirken kann; der Rest gilt nach einem Neustart."""
         save_settings(self.config_dir, settings)
+        self.saved_settings = settings
         current, saved = self.settings.model_dump(), settings.model_dump()
-        restart = [k for k in RESTART_FIELDS if saved[k] != current[k]]
         self.settings = settings.model_copy(update={k: current[k] for k in RESTART_FIELDS})
         self.bar.media.player = self.settings.player
         self._sync_radar()
         if saved["language"] != current["language"]:
             await self.bus.emit(LANGUAGE, self.settings.language)
         await self.live.send({"type": "settings", "settings": self.settings_info()})
-        return restart
 
     async def api_get_token(self, request: web.Request) -> web.Response:
         """Geräte-Token im Klartext (für die Firmware-Konfiguration), nur auf ausdrückliche Anfrage."""

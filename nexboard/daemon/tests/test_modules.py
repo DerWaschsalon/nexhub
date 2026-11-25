@@ -66,6 +66,9 @@ async def test_api_modules_and_settings(client):
     s = await r.json()
     assert r.status == 200 and s["restart"] == ["port"]
     assert client.deck.settings.name == "Pult" and client.deck.settings.port == 8765  # Port erst nach Neustart
+    assert s["settings"]["port"] == 9000  # die Seite zeigt, was gespeichert ist
+    s = await (await client.put("/api/settings", json={"name": "Pult 2"})).json()
+    assert s["settings"]["port"] == 9000 and s["restart"] == ["port"]  # die offene Änderung bleibt erhalten
     saved = yaml.safe_load((client.deck.config_dir / "config.yaml").read_text())
     assert saved["port"] == 9000 and saved["token"] == "testtoken123"
     assert (await client.put("/api/settings", json={"port": 70000})).status == 422
