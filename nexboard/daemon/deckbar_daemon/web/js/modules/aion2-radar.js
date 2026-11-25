@@ -4,7 +4,7 @@
    Das Radar selbst läuft im Daemon und zeigt sich als Widgets im Overlay (Cube-Radar, Karte, Boss-Warnungen);
    ein- und ausschalten, Deckkraft und Position dort unter Overlay. Charaktername und Sprache stehen
    unter System → Einstellungen. */
-import { fill, el, api, S, field, input, select, button, chip, card, settingsRow, sw, saver, toast, seg, collapsible } from "../core.js";
+import { fill, el, api, S, field, input, select, button, chip, card, settingsRow, sw, saver, toast, seg, collapsible, table } from "../core.js";
 
 const REICHWEITEN = { 50: "50 m", 100: "100 m", 150: "150 m", 300: "300 m", 600: "600 m" };
 const DREHUNG = { 0: "0°", 90: "90°", 180: "180°", 270: "270°" };
@@ -55,10 +55,11 @@ function rufListe(r, k, gruppe, setzen) {
     };
     return el("tr", {},
       el("td", {}, sw(!k.calls_off.includes(ruf.schluessel), (an) =>
-        setzen("calls_off", an ? k.calls_off.filter((x) => x !== ruf.schluessel) : [...k.calls_off, ruf.schluessel]))),
+        setzen("calls_off", an ? k.calls_off.filter((x) => x !== ruf.schluessel) : [...k.calls_off, ruf.schluessel]),
+        { "aria-label": `Ruf an: ${ruf.vorgabe}` })),
       el("td", { class: "small muted", text: ruf.art }),
       el("td", {}, el("div", { text: ruf.vorgabe }), ruf.zeile ? el("div", { class: "small muted", text: ruf.zeile }) : null),
-      el("td", {}, input(eigene, worte, { lazy: true, placeholder: "Eigene Worte", maxlength: 120, title: EIGENE_HINWEIS })),
+      el("td", {}, input(eigene, worte, { lazy: true, placeholder: "Eigene Worte", maxlength: 120, title: EIGENE_HINWEIS, "aria-label": `Eigene Worte für: ${ruf.vorgabe}` })),
       el("td", {}, el("div", { class: "row" },
         eigene ? button("", () => worte(""), "sm", "close", { title: "Zurück zur Vorgabe" }) : null,
         button("", () => rufTesten(ruf.schluessel), "sm", "play", { title: "Diesen Ruf abspielen", disabled: !r.laeuft }))));
@@ -116,9 +117,7 @@ function dungeonTable(r, k, setzen, draw) {
     el("td", {}, select(TON, k.sounds[gruppe] || "ansage", (art) => setzen("sounds", { ...k.sounds, [gruppe]: art })))));
   return [
     field("Dungeon", select(Object.fromEntries(Object.keys(dungeons).map((d) => [d, d])), k.dungeon, (v) => neuZeichnen("dungeon", v))),
-    el("div", { style: "overflow-x:auto" }, el("table", { class: "list" },
-      el("thead", {}, el("tr", {}, ["Meldung", "Anzeigen", "Ton"].map((h) => el("th", { text: h })))),
-      el("tbody", {}, zeilen))),
+    table(["Meldung", "Anzeigen", "Ton"], zeilen),
   ];
 }
 

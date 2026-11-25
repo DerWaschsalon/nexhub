@@ -775,7 +775,7 @@ function designTab(ctx) {
         draw();
       } catch { toast("Upload fehlgeschlagen", true); }
     } });
-    const accentIn = el("input", { type: "color" });
+    const accentIn = el("input", { type: "color", "aria-label": "Akzentfarbe" });
     accentIn.value = (theme.accent || "#5AC8FA").toLowerCase();
     accentIn.addEventListener("input", () => setTheme({ accent: accentIn.value.toUpperCase() }));
     const prev = el("img", { class: "preview-img", alt: "Hintergrund der Leiste", src: `/api/background.png?v=${encodeURIComponent(D.bgId)}` });

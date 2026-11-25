@@ -242,19 +242,29 @@ export function closedCard(title, sub, actions, ...body) {
 
 function foldCard(openByDefault, title, sub, actions, ...body) {
   const text = el("div", { class: "grow" }, title ? el("h2", { text: title }) : null, sub ? el("div", { class: "sub", text: sub }) : null);
-  if (!title) return el("section", { class: "card glass" }, actions ? el("div", { class: "card-head" }, text, el("div", { class: "row" }, actions)) : null, ...body);
+  const buttons = actions ? el("div", { class: "row" }, actions) : null;
+  if (!title) return el("section", { class: "card glass" }, buttons ? el("div", { class: "card-head" }, text, buttons) : null, ...body);
   const key = `${location.hash.replace(/^#\/?/, "").split("/")[0]}:${title}`;
-  // ein Knopf im Kopf soll nur seine Aktion auslösen, nicht auch auf- oder zuklappen
-  const buttons = actions ? el("div", { class: "row", onclick: (e) => e.preventDefault() }, actions) : null;
-  const box = el("details", { class: "card glass fold", open: foldStates()[key] ?? openByDefault },
-    el("summary", { class: "card-head" }, text, buttons), el("div", { class: "fold-body" }, ...body));
-  box.addEventListener("toggle", () => {
-    localStorage.setItem(FOLD_KEY, JSON.stringify({ ...foldStates(), [key]: box.open }));
+  const open = foldStates()[key] ?? openByDefault;
+  // Die Überschrift ist der Knopf; weitere Knöpfe stehen daneben, nicht darin
+  const toggle = el("button", { type: "button", class: "fold-toggle", "aria-expanded": String(open) }, text);
+  const content = el("div", { class: "fold-body", hidden: !open }, ...body);
+  const box = el("section", { class: `card glass fold ${open ? "open" : ""}`.trim() }, el("div", { class: "card-head" }, toggle, buttons), content);
+  toggle.addEventListener("click", () => {
+    const now = content.hidden;
+    content.hidden = !now;
+    box.classList.toggle("open", now);
+    toggle.setAttribute("aria-expanded", String(now));
+    localStorage.setItem(FOLD_KEY, JSON.stringify({ ...foldStates(), [key]: now }));
   });
   return box;
 }
 
+/** Zeile mit Beschriftung links und Bedienelement rechts; das Element bekommt die Beschriftung als Namen
+    (für Screenreader), falls es noch keinen hat. */
 export function settingsRow(title, text, control) {
+  const field = control?.matches?.("input, select, textarea") ? control : control?.querySelector?.("input, select, textarea");
+  if (field && !field.getAttribute("aria-label") && !field.labels?.length) field.setAttribute("aria-label", title);
   return el("div", { class: "settings-row" }, el("div", { class: "txt" }, el("b", { text: title }), text ? el("span", { text }) : null), control);
 }
 
@@ -263,6 +273,22 @@ export function collapsible(label, view, ...kids) {
   const box = el("details", { class: "fold advanced", open: !!view.open }, el("summary", { text: label }), ...kids);
   box.addEventListener("toggle", () => { view.open = box.open; });
   return box;
+}
+
+/** Tabelle mit Kopfzeile aus fertigen Zeilen (tr). Bedienelemente in den Zellen bekommen „Spalte: Zeile“ als
+    Namen für Screenreader, falls sie noch keinen haben. */
+export function table(heads, rows) {
+  for (const row of rows) {
+    const rowName = [...row.cells].map((cell) => cell.firstChild?.textContent?.trim()).find(Boolean) || "";
+    [...row.cells].forEach((cell, i) => {
+      for (const field of cell.querySelectorAll("input, select, textarea")) {
+        if (!field.getAttribute("aria-label")) field.setAttribute("aria-label", [heads[i], rowName].filter(Boolean).join(": "));
+      }
+    });
+  }
+  return el("div", { style: "overflow-x:auto" }, el("table", { class: "list" },
+    el("thead", {}, el("tr", {}, heads.map((h) => el("th", { text: h })))),
+    el("tbody", {}, rows)));
 }
 
 /** Segmente: items [{id, label, icon}], aktiv, onClick(id) */

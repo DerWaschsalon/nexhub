@@ -1,6 +1,6 @@
 /* Modul AION 2 · Termine: eine Liste aus den festen Terminen der Server und eigenen Ereignissen (dieselbe zeigt
    das Termine-Widget im Overlay), eigene Ereignisse bearbeiten, darunter die Feldbosse des Radars. */
-import { fill, el, api, S, on, input, select, button, chip, card, settingsRow, sw, toast, clampInt, modOn } from "../core.js";
+import { fill, el, api, S, on, input, select, button, chip, card, settingsRow, sw, toast, clampInt, modOn, table } from "../core.js";
 
 const SETTINGS = "/api/m/aion2.schedule/settings";
 const FIELD_BOSS_SETTINGS = "/api/m/aion2.field_bosses/settings";
@@ -17,12 +17,6 @@ function countdown(s) {
   const days = s >= 86400 ? `${Math.floor(s / 86400)} d ` : "";
   const h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
   return `in ${days}${h}:${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-}
-
-function table(heads, rows) {
-  return el("div", { style: "overflow-x:auto" }, el("table", { class: "list" },
-    el("thead", {}, el("tr", {}, heads.map((h) => el("th", { text: h })))),
-    el("tbody", {}, rows)));
 }
 
 const hhmm = (min) => `${String(Math.floor((min % DAY) / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
@@ -82,7 +76,7 @@ function listCard(entries, settings, save) {
       el("td", { text: clock(t.start) }), status);
   });
   return card("Termine", "Feste Zeiten der globalen Server und eigene Ereignisse, in deiner Ortszeit", null,
-    table(["", "Termin", "Uhrzeit", "Status"], rows));
+    table(["Anzeigen", "Termin", "Uhrzeit", "Status"], rows));
 }
 
 function fieldBossCard(bosses, settings, save) {

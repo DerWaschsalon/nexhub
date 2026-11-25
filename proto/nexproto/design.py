@@ -10,8 +10,8 @@ from __future__ import annotations
 DARK: dict[str, str] = {
     "bg": "#05060d",
     "text": "#f4f5fa",
-    "dim": "rgba(244, 245, 250, 0.66)",  # Nebentext
-    "faint": "rgba(244, 245, 250, 0.45)",  # Beschriftungen, Platzhalter
+    "dim": "rgba(244, 245, 250, 0.72)",  # Nebentext
+    "faint": "rgba(244, 245, 250, 0.56)",  # Beschriftungen, Platzhalter (4,5:1 auch auf den hellsten Flächen)
     "accent": "#6ad3ff",
     "accent-2": "#a78bfa",
     "on-accent": "#03131b",  # Schrift auf Akzentflächen
@@ -41,7 +41,7 @@ LIGHT: dict[str, str] = {
     "bg": "#e9edf7",
     "text": "#0e1324",
     "dim": "rgba(14, 19, 36, 0.7)",
-    "faint": "rgba(14, 19, 36, 0.55)",
+    "faint": "rgba(14, 19, 36, 0.64)",
     "accent": "#0a6fd6",
     "accent-2": "#6a4ce0",
     "on-accent": "#fff",
@@ -128,6 +128,40 @@ details.fold[open] > summary::after {
 	transform: rotate(-135deg);
 }
 details.fold > summary:hover::after {
+	border-color: var(--text);
+}
+
+/* Dasselbe als Knopf (button.fold-toggle mit aria-expanded), wo neben der Überschrift weitere Knöpfe stehen */
+button.fold-toggle {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex: 1;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+button.fold-toggle::after {
+	content: "";
+	flex-shrink: 0;
+	width: 8px;
+	height: 8px;
+	margin: 0 4px 4px auto;
+	border-right: 2px solid var(--dim);
+	border-bottom: 2px solid var(--dim);
+	transform: rotate(45deg);
+	transition: transform 0.15s var(--ease);
+}
+button.fold-toggle[aria-expanded="true"]::after {
+	margin-bottom: -4px;
+	transform: rotate(-135deg);
+}
+button.fold-toggle:hover::after {
 	border-color: var(--text);
 }
 
