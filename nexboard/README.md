@@ -113,6 +113,10 @@ einer Karte je eingeschaltetem Modul. Die Seitenleiste ordnet nach Situation: **
 Seiten haben (Radar: Warnungen, Radar & Karte). Hell und dunkel folgen dem System oder lassen sich
 umschalten, die Seite passt sich auch an schmale Fenster an.
 
+**Einrichtung** (System → Einrichtung, auf einer frischen Installation auch als Hinweis auf der Übersicht): in
+drei Schritten Vorlagen wählen (Touch-Leiste, AION 2 · PvE, PvP, Radar), sehen, was dafür auf dem PC noch fehlt,
+und die Module einschalten. Vorlagen und Voraussetzungen stehen als Tabellen in `daemon/deckbar_daemon/setup.py`.
+
 | Modul | Seiten und Inhalt | braucht |
 |---|---|---|
 | AION 2 · Overlay | Overlay: Vorschau (die Overlay-Seite in Monitorgröße, Widgets darin anordnen; nur am PC selbst), Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
