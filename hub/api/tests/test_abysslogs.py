@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from nexhub_api.modules.bis.abysslogs import best_per_name, raids, top_players
+from nexhub_api.modules.bis.abysslogs import best_per_name, leaderboard_page, raids, top_players
 
 from .fake_abyss import FakeAbyss, entry
 
@@ -37,3 +37,18 @@ def test_neuester_raid_mit_genug_eintraegen():
 def test_je_name_der_beste_echte_kampf():
     rows = [entry("A", 100), entry("A", 300), entry("B", 200), entry("C", 999, duration=5)]
     assert [(e["playerName"], e["dps"]) for e in best_per_name(rows)] == [("A", 300), ("B", 200)]
+
+
+def test_rangliste_seitenweise():
+    fake = FakeAbyss()
+    fake.boards = {8001: [f"N{i}" for i in range(250)]}
+    entries, total = run(fake, lambda http: leaderboard_page(http, "Ranger", 8001, 3))
+    assert (len(entries), total) == (50, 250)
+    entries, total = run(fake, lambda http: leaderboard_page(http, "Ranger", 8001, 1))
+    assert (len(entries), total) == (100, 250)
+
+
+def test_rangliste_nicht_gewertet():
+    fake = FakeAbyss()
+    fake.not_ranked = {4242}
+    assert run(fake, lambda http: leaderboard_page(http, "Ranger", 4242, 1)) == ([], 0)
