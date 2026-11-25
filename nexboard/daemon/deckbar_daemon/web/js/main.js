@@ -102,6 +102,7 @@ function render() {
   $("tabs").replaceChildren(...(tabs ? [tabs] : []));
   fill(view, el("div", { class: "view" }, content));
   renderNav();
+  renderBanners(); // hängt von der Seite ab
   window.scrollTo({ top: 0 });
 }
 
@@ -354,7 +355,9 @@ function renderBanners() {
   if (!S.online && S.modules) parts.push(callout("bad", "lan", "Keine Verbindung zum Daemon. Läuft deckbar.service? Die Seite verbindet sich von selbst neu."));
   if (S.layoutError) parts.push(callout("bad", "alert", `Layout ungültig – ${S.layoutError}`));
   const missing = Object.entries(S.status?.tools || {}).filter(([, ok]) => !ok).map(([t]) => t);
-  if (modOn("deck") && missing.length) parts.push(callout("warn", "information-outline", `Nicht installiert: ${missing.join(", ")} – die zugehörigen Aktionen und Anzeigen bleiben inaktiv.`));
+  // nur dort, wo es um die Leiste geht: auf jeder Seite wäre der Hinweis Dauerrauschen
+  const aboutDeck = ["dashboard", "deck", "setup"].includes(route.page);
+  if (modOn("deck") && aboutDeck && missing.length) parts.push(callout("warn", "information-outline", `Nicht installiert: ${missing.join(", ")} – die zugehörigen Aktionen und Anzeigen bleiben inaktiv.`));
   fill(b, ...parts);
 }
 

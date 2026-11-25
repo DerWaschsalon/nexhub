@@ -68,7 +68,7 @@ function pluginsPage(ctx) {
       update ? button(`Update auf ${update.to}`, () => install({ id: p.id, name: p.name }, update.newPermissions, "aktualisieren"), "sm primary", "update") : null,
       button(null, () => run(() => call("plugin_open", { id: p.id })), "sm icon ghost", "open-in-new", { title: "Fenster öffnen (Overlay muss laufen)", disabled: !on }),
       button(null, () => remove(p), "sm icon ghost", "delete", { title: "Entfernen" }),
-      sw(on, (v) => run(async () => { state.view = await call("plugin_set_enabled", { id: p.id, enabled: v }); })));
+      sw(on, (v) => run(async () => { state.view = await call("plugin_set_enabled", { id: p.id, enabled: v }); }), { "aria-label": `${p.name} einschalten` }));
     return el("div", { class: "row-group" },
       settingsRow(`${p.name} ${p.version}`, p.error ? `Fehler: ${p.error}` : p.description, controls),
       permissionList(p.permissions, viewOf(p.id)));

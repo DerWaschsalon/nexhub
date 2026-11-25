@@ -27,7 +27,8 @@
 
 	const bySlot = $derived(new Map(data.equipment.map((e) => [e.slot_name, e])));
 	// „Brooch1“ → „Brooch“: die Nummer unterscheidet nur die beiden gleichen Plätze
-	const slotLabel = (slot: string) => slot.replace(/\d+$/, '');
+	// Name eines leeren Platzes; Ohrring1 und Ohrring2 heißen gleich
+	const slotLabel = (slot: string) => t(`logs.slot.${slot.replace(/\d+$/, '')}`);
 </script>
 
 <div class="column">
@@ -89,7 +90,7 @@
 		border-radius: var(--radius);
 		background: var(--fill);
 		border: 1px solid var(--fill);
-		color: color-mix(in srgb, var(--white) 25%, transparent);
+		color: var(--faint);
 		font-size: 11px;
 	}
 </style>

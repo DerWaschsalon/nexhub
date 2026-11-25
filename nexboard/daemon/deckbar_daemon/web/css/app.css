@@ -1,6 +1,6 @@
 /* NexBoard Web-UI. Farben, Flächen, Radien, Schriften, Glaskarte (.glass), Hintergrund und Fokus kommen aus
    tokens.css, erzeugt aus proto/nexproto/design.py und gleich im NexHub. Hier stehen nur die Bausteine. */
-:root { --sidebar: 268px; }
+:root { --sidebar: 268px; --guide-bg: #0d0f14; /* Grund des Leveling-Guides: seine Farben sind für Dunkel gemacht */ }
 @font-face { font-family: "mdi"; src: url("/static/mdi.woff") format("woff"); font-display: block; }
 @font-face { font-family: "IBM Plex Sans"; src: url("/static/IBMPlexSans-400.woff2") format("woff2"); font-weight: 400; }
 @font-face { font-family: "IBM Plex Sans"; src: url("/static/IBMPlexSans-500.woff2") format("woff2"); font-weight: 500; }
@@ -15,7 +15,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font: 500 14px/1.5 var(--font-sans);
+  font: 15px/1.55 var(--font-sans); /* wie im NexHub */
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -43,8 +43,7 @@ details.advanced[open] > summary { margin-bottom: 10px; }
 .brand .logo {
   width: 38px; height: 38px; border-radius: var(--radius); display: grid; place-items: center;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, .5);
-  color: #fff; font-size: 21px;
+  color: var(--white); font-size: 21px;
 }
 .brand b { display: block; font-size: 16.5px; font-weight: 750; letter-spacing: .2px; }
 .brand small { color: var(--faint); font-size: 11.5px; }
@@ -110,11 +109,7 @@ details.advanced[open] > summary { margin-bottom: 10px; }
 .btn:active { transform: scale(.97); }
 .btn:disabled { opacity: .45; cursor: default; transform: none; }
 .btn .ic { font-size: 17px; }
-.btn.primary {
-  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--accent-2)));
-  color: var(--on-accent); border-color: transparent; font-weight: 650;
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 38%, transparent), inset 0 1px 0 rgba(255, 255, 255, .45);
-}
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .btn.primary:hover { filter: brightness(1.06); }
 .btn.danger:hover { background: color-mix(in srgb, var(--danger) 22%, transparent); border-color: var(--danger); }
 .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
@@ -124,8 +119,8 @@ details.advanced[open] > summary { margin-bottom: 10px; }
 .btn.sm.icon { width: 32px; height: 32px; }
 
 .chip {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px;
-  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--edge-soft); color: var(--dim); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 8px;
+  border-radius: var(--radius-sm); background: var(--fill-strong); border: 1px solid var(--edge-soft); color: var(--dim); white-space: nowrap;
 }
 .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
 .chip.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
@@ -146,7 +141,7 @@ details.advanced[open] > summary { margin-bottom: 10px; }
 }
 .switch span::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%;
-  background: linear-gradient(180deg, #fff, #e8ebf3); box-shadow: 0 2px 6px rgba(0, 0, 0, .3);
+  background: var(--white); box-shadow: 0 2px 6px var(--shade);
   transition: transform .28s var(--ease);
 }
 .switch input:checked + span { background: linear-gradient(135deg, var(--ok), color-mix(in srgb, var(--ok) 70%, var(--accent))); border-color: transparent; }
@@ -173,7 +168,7 @@ details.advanced[open] > summary { margin-bottom: 10px; }
 label.field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--dim); font-weight: 600; min-width: 0; }
 label.field .help { font-weight: 500; color: var(--faint); font-size: 12px; }
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), select, textarea {
-  width: 100%; padding: 9px 12px; border-radius: var(--radius-sm);
+  width: 100%; padding: 9px 12px; border-radius: var(--radius);
   background: var(--shade); border: 1px solid var(--edge); outline: none; color: var(--text); font-weight: 500;
   transition: border-color .2s, box-shadow .2s, background .2s;
 }
@@ -203,7 +198,7 @@ select option { background: var(--surface); color: var(--text); }
 .card > h2, .card-head h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: .1px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 /* Karte als Akkordeon: zugeklappt bleibt nur der Kopf stehen */
-details.card:not([open]) > .card-head { margin-bottom: 0; }
+.card.fold:not(.open) > .card-head { margin-bottom: 0; }
 .card-head .grow { flex: 1; min-width: 0; }
 .card-head .sub { color: var(--faint); font-size: 12.5px; font-weight: 500; margin-top: 2px; }
 .card + .card { margin-top: 0; }
@@ -235,9 +230,9 @@ details.card:not([open]) > .card-head { margin-bottom: 0; }
 .empty { text-align: center; padding: 38px 16px; color: var(--dim); }
 .empty .ic { font-size: 40px; color: var(--faint); display: block; margin-bottom: 10px; }
 
-table.list { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-table.list th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); font-weight: 700; padding: 0 10px 8px; }
-table.list td { padding: 10px; border-top: 1px solid var(--edge-soft); vertical-align: middle; }
+table.list { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.list th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); font-weight: 600; padding: 0 12px 10px; }
+table.list td { padding: 11px 12px; border-top: 1px solid var(--edge-soft); vertical-align: middle; }
 table.list td.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.list td.ok { color: var(--ok); }
 table.list td.warn { color: var(--warn); }
@@ -254,12 +249,11 @@ table.list td.leise { color: var(--faint); }
   border-radius: var(--radius); cursor: pointer; text-decoration: none; color: inherit;
   transition: transform .3s var(--ease), box-shadow .3s var(--ease);
 }
-.tile:hover { transform: translateY(-3px); text-decoration: none; box-shadow: 0 24px 60px rgba(0, 0, 0, .22); }
+.tile:hover { text-decoration: none; border-color: var(--edge); background: var(--surface-2); }
 .tile-head { display: flex; align-items: flex-start; gap: 13px; }
 .mod-icon {
-  width: 46px; height: 46px; flex: none; border-radius: var(--radius); display: grid; place-items: center; font-size: 24px; color: #fff;
+  width: 46px; height: 46px; flex: none; border-radius: var(--radius); display: grid; place-items: center; font-size: 24px; color: var(--white);
   background: linear-gradient(135deg, var(--c1, var(--accent)), var(--c2, var(--accent-2)));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--c1, var(--accent)) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, .45);
 }
 .mod-icon.sm { width: 36px; height: 36px; border-radius: var(--radius); font-size: 19px; }
 .mod-icon.off { filter: grayscale(1) opacity(.55); box-shadow: none; }
@@ -296,7 +290,7 @@ table.list td.leise { color: var(--faint); }
 dialog {
   border: 0; padding: 0; color: var(--text); background: transparent; max-width: min(820px, 94vw); width: 100%;
 }
-dialog::backdrop { background: rgba(5, 7, 15, .5); }
+dialog::backdrop { background: var(--shade-strong); }
 dialog .dlg { padding: 18px; border-radius: var(--radius); background: var(--surface); max-height: 82vh; display: flex; flex-direction: column; gap: 12px; }
 
 /* ------------------------------------------------------------ Schmal */
@@ -308,7 +302,7 @@ dialog .dlg { padding: 18px; border-radius: var(--radius); background: var(--sur
     transform: translateX(-110%); transition: transform .35s var(--ease);
   }
   body.nav-open .sidebar { transform: none; }
-  body.nav-open .scrim { display: block; position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .35); }
+  body.nav-open .scrim { display: block; position: fixed; inset: 0; z-index: 50; background: var(--shade); }
   .topbar .menu-btn { display: inline-flex; }
   .main { padding: 10px 16px 40px; }
   .topbar { padding-left: 10px; flex-wrap: wrap; }
@@ -326,10 +320,10 @@ dialog .dlg { padding: 18px; border-radius: var(--radius); background: var(--sur
 
 /* Leveling-Guide (PoE): Zeilen wie auf der Leiste, Symbole aus Exile-UI. Grund bewusst dunkel, auch im hellen
    Design: die Farben des Guides (Exile-UI) sind für dunklen Grund gemacht. */
-.guide-lines { list-style: none; margin: 12px 0 0; padding: 12px 14px; border-radius: var(--radius); background: #0d0f14; color: #fff; display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; line-height: 1.5; }
+.guide-lines { list-style: none; margin: 12px 0 0; padding: 12px 14px; border-radius: var(--radius); background: var(--guide-bg); color: var(--white); display: flex; flex-direction: column; gap: 4px; font-size: 14.5px; line-height: 1.5; }
 .guide-lines li { position: relative; padding-left: 16px; }
-.guide-lines li.step::before { content: "•"; position: absolute; left: 2px; color: rgba(255, 255, 255, .6); }
-.guide-lines li.optional::before { content: "+"; position: absolute; left: 2px; color: rgba(255, 255, 255, .6); }
+.guide-lines li.step::before { content: "•"; position: absolute; left: 2px; color: color-mix(in srgb, var(--white) 60%, transparent); }
+.guide-lines li.optional::before { content: "+"; position: absolute; left: 2px; color: color-mix(in srgb, var(--white) 60%, transparent); }
 .guide-lines li.hint { padding-left: 28px; font-size: 13.5px; }
 .guide-lines li.plain { padding-left: 0; }
 .guide-lines .gi { height: 18px; vertical-align: -4px; margin: 0 3px; }

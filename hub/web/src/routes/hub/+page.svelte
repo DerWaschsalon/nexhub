@@ -1,5 +1,5 @@
-<!-- Übersicht: je Eintrag der Seitenleiste eine Kachel, ein Spiel (AION 2 …) also eine Kachel für alle
-     seine Seiten. Bringt eine Seite eine Vorschau mit (NavItem.overview), steht sie in der Kachel und
+<!-- Übersicht: je Eintrag der Seitenleiste eine Kachel, ein Spiel (AION 2 …) oder die Verwaltung also eine
+     Kachel für alle ihre Seiten. Bringt eine Seite eine Vorschau mit (NavItem.overview), steht sie in der Kachel und
      die Kachel geht über die ganze Breite; bei einem Spiel steht jede Vorschau unter dem Namen ihrer Seite. -->
 <script lang="ts">
 	import Icon from '#lib/components/Icon.svelte';
@@ -35,6 +35,12 @@
 						<p.overview />
 					</div>
 				{/each}
+				<!-- Seiten der Gruppe ohne Vorschau: direkt erreichbar, statt nur über die erste Seite -->
+				<nav class="links" aria-label={t(entry.label)}>
+					{#each entry.pages.filter((p) => !p.overview) as p (p.href)}
+						<a class="chip" href={p.href}>{t(p.label)}</a>
+					{/each}
+				</nav>
 			{:else if entry.overview}
 				<div class="body"><entry.overview /></div>
 			{/if}
@@ -45,11 +51,24 @@
 <style>
 	.tiles {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 		gap: 16px;
 	}
 	.wide {
 		grid-column: 1 / -1;
+	}
+	.links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding: 0 22px 18px;
+	}
+	.links a {
+		text-decoration: none;
+	}
+	.links a:hover {
+		color: var(--text);
+		border-color: var(--edge);
 	}
 	.head {
 		display: flex;
@@ -65,15 +84,19 @@
 		background: var(--fill);
 	}
 	.head :global(svg) {
+		flex-shrink: 0;
 		color: var(--accent);
 	}
 	h2 {
 		flex: 1;
-		font-size: 18px;
+		min-width: 0;
+		font-size: 16px;
+		overflow-wrap: anywhere;
 	}
 	.open {
 		font-size: 13px;
 		color: var(--dim);
+		white-space: nowrap;
 	}
 	.body {
 		padding: 0 22px 22px;
