@@ -22,16 +22,16 @@ from pathlib import Path
 import httpx
 import uvicorn
 from fastapi.testclient import TestClient
-from nexhub_api import bis_collector
-from nexhub_api import census as census_module
+from nexhub_api.modules.bis import collector as bis_collector
+from nexhub_api.modules.armory import census as census_module
 from nexhub_api.aion2 import NC
-from nexhub_api.bis_collector import BisCollector
-from nexhub_api.census import Census
+from nexhub_api.modules.bis.collector import BisCollector
+from nexhub_api.modules.armory.census import Census
 from nexhub_api.config import Settings
 from nexhub_api.db import migrate
 from nexhub_api.main import create_app
-from nexhub_api.models import Character, ClassCensus, ItemRolls
-from nexhub_api.routes import bis as bis_route
+from nexhub_api.modules.armory.models import Character, ClassCensus, ItemRolls
+from nexhub_api.modules.bis import routes as bis_route
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests import test_rating, test_upgrades
 from tests.conftest import ADMIN, BASE, GUILD, ROLE, FakeDiscord, log_in

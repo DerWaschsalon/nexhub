@@ -1,5 +1,5 @@
 """Feedback-Board: schreiben, abstimmen, Status nur von Admins, anonym für andere Mitglieder."""
-from nexhub_api.routes import feedback
+from nexhub_api.modules.feedback import routes as feedback
 
 from .conftest import ADMIN, MEMBER
 from .test_devices import ORIGIN

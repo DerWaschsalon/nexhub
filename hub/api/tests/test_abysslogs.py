@@ -3,7 +3,7 @@ import asyncio
 
 import httpx
 
-from nexhub_api.abysslogs import best_per_name, raids, top_players
+from nexhub_api.modules.bis.abysslogs import best_per_name, raids, top_players
 
 from .fake_abyss import FakeAbyss, entry
 

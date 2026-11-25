@@ -86,7 +86,7 @@ def test_statistik_zaehlt_aus_vorhandenen_tabellen(client, as_user):
 def test_tagesreihe():
     from datetime import UTC, date, datetime
 
-    from nexhub_api.stats import last_days, per_day
+    from nexhub_api.modules.stats.days import last_days, per_day
 
     days = last_days(date(2026, 11, 24), 3)
     assert days == [date(2026, 11, 22), date(2026, 11, 23), date(2026, 11, 24)]

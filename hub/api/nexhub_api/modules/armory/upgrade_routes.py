@@ -9,9 +9,9 @@ from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ..deps import DB, CurrentUser
-from ..upgrades import DEFAULT_GOAL, plan
-from .armory import character_or_404, rating_inputs
+from ...deps import DB, CurrentUser
+from .routes import character_or_404, rating_inputs
+from .upgrades import DEFAULT_GOAL, plan
 
 router = APIRouter(prefix="/api/armory", tags=["armory"])
 

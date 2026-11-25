@@ -7,8 +7,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from nexhub_api.aion2 import NC
-from nexhub_api.armory import Armory
-from nexhub_api.models import Character, CharacterDay
+from nexhub_api.modules.armory.models import Character, CharacterDay
+from nexhub_api.modules.armory.service import Armory
 
 from .conftest import ADMIN, BASE, MEMBER, log_in
 from .fake_nc import info, search_row

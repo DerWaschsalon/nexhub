@@ -1,4 +1,4 @@
-// Antworten von /api/feedback (hub/api/nexhub_api/routes/feedback.py).
+// Antworten von /api/feedback (hub/api/nexhub_api/modules/feedback/routes.py).
 
 /** Stände eines Eintrags; „erledigt“ und „abgelehnt“ gelten als abgeschlossen */
 export const STATUSES = ['neu', 'gesehen', 'geplant', 'erledigt', 'abgelehnt'] as const;

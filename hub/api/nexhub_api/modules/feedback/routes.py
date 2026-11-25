@@ -18,9 +18,10 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 
-from ..db import aware
-from ..deps import DB, AdminUser, CurrentUser
-from ..models import Feedback, FeedbackVote, User
+from ...db import aware
+from ...deps import DB, AdminUser, CurrentUser
+from ...models import User
+from .models import Feedback, FeedbackVote
 
 router = APIRouter(tags=["feedback"])
 

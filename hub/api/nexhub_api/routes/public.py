@@ -1,26 +1,16 @@
-"""Öffentlicher Bereich: alles hier ist ohne Login erreichbar.
+"""Öffentlicher Bereich des Kerns, ohne Login:
 
-Nur herausgeben, was geteilt werden darf:
     GET /api/public/info            ist der Login eingerichtet? Wer betreibt den Hub (Impressum)?
-    GET /api/public/runs/{token}    ein geteilter Run (Teilen-Link /r/<token>)
-    GET /api/public/runs/{token}/fights/{kampf}   ein Kampf daraus im Detail
-    GET /api/public/vergleich/{token}?lang=de     ein geteilter Vergleich (Teilen-Link /v/<token>)
 
-Geteilte Runs zeigen Eckdaten und Zusammenfassung mit den Namen der Mitspieler, aber kein
-Discord-Konto und nicht die Rohdatei. Geteilte Vergleiche zeigen beide Charaktere, aber nicht, wer
-eingetragen oder geteilt hat. Suchmaschinen sollen beides nicht aufnehmen.
+Was Module öffentlich zeigen (geteilte Runs und Vergleiche, Termine), steht in ihren shared_routes.py bzw.
+routes.py, ebenfalls unter /api/public.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, Response
-from nexproto import dungeon_label
+from fastapi import APIRouter, Response
 from pydantic import BaseModel
-from sqlalchemy import select
 
-from ..deps import DB, SettingsDep
-from ..models import Comparison, Run
-from .armory import ComparisonOut, load_comparison
-from .runs import load_fight_detail
+from ..deps import SettingsDep
 
 router = APIRouter(prefix="/api/public", tags=["öffentlich"])
 
@@ -43,53 +33,7 @@ async def info(settings: SettingsDep) -> Info:
                 hoster=settings.hub_hoster.strip() or None)
 
 
-class SharedRun(BaseModel):
-    dungeon: str
-    difficulty: str | None
-    start_ms: int
-    end_ms: int
-    complete: bool
-    bosses_total: int
-    bosses_killed: int
-    fights: int
-    hits: int
-    character: str | None
-    summary: dict
-
-
-def _not_for_search_engines(response: Response) -> None:
+def not_for_search_engines(response: Response) -> None:
+    """Für geteilte Seiten der Module: nicht aufnehmen, nicht zwischenspeichern."""
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     response.headers["Cache-Control"] = "no-store"
-
-
-async def _shared(db: DB, token: str, response: Response) -> Run:
-    run = await db.scalar(select(Run).where(Run.share_token == token)) if len(token) <= 32 else None
-    if run is None:
-        raise HTTPException(404, "Link ungültig oder zurückgezogen")
-    _not_for_search_engines(response)
-    return run
-
-
-@router.get("/runs/{token}/fights/{fight_id}")
-async def shared_fight(token: str, fight_id: str, db: DB, settings: SettingsDep, response: Response) -> dict:
-    return await load_fight_detail(settings, await _shared(db, token, response), fight_id)
-
-
-@router.get("/runs/{token}")
-async def shared_run(token: str, db: DB, response: Response) -> SharedRun:
-    run = await _shared(db, token, response)
-    return SharedRun(dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty,
-                     start_ms=run.start_ms, end_ms=run.end_ms,
-                     complete=run.complete, bosses_total=run.bosses_total, bosses_killed=run.bosses_killed,
-                     fights=run.fights, hits=run.hits, character=run.character, summary=run.summary)
-
-
-@router.get("/vergleich/{token}")
-async def shared_comparison(token: str, request: Request, db: DB, response: Response,
-                            lang: str = "en") -> ComparisonOut:
-    row = await db.scalar(select(Comparison).where(Comparison.token == token)) if len(token) <= 32 else None
-    if row is None:
-        raise HTTPException(404, "Link ungültig oder zurückgezogen")
-    _not_for_search_engines(response)
-    return await load_comparison(request, db, row, lang)
-

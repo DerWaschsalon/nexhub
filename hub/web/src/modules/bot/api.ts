@@ -1,5 +1,5 @@
 // Typen und Adresse der Steuer-API von TheWashBot (bot/bot/admin/control.py), über den Hub unter
-// /api/admin/bot (hub/api/nexhub_api/routes/bot.py).
+// /api/admin/bot (hub/api/nexhub_api/modules/bot/routes.py).
 // Discord-IDs sind Strings: als Zahl verlöre JavaScript die letzten Stellen.
 
 export const BOT_API = '/api/admin/bot';

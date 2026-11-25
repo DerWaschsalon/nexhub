@@ -19,9 +19,9 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 
-from ..db import aware
-from ..deps import DB, CurrentDevice, CurrentUser, SettingsDep, hash_token
-from ..models import Device, DevicePairing, User
+from ...db import aware
+from ...deps import DB, CurrentDevice, CurrentUser, SettingsDep, hash_token
+from ...models import Device, DevicePairing, User
 
 router = APIRouter(prefix="/api/devices", tags=["geräte"])
 

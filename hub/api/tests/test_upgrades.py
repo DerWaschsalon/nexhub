@@ -1,6 +1,7 @@
 """Upgrade-Plan (upgrades.py): Zielnote, wenigste Versuche, Stufen der Ziele, Gruppen. Nur erfundene Daten,
 derselbe Schild wie in test_rating.py."""
-from nexhub_api import rating, upgrades
+from nexhub_api.modules.armory import upgrades
+from nexhub_api.modules.bis import rating
 
 from .test_rating import MINE, SLOT, TABLE, TOP, census, shield
 

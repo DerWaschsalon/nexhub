@@ -262,7 +262,7 @@ class NC:
 
     async def gear(self, server_id: int, character_id: str, lang: str = "en") -> dict:
         """Nur Ausrüstung samt Werten je Gegenstand und Skills, ohne Profil, Daevanion und
-        Verzauberungsgewinn: das Nötigste für die BiS-Listen (bis_collector.py), rund 26 statt 50 Anfragen."""
+        Verzauberungsgewinn: das Nötigste für die BiS-Listen (bis/collector.py), rund 26 statt 50 Anfragen."""
         q = {"lang": LANGS[lang], "region": shard_of(server_id), "serverId": server_id, "characterId": character_id}
         equip = await self._get(f"{SITE}/equipment", q)
         if not isinstance(equip.get("equipment"), dict):

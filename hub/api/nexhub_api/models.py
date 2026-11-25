@@ -1,10 +1,11 @@
-"""Datenbanktabellen. Änderungen immer mit Alembic-Migration (nexhub_api/migrations/versions)."""
+"""Tabellen des Kerns: Konten, Sitzungen, gekoppelte Geräte. Die Tabellen der Module stehen in
+modules/<id>/models.py. Änderungen immer mit Alembic-Migration (nexhub_api/migrations/versions)."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # SQLite (Tests) vergibt automatische IDs nur für INTEGER PRIMARY KEY
@@ -15,9 +16,7 @@ class Base(DeclarativeBase):
     pass
 
 
-# Erlaubte Werte von User.role und RunCharacter.status/Character.status (in der Datenbank Text)
-Role = Literal["admin", "member"]
-CharacterStatus = Literal["offen", "ok", "nicht_gefunden", "name_maskiert", "fehler"]
+Role = Literal["admin", "member"]  # erlaubte Werte von User.role (in der Datenbank Text)
 
 
 class User(Base):
@@ -88,181 +87,3 @@ class DevicePairing(Base):
     # Gesetzt, sobald ein Konto den Code bestätigt hat
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     device_name: Mapped[str | None] = mapped_column(String(64))
-
-
-class Run(Base):
-    """Ein hochgeladener Dungeon-Run. Die Datei (NexLog) liegt unverändert unter
-    `<HUB_DATA_DIR>/runs/<id>.nexlog.gz`; hier stehen Eckdaten und eine Zusammenfassung."""
-
-    __tablename__ = "runs"
-    __table_args__ = (UniqueConstraint("user_id", "sha256"),)  # dieselbe Datei nur einmal je Konto
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    device_id: Mapped[int | None] = mapped_column(ForeignKey("devices.id", ondelete="SET NULL"))
-    sha256: Mapped[str] = mapped_column(String(64))
-    size: Mapped[int] = mapped_column(Integer)  # Bytes, gepackt
-    dungeon_id: Mapped[int] = mapped_column(Integer)
-    dungeon: Mapped[str] = mapped_column(String(120))
-    difficulty: Mapped[str | None] = mapped_column(String(40))
-    start_ms: Mapped[int] = mapped_column(BigInteger, index=True)
-    end_ms: Mapped[int] = mapped_column(BigInteger)
-    complete: Mapped[bool] = mapped_column(Boolean)
-    bosses_total: Mapped[int] = mapped_column(Integer)
-    bosses_killed: Mapped[int] = mapped_column(Integer)
-    fights: Mapped[int] = mapped_column(Integer)
-    hits: Mapped[int] = mapped_column(Integer)
-    character: Mapped[str | None] = mapped_column(String(64))  # wer aufgenommen hat
-    summary: Mapped[dict] = mapped_column(JSON)  # analysis.summarize()
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    # Geteilt: wer den Link /r/<share_token> kennt, sieht den Run ohne Login. None = nicht geteilt
-    share_token: Mapped[str | None] = mapped_column(String(32), unique=True)
-    shared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-
-class Snapshot:
-    """Momentaufnahme eines Charakters von der AION-2-Website, gefüllt von characters.fill().
-    Gemeinsam für Mitspieler eines Runs (RunCharacter) und die Armory (Character).
-
-    status: offen, ok, nicht_gefunden, name_maskiert, fehler. `data` ist das Format aus aion2.py."""
-
-    name: Mapped[str] = mapped_column(String(64))
-    cls: Mapped[str | None] = mapped_column(String(32))
-    server_id: Mapped[int] = mapped_column(Integer, default=0)
-    status: Mapped[str] = mapped_column(String(16), index=True)
-    nc_character_id: Mapped[str | None] = mapped_column(String(128))
-    combat_power: Mapped[int | None] = mapped_column(BigInteger)
-    item_level: Mapped[int | None] = mapped_column(Integer)
-    data: Mapped[dict | None] = mapped_column(JSON)
-    error: Mapped[str | None] = mapped_column(String(200))
-    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-
-
-class RunCharacter(Snapshot, Base):
-    """Ein Mitspieler, so wie er zur Zeit des Runs aussah (characters.py)."""
-
-    __tablename__ = "run_characters"
-    __table_args__ = (UniqueConstraint("run_id", "name"),)
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
-
-
-class Character(Snapshot, Base):
-    """Ein Charakter in der Armory: eingetragen von einem Konto, täglich neu abgerufen (armory.py).
-    Jeder Charakter gehört höchstens einem Konto."""
-
-    __tablename__ = "characters"
-    __table_args__ = (UniqueConstraint("server_id", "nc_character_id"),)
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class CharacterDay(Base):
-    """Verlauf in der Armory: je Charakter und Tag Kampfkraft und Item-Level des letzten Abrufs."""
-
-    __tablename__ = "character_days"
-    __table_args__ = (UniqueConstraint("character_id", "day"),)
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
-    day: Mapped[date] = mapped_column(Date)
-    combat_power: Mapped[int | None] = mapped_column(BigInteger)
-    item_level: Mapped[int | None] = mapped_column(Integer)
-
-
-class Comparison(Base):
-    """Geteilter Vergleich: wer den Link /v/<token> kennt, sieht ihn ohne Login. Gespeichert ist nur, wer
-    mit wem verglichen wird; die Werte holt der Hub beim Öffnen (der rechte live von der Website)."""
-
-    __tablename__ = "comparisons"
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    token: Mapped[str] = mapped_column(String(32), unique=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    left_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
-    right_server_id: Mapped[int] = mapped_column(Integer)
-    right_name: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class ClassCensus(Base):
-    """Zählung der Top-Spieler einer Klasse (census.py): je Platz, wie viele welche Zeile der
-    Seelenbindung tragen, und der größte Wert je Zeile (rating.count_players/add_tops). Keine Namen."""
-
-    __tablename__ = "class_census"
-
-    cls: Mapped[str] = mapped_column(String(32), primary_key=True)
-    group_label: Mapped[str] = mapped_column(String(300))  # woher die Spieler stammen („Raid · Hard“)
-    data: Mapped[dict] = mapped_column(JSON)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
-class ItemRolls(Base):
-    """Würfeltabelle eines Gegenstands von MetaBot.GG (metabot.py), je englischem Namen; `data` leer,
-    wenn MetaBot den Gegenstand nicht kennt (dann erst nach einer Woche neu fragen)."""
-
-    __tablename__ = "item_rolls"
-
-    name: Mapped[str] = mapped_column(String(128), primary_key=True)
-    data: Mapped[dict | None] = mapped_column(JSON)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-
-
-class BisQueue(Base):
-    """Warteschlange der BiS-Listen (bis_collector.py): Namen aus den Ranglisten von Abyss Logs, die noch
-    abgerufen werden. Der Name steht nur hier und nur bis zum Abruf."""
-
-    __tablename__ = "bis_queue"
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    cls: Mapped[str] = mapped_column(String(32))
-    player_name: Mapped[str] = mapped_column(String(64))
-    raid: Mapped[str] = mapped_column(String(128))
-    tier: Mapped[str] = mapped_column(String(16))  # „Hard“ oder „Normal“
-    rank: Mapped[int] = mapped_column(Integer, index=True)  # Platz in der Klasse, mischt die Klassen beim Abruf
-    combat_power: Mapped[int | None] = mapped_column(BigInteger)
-    tries: Mapped[int] = mapped_column(Integer, default=0)
-
-
-class BisSample(Base):
-    """Ein Top-Spieler im Bestand der BiS-Listen: Ausrüstung und Skills in beiden Sprachen (FORMAT von
-    aion2.py). Ohne Namen; `character_key` ist ein SHA-256 aus Server und Charakter-ID, damit niemand doppelt
-    zählt. Die Zählung für die Bewertung der Armory (census.py) rechnet aus demselben Bestand."""
-
-    __tablename__ = "bis_samples"
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    cls: Mapped[str] = mapped_column(String(32), index=True)
-    character_key: Mapped[str] = mapped_column(String(64), unique=True)
-    raid: Mapped[str] = mapped_column(String(128))
-    tier: Mapped[str] = mapped_column(String(16))
-    combat_power: Mapped[int | None] = mapped_column(BigInteger)
-    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    data: Mapped[dict] = mapped_column(JSON)
-
-
-class Feedback(Base):
-    """Ein Wunsch oder Hinweis eines Mitglieds. Wer ihn schrieb, sehen nur Admins."""
-
-    __tablename__ = "feedback"
-
-    id: Mapped[int] = mapped_column(BigID, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    title: Mapped[str] = mapped_column(String(120))
-    body: Mapped[str] = mapped_column(String(2000), server_default="")
-    status: Mapped[str] = mapped_column(String(16), server_default="neu")  # siehe routes/feedback.py STATUSES
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
-class FeedbackVote(Base):
-    """Eine Stimme für einen Wunsch; je Konto höchstens eine."""
-
-    __tablename__ = "feedback_votes"
-
-    feedback_id: Mapped[int] = mapped_column(ForeignKey("feedback.id", ondelete="CASCADE"), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)

@@ -14,7 +14,7 @@ from urllib.parse import quote
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from ..deps import AdminUser, SettingsDep, require_admin
+from ...deps import AdminUser, SettingsDep, require_admin
 
 log = logging.getLogger(__name__)
 

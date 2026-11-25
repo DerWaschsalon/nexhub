@@ -10,9 +10,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from ..deps import DB, CurrentUser
-from ..loot import MIN_KILLS, table
-from ..models import Run
+from ...deps import DB, CurrentUser
+from ..logs.models import Run
+from .table import MIN_KILLS, table
 
 router = APIRouter(prefix="/api/loot", tags=["runs"])
 

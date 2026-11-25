@@ -1,4 +1,4 @@
-// Antworten der Hub-API für die BiS-Listen (hub/api/nexhub_api/routes/bis.py). Der typische Gegenstand
+// Antworten der Hub-API für die BiS-Listen (hub/api/nexhub_api/modules/bis/routes.py). Der typische Gegenstand
 // je Platz hat das Format eines Armory-Gegenstands, die Anteile das Format der Bewertung (rating.ts).
 import type * as Api from '#lib/api-types.ts';
 import type { CharacterData, CharacterItem } from '#modules/logs/api.ts';

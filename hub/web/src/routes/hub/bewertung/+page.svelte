@@ -1,5 +1,5 @@
 <!-- „Wie wir bewerten“: die Rechnung hinter Note und Upgrade-Plan in Worten. Die Zahlen (Notenbänder,
-     Zielnoten, Stufen) kommen von der API (routes/rating.py), damit Text und Code nicht auseinanderlaufen.
+     Zielnoten, Stufen) kommen von der API (modules/armory/rating_routes.py), damit Text und Code nicht auseinanderlaufen.
      Ändert sich die Rechnung in rating.py oder upgrades.py, diese Seite mit ändern. -->
 <script lang="ts">
 	import { formatPct } from '#lib/format.ts';

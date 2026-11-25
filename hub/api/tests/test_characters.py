@@ -7,9 +7,9 @@ from nexproto import NexLog, pack, unpack
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from nexhub_api.characters import players_of
-from nexhub_api.models import RunCharacter
-from nexhub_api.routes.characters import _details
+from nexhub_api.modules.logs.character_routes import _details
+from nexhub_api.modules.logs.characters import players_of
+from nexhub_api.modules.logs.models import RunCharacter
 
 from .conftest import ADMIN, MEMBER, log_in
 from .fake_nc import info, search_row
@@ -198,9 +198,9 @@ def test_refresh(make_client, fake, as_user):
 
 # Robustheit des Abrufs (Funde aus dem Review)
 
-from nexhub_api import characters  # noqa: E402
 from nexhub_api.aion2 import NC  # noqa: E402
-from nexhub_api.characters import Fetcher  # noqa: E402
+from nexhub_api.modules.logs import characters  # noqa: E402
+from nexhub_api.modules.logs.characters import Fetcher  # noqa: E402
 
 
 def failed_run(make_client, as_user, fake, database_url, dungeon: str = "Ferocious Horn Den") -> int:

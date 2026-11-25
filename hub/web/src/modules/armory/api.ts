@@ -1,4 +1,4 @@
-// Antworten der Hub-API für die Armory (hub/api/nexhub_api/routes/armory.py). Ein Armory-Charakter
+// Antworten der Hub-API für die Armory (hub/api/nexhub_api/modules/armory/routes.py). Ein Armory-Charakter
 // ist eine Momentaufnahme wie ein Mitspieler im Run – Typen und Ansicht kommen aus modules/logs.
 import type * as Api from '#lib/api-types.ts';
 import type { CharacterData, CharacterListItem, CharacterSnapshot } from '#modules/logs/api.ts';

@@ -7,6 +7,7 @@ import os
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from nexhub_api import modules  # noqa: F401  (meldet die Tabellen der Module an)
 from nexhub_api.models import Base
 
 config = context.config

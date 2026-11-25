@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .rating import ARCANA, BOUNDS, Census, letter, lines_of, names_de, points, score
+from ..bis.rating import ARCANA, BOUNDS, Census, letter, lines_of, names_de, points, score
 
 DEFAULT_GOAL = "S+"
 GOALS = ("S+", "BiS")

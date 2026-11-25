@@ -8,10 +8,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from nexhub_api import bis_collector
-from nexhub_api import census as census_module
-from nexhub_api.census import Census
-from nexhub_api.models import ClassCensus, ItemRolls
+from nexhub_api.modules.armory import census as census_module
+from nexhub_api.modules.armory.census import Census
+from nexhub_api.modules.armory.models import ClassCensus, ItemRolls
+from nexhub_api.modules.bis import collector as bis_collector
 
 from .conftest import MEMBER
 from .test_armory import NEW, login

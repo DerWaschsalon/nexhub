@@ -4,13 +4,13 @@
     GET    /api/armory                           alle eingetragenen Charaktere, ohne die Daten
     POST   /api/armory                           eigenen Charakter eintragen (Treffer aus der Suche)
     GET    /api/armory/{id}                      Momentaufnahme und Verlauf
-    GET    /api/armory/{id}/upgrades             Upgrade-Plan (routes/upgrades.py)
+    GET    /api/armory/{id}/upgrades             Upgrade-Plan (modules/armory/upgrade_routes.py)
     DELETE /api/armory/{id}                      austragen (wer eingetragen hat oder ein Admin)
     POST   /api/armory/{id}/refresh              jetzt neu abrufen (alle, höchstens alle 10 Minuten)
     POST   /api/armory/compare/share             Teilen-Link für einen Vergleich (öffentlich unter /v/<token>)
     DELETE /api/armory/compare/share/{token}     Teilen-Link zurückziehen (wer geteilt hat, oder ein Admin)
 
-Abruf und Format wie bei den Mitspielern eines Runs (characters.py, routes/characters.py).
+Abruf und Format wie bei den Mitspielern eines Runs (characters.py, modules/logs/character_routes.py).
 """
 from __future__ import annotations
 
@@ -22,18 +22,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import defer
 
-from ..aion2 import LANGS, NC, NCError, NotFound, localized, shard_of
-from ..armory import Armory
-from ..census import character_class
-from ..config import Settings
-from ..db import aware
-from ..deps import DB, CurrentUser, SettingsDep
-from ..models import Character, CharacterDay, ClassCensus, Comparison, ItemRolls, User
-from ..ratgeber import hints
-from ..rating import rate
-from ..upgrades import plan
-from .characters import CharacterOut, _out
-from .runs import Shared
+from ...aion2 import LANGS, NC, NCError, NotFound, localized, shard_of
+from ...config import Settings
+from ...db import aware
+from ...deps import DB, CurrentUser, SettingsDep
+from ...models import User
+from ..bis.rating import rate
+from ..logs.character_routes import CharacterOut, _out
+from ..logs.routes import Shared
+from .census import character_class
+from .models import Character, CharacterDay, ClassCensus, Comparison, ItemRolls
+from .ratgeber import hints
+from .service import Armory
+from .upgrades import plan
 
 router = APIRouter(prefix="/api/armory", tags=["armory"])
 

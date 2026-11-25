@@ -1,5 +1,5 @@
 // Modul Feedback: Mitglieder schreiben Wünsche und stimmen ab, Admins setzen den Status
-// (hub/api/nexhub_api/routes/feedback.py). Seite unter routes/hub/feedback/.
+// (hub/api/nexhub_api/modules/feedback/routes.py). Seite unter routes/hub/feedback/.
 import type { HubModule } from '#lib/module.ts';
 import { TEXTS } from './texts.ts';
 

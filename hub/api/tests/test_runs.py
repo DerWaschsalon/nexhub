@@ -92,7 +92,7 @@ def test_kaputte_und_zu_grosse_dateien(client, as_user, monkeypatch):
     token = pair(client, as_user(MEMBER))
     r = upload(client, token, b"kein gzip")
     assert r.status_code == 422 and "gzip" in r.json()["detail"]
-    import nexhub_api.routes.runs as runs
+    import nexhub_api.modules.logs.routes as runs
     monkeypatch.setattr(runs, "MAX_PACKED", 100)
     assert upload(client, token, nexlog()).status_code == 413
     assert as_user(ADMIN).get("/api/runs").json() == []

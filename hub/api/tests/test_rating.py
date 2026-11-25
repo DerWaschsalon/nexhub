@@ -1,6 +1,6 @@
 """Bewertung der Ausrüstung (rating.py): Zählung, Note, ideale Zeilen.
 Nur erfundene Daten, gebaut nach dem Muster eines Schilds mit Krit statt Kampftempo."""
-from nexhub_api import rating
+from nexhub_api.modules.bis import rating
 
 SLOT = "SubHand"
 # Würfeltabelle des Schilds wie von metabot.py: Name, Bereich, Chance
