@@ -115,7 +115,8 @@ umschalten, die Seite passt sich auch an schmale Fenster an.
 
 | Modul | Seiten und Inhalt | braucht |
 |---|---|---|
-| AION 2 · Overlay | Overlay: Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
+| AION 2 · Overlay | Overlay: Vorschau (die Overlay-Seite in Monitorgröße, Widgets darin anordnen; nur am PC selbst), Profile, Widgets aller eingeschalteten Module, Steuerung, Darstellung | Kampfdaten |
+| AION 2 · Effekte | keine Seite: `GET /api/m/aion2.effects` für andere Programme auf diesem PC | Kampfdaten |
 | AION 2 · Boss-Warnungen | Warnungen (Aus · Nur Wichtiges · Alles, Einzelheiten unter „Erweitert“) | – |
 | AION 2 · Radar | Radar & Karte | – |
 | AION 2 · Feldbosse | steht auf der Seite Termine (Timer, Ansage) | Termine |

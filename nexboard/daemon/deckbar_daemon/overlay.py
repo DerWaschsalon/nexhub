@@ -84,6 +84,7 @@ class Overlay:
         self.game = False
         self.ui_watching: Callable[[], bool] = lambda: True  # Web-UI offen? (setzt der Daemon)
         self.screens: list[dict] = []
+        self.page_port: int | None = None  # Port der Overlay-Seite, für die Vorschau in der Web-UI (setzt der Daemon)
         self.listeners: list = []
 
     # ------------------------------------------------------------ Widgets und Layout
@@ -167,7 +168,8 @@ class Overlay:
     def info(self) -> dict:
         return {"layout": self.layout.model_dump(), "widgets": self.widgets_info(),
                 "unit": self.unit, "socket": socket_path().exists(),
-                "clients": len(self.clients), "screens": self.screens, "game": self.game}
+                "clients": len(self.clients), "screens": self.screens, "game": self.game,
+                "page_port": self.page_port}
 
     async def refresh_screens(self) -> list[dict]:
         """Monitore laut KDE (kscreen-doctor), für die Auswahl in der Web-UI; sonst leer."""
