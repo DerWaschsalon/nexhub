@@ -22,12 +22,11 @@ from datetime import UTC, datetime
 from typing import Annotated, NamedTuple
 
 from fastapi import APIRouter, HTTPException, Request, Response
+from nexproto import dungeon_label
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import delete, func, select
 
 from ...aion2 import localized
-from nexproto import dungeon_label
-
 from ...deps import DB, AdminUser, CurrentDevice, CurrentUser
 from ...routes.public import not_for_search_engines
 from ..bis.abysslogs import REGION
