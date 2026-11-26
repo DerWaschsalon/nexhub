@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ...deps import DB, CurrentUser
 from ...routes.public import not_for_search_engines
@@ -45,12 +45,26 @@ def _utc(at: datetime) -> datetime:
     return at if at.tzinfo else at.replace(tzinfo=UTC)
 
 
-async def _parses(db: DB, run: Run) -> RunParses:
+async def _guild(request: Request, db: DB) -> dict[tuple[int, str], list[float]]:
+    """Gildenbestwerte, im Speicher gehalten, bis ein Run dazukommt oder gelöscht wird (Anzahl und höchste ID).
+    So liest nicht jeder Aufruf einer Kampfseite alle Runs."""
+    key = tuple((await db.execute(select(func.count(), func.max(Run.id)).select_from(Run))).one())
+    cached = getattr(request.app.state, "parses_guild", None)
+    if cached is None or cached[0] != key:
+        cached = (key, guild_bests((await db.scalars(select(Run.summary))).all()))
+        request.app.state.parses_guild = cached
+    return cached[1]
+
+
+async def _parses(request: Request, db: DB, run: Run) -> RunParses:
     killed = [b for b in run.summary.get("bosses", []) if b.get("killed")]
-    mobs = {b["mob"] for b in killed}
+    if not killed:
+        return RunParses(guild_min=GUILD_MIN, fights={})
+    pairs = {(b["mob"], p.get("cls")) for b in killed for p in b.get("players", [])}
     boards = {(b.boss, b.cls): b for b in (await db.scalars(select(ParseBoard).where(
-        ParseBoard.region == REGION, ParseBoard.boss.in_(mobs)))).all()} if mobs else {}
-    guild = guild_bests((await db.scalars(select(Run.summary))).all())
+        ParseBoard.region == REGION, ParseBoard.boss.in_({m for m, _ in pairs}),
+        ParseBoard.cls.in_({c for _, c in pairs if c})))).all()}
+    guild = await _guild(request, db)
     fights: dict[str, dict[str, Parse]] = {}
     for b in killed:
         best: dict[str, dict] = {}  # derselbe Name doppelt (Relog): der stärkere Eintrag
@@ -70,17 +84,17 @@ async def _parses(db: DB, run: Run) -> RunParses:
 
 
 @router.get("/runs/{run_id}")
-async def run_parses(run_id: int, user: CurrentUser, db: DB) -> RunParses:
+async def run_parses(run_id: int, request: Request, user: CurrentUser, db: DB) -> RunParses:
     run = await db.get(Run, run_id)
     if run is None:
         raise HTTPException(404, "Run nicht gefunden")
-    return await _parses(db, run)
+    return await _parses(request, db, run)
 
 
 @public_router.get("/shared/{token}")
-async def shared_parses(token: str, db: DB, response: Response) -> RunParses:
+async def shared_parses(token: str, request: Request, db: DB, response: Response) -> RunParses:
     run = await db.scalar(select(Run).where(Run.share_token == token)) if len(token) <= 32 else None
     if run is None:
         raise HTTPException(404, "Link ungültig oder zurückgezogen")
     not_for_search_engines(response)
-    return await _parses(db, run)
+    return await _parses(request, db, run)

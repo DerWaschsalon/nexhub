@@ -3,7 +3,8 @@
 Alle TICK_SECONDS sucht der Abruf die Paare aus Boss und Klasse, die in getöteten Bossen der Runs der letzten
 WINDOW_DAYS Tage vorkommen (calc.needed_pairs). Fällig ist ein Paar ohne Rangliste, eine Rangliste älter als
 MAX_AGE und eine leere („not ranked“) älter als EMPTY_MAX_AGE; fehlende zuerst, dann die ältesten, höchstens
-PER_TICK je Takt. Zwischen zwei Anfragen liegen PAUSE_SECONDS. Geht etwas schief, bleibt der alte Stand stehen.
+PER_TICK je Takt. Ein Paar, dessen Abruf fehlschlug, kommt erst nach RETRY_AFTER wieder dran. Zwischen zwei
+Anfragen liegen PAUSE_SECONDS. Geht etwas schief, bleibt der alte Stand stehen.
 
 Gespeichert werden nur die DPS-Bestwerte je Spieler, keine Namen.
 """
@@ -33,6 +34,7 @@ MAX_AGE = timedelta(hours=24)
 EMPTY_MAX_AGE = timedelta(days=7)
 WINDOW_DAYS = 30
 MAX_PAGES = 100  # Sicherung: 10.000 Einträge
+RETRY_AFTER = timedelta(hours=1)  # nach einem Fehler: so lange warten, damit andere Ranglisten drankommen
 
 
 async def fetch_board(http: httpx.AsyncClient, cls: str, boss: int, pause: float) -> tuple[int, list[float]]:
@@ -49,6 +51,7 @@ class ParseFetcher:
     def __init__(self, sessionmaker: async_sessionmaker[AsyncSession], http: httpx.AsyncClient,
                  pause: float = PAUSE_SECONDS) -> None:
         self.sessionmaker, self.http, self.pause = sessionmaker, http, pause
+        self.failed: dict[tuple[int, str], datetime] = {}  # nur im Speicher: nach einem Neustart sofort wieder
 
     async def run(self) -> None:
         """Läuft, bis der Hub beendet wird."""
@@ -71,7 +74,9 @@ class ParseFetcher:
                 total, dps = await fetch_board(self.http, cls, boss, self.pause)
             except AbyssError as e:
                 log.info("Parses %s an %s: %s", cls, boss, e)
+                self.failed[(boss, cls)] = datetime.now(UTC)
                 continue
+            self.failed.pop((boss, cls), None)
             await self._store(boss, cls, total, dps)
             done += 1
         return done
@@ -85,6 +90,9 @@ class ParseFetcher:
         now = datetime.now(UTC)
         due: list[tuple[datetime, int, str]] = []
         for boss, cls in needed_pairs(summaries):
+            failed = self.failed.get((boss, cls))
+            if failed and now - failed < RETRY_AFTER:
+                continue
             board = stored.get((boss, cls))
             if board is None:
                 due.append((datetime.min.replace(tzinfo=UTC), boss, cls))

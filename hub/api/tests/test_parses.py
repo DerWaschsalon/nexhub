@@ -225,3 +225,33 @@ def test_zugriff(client, as_user, database_url):
     assert r.headers["X-Robots-Tag"].startswith("noindex")
     assert client.get("/api/public/parses/shared/falsch").status_code == 404
     assert client.get("/api/public/parses/shared/" + "x" * 40).status_code == 404
+
+
+def test_fehlschlaege_verdraengen_andere_nicht(fake, database_url):
+    fake.abyss.failing = {9100 + i for i in range(6)}
+
+    async def work(fetcher, sm):
+        await add_run(sm, summary(*[boss(9100 + i, [("A", "ranger", 100)], fight=f"f{i}") for i in range(7)]))
+        first = await fetcher.tick()
+        calls = len(fake.abyss.calls)
+        second, third = await fetcher.tick(), await fetcher.tick()
+        return first, second, third, len(fake.abyss.calls) - calls
+    first, second, third, calls = fetch(database_url, fake, work)
+    # Takt 1: fünf Fehlschläge; Takt 2: der sechste Fehlschlag und die gesunde Rangliste; Takt 3: nichts
+    assert (first, second, third) == (0, 1, 0)
+    assert calls == 2
+
+
+def test_gilde_nicht_bei_jedem_aufruf_neu_gerechnet(as_user, database_url, monkeypatch):
+    from nexhub_api.modules.parses import routes
+    calls = []
+    real = routes.guild_bests
+    monkeypatch.setattr(routes, "guild_bests", lambda s: calls.append(1) or real(s))
+    member = as_user(MEMBER)
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 250)])))
+    member.get(f"/api/parses/runs/{run_id}")
+    member.get(f"/api/parses/runs/{run_id}")
+    assert len(calls) == 1
+    new_run(database_url, summary(boss(1, [("B", "ranger", 100)])))
+    assert member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]["A"]["guild_n"] == 2
+    assert len(calls) == 2

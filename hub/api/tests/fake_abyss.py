@@ -26,6 +26,7 @@ class FakeAbyss:
         self.boards: dict[int, list[str]] = {8001: [f"Bogenheld{i}" for i in range(1, 6)]}
         self.not_ranked: set[int] = set()
         self.fail_page: int | None = None
+        self.failing: set[int] = set()  # Bosse, deren Rangliste immer mit HTTP 500 antwortet
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(f"{request.url.path}?{request.url.query.decode()}")
@@ -38,7 +39,7 @@ class FakeAbyss:
             limit = int(request.url.params.get("limit", 100))
             if boss in self.not_ranked:
                 return httpx.Response(400, json={"error": "boss not ranked"})
-            if page == self.fail_page:
+            if page == self.fail_page or boss in self.failing:
                 return httpx.Response(500)
             names = self.boards.get(boss, [])
             rows = [entry(n, 90_000 - i * 100) for i, n in enumerate(names)][(page - 1) * limit:page * limit]
