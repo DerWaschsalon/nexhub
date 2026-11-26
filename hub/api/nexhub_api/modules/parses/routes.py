@@ -4,6 +4,10 @@
     GET /api/public/parses/shared/{token}    geteilter Run (/r/<token>), ohne Login
     GET /api/parses/device/runs/{run_id}     eigener Run des gekoppelten NexBoards, für das Run-Bild in Discord
     GET /api/parses/top?since_ms=            bester EU-Parse je Gildenmitglied seit since_ms (Startseite)
+    GET /api/parses/hall                     Bestenliste ab Lila über alle Runs
+
+/top und /hall lesen aus dem Verzeichnis aller Parses der Gilde, das hall.py alle 5 Minuten im Hintergrund rechnet
+(state.parses_index); neue Runs erscheinen dort also mit bis zu 5 Minuten Verzug.
     GET /api/parses/legions                  Legionen der Gilde und Vorschläge aus den Momentaufnahmen
     PUT /api/parses/legions                  Legionen der Gilde ersetzen, nur Admins
 
@@ -199,6 +203,21 @@ class TopParse(BaseModel):
     fight: str
     run_id: int
     dungeon: str
+    start_ms: int  # Beginn des Runs
+
+
+class Hall(BaseModel):
+    computed_at: datetime | None  # None: noch nicht gerechnet (kurz nach dem Start des Hubs)
+    entries: list[TopParse]
+
+
+class ParseIndex(NamedTuple):
+    computed_at: datetime
+    entries: list[TopParse]  # jeder EU-Parse eines Gildenmitglieds an einem getöteten Boss
+
+
+HALL_MIN_EU = 75  # Lila und besser
+HALL_COUNT = 5
 
 
 TOP_RUNS = 200  # Sicherung: so viele Runs liest /top höchstens
@@ -207,22 +226,50 @@ TOP_RUNS = 200  # Sicherung: so viele Runs liest /top höchstens
 @router.get("/top")
 async def top_parses(request: Request, user: CurrentUser, db: DB, since_ms: int, limit: int = 10) -> list[TopParse]:
     """Je Mitglied der Gilde der beste EU-Parse in Runs ab since_ms, bester zuerst."""
-    guild = await _guild(request, db)
-    runs = (await db.scalars(select(Run).where(Run.start_ms >= since_ms).order_by(Run.start_ms.desc())
-                             .limit(TOP_RUNS))).all()
+    index: ParseIndex | None = getattr(request.app.state, "parses_index", None)
+    if index is not None:
+        entries = [e for e in index.entries if e.start_ms >= since_ms]
+    else:  # gleich nach dem Start: direkt rechnen, begrenzt
+        runs = (await db.scalars(select(Run).where(Run.start_ms >= since_ms).order_by(Run.start_ms.desc())
+                                 .limit(TOP_RUNS))).all()
+        entries = await member_parses(request, db, runs)
+    return best_per_member(entries)[:min(max(limit, 1), 50)]
+
+
+@router.get("/hall")
+async def hall(request: Request, user: CurrentUser) -> Hall:
+    """Je Mitglied der beste Parse ab Lila über alle Runs, die besten HALL_COUNT."""
+    index: ParseIndex | None = getattr(request.app.state, "parses_index", None)
+    if index is None:
+        return Hall(computed_at=None, entries=[])
+    return Hall(computed_at=index.computed_at, entries=best_per_member(index.entries, HALL_MIN_EU)[:HALL_COUNT])
+
+
+def best_per_member(entries: list[TopParse], min_eu: int = 0) -> list[TopParse]:
+    """Je Name der beste Parse (mindestens min_eu), bester zuerst; bei Gleichstand der frühere Run."""
     best: dict[str, TopParse] = {}
+    for e in entries:
+        if e.eu >= min_eu and (e.name not in best or (e.eu, -e.start_ms) > (best[e.name].eu, -best[e.name].start_ms)):
+            best[e.name] = e
+    return sorted(best.values(), key=lambda t: (-t.eu, t.start_ms, t.name))
+
+
+async def member_parses(request: Request, db: DB, runs) -> list[TopParse]:
+    """Alle EU-Parses der Mitglieder der Gilde in `runs`."""
+    guild = await _guild(request, db)
+    out: list[TopParse] = []
     for run in runs:
         parses = await _parses(request, db, run)
         bosses = {b["fight"]: b for b in run.summary.get("bosses", [])}
         for fight, players in parses.fights.items():
             boss = bosses[fight]
             for name, p in players.items():
-                if name not in guild.members or p.eu is None or (name in best and best[name].eu >= p.eu):
+                if name not in guild.members or p.eu is None:
                     continue
                 cls = next((q.get("cls") for q in boss.get("players", []) if q["name"] == name), None)
-                best[name] = TopParse(name=name, cls=cls, eu=p.eu, boss=boss["name"], fight=fight, run_id=run.id,
-                                      dungeon=dungeon_label(run.dungeon_id, run.dungeon))
-    return sorted(best.values(), key=lambda t: (-t.eu, t.name))[:min(max(limit, 1), 50)]
+                out.append(TopParse(name=name, cls=cls, eu=p.eu, boss=boss["name"], fight=fight, run_id=run.id,
+                                    dungeon=dungeon_label(run.dungeon_id, run.dungeon), start_ms=run.start_ms))
+    return out
 
 
 @router.get("/legions")

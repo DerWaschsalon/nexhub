@@ -411,3 +411,25 @@ def test_beste_parses_der_gilde_seit(as_user, database_url):
     assert [(t["name"], t["eu"]) for t in top] == [("B", 90), ("A", 75)]
     assert top[0]["run_id"] == first and top[0]["boss"] == "Boss 1" and top[0]["cls"] == "ranger"
     assert member.get(f"/api/parses/top?since_ms={NOW_MS + DAY_MS}").json() == []
+
+
+def test_bestenliste_ab_lila(as_user, database_url):
+    """Je Mitglied der beste Parse ab 75 über alle Runs; /top und /hall lesen das Verzeichnis aus hall.py."""
+    from nexhub_api.modules.parses.hall import HallOfFame
+
+    set_legions(as_user, "Gilde")
+    member = as_user(MEMBER)
+    assert member.get("/api/parses/hall").json() == {"computed_at": None, "entries": []}
+    add_board(database_url, 1, "ranger", [float(i) for i in range(1, 21)])
+    new_run(database_url, summary(boss(1, [("A", "ranger", 16), ("B", "ranger", 14), ("C", "ranger", 20)])))
+    new_run(database_url, summary(boss(1, [("A", "ranger", 18)])))
+    new_run(database_url, summary(boss(1, [("R", "ranger", 20)])), legion="Andere")
+
+    async def work(sm):
+        return await HallOfFame(member.app.state, sm).tick()
+    index = db_do(database_url, work)
+    assert sorted((e.name, e.eu) for e in index.entries) == [("A", 80), ("A", 90), ("B", 70), ("C", 100)]
+    body = member.get("/api/parses/hall").json()
+    assert [(e["name"], e["eu"]) for e in body["entries"]] == [("C", 100), ("A", 90)] and body["computed_at"]
+    top = member.get(f"/api/parses/top?since_ms={NOW_MS - DAY_MS}").json()
+    assert [(t["name"], t["eu"]) for t in top] == [("C", 100), ("A", 90), ("B", 70)]

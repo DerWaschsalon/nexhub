@@ -9,10 +9,11 @@ from starlette.datastructures import State
 from ...module import ApiModule, Runtime
 from . import routes
 from .fetcher import ParseFetcher
+from .hall import HallOfFame
 
 
 def start(state: State, runtime: Runtime) -> list[Coroutine[Any, Any, None]]:
-    return [ParseFetcher(runtime.sessionmaker, runtime.http).run()]
+    return [ParseFetcher(runtime.sessionmaker, runtime.http).run(), HallOfFame(state, runtime.sessionmaker).run()]
 
 
 MODULE = ApiModule("parses", (routes.router, routes.public_router), requires=("logs", "bis"), start=start)

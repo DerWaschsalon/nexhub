@@ -221,6 +221,11 @@ export type HTTPValidationError = {
 	detail: ValidationError[];
 };
 
+export type Hall = {
+	computed_at: string | null;
+	entries: TopParse[];
+};
+
 export type Hit = {
 	name: string;
 	server_id: number;
@@ -560,6 +565,7 @@ export type TopParse = {
 	fight: string;
 	run_id: number;
 	dungeon: string;
+	start_ms: number;
 };
 
 export type Unreachable = {
