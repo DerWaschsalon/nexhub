@@ -157,3 +157,9 @@ def test_dungeon_label_fuellt_nur_den_platzhalter():
     assert dungeon_label(610062, "Dungeon 610062") == "Shattered Arkanis"
     assert dungeon_label(610062, "Eigener Name") == "Eigener Name"
     assert dungeon_label(1, "Dungeon 1") == "Dungeon 1"
+
+
+def test_alle_bekannten_ids_haben_einen_namen():
+    """IDs aus echten Runs, die A2Tools nicht kennt (Stand 26.11.2026)."""
+    for dungeon_id in (200003, 600081, 600082, 610052, 610062, 620011, 910013, 910014, 910033, 910034):
+        assert not dungeon_label(dungeon_id, f"Dungeon {dungeon_id}").startswith("Dungeon ")

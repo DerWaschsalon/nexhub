@@ -7,8 +7,16 @@ füllt die Lücken, englisch wie dort. Nachtragen, sobald ein Run mit unbekannte
 from __future__ import annotations
 
 EXTRA_DUNGEONS: dict[int, str] = {
-    610062: "Shattered Arkanis",    # Siliator of Deceit, Ruthilis of Pain, Talisra of the Void
-    910034: "Sanctum of Loathing",  # Ascension Trial: Featherstorm Duduri, Watchful Raptor Dodori
+    200003: "Nightmare",                          # Albtraum: Gatekeeper Pinopi, Fortress Guardian Notun, Mutated Gerod …
+    600081: "Abyssal Forge: Ludra",               # Isolation Specialist Rahu, Abyssal Wing Ketu, Fusion Reactor
+    600082: "Abyssal Forge: Ludra",               # Rahu, Central Abyss Fusion Reactor, Eternal Ludra
+    610052: "Deus Research Base",                 # Gelcos, Nazmun, Atiel
+    610062: "Shattered Arkanis",                  # Siliator of Deceit, Ruthilis of Pain, Talisra of the Void
+    620011: "Corroded Decontamination Facility",  # Surveillance Device, Devouring Klawfly, Black Blood Blatt, Bargott
+    910013: "Ascension Trial: Aponos",            # Divided Aponos; offizieller Name noch unbekannt
+    910014: "Ascension Trial: Aponos",            # Divided Aponos; offizieller Name noch unbekannt
+    910033: "Sanctum of Loathing",                # Ascension Trial: Featherstorm Duduri, Watchful Raptor Dodori
+    910034: "Sanctum of Loathing",                # Ascension Trial: Featherstorm Duduri, Watchful Raptor Dodori
 }
 
 
