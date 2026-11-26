@@ -321,6 +321,8 @@ export type Parse = {
 	eu: number | null;
 	eu_n: number | null;
 	eu_at: string | null;
+	eu_cp: number | null;
+	eu_few: boolean;
 	guild: number | null;
 	guild_n: number;
 	member: boolean;

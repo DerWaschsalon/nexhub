@@ -153,7 +153,7 @@
 	{/if}
 
 	<!-- Parses in der Kampfansicht (Modul parses). Ändert sich modules/parses/calc.py oder fetcher.py
-	     (Schwelle GUILD_MIN = 10, Abruf täglich), diesen Abschnitt mit ändern. -->
+	     (CP_RANGE = 5000, EU_MIN = 10, GUILD_MIN = 10, Abruf täglich), diesen Abschnitt mit ändern. -->
 	{#if i18n.lang === 'de'}
 		<h2 id="parses">Parses in der Kampfansicht</h2>
 		<p>
@@ -161,18 +161,44 @@
 			Vergleichswerte derselben Klasse am selben Boss dein DPS erreicht oder übertrifft. Die Farben folgen
 			Warcraft Logs, von Grau (unter 25) über Grün, Blau, Lila und Orange bis Rosa (99) und Gold (100).
 		</p>
-		<ul>
+		<h3>EU: gegen Spieler mit ähnlicher Kampfkraft</h3>
+		<p>
+			Die Kampfkraft (CP) zeigt den Ausrüstungsstand. Wer 40.000 CP mehr hat, macht fast immer mehr Schaden, auch
+			bei gleich gutem Spiel. Deshalb vergleicht EU dich nur mit Spielern deiner Klasse, deren CP höchstens
+			<strong>5.000 über oder unter deiner</strong> liegt. So misst der Wert, wie gut du aus deiner Ausrüstung
+			spielst, nicht wie gut die Ausrüstung ist.
+		</p>
+		<ol>
 			<li>
-				<strong>EU:</strong> gegen die Ranglisten von Abyss Logs (Region EU), je Spieler sein bester Kampf von
-				mindestens 30 Sekunden. Der Hub holt sie einmal am Tag und nur für Bosse und Klassen aus unseren Runs der
-				letzten 30 Tage. Die API von Abyss Logs ist inoffiziell, und deren Messung kann leicht von unserer abweichen.
+				Der Hub holt einmal am Tag die Ranglisten von Abyss Logs (Region EU), nur für Bosse und Klassen aus unseren
+				Runs der letzten 30 Tage. Je Spieler zählt sein bester Kampf von mindestens 30 Sekunden, mit der CP aus
+				diesem Kampf.
 			</li>
+			<li>Deine CP stammt aus deiner Momentaufnahme von der AION-2-Website zu diesem Run.</li>
+			<li>Aus der Rangliste bleiben die Spieler mit CP im Bereich deiner CP ± 5.000.</li>
+			<li>Der Parse ist der Anteil davon, deren DPS kleiner oder gleich deinem ist, abgerundet.</li>
+		</ol>
+		<p>
+			<strong>Beispiel:</strong> Du spielst Kantor mit 250.000 CP und machst 120.000 DPS. Verglichen wird mit
+			allen Kantoren von 245.000 bis 255.000 CP. Das sind 80 Spieler, 60 davon haben 120.000 DPS oder weniger.
+			Dein Parse ist 60 / 80 = 75, also Lila.
+		</p>
+		<ul>
+			<li>Liegen weniger als 10 Spieler im CP-Bereich, gibt es keinen EU-Wert. Er sagt dann zu wenig aus.</li>
 			<li>
-				<strong>Gilde:</strong> gegen den Bestwert jedes Charakters derselben Klasse an diesem Boss aus allen Runs
-				im Hub. Angezeigt erst ab 10 Charakteren.
+				Ist deine CP noch nicht bekannt (Momentaufnahme fehlt), vergleicht EU ausnahmsweise mit allen Spielern
+				deiner Klasse. Der Tooltip sagt dann nichts von einem CP-Bereich.
 			</li>
 			<li>Hard und Normal sind bei Abyss Logs eigene Bosse und werden getrennt verglichen.</li>
+			<li>Die API von Abyss Logs ist inoffiziell, und deren Messung kann leicht von unserer abweichen.</li>
 		</ul>
+		<h3>Gilde: gegen eure eigenen Charaktere</h3>
+		<p>
+			Gilde vergleicht mit dem Bestwert jedes Gildencharakters derselben Klasse an diesem Boss, aus allen Runs im
+			Hub. Zur Gilde gehört, wer in seiner jüngsten Momentaufnahme in einer der Legionen ist, die ein Admin unter
+			Verwaltung &gt; Gilde eingetragen hat. Mitspieler von außerhalb zählen nicht und bekommen keinen Gildenwert.
+			Angezeigt wird er erst ab 10 Charakteren, die Kampfkraft spielt hier keine Rolle.
+		</p>
 	{:else}
 		<h2 id="parses">Parses in the fight view</h2>
 		<p>
@@ -180,18 +206,43 @@
 			class at the same boss that your DPS reaches or beats. Colours follow Warcraft Logs, from grey (below 25)
 			through green, blue, purple and orange to pink (99) and gold (100).
 		</p>
-		<ul>
+		<h3>EU: against players with similar combat power</h3>
+		<p>
+			Combat power (CP) shows how geared you are. Someone with 40,000 more CP almost always deals more damage, even
+			when playing equally well. So EU only compares you with players of your class whose CP is at most
+			<strong>5,000 above or below yours</strong>. The value measures how well you play with your gear, not how good
+			the gear is.
+		</p>
+		<ol>
 			<li>
-				<strong>EU:</strong> against the Abyss Logs rankings (region EU), each player's best fight of at least 30
-				seconds. The hub fetches them once a day and only for bosses and classes from our runs of the last 30 days.
-				The Abyss Logs API is unofficial, and their measurement can differ slightly from ours.
+				Once a day the hub fetches the Abyss Logs rankings (region EU), only for bosses and classes from our runs of
+				the last 30 days. Each player counts with their best fight of at least 30 seconds and the CP from that fight.
 			</li>
+			<li>Your CP comes from your snapshot from the AION 2 website for this run.</li>
+			<li>From the ranking, the players with CP within your CP ± 5,000 remain.</li>
+			<li>The parse is the share of them whose DPS is lower than or equal to yours, rounded down.</li>
+		</ol>
+		<p>
+			<strong>Example:</strong> you play Chanter with 250,000 CP and deal 120,000 DPS. You are compared with all
+			Chanters from 245,000 to 255,000 CP. That is 80 players, 60 of them have 120,000 DPS or less. Your parse is
+			60 / 80 = 75, purple.
+		</p>
+		<ul>
+			<li>With fewer than 10 players in the CP range there is no EU value, it would say too little.</li>
 			<li>
-				<strong>Guild:</strong> against the best value of every character of the same class at this boss from all
-				runs in the hub. Shown from 10 characters on.
+				If your CP is not known yet (snapshot missing), EU compares with all players of your class as an exception.
+				The tooltip then shows no CP range.
 			</li>
 			<li>Hard and Normal are separate bosses on Abyss Logs and are compared separately.</li>
+			<li>The Abyss Logs API is unofficial, and their measurement can differ slightly from ours.</li>
 		</ul>
+		<h3>Guild: against your own characters</h3>
+		<p>
+			Guild compares with the best value of every guild character of the same class at this boss, from all runs in
+			the hub. A character belongs to the guild if their latest snapshot shows one of the legions an admin entered
+			under Administration &gt; Guild. Players from outside do not count and get no guild value. It is shown from 10
+			characters on; combat power plays no part here.
+		</p>
 	{/if}
 </article>
 

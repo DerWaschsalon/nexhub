@@ -13,6 +13,8 @@ from collections.abc import Collection, Iterable, Iterator
 from nexproto.classes import CLASS_KEYS
 
 GUILD_MIN = 10  # Charaktere, ab denen der Gildenvergleich angezeigt wird
+CP_RANGE = 5000  # EU: nur Einträge, deren Kampfkraft höchstens so weit von der eigenen entfernt ist
+EU_MIN = 10  # Einträge im CP-Bereich, ab denen der EU-Wert angezeigt wird
 
 
 def percentile(value: float, ranked: list[float]) -> int | None:
@@ -20,6 +22,12 @@ def percentile(value: float, ranked: list[float]) -> int | None:
     if not ranked:
         return None
     return 100 * bisect_right(ranked, value) // len(ranked)
+
+
+def in_cp_range(dps: list[float], cps: list[int], cp: int) -> list[float]:
+    """Die DPS-Werte (aufsteigend, wie `dps`) der Einträge mit Kampfkraft im Bereich cp ± CP_RANGE.
+    Einträge ohne Kampfkraft (0) fallen weg."""
+    return [d for d, c in zip(dps, cps, strict=True) if c and abs(c - cp) <= CP_RANGE]
 
 
 def _killed_players(summaries: Iterable[dict]) -> Iterator[tuple[int, dict]]:

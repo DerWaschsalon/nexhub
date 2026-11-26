@@ -3,20 +3,26 @@
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { classInfo } from '#modules/logs/classes.ts';
-	import { parseColor, type Parse } from '../api.ts';
+	import { CP_RANGE, parseColor, type Parse } from '../api.ts';
 
 	let { parse, cls, guildMin }: { parse: Parse | undefined; cls: string | null; guildMin: number } = $props();
+
+	/** „251.000–261.000“: der CP-Bereich, gegen den EU vergleicht */
+	const cpRange = (cp: number) => `${formatNumber(Math.max(0, cp - CP_RANGE))}–${formatNumber(cp + CP_RANGE)}`;
 
 	const euTip = $derived.by(() => {
 		if (!parse || !classInfo(cls)) return t('parses.eu.noClass');
 		if (parse.eu_at === null) return t('parses.eu.loading');
+		const range = parse.eu_cp != null ? cpRange(parse.eu_cp) : null;
+		if (parse.eu_few && range) return t('parses.eu.few', { n: parse.eu_n ?? 0, range });
 		if (parse.eu === null) return t('parses.eu.none');
-		return t('parses.eu.tip', {
+		const values = {
 			pct: parse.eu,
 			n: formatNumber(parse.eu_n ?? 0),
 			cls: classInfo(cls)?.label ?? '',
 			date: formatDateTime(parse.eu_at)
-		});
+		};
+		return range ? t('parses.eu.tipCp', { ...values, range }) : t('parses.eu.tip', values);
 	});
 	const guildTip = $derived.by(() => {
 		if (parse?.guild != null) return t('parses.guild.tip', { pct: parse.guild, n: formatNumber(parse.guild_n) });
