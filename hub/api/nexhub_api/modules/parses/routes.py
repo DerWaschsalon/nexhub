@@ -3,6 +3,7 @@
     GET /api/parses/runs/{run_id}            mit Login
     GET /api/public/parses/shared/{token}    geteilter Run (/r/<token>), ohne Login
     GET /api/parses/device/runs/{run_id}     eigener Run des gekoppelten NexBoards, für das Run-Bild in Discord
+    GET /api/parses/top?since_ms=            bester EU-Parse je Gildenmitglied seit since_ms (Startseite)
     GET /api/parses/legions                  Legionen der Gilde und Vorschläge aus den Momentaufnahmen
     PUT /api/parses/legions                  Legionen der Gilde ersetzen, nur Admins
 
@@ -25,6 +26,8 @@ from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import delete, func, select
 
 from ...aion2 import localized
+from nexproto import dungeon_label
+
 from ...deps import DB, AdminUser, CurrentDevice, CurrentUser
 from ...routes.public import not_for_search_engines
 from ..bis.abysslogs import REGION
@@ -187,6 +190,40 @@ async def device_run_parses(run_id: int, request: Request, device: CurrentDevice
     if run is None or run.user_id != device.user_id:
         raise HTTPException(404, "Run nicht gefunden")
     return _by_boss(run, await _parses(request, db, run))
+
+
+class TopParse(BaseModel):
+    name: str
+    cls: str | None
+    eu: int
+    boss: str
+    fight: str
+    run_id: int
+    dungeon: str
+
+
+TOP_RUNS = 200  # Sicherung: so viele Runs liest /top höchstens
+
+
+@router.get("/top")
+async def top_parses(request: Request, user: CurrentUser, db: DB, since_ms: int, limit: int = 10) -> list[TopParse]:
+    """Je Mitglied der Gilde der beste EU-Parse in Runs ab since_ms, bester zuerst."""
+    guild = await _guild(request, db)
+    runs = (await db.scalars(select(Run).where(Run.start_ms >= since_ms).order_by(Run.start_ms.desc())
+                             .limit(TOP_RUNS))).all()
+    best: dict[str, TopParse] = {}
+    for run in runs:
+        parses = await _parses(request, db, run)
+        bosses = {b["fight"]: b for b in run.summary.get("bosses", [])}
+        for fight, players in parses.fights.items():
+            boss = bosses[fight]
+            for name, p in players.items():
+                if name not in guild.members or p.eu is None or (name in best and best[name].eu >= p.eu):
+                    continue
+                cls = next((q.get("cls") for q in boss.get("players", []) if q["name"] == name), None)
+                best[name] = TopParse(name=name, cls=cls, eu=p.eu, boss=boss["name"], fight=fight, run_id=run.id,
+                                      dungeon=dungeon_label(run.dungeon_id, run.dungeon))
+    return sorted(best.values(), key=lambda t: (-t.eu, t.name))[:min(max(limit, 1), 50)]
 
 
 @router.get("/legions")

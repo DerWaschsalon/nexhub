@@ -188,6 +188,19 @@ export type Dungeon = {
 	bosses: Boss[];
 };
 
+export type DungeonStat = {
+	dungeon_id: number;
+	dungeon: string;
+	difficulty: string | null;
+	runs: number;
+	complete: number;
+	fastest_ms: number | null;
+	kills: number;
+	wipes: number;
+	players: number;
+	last_ms: number;
+};
+
 export type FeedbackEntry = {
 	id: number;
 	title: string;
@@ -372,8 +385,19 @@ export type Rules = {
 	tier_good: number;
 };
 
+export type RunDeath = {
+	fight: string;
+	boss: string;
+	name: string;
+	cls: string | null;
+	t_ms: number;
+	revived_ms: number | null;
+	skill: number | null;
+};
+
 export type RunDetail = {
 	id: number;
+	dungeon_id: number;
 	dungeon: string;
 	difficulty: string | null;
 	start_ms: number;
@@ -387,7 +411,9 @@ export type RunDetail = {
 	uploader: string;
 	created_at: string;
 	players: string[];
+	classes: (string | null)[];
 	bosses: string[];
+	results: boolean[];
 	size: number;
 	can_delete: boolean;
 	share_url: string | null;
@@ -396,6 +422,7 @@ export type RunDetail = {
 
 export type RunOut = {
 	id: number;
+	dungeon_id: number;
 	dungeon: string;
 	difficulty: string | null;
 	start_ms: number;
@@ -409,7 +436,14 @@ export type RunOut = {
 	uploader: string;
 	created_at: string;
 	players: string[];
+	classes: (string | null)[];
 	bosses: string[];
+	results: boolean[];
+};
+
+export type RunOverview = {
+	deaths: RunDeath[];
+	skills: RunSkill[];
 };
 
 export type RunParses = {
@@ -430,6 +464,15 @@ export type RunReport = {
 	players: ReportPlayer[];
 	bosses?: ReportBoss[];
 	image_webp?: string | null;
+};
+
+export type RunSkill = {
+	code: number | null;
+	name: string;
+	player: string;
+	cls: string | null;
+	damage: number;
+	hits: number;
 };
 
 export type Schedule = {
@@ -507,6 +550,16 @@ export type Target = {
 	name: string;
 	gain_lo: number;
 	gain_hi: number;
+};
+
+export type TopParse = {
+	name: string;
+	cls: string | null;
+	eu: number;
+	boss: string;
+	fight: string;
+	run_id: number;
+	dungeon: string;
 };
 
 export type Unreachable = {

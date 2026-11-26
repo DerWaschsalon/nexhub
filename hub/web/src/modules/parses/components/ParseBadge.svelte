@@ -1,9 +1,10 @@
-<!-- Parse eines Spielers an einem Boss: EU (Abyss Logs) und Gilde, je als Zahl in der Farbstufe -->
+<!-- Parse eines Spielers an einem Boss: EU (Abyss Logs) und Gilde, je als Zahl in der Farbstufe (ParseValue). -->
 <script lang="ts">
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import { classInfo } from '#modules/logs/classes.ts';
-	import { CP_RANGE, parseColor, type Parse } from '../api.ts';
+	import { CP_RANGE, type Parse } from '../api.ts';
+	import ParseValue from './ParseValue.svelte';
 
 	let { parse, cls, guildMin }: { parse: Parse | undefined; cls: string | null; guildMin: number } = $props();
 
@@ -35,7 +36,7 @@
 {#snippet value(label: string, v: number | null | undefined, tip: string, pending = false)}
 	<span class="parse" title={tip} aria-label={tip}>
 		<small>{label}</small>
-		{#if v != null}<b class={parseColor(v)}>{v}</b>{:else}<b class="none">{pending ? '…' : '–'}</b>{/if}
+		{#if v != null}<b><ParseValue value={v} /></b>{:else}<b class="none">{pending ? '…' : '–'}</b>{/if}
 	</span>
 {/snippet}
 
@@ -64,28 +65,6 @@
 		min-width: 2ch;
 		text-align: right;
 		font-weight: 700;
-	}
-	/* Farbstufen wie bei Warcraft Logs, etwas gedämpft, damit sie auf hellem und dunklem Grund lesbar bleiben */
-	.grey {
-		color: #9aa0a6;
-	}
-	.green {
-		color: #2fbf3a;
-	}
-	.blue {
-		color: #3d86f0;
-	}
-	.purple {
-		color: #a750ee;
-	}
-	.orange {
-		color: #ff8000;
-	}
-	.pink {
-		color: #e268a8;
-	}
-	.gold {
-		color: #d4b45a;
 	}
 	.none {
 		color: var(--faint);
