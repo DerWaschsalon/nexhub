@@ -9,7 +9,19 @@ export const TEXTS = defineTexts(
 		'parses.eu.none': 'EU: no ranking on Abyss Logs for this boss',
 		'parses.eu.noClass': 'EU: class unknown',
 		'parses.guild.tip': 'Guild: better than {pct}% of {n} characters',
-		'parses.guild.few': 'Guild: too little data ({n} of {min} characters)'
+		'parses.guild.few': 'Guild: too little data ({n} of {min} characters)',
+		'parses.guild.notMember': 'Guild: not in one of the guild\'s legions',
+		'parses.legions.nav': 'Guild',
+		'parses.legions.title': 'Guild legions',
+		'parses.legions.intro': 'Only characters from these legions count for the guild parse. Characters belong to the legion shown in their latest snapshot from the AION 2 website. Without a legion there is no guild parse.',
+		'parses.legions.current': 'Counted legions',
+		'parses.legions.none': 'No legion yet: the guild parse is off.',
+		'parses.legions.add': 'Add',
+		'parses.legions.field': 'Legion name',
+		'parses.legions.remove': 'Remove {name}',
+		'parses.legions.known': 'Legions seen in runs',
+		'parses.legions.knownIntro': 'From the snapshots of all players in uploaded runs, most characters first.',
+		'parses.legions.characters': '{n} characters'
 	},
 	{
 		'parses.eu': 'EU',
@@ -19,6 +31,18 @@ export const TEXTS = defineTexts(
 		'parses.eu.none': 'EU: keine Rangliste bei Abyss Logs für diesen Boss',
 		'parses.eu.noClass': 'EU: Klasse unbekannt',
 		'parses.guild.tip': 'Gilde: besser als {pct} % von {n} Charakteren',
-		'parses.guild.few': 'Gilde: zu wenig Daten ({n} von {min} Charakteren)'
+		'parses.guild.few': 'Gilde: zu wenig Daten ({n} von {min} Charakteren)',
+		'parses.guild.notMember': 'Gilde: nicht in einer Legion der Gilde',
+		'parses.legions.nav': 'Gilde',
+		'parses.legions.title': 'Legionen der Gilde',
+		'parses.legions.intro': 'Im Gildenvergleich zählen nur Charaktere aus diesen Legionen. Maßgeblich ist die Legion in der jüngsten Momentaufnahme von der AION-2-Website. Ohne Legion gibt es keinen Gildenwert.',
+		'parses.legions.current': 'Gezählte Legionen',
+		'parses.legions.none': 'Noch keine Legion: der Gildenwert ist aus.',
+		'parses.legions.add': 'Hinzufügen',
+		'parses.legions.field': 'Name der Legion',
+		'parses.legions.remove': '{name} entfernen',
+		'parses.legions.known': 'Legionen aus den Runs',
+		'parses.legions.knownIntro': 'Aus den Momentaufnahmen aller Mitspieler in hochgeladenen Runs, die meisten Charaktere zuerst.',
+		'parses.legions.characters': '{n} Charaktere'
 	}
 );

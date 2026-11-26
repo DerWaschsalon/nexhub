@@ -3,7 +3,7 @@
 import { api } from '#lib/api.ts';
 import type { RunParses } from '#lib/api-types.ts';
 
-export type { Parse, RunParses } from '#lib/api-types.ts';
+export type { KnownLegion, LegionsOut, Parse, RunParses } from '#lib/api-types.ts';
 
 type Fetch = typeof fetch;
 
@@ -16,6 +16,7 @@ export async function loadParses(path: string, f: Fetch): Promise<RunParses | nu
 	}
 }
 
+export const LEGIONS_PATH = '/api/parses/legions';
 export const runParsesPath = (id: string | number) => `/api/parses/runs/${id}`;
 export const sharedParsesPath = (token: string) => `/api/public/parses/shared/${encodeURIComponent(token)}`;
 

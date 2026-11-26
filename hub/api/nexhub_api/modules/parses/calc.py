@@ -2,12 +2,13 @@
 
 Ein Parse ist der Anteil der Vergleichswerte, die kleiner oder gleich dem eigenen Wert sind, in ganzen
 Prozent (abgerundet). „Gleich“ zählt mit, damit der beste Charakter der Gilde, der selbst in der Liste steht,
-auf 100 kommt.
+auf 100 kommt. Zur Gilde gehört, wer laut seiner letzten Momentaufnahme (logs/characters.py) in einer der
+eingetragenen Legionen ist (models.GuildLegion).
 """
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections.abc import Iterable, Iterator
+from collections.abc import Collection, Iterable, Iterator
 
 from nexproto.classes import CLASS_KEYS
 
@@ -37,10 +38,13 @@ def needed_pairs(summaries: Iterable[dict]) -> set[tuple[int, str]]:
     return {(mob, p["cls"]) for mob, p in _killed_players(summaries)}
 
 
-def guild_bests(summaries: Iterable[dict]) -> dict[tuple[int, str], list[float]]:
-    """Je Boss und Klasse die Bestwerte je Charakter (Name und Klasse), aufsteigend."""
+def guild_bests(summaries: Iterable[dict], members: Collection[str]) -> dict[tuple[int, str], list[float]]:
+    """Je Boss und Klasse die Bestwerte je Charakter (Name und Klasse), aufsteigend. Nur Charaktere aus
+    `members` (Namen der Gilde), Mitspieler von außerhalb zählen nicht."""
     best: dict[tuple[int, str], dict[str, float]] = {}
     for mob, p in _killed_players(summaries):
+        if p["name"] not in members:
+            continue
         names = best.setdefault((mob, p["cls"]), {})
         names[p["name"]] = max(names.get(p["name"], 0.0), float(p["dps"]))
     return {key: sorted(names.values()) for key, names in best.items()}

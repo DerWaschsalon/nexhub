@@ -18,11 +18,11 @@
 			date: formatDateTime(parse.eu_at)
 		});
 	});
-	const guildTip = $derived(
-		parse?.guild != null
-			? t('parses.guild.tip', { pct: parse.guild, n: formatNumber(parse.guild_n) })
-			: t('parses.guild.few', { n: parse?.guild_n ?? 0, min: guildMin })
-	);
+	const guildTip = $derived.by(() => {
+		if (parse?.guild != null) return t('parses.guild.tip', { pct: parse.guild, n: formatNumber(parse.guild_n) });
+		if (parse && !parse.member) return t('parses.guild.notMember');
+		return t('parses.guild.few', { n: parse?.guild_n ?? 0, min: guildMin });
+	});
 	const loading = $derived(!!parse && !!classInfo(cls) && parse.eu_at === null);
 </script>
 
