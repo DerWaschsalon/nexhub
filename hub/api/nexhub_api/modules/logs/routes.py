@@ -1,8 +1,11 @@
 """Runs: NexBoards laden fertige Dungeon-Runs hoch, Angemeldete sehen sie sich an.
 
     POST   /api/runs               Gerät (Bearer): NexLog hochladen (gzip, siehe proto/README.md)
-    GET    /api/runs               alle Runs, neueste zuerst (mit Spieler- und Bossnamen zum Suchen)
+    GET    /api/runs               alle Runs, neueste zuerst (mit Spieler- und Bossnamen zum Suchen);
+                                   ?dungeon_id= und ?since_ms= grenzen ein
+    GET    /api/runs/dungeons      je Dungeon-ID: Runs, Bestzeit, Kills, Wipes (?since_ms= für Heute/Woche)
     GET    /api/runs/{id}          Eckdaten und Zusammenfassung
+    GET    /api/runs/{id}/overview Tode und stärkste Fähigkeiten über alle Bosskämpfe
     GET    /api/runs/{id}/nexlog   die Datei, so wie sie hochgeladen wurde
     GET    /api/runs/{id}/fights/{kampf}   ein Kampf im Detail (DPS-Kurve, Skills, Tode)
     DELETE /api/runs/{id}          wer hochgeladen hat, oder ein Admin
@@ -135,6 +138,7 @@ async def report(run_id: int, body: RunReport, request: Request, device: Current
 
 class RunOut(BaseModel):
     id: int
+    dungeon_id: int
     dungeon: str
     difficulty: str | None
     start_ms: int
@@ -148,7 +152,9 @@ class RunOut(BaseModel):
     uploader: str
     created_at: datetime
     players: list[str]  # Namen aus der Zusammenfassung, für Suche und Filter der Liste
+    classes: list[str | None]  # Klasse zu players, gleiche Reihenfolge
     bosses: list[str]
+    results: list[bool]  # je Bosskampf: getötet
 
 
 class RunDetail(RunOut):
@@ -159,19 +165,67 @@ class RunDetail(RunOut):
 
 
 def _out(run: Run, uploader: User) -> dict:
-    return dict(id=run.id, dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty,
+    return dict(id=run.id, dungeon_id=run.dungeon_id, dungeon=dungeon_label(run.dungeon_id, run.dungeon),
+                difficulty=run.difficulty,
                 start_ms=run.start_ms, end_ms=run.end_ms, complete=run.complete, bosses_total=run.bosses_total,
                 bosses_killed=run.bosses_killed, fights=run.fights, hits=run.hits, character=run.character,
                 uploader=uploader.name, created_at=run.created_at,
                 players=[p["name"] for p in run.summary.get("players", [])],
-                bosses=[b["name"] for b in run.summary.get("bosses", [])])
+                classes=[p.get("cls") for p in run.summary.get("players", [])],
+                bosses=[b["name"] for b in run.summary.get("bosses", [])],
+                results=[bool(b.get("killed")) for b in run.summary.get("bosses", [])])
 
 
 @router.get("")
-async def list_runs(user: CurrentUser, db: DB, limit: int = 100) -> list[RunOut]:
-    rows = await db.execute(select(Run, User).join(User, User.id == Run.user_id)
-                            .order_by(Run.start_ms.desc()).limit(min(max(limit, 1), 500)))
+async def list_runs(user: CurrentUser, db: DB, limit: int = 100, dungeon_id: int | None = None,
+                    since_ms: int | None = None) -> list[RunOut]:
+    query = select(Run, User).join(User, User.id == Run.user_id)
+    if dungeon_id is not None:
+        query = query.where(Run.dungeon_id == dungeon_id)
+    if since_ms is not None:
+        query = query.where(Run.start_ms >= since_ms)
+    rows = await db.execute(query.order_by(Run.start_ms.desc()).limit(min(max(limit, 1), 500)))
     return [RunOut(**_out(run, uploader)) for run, uploader in rows.all()]
+
+
+class DungeonStat(BaseModel):
+    """Ein Dungeon in einer Schwierigkeit (AION 2 gibt jeder Schwierigkeit eine eigene ID)."""
+    dungeon_id: int
+    dungeon: str
+    difficulty: str | None
+    runs: int
+    complete: int
+    fastest_ms: int | None  # schnellster vollständiger Run
+    kills: int
+    wipes: int
+    players: int  # verschiedene Spielernamen
+    last_ms: int  # Beginn des neuesten Runs
+
+
+@router.get("/dungeons")
+async def list_dungeons(user: CurrentUser, db: DB, since_ms: int | None = None) -> list[DungeonStat]:
+    """Kennzahlen je Dungeon-ID für die Übersicht, neuester zuerst. Liest nur Eckdaten und Zusammenfassungen."""
+    query = select(Run.dungeon_id, Run.dungeon, Run.difficulty, Run.start_ms, Run.end_ms, Run.complete, Run.summary)
+    if since_ms is not None:
+        query = query.where(Run.start_ms >= since_ms)
+    stats: dict[int, dict] = {}
+    names: dict[int, set[str]] = {}
+    for dungeon_id, dungeon, difficulty, start, end, complete, summary in (await db.execute(query)).all():
+        s = stats.setdefault(dungeon_id, dict(dungeon_id=dungeon_id, dungeon=dungeon_label(dungeon_id, dungeon),
+                                              difficulty=difficulty, runs=0, complete=0, fastest_ms=None,
+                                              kills=0, wipes=0, players=0, last_ms=start))
+        s["runs"] += 1
+        s["difficulty"] = s["difficulty"] or difficulty
+        s["last_ms"] = max(s["last_ms"], start)
+        if complete:
+            s["complete"] += 1
+            s["fastest_ms"] = min(s["fastest_ms"] or end - start, end - start)
+        for b in summary.get("bosses", []):
+            s["kills" if b.get("killed") else "wipes"] += 1
+        names.setdefault(dungeon_id, set()).update(p["name"] for p in summary.get("players", []))
+    for dungeon_id, s in stats.items():
+        s["players"] = len(names[dungeon_id])
+    return [DungeonStat(**s) for s in sorted(stats.values(), key=lambda s: -s["last_ms"])]
 
 
 async def _get(db: DB, run_id: int) -> tuple[Run, User]:
@@ -194,6 +248,62 @@ async def get_run(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep)
     run, uploader = await _get(db, run_id)
     return RunDetail(**_out(run, uploader), size=run.size, summary=run.summary,
                      can_delete=_may_manage(run, user), share_url=share_url(settings, run))
+
+
+class RunDeath(BaseModel):
+    fight: str
+    boss: str
+    name: str
+    cls: str | None
+    t_ms: int  # seit Kampfbeginn
+    revived_ms: int | None
+    skill: int | None  # Ursache vom Radar im NexBoard
+
+
+class RunSkill(BaseModel):
+    code: int | None
+    name: str
+    player: str
+    cls: str | None
+    damage: int
+    hits: int
+
+
+class RunOverview(BaseModel):
+    deaths: list[RunDeath]
+    skills: list[RunSkill]  # stärkste Fähigkeiten über alle Bosskämpfe, je Spieler und Fähigkeit
+
+
+OVERVIEW_SKILLS = 10
+
+
+@router.get("/{run_id}/overview")
+async def run_overview(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> RunOverview:
+    """Für die Zusammenfassung eines Runs: liest jeden Bosskampf aus der Datei."""
+    run, _ = await _get(db, run_id)
+    deaths: list[RunDeath] = []
+    skills: dict[tuple[str, str], RunSkill] = {}
+    for boss in run.summary.get("bosses", []):
+        try:
+            detail = await load_fight_detail(settings, run, boss["fight"])
+        except HTTPException:
+            continue
+        classes = {p["name"]: p.get("cls") for p in detail["players"]}
+        for d in detail.get("deaths") or []:
+            deaths.append(RunDeath(fight=boss["fight"], boss=boss["name"], name=d["name"], cls=classes.get(d["name"]),
+                                   t_ms=d["t_ms"], revived_ms=d.get("revived_ms"), skill=d.get("skill")))
+        for p in detail["players"]:
+            for sk in p.get("skills") or []:
+                key = (p["name"], sk["name"])
+                got = skills.get(key)
+                if got is None:
+                    skills[key] = RunSkill(code=sk.get("code"), name=sk["name"], player=p["name"], cls=p.get("cls"),
+                                           damage=sk["damage"], hits=sk["hits"])
+                else:
+                    got.damage += sk["damage"]
+                    got.hits += sk["hits"]
+    top = sorted(skills.values(), key=lambda s: -s.damage)[:OVERVIEW_SKILLS]
+    return RunOverview(deaths=deaths, skills=top)
 
 
 class Shared(BaseModel):

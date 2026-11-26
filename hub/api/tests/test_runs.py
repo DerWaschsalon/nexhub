@@ -314,3 +314,34 @@ def test_run_bericht_geht_ueber_den_hub_an_den_bot(make_client, fake, as_user):
         assert bad.status_code == 422
         assert c.post("/api/runs/9999/report", json=bericht,
                       headers={"Authorization": f"Bearer {token}"}).status_code == 404
+
+
+def test_dungeon_kennzahlen_und_filter(client, as_user):
+    member = as_user(MEMBER)
+    token = pair(client, member)
+    upload(client, token, nexlog())
+    upload(client, token, nexlog(start_ms=1_792_000_400_000))
+    upload(client, token, nexlog(dungeon_id=600124, start_ms=1_792_100_000_000, end_ms=1_792_100_200_000))
+    stats = member.get("/api/runs/dungeons").json()
+    assert [(s["dungeon_id"], s["runs"], s["complete"], s["kills"], s["wipes"], s["players"]) for s in stats] == \
+        [(600124, 1, 1, 1, 1, 2), (600123, 2, 2, 2, 2, 2)]
+    assert stats[1]["fastest_ms"] == 300_000 and stats[1]["difficulty"] == "Normal"
+    assert [s["dungeon_id"] for s in member.get("/api/runs/dungeons?since_ms=1792050000000").json()] == [600124]
+
+    runs = member.get("/api/runs?dungeon_id=600123").json()
+    assert len(runs) == 2 and {r["dungeon_id"] for r in runs} == {600123}
+    assert runs[0]["results"] == [True, False] and runs[0]["classes"] == ["ranger", "cleric"]
+    assert len(member.get("/api/runs?since_ms=1792050000000").json()) == 1
+    assert client.get("/api/runs/dungeons").status_code == 401
+
+
+def test_run_uebersicht_mit_toden_und_faehigkeiten(client, as_user):
+    member = as_user(MEMBER)
+    run_id = upload(client, pair(client, member), nexlog()).json()["id"]
+    body = member.get(f"/api/runs/{run_id}/overview").json()
+    assert [(d["fight"], d["name"], d["cls"], d["t_ms"]) for d in body["deaths"]] == \
+        [("auto_1", "Moonlin", "cleric", 40_000), ("auto_2", "Moonlin", "cleric", 40_000)]
+    top = body["skills"][0]
+    assert (top["name"], top["player"], top["cls"], top["damage"]) == ("Pfeilhagel", "Testheld", "ranger", 750_000)
+    assert client.get(f"/api/runs/{run_id}/overview").status_code == 401
+    assert member.get("/api/runs/999999/overview").status_code == 404

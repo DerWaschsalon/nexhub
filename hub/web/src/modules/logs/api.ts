@@ -2,8 +2,6 @@
 
 import type * as Api from '#lib/api-types.ts';
 
-/** Obergrenze von GET /api/runs (modules/logs/routes.py) */
-export const RUN_LIMIT = 500;
 
 export type Player = { name: string; cls: string | null; damage: number; dps: number };
 

@@ -1,148 +1,125 @@
-<!-- Modul Logs: alle hochgeladenen Runs, neueste zuerst, mit Suche und Filtern. -->
+<!-- Modul Logs: Runs nach Dungeon. Oben Zeitraum (Heute, Woche, Alle) und Art (Gruppe, Solo), darunter je Dungeon
+     eine Karte mit den Zahlen des Zeitraums; ein Klick zeigt nur dessen Runs (runs/dungeon/[name]). -->
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { formatNumber } from '#lib/format.ts';
+	import Tabs from '#lib/components/Tabs.svelte';
 	import { t } from '#lib/i18n.svelte.ts';
-	import { RUN_LIMIT } from '#modules/logs/api.ts';
-	import RunTable from '#modules/logs/components/RunTable.svelte';
-	import { applyFilter, filterOptions, fromParams, isActive, PERIODS, toSearch, type RunFilter } from '#modules/logs/filter.ts';
+	import DungeonCard from '#modules/logs/components/DungeonCard.svelte';
+	import { groupDungeons, KINDS, matchesKind, PERIODS, type Kind, type Period } from '#modules/logs/dungeons.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+	let q = $state('');
 
-	// Aus location statt page.url: nach Zurück aus einem Run zeigt page.url die Adresse ohne Filter
-	let filter = $state<RunFilter>(fromParams(new URLSearchParams(location.search)));
-	const options = $derived(filterOptions(data.runs));
-	const runs = $derived(applyFilter(data.runs, filter));
+	const groups = $derived(groupDungeons(data.all, data.inPeriod));
+	const ofKind = $derived(groups.filter((g) => matchesKind(g, data.kind)));
+	const shown = $derived(ofKind.filter((g) => g.name.toLocaleLowerCase().includes(q.trim().toLocaleLowerCase())));
+	const when = $derived(t(`logs.when.${data.period}`));
 
-	// Filter in die Adresse schreiben, ohne neu zu laden: Zurück aus einem Run landet in derselben Auswahl.
-	// Verglichen wird mit location, nicht page.url – die bleibt bei shallow auf dem alten Stand – und
-	// nur der Filter ist Abhängigkeit, sonst startet jede Adressänderung den Effekt endlos neu.
-	$effect(() => {
-		const search = toSearch(filter);
-		untrack(() => {
-			if (search !== location.search) goto(`${location.pathname}${search}`, { shallow: true, replace: true });
-		});
-	});
-
-	function reset() {
-		filter = fromParams(new URLSearchParams());
+	function href(period: Period, kind: Kind): string {
+		const s = new URLSearchParams();
+		if (period !== 'heute') s.set('zeit', period);
+		if (kind !== 'gruppe') s.set('art', kind);
+		const str = s.toString();
+		return `/hub/runs${str ? `?${str}` : ''}`;
 	}
-
-	// Ein Auswahlfeld lohnt erst ab zwei Werten; ist schon einer gewählt (aus der Adresse), bleibt es da
-	const show = (values: string[], current: string) => values.length > 1 || current !== '';
 </script>
 
 <svelte:head><title>{t('logs.list.title')} · NexHub</title></svelte:head>
 
-<header class="page-head">
-	<h1>{t('logs.list.title')}</h1>
-	<p>{t('logs.list.intro')}</p>
+<header class="page-head head">
+	<div>
+		<h1>{t('logs.dungeons.title')}</h1>
+		<p>{t('logs.dungeons.intro')}</p>
+	</div>
+	<div class="totals">
+		<div class="glass total"><b class="num">{ofKind.reduce((s, g) => s + g.runs, 0)}</b><small>{t('logs.dungeons.runs', { when })}</small></div>
+		<div class="glass total"><b class="num ok">{ofKind.reduce((s, g) => s + g.kills, 0)}</b><small>{t('logs.dungeons.kills')}</small></div>
+		<div class="glass total"><b class="num">{ofKind.length}</b><small>{t('logs.dungeons.count')}</small></div>
+	</div>
 </header>
 
-{#if data.runs.length}
-	<section class="glass pad filters" aria-label={t('logs.find.search')}>
-		<label class="field search">
-			{t('logs.find.search')}
-			<input class="input" type="search" bind:value={filter.q} placeholder={t('logs.find.placeholder')} />
-		</label>
-		{#if show(options.dungeons, filter.dungeon)}
-			<label class="field">
-				{t('logs.find.dungeon')}
-				<select class="input" bind:value={filter.dungeon}>
-					<option value="">{t('logs.find.any')}</option>
-					{#each options.dungeons as d (d)}<option value={d}>{d}</option>{/each}
-				</select>
-			</label>
-		{/if}
-		{#if show(options.difficulties, filter.difficulty)}
-			<label class="field">
-				{t('logs.find.difficulty')}
-				<select class="input" bind:value={filter.difficulty}>
-					<option value="">{t('logs.find.any')}</option>
-					{#each options.difficulties as d (d)}<option value={d}>{d}</option>{/each}
-				</select>
-			</label>
-		{/if}
-		{#if show(options.players, filter.player)}
-			<label class="field">
-				{t('logs.find.player')}
-				<select class="input" bind:value={filter.player}>
-					<option value="">{t('logs.find.any')}</option>
-					{#each options.players as p (p)}<option value={p}>{p}</option>{/each}
-				</select>
-			</label>
-		{/if}
-		{#if show(options.uploaders, filter.uploader)}
-			<label class="field">
-				{t('logs.find.uploader')}
-				<select class="input" bind:value={filter.uploader}>
-					<option value="">{t('logs.find.any')}</option>
-					{#each options.uploaders as u (u)}<option value={u}>{u}</option>{/each}
-				</select>
-			</label>
-		{/if}
-		<label class="field">
-			{t('logs.find.status')}
-			<select class="input" bind:value={filter.status}>
-				<option value="">{t('logs.find.any')}</option>
-				<option value="clear">{t('logs.find.clear')}</option>
-				<option value="open">{t('logs.find.open')}</option>
-			</select>
-		</label>
-		<label class="field">
-			{t('logs.find.period')}
-			<select class="input" bind:value={filter.days}>
-				<option value="">{t('logs.find.any')}</option>
-				{#each PERIODS as n (n)}
-					<option value={n}>{n === '1' ? t('logs.find.day') : t('logs.find.days', { n })}</option>
-				{/each}
-			</select>
-		</label>
-		{#if isActive(filter)}
-			<div class="reset">
-				<button class="btn small" type="button" onclick={reset}>{t('logs.find.reset')}</button>
-			</div>
-		{/if}
-	</section>
+<div class="bar">
+	<Tabs label={t('logs.dungeons.period')} active={data.period}
+		tabs={PERIODS.map((p) => ({ id: p, label: t(`logs.period.${p}`), href: href(p, data.kind) }))} />
+	<Tabs label={t('logs.dungeons.kind')} active={data.kind}
+		tabs={KINDS.map((k) => ({ id: k, label: t(`logs.kind.${k}`), href: href(data.period, k) }))} />
+	<label class="search">
+		<span class="sr-only">{t('logs.dungeons.search')}</span>
+		<input class="input" type="search" bind:value={q} placeholder={t('logs.dungeons.search')} />
+	</label>
+</div>
 
-	<section class="glass pad table-wrap">
-		{#if runs.length}
-			<RunTable {runs} />
-		{:else}
-			<p class="dim empty">{t('logs.list.noMatch')}</p>
-		{/if}
-		<p class="dim count">
-			{isActive(filter)
-				? t('logs.list.countOf', { n: formatNumber(runs.length), t: formatNumber(data.runs.length) })
-				: t('logs.list.count', { n: formatNumber(data.runs.length) })}
-			{#if data.runs.length >= RUN_LIMIT}· {t('logs.list.limit', { n: formatNumber(RUN_LIMIT) })}{/if}
-		</p>
+{#if shown.length}
+	<section class="cards" aria-label={t('logs.dungeons.count')}>
+		{#each shown as group (group.name)}
+			<DungeonCard {group} period={data.period} />
+		{/each}
 	</section>
 {:else}
-	<section class="glass pad"><p class="dim empty">{t('logs.list.empty')}</p></section>
+	<p class="glass pad empty">{data.all.length ? t('logs.dungeons.none', { when }) : t('logs.list.empty')}</p>
 {/if}
 
 <style>
-	.filters {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-		gap: 14px;
-		align-items: end;
-		margin-bottom: 16px;
+	.head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 18px;
+	}
+	.totals {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+	}
+	.total {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 96px;
+		padding: 12px 16px;
+		border-radius: 12px;
+	}
+	.total b {
+		font-size: 22px;
+		font-weight: 600;
+	}
+	.total b.ok {
+		color: var(--ok);
+	}
+	.total small {
+		font-size: 12px;
+		color: var(--faint);
+	}
+	.bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 12px;
+		margin-bottom: 18px;
 	}
 	.search {
-		grid-column: 1 / -1;
+		margin-left: auto;
 	}
-	.reset {
-		padding-bottom: 4px;
+	.search .input {
+		width: 220px;
+		max-width: 100%;
 	}
-	.count {
-		margin: 12px 14px 0;
-		font-size: 13px;
+	.cards {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+		gap: 16px;
 	}
 	.empty {
-		margin: 0;
+		text-align: center;
+		color: var(--dim);
+	}
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 </style>

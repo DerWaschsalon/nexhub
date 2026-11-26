@@ -398,3 +398,16 @@ def test_cp_aus_frueherem_run_wenn_der_neue_noch_fehlt(as_user, database_url):
     assert (p["eu"], p["eu_cp"]) == (50, 251_000)
     add_snapshot(database_url, run_id, "A", 400_000, datetime.now(UTC) - timedelta(days=1))  # dieser Run zählt vor
     assert member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]["A"]["eu_few"] is True
+
+
+def test_beste_parses_der_gilde_seit(as_user, database_url):
+    set_legions(as_user, "Gilde")
+    member = as_user(MEMBER)
+    add_board(database_url, 1, "ranger", [float(i) for i in range(1, 21)])
+    first = new_run(database_url, summary(boss(1, [("A", "ranger", 5), ("B", "ranger", 18)])))
+    new_run(database_url, summary(boss(1, [("A", "ranger", 15)])))
+    new_run(database_url, summary(boss(1, [("Random", "ranger", 20)])), legion="Andere")
+    top = member.get(f"/api/parses/top?since_ms={NOW_MS - DAY_MS}").json()
+    assert [(t["name"], t["eu"]) for t in top] == [("B", 90), ("A", 75)]
+    assert top[0]["run_id"] == first and top[0]["boss"] == "Boss 1" and top[0]["cls"] == "ranger"
+    assert member.get(f"/api/parses/top?since_ms={NOW_MS + DAY_MS}").json() == []
