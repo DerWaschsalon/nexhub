@@ -151,6 +151,48 @@
 			<li>PvP gear is not rated separately.</li>
 		</ul>
 	{/if}
+
+	<!-- Parses in der Kampfansicht (Modul parses). Ändert sich modules/parses/calc.py oder fetcher.py
+	     (Schwelle GUILD_MIN = 10, Abruf täglich), diesen Abschnitt mit ändern. -->
+	{#if i18n.lang === 'de'}
+		<h2 id="parses">Parses in der Kampfansicht</h2>
+		<p>
+			Bei getöteten Bossen steht hinter dem DPS jedes Spielers eine Zahl von 0 bis 100: wie viel Prozent der
+			Vergleichswerte derselben Klasse am selben Boss dein DPS erreicht oder übertrifft. Die Farben folgen
+			Warcraft Logs, von Grau (unter 25) über Grün, Blau, Lila und Orange bis Rosa (99) und Gold (100).
+		</p>
+		<ul>
+			<li>
+				<strong>EU:</strong> gegen die Ranglisten von Abyss Logs (Region EU), je Spieler sein bester Kampf von
+				mindestens 30 Sekunden. Der Hub holt sie einmal am Tag und nur für Bosse und Klassen aus unseren Runs der
+				letzten 30 Tage. Die API von Abyss Logs ist inoffiziell, und deren Messung kann leicht von unserer abweichen.
+			</li>
+			<li>
+				<strong>Gilde:</strong> gegen den Bestwert jedes Charakters derselben Klasse an diesem Boss aus allen Runs
+				im Hub. Angezeigt erst ab 10 Charakteren.
+			</li>
+			<li>Hard und Normal sind bei Abyss Logs eigene Bosse und werden getrennt verglichen.</li>
+		</ul>
+	{:else}
+		<h2 id="parses">Parses in the fight view</h2>
+		<p>
+			For killed bosses each player's DPS gets a number from 0 to 100: the share of comparison values of the same
+			class at the same boss that your DPS reaches or beats. Colours follow Warcraft Logs, from grey (below 25)
+			through green, blue, purple and orange to pink (99) and gold (100).
+		</p>
+		<ul>
+			<li>
+				<strong>EU:</strong> against the Abyss Logs rankings (region EU), each player's best fight of at least 30
+				seconds. The hub fetches them once a day and only for bosses and classes from our runs of the last 30 days.
+				The Abyss Logs API is unofficial, and their measurement can differ slightly from ours.
+			</li>
+			<li>
+				<strong>Guild:</strong> against the best value of every character of the same class at this boss from all
+				runs in the hub. Shown from 10 characters on.
+			</li>
+			<li>Hard and Normal are separate bosses on Abyss Logs and are compared separately.</li>
+		</ul>
+	{/if}
 </article>
 
 <style>

@@ -1,5 +1,6 @@
 <!-- Rangliste: Balken in Klassenfarbe, längster Balken = meister Schaden. Mit onSelect anklickbar. -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Num from '#lib/components/Num.svelte';
 	import { formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
@@ -12,7 +13,8 @@
 		selected = null,
 		onSelect,
 		href,
-		note
+		note,
+		badge
 	}: {
 		players: (Player & { actor?: number })[];
 		selected?: string | null;
@@ -21,6 +23,8 @@
 		href?: (p: Player) => string | undefined;
 		/** kleiner Zusatz hinter dem Namen, z. B. die Kampfkraft */
 		note?: (p: Player) => string | undefined;
+		/** Zusatz hinter dem DPS, z. B. der Parse (Modul parses); ohne: keine Spalte */
+		badge?: Snippet<[Player]>;
 	} = $props();
 
 	const max = $derived(players[0]?.damage || 1);
@@ -41,9 +45,10 @@
 		<Num value={p.damage} unit={t('logs.skills.col.damage')} /><small>{Math.round((100 * p.damage) / total)} %</small>
 	</span>
 	<span class="dps num">{formatNumber(p.dps)}<small>/s</small></span>
+	{#if badge}<span class="badge">{@render badge(p)}</span>{/if}
 {/snippet}
 
-<ol class="ranks">
+<ol class="ranks" class:with-badge={!!badge}>
 	{#each players as p, i (playerId(p))}
 		<li class:selected={selected === playerId(p)}>
 			{#if onSelect}
@@ -81,6 +86,12 @@
 		color: var(--text);
 		font: inherit;
 		text-align: left;
+	}
+	.with-badge .row {
+		grid-template-columns: 26px minmax(110px, 200px) minmax(60px, 1fr) 96px 84px auto;
+	}
+	.badge {
+		justify-self: end;
 	}
 	button.row {
 		cursor: pointer;
@@ -155,6 +166,15 @@
 		}
 		.dps {
 			display: none;
+		}
+		.with-badge .row {
+			grid-template-columns: 20px minmax(0, 1fr) 80px;
+			grid-template-areas: 'rank name value' 'bar bar bar' 'badge badge badge';
+		}
+		.badge {
+			grid-area: badge;
+			justify-self: start;
+			margin-left: 30px;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {

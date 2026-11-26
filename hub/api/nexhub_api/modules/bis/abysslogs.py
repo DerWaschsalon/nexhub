@@ -73,6 +73,17 @@ async def leaderboard(http: httpx.AsyncClient, cls: str, boss: int) -> list[dict
     return [e for e in entries if isinstance(e, dict) and e.get("playerName")]
 
 
+async def leaderboard_page(http: httpx.AsyncClient, cls: str, boss: int, page: int) -> tuple[list[dict], int]:
+    """Eine Seite (100 Einträge) der Bestenliste und die Gesamtzahl. Ohne Rangliste: ([], 0)."""
+    body = await _get(http, "/leaderboards", {"region": REGION, "class": cls, "boss": boss, "limit": 100, "page": page})
+    entries = body.get("entries") if isinstance(body, dict) else None
+    if not isinstance(entries, list):
+        raise AbyssError("Abyss Logs: Rangliste unbekannt")
+    entries = [e for e in entries if isinstance(e, dict) and e.get("playerName")]
+    total = body.get("total")
+    return entries, total if isinstance(total, int) else len(entries)
+
+
 def best_per_name(entries: list[dict]) -> list[dict]:
     """Je Name der beste echte Kampf, stärkste zuerst."""
     best: dict[str, dict] = {}

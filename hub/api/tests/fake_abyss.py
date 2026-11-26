@@ -18,11 +18,15 @@ def entry(name: str, dps: float, duration: float = 120) -> dict:
 
 
 class FakeAbyss:
-    """`boards` je Boss die Namen der Rangliste (stärkste zuerst); unbekannte Bosse sind leer."""
+    """`boards` je Boss die Namen der Rangliste (stärkste zuerst); unbekannte Bosse sind leer. Bosse in
+    `not_ranked` antworten wie die echte API mit HTTP 400; `fail_page` antwortet mit HTTP 500."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
         self.boards: dict[int, list[str]] = {8001: [f"Bogenheld{i}" for i in range(1, 6)]}
+        self.not_ranked: set[int] = set()
+        self.fail_page: int | None = None
+        self.failing: set[int] = set()  # Bosse, deren Rangliste immer mit HTTP 500 antwortet
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(f"{request.url.path}?{request.url.query.decode()}")
@@ -31,7 +35,13 @@ class FakeAbyss:
                 {"mobCode": 1, "name": "Testboss", "category": "Transcendence", "tier": "Stage 4", "dungeonId": 1}])
         if request.url.path == "/v1/leaderboards":
             boss = int(request.url.params["boss"])
+            page = int(request.url.params.get("page", 1))
+            limit = int(request.url.params.get("limit", 100))
+            if boss in self.not_ranked:
+                return httpx.Response(400, json={"error": "boss not ranked"})
+            if page == self.fail_page or boss in self.failing:
+                return httpx.Response(500)
             names = self.boards.get(boss, [])
-            rows = [entry(n, 90_000 - i * 1000) for i, n in enumerate(names)]
-            return httpx.Response(200, json={"entries": rows, "total": len(rows), "page": 1, "limit": 100})
+            rows = [entry(n, 90_000 - i * 100) for i, n in enumerate(names)][(page - 1) * limit:page * limit]
+            return httpx.Response(200, json={"entries": rows, "total": len(names), "page": page, "limit": limit})
         return httpx.Response(404)

@@ -13,6 +13,7 @@ from nexhub_api.config import Settings
 from nexhub_api.db import migrate
 from nexhub_api.main import create_app
 from nexhub_api.modules.bis.collector import BisCollector
+from nexhub_api.modules.parses.fetcher import ParseFetcher
 
 from .fake_abyss import HOST as ABYSS_HOST
 from .fake_abyss import FakeAbyss
@@ -77,11 +78,12 @@ class FakeDiscord:
 
 @pytest.fixture(autouse=True)
 def no_background_collector(monkeypatch):
-    """Der Sammler der BiS-Listen läuft im Test nicht neben dem Hub her; test_bis.py ruft seine Takte selbst
-    auf. Sonst sammeln zwei Sammler gleichzeitig in dieselbe Datenbank."""
-    async def idle(self: BisCollector) -> None:
+    """Der Sammler der BiS-Listen und der Abruf der Parses laufen im Test nicht neben dem Hub her; test_bis.py
+    und test_parses.py rufen ihre Takte selbst auf. Sonst schreiben zwei gleichzeitig in dieselbe Datenbank."""
+    async def idle(self) -> None:
         return None
     monkeypatch.setattr(BisCollector, "run", idle)
+    monkeypatch.setattr(ParseFetcher, "run", idle)
 
 
 @pytest.fixture

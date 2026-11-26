@@ -10,9 +10,10 @@ import devices from '#modules/devices/module.ts';
 import feedback from '#modules/feedback/module.ts';
 import logs from '#modules/logs/module.ts';
 import loot from '#modules/loot/module.ts';
+import parses from '#modules/parses/module.ts';
 import schedule from '#modules/schedule/module.ts';
 
-export const MODULES: HubModule[] = [logs, armory, bis, loot, schedule, devices, feedback, bot];
+export const MODULES: HubModule[] = [logs, armory, bis, loot, parses, schedule, devices, feedback, bot];
 
 addTexts(CORE_TEXTS);
 for (const m of MODULES) if (m.texts) addTexts(m.texts);

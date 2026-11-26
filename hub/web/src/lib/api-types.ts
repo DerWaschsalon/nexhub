@@ -294,6 +294,14 @@ export type PairStarted = {
 	interval: number;
 };
 
+export type Parse = {
+	eu: number | null;
+	eu_n: number | null;
+	eu_at: string | null;
+	guild: number | null;
+	guild_n: number;
+};
+
 export type Piece = {
 	slot: string;
 	name: string | null;
@@ -376,6 +384,11 @@ export type RunOut = {
 	created_at: string;
 	players: string[];
 	bosses: string[];
+};
+
+export type RunParses = {
+	guild_min: number;
+	fights: Record<string, Record<string, Parse>>;
 };
 
 export type RunReport = {
