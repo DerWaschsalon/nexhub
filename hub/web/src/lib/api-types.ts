@@ -80,6 +80,11 @@ export type Boss = {
 	items: Item[];
 };
 
+export type BossParse = {
+	eu: number | null;
+	guild: number | null;
+};
+
 export type Bound = {
 	letter: string;
 	low: number;
@@ -163,6 +168,10 @@ export type DeviceOut = {
 	created_at: string;
 	last_seen_at: string | null;
 	version: string | null;
+};
+
+export type DeviceParses = {
+	bosses: Record<string, Record<string, BossParse>>;
 };
 
 export type DeviceSelf = {

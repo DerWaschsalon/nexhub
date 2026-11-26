@@ -2,6 +2,7 @@
 
     GET /api/parses/runs/{run_id}            mit Login
     GET /api/public/parses/shared/{token}    geteilter Run (/r/<token>), ohne Login
+    GET /api/parses/device/runs/{run_id}     eigener Run des gekoppelten NexBoards, für das Run-Bild in Discord
 
 Nur getötete Bosse. Je Kampf (`fight`) und Spielername:
     eu_at None        Rangliste noch nicht geladen
@@ -16,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import func, select
 
-from ...deps import DB, CurrentUser
+from ...deps import DB, CurrentDevice, CurrentUser
 from ...routes.public import not_for_search_engines
 from ..bis.abysslogs import REGION
 from ..logs.models import Run
@@ -38,6 +39,17 @@ class Parse(BaseModel):
 class RunParses(BaseModel):
     guild_min: int
     fights: dict[str, dict[str, Parse]]
+
+
+class BossParse(BaseModel):
+    eu: int | None
+    guild: int | None
+
+
+class DeviceParses(BaseModel):
+    """Je Boss (mob als Text) und Spielername nur die Zahlen, die das Run-Bild zeigt. Hat ein Boss mehrere
+    getötete Kämpfe im Run, gilt der mit dem höheren DPS des Spielers."""
+    bosses: dict[str, dict[str, BossParse]]
 
 
 def _utc(at: datetime) -> datetime:
@@ -81,6 +93,28 @@ async def _parses(request: Request, db: DB, run: Run) -> RunParses:
                               guild=percentile(p["dps"], mates) if len(mates) >= GUILD_MIN else None,
                               guild_n=len(mates))
     return RunParses(guild_min=GUILD_MIN, fights=fights)
+
+
+def _by_boss(run: Run, parses: RunParses) -> DeviceParses:
+    dps = {(b["fight"], p["name"]): p["dps"] for b in run.summary.get("bosses", []) for p in b.get("players", [])}
+    mobs = {b["fight"]: str(b["mob"]) for b in run.summary.get("bosses", [])}
+    best: dict[str, dict[str, tuple[float, BossParse]]] = {}
+    for fight, players in parses.fights.items():
+        out = best.setdefault(mobs[fight], {})
+        for name, p in players.items():
+            value = dps.get((fight, name), 0)
+            if name not in out or value > out[name][0]:
+                out[name] = (value, BossParse(eu=p.eu, guild=p.guild))
+    return DeviceParses(bosses={mob: {n: bp for n, (_, bp) in names.items()} for mob, names in best.items()})
+
+
+@router.get("/device/runs/{run_id}")
+async def device_run_parses(run_id: int, request: Request, device: CurrentDevice, db: DB) -> DeviceParses:
+    """Parses des eben hochgeladenen Runs für das NexBoard (Bearer-Token), nur für eigene Runs."""
+    run = await db.get(Run, run_id)
+    if run is None or run.user_id != device.user_id:
+        raise HTTPException(404, "Run nicht gefunden")
+    return _by_boss(run, await _parses(request, db, run))
 
 
 @router.get("/runs/{run_id}")

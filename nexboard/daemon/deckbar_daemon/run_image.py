@@ -26,6 +26,11 @@ HP_KILL = ((71, 212, 125), (46, 167, 95), (216, 255, 232))  # Verlauf oben/unten
 HP_OPEN = ((240, 187, 82), (207, 145, 44), (255, 240, 208))
 END_DOT = (123, 109, 255)  # --indicator-end
 WHITE = (255, 255, 255)
+# Parses (Hub, /api/parses/device/runs): je Boss (mob) und Spielername (EU, Gilde) in Prozent, None = keine Zahl
+Parses = dict[int, dict[str, tuple[int | None, int | None]]]
+# Farbstufen wie im Hub (ParseBadge.svelte) und bei Warcraft Logs
+PARSE_TIERS = ((100, (212, 180, 90)), (99, (226, 104, 168)), (95, (255, 128, 0)), (75, (167, 80, 238)),
+               (50, (61, 134, 240)), (25, (47, 191, 58)), (0, (154, 160, 166)))
 
 
 def _rgba(c: tuple[int, int, int], a: float) -> tuple[int, int, int, int]:
@@ -188,7 +193,42 @@ def _hp_strip(L: _Layers, x: int, y: int, w: int, boss: Boss) -> None:
         L.t.text((x + w - 8 * S, y + 2.5 * S), hp, font=f, fill=_rgba(WHITE, 0.72), anchor="ra")
 
 
-def _row(L: _Layers, x: int, y: int, w: int, rank: int, p: Player, best: int, total: int, secs: float) -> None:
+def parse_color(value: int) -> tuple[int, int, int]:
+    return next(c for limit, c in PARSE_TIERS if value >= limit)
+
+
+def _parse_parts(parse: tuple[int | None, int | None], guild: bool) -> list[tuple[str, bool, int | None]]:
+    """(Text, ist Zahl, Wert) von rechts nach links: Gilde, dann EU. Ohne Gilde nur EU."""
+    eu, g = parse
+    parts: list[tuple[str, bool, int | None]] = []
+    if guild and g is not None:
+        parts += [(str(g), True, g), ("G", False, None)]
+    parts += [(str(eu) if eu is not None else "–", True, eu), ("EU", False, None)]
+    return parts
+
+
+def _draw_parse(L: _Layers, rx: float, cy: int, left: float, parse: tuple[int | None, int | None]) -> float:
+    """Parse rechts bündig bei rx zeichnen, wenn er bis `left` passt (sonst nur EU, sonst nichts). Gibt die
+    neue rechte Kante für alles Weitere links davon zurück."""
+    nf, lf = font("num_bold", 12.5), font("num", 10)
+    for guild in (True, False):
+        parts = _parse_parts(parse, guild)
+        if guild and len(parts) == 2:
+            continue  # keine Gildenzahl: gleich die kurze Form
+        width = sum(L.t.textlength(t, font=nf if num else lf) + (3 if num else 7) * S for t, num, _ in parts) + 4 * S
+        if rx - width < left:
+            continue
+        for text, num, value in parts:
+            f = nf if num else lf
+            color = _rgba(parse_color(value), 1.0) if value is not None else _rgba(WHITE, 0.35 if not num else 0.3)
+            L.label((rx, cy), text, f, color, anchor="rm", shadow=0.9)
+            rx -= L.t.textlength(text, font=f) + (3 if num else 7) * S
+        return rx - 4 * S
+    return rx
+
+
+def _row(L: _Layers, x: int, y: int, w: int, rank: int, p: Player, best: int, total: int, secs: float,
+         parse: tuple[int | None, int | None] | None = None) -> None:
     h = ROW_H * S
     row = Image.new("RGBA", (w, h), (255, 255, 255, 9))  # --hud-row-bg
     bar = USER_FILL if p.you else ROW_FILL
@@ -235,6 +275,9 @@ def _row(L: _Layers, x: int, y: int, w: int, rank: int, p: Player, best: int, to
     amount = fmt_amount(p.dmg)
     L.label((rx, cy), amount, sf, _rgba(WHITE, 0.45), anchor="rm", shadow=0.9)
     rx -= L.t.textlength(amount, font=sf)
+    if parse is not None:
+        name_end = cx + L.t.textlength(p.name, font=nf) + 10 * S
+        rx = _draw_parse(L, rx - 12 * S, cy, name_end, parse)
 
     # Itemlevel und Kampfkraft hinter dem Namen, nur wenn Platz bis zu den Zahlen ist
     info = player_info(p)
@@ -251,7 +294,7 @@ def player_info(p: Player) -> str:
     return " · ".join(parts)
 
 
-def _panel(boss: Boss, height: int) -> Image.Image:
+def _panel(boss: Boss, height: int, parses: Parses | None = None) -> Image.Image:
     w, h = PANEL_W * S, height * S
     L = _Layers((w, h))
     L.d.rounded_rectangle((0, 0, w - 1, h - 1), 10 * S, fill=(*_mix(WHITE, HUD_BG, 0.035), 245),
@@ -275,14 +318,16 @@ def _panel(boss: Boss, height: int) -> Image.Image:
     best = max((p.dmg for p in players), default=1) or 1
     total = boss.total or 1
     secs = max(1.0, boss.duration_ms / 1000)
+    mine = (parses or {}).get(boss.mob, {}) if boss.mob and boss.killed else {}
     for i, p in enumerate(players):
-        _row(L, PAD * S, y, w - 2 * PAD * S, i + 1, p, best, total, secs)
+        _row(L, PAD * S, y, w - 2 * PAD * S, i + 1, p, best, total, secs, mine.get(p.name))
         y += (ROW_H + ROW_GAP) * S
     return L.flatten()
 
 
-def render_run(run: Run) -> bytes:
-    """Run → Bild (WebP): Kopf mit Dungeon, dann je ein Meter-Fenster für „Gesamt“ und jeden Boss."""
+def render_run(run: Run, parses: Parses | None = None) -> bytes:
+    """Run → Bild (WebP): Kopf mit Dungeon, dann je ein Meter-Fenster für „Gesamt“ und jeden Boss. Mit
+    `parses` (nach dem Upload vom Hub) steht in den Zeilen getöteter Bosse der Parse „EU 87 G 60“."""
     bosses = run.bosses()
     panels = [run.total(), *bosses] if len(bosses) > 1 else bosses
     cols = 1 if len(panels) == 1 else 2 if len(panels) <= 4 else 3
@@ -326,7 +371,7 @@ def render_run(run: Run) -> bytes:
     for r, rh in zip(rows, heights):
         for i, boss in enumerate(r):
             px = x0 + i * (PANEL_W + gap) * S
-            p = _panel(boss, rh)
+            p = _panel(boss, rh, parses)
             # Schatten nur in Panelgröße plus Rand für die Unschärfe (nicht über die ganze Leinwand)
             m = 3 * 14 * S
             shadow = Image.new("RGBA", (p.width + 2 * m, p.height + 2 * m), (0, 0, 0, 0))

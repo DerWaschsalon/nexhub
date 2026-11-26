@@ -227,6 +227,22 @@ def test_zugriff(client, as_user, database_url):
     assert client.get("/api/public/parses/shared/" + "x" * 40).status_code == 404
 
 
+def test_parses_fuers_run_bild_des_nexboards(client, as_user, database_url):
+    from .test_devices import bearer, pair
+
+    token = pair(client, as_user(MEMBER))
+    add_board(database_url, 1, "ranger", [100, 200, 300, 400])
+    run_id = new_run(database_url, summary(
+        boss(1, [("A", "ranger", 150)], fight="f1"),            # erster Versuch, schwächer
+        boss(1, [("A", "ranger", 350)], fight="f2"),            # zweiter Kill am selben Boss zählt
+        boss(2, [("A", "ranger", 100)], killed=False, fight="f3")))
+    r = client.get(f"/api/parses/device/runs/{run_id}", headers=bearer(token))
+    assert r.status_code == 200, r.text
+    assert r.json() == {"bosses": {"1": {"A": {"eu": 75, "guild": None}}}}
+    assert client.get(f"/api/parses/device/runs/{run_id}").status_code == 401
+    assert client.get("/api/parses/device/runs/999999", headers=bearer(token)).status_code == 404
+
+
 def test_fehlschlaege_verdraengen_andere_nicht(fake, database_url):
     fake.abyss.failing = {9100 + i for i in range(6)}
 
