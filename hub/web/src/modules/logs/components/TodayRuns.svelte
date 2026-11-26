@@ -1,8 +1,9 @@
-<!-- Übersicht (Startseite), Kachel Runs: nur der heutige Tag, kompakt. Eine Zeile mit den Zahlen des Tages, darunter
-     drei schmale Spalten: beste Parses der Gilde, gespielte Dungeons, die neuesten Runs. Ältere unter „Runs“. -->
+<!-- Übersicht (Startseite), Kachel Runs: oben die Bestenliste ab Lila (dauerhaft, über alle Runs), darunter nur der
+     heutige Tag, kompakt: Zahlen in einer Zeile und drei schmale Spalten (beste Parses der Gilde, gespielte Dungeons,
+     neueste Runs). Ältere unter „Runs“. Parses rechnet der Hub alle 5 Minuten im Hintergrund (parses/hall.py). -->
 <script lang="ts">
 	import { api } from '#lib/api.ts';
-	import type { LegionsOut, TopParse } from '#lib/api-types.ts';
+	import type { Hall, LegionsOut, TopParse } from '#lib/api-types.ts';
 	import { formatDuration } from '#lib/format.ts';
 	import { i18n, t } from '#lib/i18n.svelte.ts';
 	import ParseValue from '#modules/parses/components/ParseValue.svelte';
@@ -22,12 +23,14 @@
 		api<DungeonStat[]>('/api/runs/dungeons'),
 		api<DungeonStat[]>(`/api/runs/dungeons?since_ms=${since}`),
 		optional(api<TopParse[]>(`/api/parses/top?since_ms=${since}&limit=${TOP}`)),
-		optional(api<LegionsOut>('/api/parses/legions'))
+		optional(api<LegionsOut>('/api/parses/legions')),
+		optional(api<Hall>('/api/parses/hall'))
 	]);
+	const date = (ms: number) => new Date(ms).toLocaleDateString(i18n.locale, { day: '2-digit', month: '2-digit' });
 	const time = (ms: number) => new Date(ms).toLocaleTimeString(i18n.locale, { hour: '2-digit', minute: '2-digit' });
 </script>
 
-{#await load then [runs, all, stats, top, legions]}
+{#await load then [runs, all, stats, top, legions, hall]}
 	{@const kills = stats.reduce((s, x) => s + x.kills, 0)}
 	{@const rate = killRate(kills, stats.reduce((s, x) => s + x.wipes, 0))}
 	{@const minutes = Math.round(runs.reduce((s, r) => s + r.end_ms - r.start_ms, 0) / 60_000)}
@@ -43,6 +46,28 @@
 				<span class="chip"><b class="num">{minutes >= 60 ? (minutes / 60).toFixed(1).replace('.', ',') : minutes}</b> {minutes >= 60 ? 'h' : 'min'}</span>
 			</span>
 		</div>
+
+		{#if hall?.entries.length}
+			<section class="hall" aria-label={t('logs.today.hall')}>
+				<h3>{t('logs.today.hall')} <span class="hint">{t('logs.today.hallHint')}</span></h3>
+				<div class="hall-list">
+					{#each hall.entries as p, i (p.name)}
+						{@const info = classInfo(p.cls)}
+						<a class="fame" href="/hub/runs/{p.run_id}/kampf/{encodeURIComponent(p.fight)}">
+							<span class="place num">{i + 1}</span>
+							<b class="big"><ParseValue value={p.eu} /></b>
+							<span class="two">
+								<strong style:color={info?.color}>
+									{#if info}<img src={info.icon} alt={info.label} width="16" height="16" />{/if}{p.name}
+								</strong>
+								<small>{p.boss}</small>
+								<small>{p.dungeon} · {date(p.start_ms)}</small>
+							</span>
+						</a>
+					{/each}
+				</div>
+			</section>
+		{/if}
 
 		{#if runs.length}
 			<div class="cols">
@@ -141,6 +166,52 @@
 	}
 	.chips b.accent {
 		color: var(--accent);
+	}
+	.hall {
+		padding: 0;
+	}
+	.hall h3 .hint {
+		text-transform: none;
+		letter-spacing: 0;
+		font-weight: 400;
+	}
+	.hall-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+		gap: 8px;
+	}
+	.fame {
+		position: relative;
+		display: grid;
+		grid-template-columns: 14px 52px minmax(0, 1fr);
+		gap: 8px;
+		align-items: center;
+		padding: 10px 12px;
+		border-radius: 12px;
+		border: 1px solid var(--edge-soft);
+		background: var(--fill);
+		color: var(--text);
+		text-decoration: none;
+	}
+	.fame:hover {
+		border-color: var(--edge);
+	}
+	.place {
+		font-size: 11px;
+		color: var(--faint);
+	}
+	.big {
+		font-size: 24px;
+		text-align: center;
+	}
+	.fame strong {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+	}
+	.fame img {
+		border-radius: 4px;
+		object-fit: contain;
 	}
 	.cols {
 		display: grid;

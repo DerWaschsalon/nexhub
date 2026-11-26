@@ -33,7 +33,7 @@ from nexproto import NexLogError, dungeon_label, unpack
 from nexproto.nexlog import MAX_PACKED
 from nexproto.runreport import RunReport
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from ...bot_client import tell_bot
 from ...config import Settings
@@ -203,8 +203,20 @@ class DungeonStat(BaseModel):
 
 
 @router.get("/dungeons")
-async def list_dungeons(user: CurrentUser, db: DB, since_ms: int | None = None) -> list[DungeonStat]:
-    """Kennzahlen je Dungeon-ID für die Übersicht, neuester zuerst. Liest nur Eckdaten und Zusammenfassungen."""
+async def list_dungeons(request: Request, user: CurrentUser, db: DB, since_ms: int | None = None) -> list[DungeonStat]:
+    """Kennzahlen je Dungeon-ID für die Übersicht, neuester zuerst. Über alle Runs im Speicher gehalten, bis ein Run
+    dazukommt oder gelöscht wird (Anzahl und höchste ID); ein Zeitraum liest nur seine Runs."""
+    if since_ms is not None:
+        return await _dungeon_stats(db, since_ms)
+    key = tuple((await db.execute(select(func.count(), func.max(Run.id)).select_from(Run))).one())
+    cached = getattr(request.app.state, "runs_dungeons", None)
+    if cached is None or cached[0] != key:
+        cached = (key, await _dungeon_stats(db, None))
+        request.app.state.runs_dungeons = cached
+    return cached[1]
+
+
+async def _dungeon_stats(db: DB, since_ms: int | None) -> list[DungeonStat]:
     query = select(Run.dungeon_id, Run.dungeon, Run.difficulty, Run.start_ms, Run.end_ms, Run.complete, Run.summary)
     if since_ms is not None:
         query = query.where(Run.start_ms >= since_ms)
