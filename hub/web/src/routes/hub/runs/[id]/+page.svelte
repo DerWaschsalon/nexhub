@@ -59,7 +59,8 @@
 				eu_few: !eu.length && ps.some((p) => p.eu_few),
 				guild: avg(guild.map((p) => p.guild!)),
 				guild_n: Math.max(...ps.map((p) => p.guild_n)),
-				member: ps.some((p) => p.member)
+				member: ps.some((p) => p.member),
+				bench: null
 			});
 		}
 		return out;
@@ -97,7 +98,7 @@
 		{#if data.parses}
 			<RankBars players={run.summary.players} {href} {note}>
 				{#snippet badge(p)}
-					<ParseBadge parse={runParse.get(p.name)} cls={p.cls} guildMin={data.parses!.guild_min} />
+					<ParseBadge parse={runParse.get(p.name)} cls={p.cls} guildMin={data.parses!.guild_min} classStats={false} />
 				{/snippet}
 			</RankBars>
 			<p class="hint">{t('logs.sum.parseNote')} <a href="/hub/bewertung#parses">{t('parses.how')}</a></p>

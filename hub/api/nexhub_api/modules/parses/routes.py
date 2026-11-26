@@ -17,6 +17,7 @@ Nur getötete Bosse. Je Kampf (`fight`) und Spielername:
     eu_cp             eigene Kampfkraft: EU nur gegen Einträge mit cp ± CP_RANGE (eu_n zählt nur die).
                       None: Kampfkraft unbekannt oder Rangliste noch ohne, EU gegen alle Einträge
     eu_few True       weniger als EU_MIN Einträge im CP-Bereich: kein EU-Wert
+    bench             DPS-Verteilung der letzten Woche bei Abyss Logs für Klasse und Kampfkraft (extras.py); None ohne
     member False      nicht in einer Legion der Gilde (Random aus der Gruppe): kein Gildenwert
     guild None        nicht in der Gilde oder weniger als GUILD_MIN Charaktere dieser Klasse an diesem Boss (guild_n)
 """
@@ -26,20 +27,71 @@ from datetime import UTC, datetime
 from typing import Annotated, NamedTuple
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from nexproto import dungeon_label
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import delete, func, select
 
 from ...aion2 import localized
 from ...deps import DB, AdminUser, CurrentDevice, CurrentUser
 from ...routes.public import not_for_search_engines
-from ..bis.abysslogs import REGION
+from ..bis.abysslogs import REGION, abyss_class
 from ..logs.models import Run, RunCharacter
+from ..logs.routes import dungeon_names
 from .calc import EU_MIN, GUILD_MIN, guild_bests, in_cp_range, percentile
-from .models import GuildLegion, ParseBoard
+from .models import GuildLegion, ParseBenchmark, ParseBoard
 
 router = APIRouter(prefix="/api/parses", tags=["runs"])
 public_router = APIRouter(prefix="/api/public/parses", tags=["öffentlich"])
+
+
+class Bench(BaseModel):
+    """Klassenstatistik wie bei Abyss Logs: DPS-Verteilung der letzten Woche für Klasse und Kampfkraft-Stufe an
+    einem Boss, und wo der Spieler darin steht."""
+    pct: int  # geschätzter Platz in der Verteilung, 0 bis 100 (zwischen den Stützpunkten gerade verbunden)
+    lowest: float
+    top75: float  # untere 25 % liegen darunter
+    median: float
+    top25: float
+    top10: float
+    highest: float
+    week_before_median: float | None
+    samples: int  # Kämpfe
+    characters: int
+    cp_floor: int | None  # Kampfkraft-Stufe; None: über alle Kampfkraft
+    cp_ceil: int | None
+
+
+BENCH_MIN = 20  # Kämpfe in der Kampfkraft-Stufe, sonst die Verteilung über alle Kampfkraft
+
+
+def bench_pct(dps: float, c: dict) -> int:
+    """Platz eines DPS-Werts in der Verteilung aus ihren Stützpunkten (Tiefstwert 0, untere 25 % 25, Median 50,
+    Top 25 % 75, Top 10 % 90, Höchstwert 100), dazwischen linear."""
+    points = [(c.get("lowest"), 0), (c.get("top75"), 25), (c["median"], 50), (c.get("top25"), 75),
+              (c.get("top10"), 90), (c.get("highest"), 100)]
+    points = [(float(v), p) for v, p in points if isinstance(v, int | float)]
+    if dps <= points[0][0]:
+        return points[0][1]
+    for (v1, p1), (v2, p2) in zip(points, points[1:], strict=False):
+        if dps <= v2:
+            return int(p1 + (p2 - p1) * (dps - v1) / (v2 - v1)) if v2 > v1 else p2
+    return 100
+
+
+def _bench(cells: list[dict], cls: str | None, cp: int | None, dps: float) -> Bench | None:
+    if not cls:
+        return None
+    mine = [c for c in cells if c.get("classHint") == abyss_class(cls)]
+    near = [c for c in mine if cp and c.get("bracketCeil") and c["bracketFloor"] <= cp < c["bracketCeil"]
+            and (c.get("samples") or 0) >= BENCH_MIN]
+    c = near[0] if near else next((c for c in mine if not c.get("bracketCeil")), None)
+    if c is None:
+        return None
+    m = c["median"]
+    return Bench(pct=bench_pct(dps, c), lowest=c.get("lowest") or 0, top75=c.get("top75") or m, median=m,
+                 top25=c.get("top25") or m, top10=c.get("top10") or m, highest=c.get("highest") or m,
+                 week_before_median=c.get("weekBeforeMedian"), samples=c.get("samples") or 0,
+                 characters=c.get("characters") or 0, cp_floor=c["bracketFloor"] if near else None,
+                 cp_ceil=c["bracketCeil"] if near else None)
 
 
 class Parse(BaseModel):
@@ -51,6 +103,7 @@ class Parse(BaseModel):
     guild: int | None
     guild_n: int
     member: bool
+    bench: Bench | None = None
 
 
 class RunParses(BaseModel):
@@ -156,6 +209,8 @@ async def _parses(request: Request, db: DB, run: Run) -> RunParses:
         ParseBoard.cls.in_({c for _, c in pairs if c})))).all()}
     guild = await _guild(request, db)
     cps = await _combat_power(db, run, {p["name"] for b in killed for p in b.get("players", [])})
+    benches = {b.boss: b.cells for b in (await db.scalars(select(ParseBenchmark).where(
+        ParseBenchmark.boss.in_({b["mob"] for b in killed})))).all()}
     fights: dict[str, dict[str, Parse]] = {}
     for b in killed:
         best: dict[str, dict] = {}  # derselbe Name doppelt (Relog): der stärkere Eintrag
@@ -169,7 +224,8 @@ async def _parses(request: Request, db: DB, run: Run) -> RunParses:
             member = name in guild.members
             out[name] = Parse(**_eu(p["dps"], cps.get(name), board),
                               guild=percentile(p["dps"], mates) if member and len(mates) >= GUILD_MIN else None,
-                              guild_n=len(mates), member=member)
+                              guild_n=len(mates), member=member,
+                              bench=_bench(benches.get(b["mob"], []), p.get("cls"), cps.get(name), p["dps"]))
     return RunParses(guild_min=GUILD_MIN, fights=fights)
 
 
@@ -257,6 +313,7 @@ def best_per_member(entries: list[TopParse], min_eu: int = 0) -> list[TopParse]:
 async def member_parses(request: Request, db: DB, runs) -> list[TopParse]:
     """Alle EU-Parses der Mitglieder der Gilde in `runs`."""
     guild = await _guild(request, db)
+    info = getattr(request.app.state, "dungeon_info", None) or {}
     out: list[TopParse] = []
     for run in runs:
         parses = await _parses(request, db, run)
@@ -268,7 +325,8 @@ async def member_parses(request: Request, db: DB, runs) -> list[TopParse]:
                     continue
                 cls = next((q.get("cls") for q in boss.get("players", []) if q["name"] == name), None)
                 out.append(TopParse(name=name, cls=cls, eu=p.eu, boss=boss["name"], fight=fight, run_id=run.id,
-                                    dungeon=dungeon_label(run.dungeon_id, run.dungeon), start_ms=run.start_ms))
+                                    dungeon=dungeon_names(run.dungeon_id, run.dungeon, None, info)[0],
+                                    start_ms=run.start_ms))
     return out
 
 

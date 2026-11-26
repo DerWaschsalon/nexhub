@@ -192,6 +192,15 @@
 			<li>Hard und Normal sind bei Abyss Logs eigene Bosse und werden getrennt verglichen.</li>
 			<li>Die API von Abyss Logs ist inoffiziell, und deren Messung kann leicht von unserer abweichen.</li>
 		</ul>
+		<h3>Klasse: die Klassenstatistik von Abyss Logs</h3>
+		<p>
+			Abyss Logs wertet jede Woche alle hochgeladenen Kämpfe eines Bosses aus, getrennt nach Klasse und Kampfkraft in
+			Stufen von 25.000 CP: Tiefstwert, untere 25 %, Median, Top 25 %, Top 10 % und Höchstwert. Der Wert „Klasse“
+			sagt, wo dein DPS in dieser Verteilung liegt, zwischen den Stufen gerade verbunden. 50 heißt Median, 75 heißt
+			so gut wie die Top 25 %. Liegen in deiner CP-Stufe weniger als 20 Kämpfe, gilt die Verteilung über alle CP.
+			Der Tooltip nennt Median, Top 25 % und Top 10 % in DPS. Anders als EU zählt hier jeder Kampf der letzten
+			Woche, nicht nur der Bestwert je Spieler; der Hub holt die Werte einmal am Tag.
+		</p>
 		<h3>Gilde: gegen eure eigenen Charaktere</h3>
 		<p>
 			Gilde vergleicht mit dem Bestwert jedes Gildencharakters derselben Klasse an diesem Boss, aus allen Runs im
@@ -236,6 +245,15 @@
 			<li>Hard and Normal are separate bosses on Abyss Logs and are compared separately.</li>
 			<li>The Abyss Logs API is unofficial, and their measurement can differ slightly from ours.</li>
 		</ul>
+		<h3>Class: the class statistics of Abyss Logs</h3>
+		<p>
+			Every week Abyss Logs evaluates all uploaded fights of a boss, split by class and combat power in steps of
+			25,000 CP: lowest, bottom 25%, median, top 25%, top 10% and highest. The “Class” value says where your DPS
+			lies in that distribution, straight lines between the steps. 50 means median, 75 means as good as the top
+			25%. With fewer than 20 fights in your CP step, the distribution over all CP counts. The tooltip names median,
+			top 25% and top 10% in DPS. Unlike EU, every fight of the last week counts, not just each player's best; the
+			hub fetches the values once a day.
+		</p>
 		<h3>Guild: against your own characters</h3>
 		<p>
 			Guild compares with the best value of every guild character of the same class at this boss, from all runs in

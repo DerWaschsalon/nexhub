@@ -2,9 +2,11 @@
 // (routes/hub/runs/) und die Seite eines Dungeons (routes/hub/runs/dungeon/[name]/).
 //
 // AION 2 gibt jeder Schwierigkeit eine eigene Dungeon-ID. Die API zählt je ID (GET /api/runs/dungeons), hier
-// werden IDs mit gleichem Namen zu einem Dungeon. Fehlt die Schwierigkeit in den Daten, heißt sie „Stufe n“
-// nach der Reihenfolge der IDs – gezählt über alle Runs, damit die Nummer in jedem Zeitraum gleich bleibt.
+// werden IDs mit gleichem Namen zu einem Dungeon. Name und Schwierigkeit kommen von Abyss Logs (Hub, Modul
+// parses/extras.py), sonst aus der Aufnahme; fehlt die Schwierigkeit ganz, heißt sie „Stufe n“ nach der
+// Reihenfolge der IDs – gezählt über alle Runs, damit die Nummer in jedem Zeitraum gleich bleibt.
 import type * as Api from '#lib/api-types.ts';
+import { i18n } from '#lib/i18n.svelte.ts';
 
 export type DungeonStat = Api.DungeonStat;
 
@@ -26,11 +28,30 @@ export function sinceMs(period: Period, now = new Date()): number | null {
 
 /** Höchstens so viele Spieler: Inhalt für eine Person (Solo), auch wenn einmal jemand mitlief */
 const SOLO_PLAYERS = 2;
-const DIFFICULTY_KEYS: Record<string, string> = { Hard: 'hard', Normal: 'normal', Exploration: 'exploration' };
+const GERMAN: Record<string, string> = {
+	Hard: 'Schwer', Normal: 'Normal', Easy: 'Leicht', Exploration: 'Erkundung', Extreme: 'Extrem', Hell: 'Hölle',
+	Insane: 'Wahnsinn', Doom: 'Verderben'
+};
+const HARD = ['Hard', 'Extreme', 'Hell', 'Insane', 'Doom'];
+const EASY = ['Easy', 'Exploration'];
+
+/** Kern der Schwierigkeit ohne „Conquest [ … ]“ (Abyss Logs schreibt „Conquest [Hard]“) */
+const core = (d: string) => d.match(/^Conquest \[(.+)\]$/)?.[1] ?? d;
+
+/** Schwierigkeit zum Anzeigen: übersetzt, „Stage 4“ wird „Stufe 4“ */
+export function tierName(difficulty: string): string {
+	const d = core(difficulty);
+	const stage = d.match(/^(?:Stage|Level) (\d+)$/);
+	if (i18n.lang !== 'de') return d;
+	return stage ? `Stufe ${stage[1]}` : (GERMAN[d] ?? d);
+}
+
+/** Farbe der Schwierigkeit: schwer in Orange, leicht in Grün */
+export const tierTone = (difficulty: string | null): 'hard' | 'easy' | null =>
+	!difficulty ? null : HARD.includes(core(difficulty)) ? 'hard' : EASY.includes(core(difficulty)) ? 'easy' : null;
 
 export type Tier = DungeonStat & {
-	/** Textschlüssel der Schwierigkeit oder null, dann gilt `stage` */
-	difficultyKey: string | null;
+	/** Reihenfolge der ID im Dungeon, für „Stufe n“, wenn die Schwierigkeit fehlt */
 	stage: number;
 	/** Schwierigkeit nur einmal im Dungeon: ohne Beschriftung */
 	only: boolean;
@@ -60,8 +81,7 @@ export function groupDungeons(all: DungeonStat[], period: DungeonStat[]): Dungeo
 		const tiers = ordered.flatMap((s, i): Tier[] => {
 			const p = inPeriod.get(s.dungeon_id);
 			if (!p) return [];
-			const key = DIFFICULTY_KEYS[s.difficulty ?? p.difficulty ?? ''] ?? null;
-			return [{ ...p, difficultyKey: key, stage: i + 1, only: ordered.length === 1 }];
+			return [{ ...p, difficulty: p.difficulty ?? s.difficulty, stage: i + 1, only: ordered.length === 1 }];
 		});
 		if (!tiers.length) continue;
 		const fastest = tiers.map((t) => t.fastest_ms).filter((x): x is number => x != null);

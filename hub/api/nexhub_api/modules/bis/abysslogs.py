@@ -120,3 +120,28 @@ async def _raid_players(http: httpx.AsyncClient, cls: str, tiers: list[tuple[str
                 seen.add(entry["playerName"])
                 out.append({**entry, "tier": tier})
     return out
+
+
+async def dungeons(http: httpx.AsyncClient) -> list[dict]:
+    """Alle Dungeons mit Name, Schwierigkeit (tier) und Art (category), je Dungeon-ID."""
+    rows = await _get(http, "/dungeons", {"region": REGION})
+    if not isinstance(rows, list):
+        raise AbyssError("Abyss Logs: Dungeonliste unbekannt")
+    return [{"id": r["id"], "name": str(r.get("name") or ""), "tier": r.get("tier") or None,
+             "category": r.get("category") or None}
+            for r in rows if isinstance(r, dict) and isinstance(r.get("id"), int) and r.get("name")]
+
+
+STAT_FIELDS = ("classHint", "bracketFloor", "bracketCeil", "samples", "characters",
+               "lowest", "top75", "median", "top25", "top10", "highest", "weekBeforeMedian")
+
+
+async def statistics(http: httpx.AsyncClient, boss: int) -> list[dict]:
+    """DPS-Verteilung der letzten Woche an einem Boss je Klasse und Kampfkraft-Stufe (bracketFloor bis
+    bracketCeil; 0 und 0 = alle Kampfkraft). Ohne Daten eine leere Liste."""
+    body = await _get(http, "/statistics", {"region": REGION, "period": "week", "fight": boss})
+    cells = body.get("cells") if isinstance(body, dict) else None
+    if not isinstance(cells, list):
+        raise AbyssError("Abyss Logs: Statistik unbekannt")
+    return [{k: c.get(k) for k in STAT_FIELDS} for c in cells
+            if isinstance(c, dict) and c.get("classHint") and isinstance(c.get("median"), int | float)]

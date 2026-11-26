@@ -8,15 +8,14 @@ die Seiten nicht aufnehmen.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Response
-from nexproto import dungeon_label
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from ...deps import DB, SettingsDep
 from ...routes.public import not_for_search_engines
 from .models import Run
-from .routes import load_fight_detail
+from .routes import dungeon_info, dungeon_names, load_fight_detail
 
 router = APIRouter(prefix="/api/public", tags=["öffentlich"])
 
@@ -49,9 +48,10 @@ async def shared_fight(token: str, fight_id: str, db: DB, settings: SettingsDep,
 
 
 @router.get("/runs/{token}")
-async def shared_run(token: str, db: DB, response: Response) -> SharedRun:
+async def shared_run(token: str, request: Request, db: DB, response: Response) -> SharedRun:
     run = await _shared(db, token, response)
-    return SharedRun(dungeon=dungeon_label(run.dungeon_id, run.dungeon), difficulty=run.difficulty,
+    name, difficulty = dungeon_names(run.dungeon_id, run.dungeon, run.difficulty, dungeon_info(request))
+    return SharedRun(dungeon=name, difficulty=difficulty,
                      start_ms=run.start_ms, end_ms=run.end_ms,
                      complete=run.complete, bosses_total=run.bosses_total, bosses_killed=run.bosses_killed,
                      fights=run.fights, hits=run.hits, character=run.character, summary=run.summary)

@@ -5,6 +5,7 @@
 	import { formatDuration, formatMs } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
 	import type { Run } from '../api.ts';
+	import { tierName } from '../dungeons.ts';
 
 	let {
 		run,
@@ -31,7 +32,7 @@
 	<div>
 		<h1>{run.dungeon}</h1>
 		<p class="meta">
-			{#if run.difficulty}<span class="chip">{run.difficulty}</span>{/if}
+			{#if run.difficulty}<span class="chip">{tierName(run.difficulty)}</span>{/if}
 			<span class="chip" class:ok={run.bosses_killed === run.bosses_total} class:warn={run.bosses_killed !== run.bosses_total}>
 				{t('logs.run.bosses', { k: run.bosses_killed, t: run.bosses_total })}
 			</span>

@@ -14,6 +14,7 @@ from nexhub_api.db import migrate
 from nexhub_api.main import create_app
 from nexhub_api.modules.bis.collector import BisCollector
 from nexhub_api.modules.parses.fetcher import ParseFetcher
+from nexhub_api.modules.parses.extras import AbyssExtras
 from nexhub_api.modules.parses.hall import HallOfFame
 
 from .fake_abyss import HOST as ABYSS_HOST
@@ -86,6 +87,7 @@ def no_background_collector(monkeypatch):
     monkeypatch.setattr(BisCollector, "run", idle)
     monkeypatch.setattr(ParseFetcher, "run", idle)
     monkeypatch.setattr(HallOfFame, "run", idle)
+    monkeypatch.setattr(AbyssExtras, "run", idle)
 
 
 @pytest.fixture

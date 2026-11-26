@@ -27,12 +27,21 @@ class FakeAbyss:
         self.not_ranked: set[int] = set()
         self.fail_page: int | None = None
         self.failing: set[int] = set()  # Bosse, deren Rangliste immer mit HTTP 500 antwortet
+        self.dungeons: list[dict] = [{"id": 600123, "name": "Ferocious Horn Den", "tier": "Conquest [Hard]",
+                                      "category": "Dungeon", "display": "Ferocious Horn Den (Conquest [Hard])"}]
+        self.stats: dict[int, list[dict]] = {}  # Boss → Zellen der Klassenstatistik
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(f"{request.url.path}?{request.url.query.decode()}")
         if request.url.path == "/v1/bosses":
             return httpx.Response(200, json=NEW_RAID + OLD_RAID + [
                 {"mobCode": 1, "name": "Testboss", "category": "Transcendence", "tier": "Stage 4", "dungeonId": 1}])
+        if request.url.path == "/v1/dungeons":
+            return httpx.Response(200, json=self.dungeons)
+        if request.url.path == "/v1/statistics":
+            boss = int(request.url.params["fight"])
+            return httpx.Response(200, json={"build": "global", "fightKey": boss, "period": "week",
+                                             "cells": self.stats.get(boss, [])})
         if request.url.path == "/v1/leaderboards":
             boss = int(request.url.params["boss"])
             page = int(request.url.params.get("page", 1))

@@ -61,6 +61,21 @@ export type ArmoryRefreshStarted = {
 	started: boolean;
 };
 
+export type Bench = {
+	pct: number;
+	lowest: number;
+	top75: number;
+	median: number;
+	top25: number;
+	top10: number;
+	highest: number;
+	week_before_median: number | null;
+	samples: number;
+	characters: number;
+	cp_floor: number | null;
+	cp_ceil: number | null;
+};
+
 export type BisOut = {
 	cls: string;
 	size: number;
@@ -192,6 +207,7 @@ export type DungeonStat = {
 	dungeon_id: number;
 	dungeon: string;
 	difficulty: string | null;
+	category: string | null;
 	runs: number;
 	complete: number;
 	fastest_ms: number | null;
@@ -344,6 +360,7 @@ export type Parse = {
 	guild: number | null;
 	guild_n: number;
 	member: boolean;
+	bench: Bench | null;
 };
 
 export type Piece = {

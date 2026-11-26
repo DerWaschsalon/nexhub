@@ -35,3 +35,27 @@ class GuildLegion(Base):
     __tablename__ = "guild_legions"
 
     name: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class DungeonInfo(Base):
+    """Name, Schwierigkeit und Art eines Dungeons laut Abyss Logs (extras.py). Die Runs zeigen sie statt der
+    Angaben aus der Aufnahme (state.dungeon_info), solange Abyss Logs die ID kennt."""
+
+    __tablename__ = "dungeon_info"
+
+    dungeon_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    tier: Mapped[str | None] = mapped_column(String(60))
+    category: Mapped[str | None] = mapped_column(String(60))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ParseBenchmark(Base):
+    """DPS-Verteilung der letzten Woche an einem Boss je Klasse und Kampfkraft-Stufe (Abyss Logs /statistics,
+    Felder wie abysslogs.STAT_FIELDS). Vergleichswert im Kampfbericht neben dem EU-Parse."""
+
+    __tablename__ = "parse_benchmarks"
+
+    boss: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    cells: Mapped[list] = mapped_column(JSON)

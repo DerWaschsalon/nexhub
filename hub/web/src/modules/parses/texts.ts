@@ -4,6 +4,10 @@ export const TEXTS = defineTexts(
 	{
 		'parses.eu': 'EU',
 		'parses.guild': 'Guild',
+		'parses.class': 'Class',
+		'parses.class.tip': 'Class: about {pct}. Last week on Abyss Logs, {cls} with {range} CP: median {median} DPS, top 25% {top25}, top 10% {top10} ({n} fights)',
+		'parses.class.allCp': 'any',
+		'parses.class.none': 'Class: no class statistics for this boss yet',
 		'parses.eu.tip': 'EU: better than {pct}% of {n} {cls} on Abyss Logs (as of {date})',
 		'parses.eu.tipCp': 'EU: better than {pct}% of {n} {cls} with {range} CP on Abyss Logs (as of {date})',
 		'parses.eu.few': 'EU: too few players with {range} CP on Abyss Logs ({n} of 10)',
@@ -29,6 +33,10 @@ export const TEXTS = defineTexts(
 	{
 		'parses.eu': 'EU',
 		'parses.guild': 'Gilde',
+		'parses.class': 'Klasse',
+		'parses.class.tip': 'Klasse: etwa {pct}. Letzte Woche bei Abyss Logs, {cls} mit {range} CP: Median {median} DPS, Top 25 % {top25}, Top 10 % {top10} ({n} Kämpfe)',
+		'parses.class.allCp': 'beliebiger',
+		'parses.class.none': 'Klasse: für diesen Boss noch keine Klassenstatistik',
 		'parses.eu.tip': 'EU: besser als {pct} % von {n} {cls} auf Abyss Logs (Stand {date})',
 		'parses.eu.tipCp': 'EU: besser als {pct} % von {n} {cls} mit {range} CP auf Abyss Logs (Stand {date})',
 		'parses.eu.few': 'EU: zu wenige Spieler mit {range} CP auf Abyss Logs ({n} von 10)',

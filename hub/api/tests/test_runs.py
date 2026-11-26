@@ -345,3 +345,15 @@ def test_run_uebersicht_mit_toden_und_faehigkeiten(client, as_user):
     assert (top["name"], top["player"], top["cls"], top["damage"]) == ("Pfeilhagel", "Testheld", "ranger", 750_000)
     assert client.get(f"/api/runs/{run_id}/overview").status_code == 401
     assert member.get("/api/runs/999999/overview").status_code == 404
+
+
+def test_dungeon_namen_von_abyss_logs(client, as_user):
+    member = as_user(MEMBER)
+    upload(client, pair(client, member), nexlog())
+    assert member.get("/api/runs").json()[0]["difficulty"] == "Normal"  # ohne Abyss Logs: aus der Aufnahme
+    member.app.state.dungeon_info = {600123: ("Horn Den", "Conquest [Hard]", "Dungeon")}
+    run = member.get("/api/runs").json()[0]
+    assert (run["dungeon"], run["difficulty"]) == ("Horn Den", "Conquest [Hard]")
+    [stat] = member.get("/api/runs/dungeons").json()
+    assert (stat["dungeon"], stat["difficulty"], stat["category"]) == ("Horn Den", "Conquest [Hard]", "Dungeon")
+    assert member.get(f"/api/runs/{run['id']}").json()["dungeon"] == "Horn Den"

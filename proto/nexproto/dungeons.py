@@ -13,8 +13,8 @@ EXTRA_DUNGEONS: dict[int, str] = {
     610052: "Deus Research Base",                 # Gelcos, Nazmun, Atiel
     610062: "Shattered Arkanis",                  # Siliator of Deceit, Ruthilis of Pain, Talisra of the Void
     620011: "Corroded Decontamination Facility",  # Surveillance Device, Devouring Klawfly, Black Blood Blatt, Bargott
-    910013: "Ascension Trial: Aponos",            # Divided Aponos; offizieller Name noch unbekannt
-    910014: "Ascension Trial: Aponos",            # Divided Aponos; offizieller Name noch unbekannt
+    910013: "Nightmare Altar",                    # Ascension Trial (Hard): Divided Aponos
+    910014: "Nightmare Altar",                    # Ascension Trial (Extreme): Divided Aponos
     910033: "Sanctum of Loathing",                # Ascension Trial: Featherstorm Duduri, Watchful Raptor Dodori
     910034: "Sanctum of Loathing",                # Ascension Trial: Featherstorm Duduri, Watchful Raptor Dodori
 }

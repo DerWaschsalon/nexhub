@@ -5,14 +5,14 @@
 	import { t } from '#lib/i18n.svelte.ts';
 	import RunRow from '#modules/logs/components/RunRow.svelte';
 	import TierLabel from '#modules/logs/components/TierLabel.svelte';
-	import { dungeonHref, dungeonHue, killRate, PERIODS, type Tier } from '#modules/logs/dungeons.ts';
+	import { dungeonHref, dungeonHue, killRate, PERIODS, tierName, type Tier } from '#modules/logs/dungeons.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 	let q = $state('');
 
 	const tierText = (x: Tier) =>
-		x.difficultyKey ? t(`logs.difficulty.${x.difficultyKey}`) : x.only ? t('logs.difficulty.only') : t('logs.difficulty.stage', { n: x.stage });
+		x.difficulty ? tierName(x.difficulty) : x.only ? t('logs.difficulty.only') : t('logs.difficulty.stage', { n: x.stage });
 
 	const when = $derived(t(`logs.when.${data.period}`));
 	const stat = $derived(data.stats.get(data.tier.dungeon_id));
