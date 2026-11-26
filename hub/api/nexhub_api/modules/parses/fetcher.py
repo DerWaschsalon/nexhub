@@ -2,11 +2,12 @@
 
 Alle TICK_SECONDS sucht der Abruf die Paare aus Boss und Klasse, die in getöteten Bossen der Runs der letzten
 WINDOW_DAYS Tage vorkommen (calc.needed_pairs). Fällig ist ein Paar ohne Rangliste, eine Rangliste älter als
-MAX_AGE und eine leere („not ranked“) älter als EMPTY_MAX_AGE; fehlende zuerst, dann die ältesten, höchstens
+MAX_AGE, eine ohne Kampfkraft (vor Revision 0018) und eine leere („not ranked“) älter als
+EMPTY_MAX_AGE; fehlende zuerst, dann die ältesten, höchstens
 PER_TICK je Takt. Ein Paar, dessen Abruf fehlschlug, kommt erst nach RETRY_AFTER wieder dran. Zwischen zwei
 Anfragen liegen PAUSE_SECONDS. Geht etwas schief, bleibt der alte Stand stehen.
 
-Gespeichert werden nur die DPS-Bestwerte je Spieler, keine Namen.
+Gespeichert werden nur die DPS-Bestwerte je Spieler und die Kampfkraft dazu, keine Namen.
 """
 from __future__ import annotations
 
@@ -37,14 +38,21 @@ MAX_PAGES = 100  # Sicherung: 10.000 Einträge
 RETRY_AFTER = timedelta(hours=1)  # nach einem Fehler: so lange warten, damit andere Ranglisten drankommen
 
 
-async def fetch_board(http: httpx.AsyncClient, cls: str, boss: int, pause: float) -> tuple[int, list[float]]:
-    """Alle Seiten der Rangliste; gibt die Gesamtzahl und die Bestwerte je Name aufsteigend zurück."""
+async def fetch_board(http: httpx.AsyncClient, cls: str, boss: int,
+                      pause: float) -> tuple[int, list[float], list[int]]:
+    """Alle Seiten der Rangliste; gibt die Gesamtzahl, die Bestwerte je Name aufsteigend und die Kampfkraft
+    dazu (gleiche Reihenfolge, 0 = unbekannt) zurück."""
     entries, total = await leaderboard_page(http, abyss_class(cls), boss, 1)
     for page in range(2, min(math.ceil(total / 100), MAX_PAGES) + 1):
         await asyncio.sleep(pause)
         more, _ = await leaderboard_page(http, abyss_class(cls), boss, page)
         entries += more
-    return total, sorted(float(e.get("dps") or 0) for e in best_per_name(entries))
+    rows = sorted((float(e.get("dps") or 0), _cp(e.get("combatPower"))) for e in best_per_name(entries))
+    return total, [d for d, _ in rows], [c for _, c in rows]
+
+
+def _cp(value: object) -> int:
+    return int(value) if isinstance(value, int | float) and value > 0 else 0
 
 
 class ParseFetcher:
@@ -71,13 +79,13 @@ class ParseFetcher:
             if i:
                 await asyncio.sleep(self.pause)
             try:
-                total, dps = await fetch_board(self.http, cls, boss, self.pause)
+                total, dps, cp = await fetch_board(self.http, cls, boss, self.pause)
             except AbyssError as e:
                 log.info("Parses %s an %s: %s", cls, boss, e)
                 self.failed[(boss, cls)] = datetime.now(UTC)
                 continue
             self.failed.pop((boss, cls), None)
-            await self._store(boss, cls, total, dps)
+            await self._store(boss, cls, total, dps, cp)
             done += 1
         return done
 
@@ -98,16 +106,16 @@ class ParseFetcher:
                 due.append((datetime.min.replace(tzinfo=UTC), boss, cls))
                 continue
             fetched = board.fetched_at if board.fetched_at.tzinfo else board.fetched_at.replace(tzinfo=UTC)
-            if now - fetched > (MAX_AGE if board.dps else EMPTY_MAX_AGE):
+            if now - fetched > (MAX_AGE if board.dps else EMPTY_MAX_AGE) or (board.dps and board.cp is None):
                 due.append((fetched, boss, cls))
         return [(boss, cls) for _, boss, cls in sorted(due)]
 
-    async def _store(self, boss: int, cls: str, total: int, dps: list[float]) -> None:
+    async def _store(self, boss: int, cls: str, total: int, dps: list[float], cp: list[int]) -> None:
         async with self.sessionmaker() as db:
             board = await db.scalar(select(ParseBoard).where(
                 ParseBoard.boss == boss, ParseBoard.cls == cls, ParseBoard.region == REGION))
             if board is None:
                 board = ParseBoard(boss=boss, cls=cls, region=REGION)
                 db.add(board)
-            board.total, board.dps, board.fetched_at = total, dps, datetime.now(UTC)
+            board.total, board.dps, board.cp, board.fetched_at = total, dps, cp, datetime.now(UTC)
             await db.commit()

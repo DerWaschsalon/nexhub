@@ -9,6 +9,9 @@
 Nur getötete Bosse. Je Kampf (`fight`) und Spielername:
     eu_at None        Rangliste noch nicht geladen
     eu_n 0            Abyss Logs führt für diesen Boss keine Rangliste
+    eu_cp             eigene Kampfkraft: EU nur gegen Einträge mit cp ± CP_RANGE (eu_n zählt nur die).
+                      None: Kampfkraft unbekannt oder Rangliste noch ohne, EU gegen alle Einträge
+    eu_few True       weniger als EU_MIN Einträge im CP-Bereich: kein EU-Wert
     member False      nicht in einer Legion der Gilde (Random aus der Gruppe): kein Gildenwert
     guild None        nicht in der Gilde oder weniger als GUILD_MIN Charaktere dieser Klasse an diesem Boss (guild_n)
 """
@@ -26,7 +29,7 @@ from ...deps import DB, AdminUser, CurrentDevice, CurrentUser
 from ...routes.public import not_for_search_engines
 from ..bis.abysslogs import REGION
 from ..logs.models import Run, RunCharacter
-from .calc import GUILD_MIN, guild_bests, percentile
+from .calc import EU_MIN, GUILD_MIN, guild_bests, in_cp_range, percentile
 from .models import GuildLegion, ParseBoard
 
 router = APIRouter(prefix="/api/parses", tags=["runs"])
@@ -37,6 +40,8 @@ class Parse(BaseModel):
     eu: int | None
     eu_n: int | None
     eu_at: datetime | None
+    eu_cp: int | None
+    eu_few: bool
     guild: int | None
     guild_n: int
     member: bool
@@ -109,6 +114,32 @@ async def _guild(request: Request, db: DB) -> Guild:
     return cached[1]
 
 
+async def _combat_power(db: DB, run: Run, names: set[str]) -> dict[str, int]:
+    """Kampfkraft je Spieler: aus der Momentaufnahme dieses Runs, sonst (noch nicht geladen) die jüngste bekannte."""
+    rows = await db.execute(select(RunCharacter.name, RunCharacter.combat_power, RunCharacter.run_id).where(
+        RunCharacter.status == "ok", RunCharacter.combat_power.is_not(None), RunCharacter.name.in_(names))
+        .order_by(RunCharacter.fetched_at))
+    latest: dict[str, int] = {}
+    this_run: dict[str, int] = {}
+    for name, cp, run_id in rows.all():
+        latest[name] = cp
+        if run_id == run.id:
+            this_run[name] = cp
+    return latest | this_run
+
+
+def _eu(dps: float, cp: int | None, board: ParseBoard | None) -> dict:
+    if board is None:
+        return {"eu": None, "eu_n": None, "eu_at": None, "eu_cp": cp, "eu_few": False}
+    at = _utc(board.fetched_at)
+    if cp and board.cp is not None:
+        ranked = in_cp_range(board.dps, board.cp, cp)
+        few = bool(board.dps) and len(ranked) < EU_MIN
+        return {"eu": None if few else percentile(dps, ranked), "eu_n": len(ranked), "eu_at": at, "eu_cp": cp,
+                "eu_few": few}
+    return {"eu": percentile(dps, board.dps), "eu_n": len(board.dps), "eu_at": at, "eu_cp": None, "eu_few": False}
+
+
 async def _parses(request: Request, db: DB, run: Run) -> RunParses:
     killed = [b for b in run.summary.get("bosses", []) if b.get("killed")]
     if not killed:
@@ -118,6 +149,7 @@ async def _parses(request: Request, db: DB, run: Run) -> RunParses:
         ParseBoard.region == REGION, ParseBoard.boss.in_({m for m, _ in pairs}),
         ParseBoard.cls.in_({c for _, c in pairs if c})))).all()}
     guild = await _guild(request, db)
+    cps = await _combat_power(db, run, {p["name"] for b in killed for p in b.get("players", [])})
     fights: dict[str, dict[str, Parse]] = {}
     for b in killed:
         best: dict[str, dict] = {}  # derselbe Name doppelt (Relog): der stärkere Eintrag
@@ -129,9 +161,7 @@ async def _parses(request: Request, db: DB, run: Run) -> RunParses:
             board = boards.get((b["mob"], p.get("cls")))
             mates = guild.bests.get((b["mob"], p.get("cls")), [])
             member = name in guild.members
-            out[name] = Parse(eu=percentile(p["dps"], board.dps) if board else None,
-                              eu_n=len(board.dps) if board else None,
-                              eu_at=_utc(board.fetched_at) if board else None,
+            out[name] = Parse(**_eu(p["dps"], cps.get(name), board),
                               guild=percentile(p["dps"], mates) if member and len(mates) >= GUILD_MIN else None,
                               guild_n=len(mates), member=member)
     return RunParses(guild_min=GUILD_MIN, fights=fights)

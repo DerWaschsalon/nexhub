@@ -16,6 +16,9 @@ export async function loadParses(path: string, f: Fetch): Promise<RunParses | nu
 	}
 }
 
+/** Wie calc.CP_RANGE im Hub: EU vergleicht nur mit Einträgen, deren Kampfkraft so nah an der eigenen liegt */
+export const CP_RANGE = 5000;
+
 export const LEGIONS_PATH = '/api/parses/legions';
 export const runParsesPath = (id: string | number) => `/api/parses/runs/${id}`;
 export const sharedParsesPath = (token: string) => `/api/public/parses/shared/${encodeURIComponent(token)}`;

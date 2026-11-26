@@ -4,7 +4,7 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from nexhub_api.models import User
@@ -100,6 +100,7 @@ def test_abruf_speichert_nur_dps_aufsteigend(fake, database_url):
     [b] = fetch(database_url, fake, work)
     assert (b.boss, b.cls, b.region, b.total) == (8001, "ranger", "eu", 250)
     assert len(b.dps) == 250 and b.dps == sorted(b.dps)
+    assert b.cp == [123_456] * 250
     assert "N1" not in repr(b.__dict__)
     assert sum("boss=8001" in c for c in fake.abyss.calls) == 3
 
@@ -159,10 +160,11 @@ def db_do(database_url, work):
     return asyncio.run(go())
 
 
-def add_board(database_url, boss: int, cls: str, dps: list[float]) -> None:
+def add_board(database_url, boss: int, cls: str, dps: list[float], cp: list[int] | None = None) -> None:
     async def work(sm):
         async with sm() as db:
-            db.add(ParseBoard(boss=boss, cls=cls, region="eu", total=len(dps), dps=dps, fetched_at=datetime.now(UTC)))
+            db.add(ParseBoard(boss=boss, cls=cls, region="eu", total=len(dps), dps=dps, cp=cp,
+                              fetched_at=datetime.now(UTC)))
             await db.commit()
     db_do(database_url, work)
 
@@ -180,8 +182,8 @@ def new_run(database_url, s: dict, share_token: str | None = None, legion: str |
     return db_do(database_url, work)
 
 
-def snapshot(run_id: int, name: str, legion: str, at: datetime | None = None) -> RunCharacter:
-    return RunCharacter(run_id=run_id, name=name, status="ok", fetched_at=at or datetime.now(UTC),
+def snapshot(run_id: int, name: str, legion: str, at: datetime | None = None, cp: int | None = None) -> RunCharacter:
+    return RunCharacter(run_id=run_id, name=name, status="ok", fetched_at=at or datetime.now(UTC), combat_power=cp,
                         data={"v": 2, "en": {"profile": {"name": name, "guild": legion}}, "de": {}})
 
 
@@ -341,3 +343,58 @@ def test_legionen_pflegen(client, as_user, database_url):
     assert set_legions(as_user, " Taubenschlag ", "taubenschlag", "Neu")["legions"] == ["Neu", "Taubenschlag"]
     assert set_legions(as_user)["legions"] == []
     assert as_user(ADMIN).put("/api/parses/legions", json={"legions": [""]}, headers=ORIGIN).status_code == 422
+
+
+def test_rangliste_ohne_kampfkraft_wird_neu_geholt(fake, database_url):
+    fake.abyss.boards = {8001: [f"N{i}" for i in range(20)]}
+
+    async def work(fetcher, sm):
+        await add_run(sm, summary(boss(8001, [("A", "ranger", 100)])))
+        async with sm() as db:
+            db.add(ParseBoard(boss=8001, cls="ranger", region="eu", total=1, dps=[1.0], cp=None,
+                              fetched_at=datetime.now(UTC)))
+            await db.commit()
+        assert await fetcher.tick() == 1
+        return await boards(sm)
+    [b] = fetch(database_url, fake, work)
+    assert len(b.cp) == 20
+
+
+def add_snapshot(database_url, run_id: int, name: str, cp: int, at: datetime | None = None) -> None:
+    async def work(sm):
+        async with sm() as db:
+            await db.execute(delete(RunCharacter).where(RunCharacter.run_id == run_id, RunCharacter.name == name))
+            db.add(snapshot(run_id, name, "Gilde", at, cp=cp))
+            await db.commit()
+    db_do(database_url, work)
+
+
+def test_eu_nur_im_cp_bereich(as_user, database_url):
+    """250.000 CP: es zählen die Einträge von 245.000 bis 255.000, nicht die schwachen 200.000er davor."""
+    member = as_user(MEMBER)
+    dps = [float(10 * i) for i in range(1, 31)]                          # 10 … 300
+    cp = [200_000] * 10 + [245_000, 255_000] + [250_000] * 18            # erste 10 außerhalb
+    add_board(database_url, 1, "ranger", dps, cp)
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 200), ("B", "ranger", 200), ("C", "ranger", 200)])),
+                     legion=None)
+    add_snapshot(database_url, run_id, "A", 250_000)
+    add_snapshot(database_url, run_id, "B", 300_000)
+    p = member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]
+    # A: 20 Einträge im Bereich (110 … 300), 10 davon ≤ 200
+    assert (p["A"]["eu"], p["A"]["eu_n"], p["A"]["eu_cp"], p["A"]["eu_few"]) == (50, 20, 250_000, False)
+    # B: niemand im Bereich: kein Wert
+    assert (p["B"]["eu"], p["B"]["eu_n"], p["B"]["eu_few"]) == (None, 0, True)
+    # C: Kampfkraft unbekannt: gegen alle 30
+    assert (p["C"]["eu"], p["C"]["eu_n"], p["C"]["eu_cp"]) == (66, 30, None)
+
+
+def test_cp_aus_frueherem_run_wenn_der_neue_noch_fehlt(as_user, database_url):
+    member = as_user(MEMBER)
+    add_board(database_url, 1, "ranger", [float(i) for i in range(1, 21)], [250_000] * 20)
+    old = new_run(database_url, summary(boss(1, [("A", "ranger", 5)])), legion=None)
+    add_snapshot(database_url, old, "A", 251_000)
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 10)])), legion=None)
+    p = member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]["A"]
+    assert (p["eu"], p["eu_cp"]) == (50, 251_000)
+    add_snapshot(database_url, run_id, "A", 400_000, datetime.now(UTC) - timedelta(days=1))  # dieser Run zählt vor
+    assert member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]["A"]["eu_few"] is True
