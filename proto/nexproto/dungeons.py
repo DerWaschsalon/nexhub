@@ -7,7 +7,7 @@ füllt die Lücken, englisch wie dort. Nachtragen, sobald ein Run mit unbekannte
 from __future__ import annotations
 
 EXTRA_DUNGEONS: dict[int, str] = {
-    200003: "Nightmare",                          # Albtraum: Gatekeeper Pinopi, Fortress Guardian Notun, Mutated Gerod …
+    200003: "Nightmare",                          # Albtraum: Gatekeeper Pinopi, Guardian Notun, Mutated Gerod
     600081: "Abyssal Forge: Ludra",               # Isolation Specialist Rahu, Abyssal Wing Ketu, Fusion Reactor
     600082: "Abyssal Forge: Ludra",               # Rahu, Central Abyss Fusion Reactor, Eternal Ludra
     610052: "Deus Research Base",                 # Gelcos, Nazmun, Atiel
