@@ -8,12 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from nexhub_api.models import User
-from nexhub_api.modules.logs.models import Run
+from nexhub_api.modules.logs.models import Run, RunCharacter
 from nexhub_api.modules.parses.calc import guild_bests, needed_pairs, percentile
 from nexhub_api.modules.parses.fetcher import ParseFetcher
 from nexhub_api.modules.parses.models import ParseBoard
 
-from .conftest import MEMBER
+from .conftest import ADMIN, MEMBER
+from .test_devices import ORIGIN
 
 NOW_MS = int(time.time() * 1000)
 DAY_MS = 86_400_000
@@ -43,9 +44,9 @@ def test_paare_nur_getoetete_bosse_mit_klasse():
 
 
 def test_gilde_bestwert_je_charakter():
-    runs = [summary(boss(1, [("A", "ranger", 100), ("B", "ranger", 200)])),
+    runs = [summary(boss(1, [("A", "ranger", 100), ("B", "ranger", 200), ("X", "ranger", 900)])),
             summary(boss(1, [("A", "ranger", 300), ("A", "gladiator", 50)]))]
-    assert guild_bests(runs) == {(1, "ranger"): [200.0, 300.0], (1, "gladiator"): [50.0]}
+    assert guild_bests(runs, {"A", "B"}) == {(1, "ranger"): [200.0, 300.0], (1, "gladiator"): [50.0]}
 
 
 async def add_run(sessionmaker, s: dict, start_ms: int = NOW_MS, share_token: str | None = None) -> int:
@@ -166,8 +167,28 @@ def add_board(database_url, boss: int, cls: str, dps: list[float]) -> None:
     db_do(database_url, work)
 
 
-def new_run(database_url, s: dict, share_token: str | None = None) -> int:
-    return db_do(database_url, lambda sm: add_run(sm, s, share_token=share_token))
+def new_run(database_url, s: dict, share_token: str | None = None, legion: str | None = "Gilde") -> int:
+    """Run mit Momentaufnahmen aller Spieler in `legion` (None: keine Momentaufnahmen)."""
+    async def work(sm):
+        run_id = await add_run(sm, s, share_token=share_token)
+        if legion is not None:
+            names = {p["name"] for b in s["bosses"] for p in b["players"]}
+            async with sm() as db:
+                db.add_all(snapshot(run_id, n, legion) for n in names)
+                await db.commit()
+        return run_id
+    return db_do(database_url, work)
+
+
+def snapshot(run_id: int, name: str, legion: str, at: datetime | None = None) -> RunCharacter:
+    return RunCharacter(run_id=run_id, name=name, status="ok", fetched_at=at or datetime.now(UTC),
+                        data={"v": 2, "en": {"profile": {"name": name, "guild": legion}}, "de": {}})
+
+
+def set_legions(as_user, *names: str) -> dict:
+    r = as_user(ADMIN).put("/api/parses/legions", json={"legions": list(names)}, headers=ORIGIN)
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 def test_parse_im_run(as_user, database_url):
@@ -182,6 +203,7 @@ def test_parse_im_run(as_user, database_url):
 
 
 def test_gilde_erst_ab_zehn(as_user, database_url):
+    set_legions(as_user, "Gilde")
     member = as_user(MEMBER)
     ids = [new_run(database_url, summary(boss(1, [(f"C{i}", "ranger", 100 + i)]))) for i in range(9)]
     p = member.get(f"/api/parses/runs/{ids[-1]}").json()["fights"]["f1"]["C8"]
@@ -262,7 +284,8 @@ def test_gilde_nicht_bei_jedem_aufruf_neu_gerechnet(as_user, database_url, monke
     from nexhub_api.modules.parses import routes
     calls = []
     real = routes.guild_bests
-    monkeypatch.setattr(routes, "guild_bests", lambda s: calls.append(1) or real(s))
+    monkeypatch.setattr(routes, "guild_bests", lambda *a: calls.append(1) or real(*a))
+    set_legions(as_user, "Gilde")
     member = as_user(MEMBER)
     run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 250)])))
     member.get(f"/api/parses/runs/{run_id}")
@@ -271,3 +294,50 @@ def test_gilde_nicht_bei_jedem_aufruf_neu_gerechnet(as_user, database_url, monke
     new_run(database_url, summary(boss(1, [("B", "ranger", 100)])))
     assert member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]["A"]["guild_n"] == 2
     assert len(calls) == 2
+
+
+def test_gilde_nur_mitglieder_der_legionen(as_user, database_url):
+    """Randoms aus der Gruppe zählen nicht und bekommen keinen Gildenwert; Mitglied ist, wer in seiner jüngsten
+    Momentaufnahme in einer eingetragenen Legion ist, auch wenn der neue Run noch keine Momentaufnahme hat."""
+    set_legions(as_user, "taubenschlag", "Neu")
+    member = as_user(MEMBER)
+    for i in range(10):
+        new_run(database_url, summary(boss(1, [(f"G{i}", "ranger", 100 + i), (f"R{i}", "ranger", 1000)])),
+                legion="Taubenschlag")
+    # die Randoms R0..R9 sind in ihrer jüngsten Momentaufnahme in einer anderen Legion
+    async def randoms(sm):
+        async with sm() as db:
+            db.add(Run(**{c: getattr(await db.get(Run, 1), c) for c in ("user_id", "dungeon_id", "dungeon",
+                   "difficulty", "start_ms", "end_ms", "complete", "bosses_total", "bosses_killed", "fights",
+                   "hits", "summary", "size")}, sha256="randoms", character=None))
+            await db.flush()
+            later = datetime.now(UTC) + timedelta(minutes=1)
+            run = await db.scalar(select(Run).where(Run.sha256 == "randoms"))
+            db.add_all(snapshot(run.id, f"R{i}", "Andere", later) for i in range(10))
+            await db.commit()
+    db_do(database_url, randoms)
+    run_id = new_run(database_url, summary(boss(1, [("G9", "ranger", 105), ("R0", "ranger", 1000)])), legion=None)
+    fights = member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]
+    assert fights["G9"]["member"] and fights["G9"]["guild_n"] == 10 and fights["G9"]["guild"] == 60
+    assert not fights["R0"]["member"] and fights["R0"]["guild"] is None
+
+
+def test_ohne_legionen_kein_gildenwert(as_user, database_url):
+    member = as_user(MEMBER)
+    ids = [new_run(database_url, summary(boss(1, [(f"C{i}", "ranger", 100 + i)]))) for i in range(10)]
+    p = member.get(f"/api/parses/runs/{ids[-1]}").json()["fights"]["f1"]["C9"]
+    assert p["guild"] is None and p["guild_n"] == 0 and not p["member"]
+
+
+def test_legionen_pflegen(client, as_user, database_url):
+    new_run(database_url, summary(boss(1, [("A", "ranger", 1), ("B", "ranger", 1)])), legion="Taubenschlag")
+    new_run(database_url, summary(boss(1, [("C", "ranger", 1)])), legion="Katzen")
+    assert client.get("/api/parses/legions").status_code == 401
+    member = as_user(MEMBER)
+    assert member.put("/api/parses/legions", json={"legions": ["X"]}, headers=ORIGIN).status_code == 403
+    body = member.get("/api/parses/legions").json()
+    assert body == {"legions": [], "known": [{"name": "Taubenschlag", "characters": 2},
+                                             {"name": "Katzen", "characters": 1}]}
+    assert set_legions(as_user, " Taubenschlag ", "taubenschlag", "Neu")["legions"] == ["Neu", "Taubenschlag"]
+    assert set_legions(as_user)["legions"] == []
+    assert as_user(ADMIN).put("/api/parses/legions", json={"legions": [""]}, headers=ORIGIN).status_code == 422

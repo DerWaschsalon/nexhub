@@ -1,4 +1,5 @@
-"""Tabelle des Moduls Parses: zwischengespeicherte Ranglisten von Abyss Logs. Änderungen immer mit Alembic-Migration."""
+"""Tabellen des Moduls Parses: zwischengespeicherte Ranglisten von Abyss Logs und die Legionen der Gilde.
+Änderungen immer mit Alembic-Migration."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -23,3 +24,12 @@ class ParseBoard(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     total: Mapped[int] = mapped_column(Integer)  # Einträge laut Abyss Logs, vor dem Bestwert je Name
     dps: Mapped[list] = mapped_column(JSON)
+
+
+class GuildLegion(Base):
+    """Eine Legion, die im Gildenvergleich zählt. Admins pflegen die Liste (routes.py), etwa nach einem
+    Wechsel der Legion. Leer: kein Gildenvergleich."""
+
+    __tablename__ = "guild_legions"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)

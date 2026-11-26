@@ -234,6 +234,20 @@ export type Item = {
 	one_in_high: number | null;
 };
 
+export type KnownLegion = {
+	name: string;
+	characters: number;
+};
+
+export type Legions = {
+	legions: string[];
+};
+
+export type LegionsOut = {
+	legions: string[];
+	known: KnownLegion[];
+};
+
 export type Live = {
 	name: string;
 	server_id: number;
@@ -309,6 +323,7 @@ export type Parse = {
 	eu_at: string | null;
 	guild: number | null;
 	guild_n: number;
+	member: boolean;
 };
 
 export type Piece = {
