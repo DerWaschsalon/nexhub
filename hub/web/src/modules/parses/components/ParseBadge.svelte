@@ -1,4 +1,5 @@
-<!-- Parse eines Spielers an einem Boss: EU (Abyss Logs) und Gilde, je als Zahl in der Farbstufe (ParseValue). -->
+<!-- Parse eines Spielers an einem Boss: EU (Abyss Logs), Gilde und Klasse (Klassenstatistik von Abyss Logs: Platz in
+     der DPS-Verteilung der letzten Woche für Klasse und Kampfkraft), je als Zahl in der Farbstufe (ParseValue). -->
 <script lang="ts">
 	import { formatDateTime, formatNumber } from '#lib/format.ts';
 	import { t } from '#lib/i18n.svelte.ts';
@@ -6,7 +7,13 @@
 	import { CP_RANGE, type Parse } from '../api.ts';
 	import ParseValue from './ParseValue.svelte';
 
-	let { parse, cls, guildMin }: { parse: Parse | undefined; cls: string | null; guildMin: number } = $props();
+	let { parse, cls, guildMin, classStats = true }: {
+		parse: Parse | undefined;
+		cls: string | null;
+		guildMin: number;
+		/** Klassenstatistik zeigen (nur je Kampf, nicht im Schnitt über den Run) */
+		classStats?: boolean;
+	} = $props();
 
 	/** „251.000–261.000“: der CP-Bereich, gegen den EU vergleicht */
 	const cpRange = (cp: number) => `${formatNumber(Math.max(0, cp - CP_RANGE))}–${formatNumber(cp + CP_RANGE)}`;
@@ -30,6 +37,16 @@
 		if (parse && !parse.member) return t('parses.guild.notMember');
 		return t('parses.guild.few', { n: parse?.guild_n ?? 0, min: guildMin });
 	});
+	const classTip = $derived.by(() => {
+		const b = parse?.bench;
+		if (!b) return t('parses.class.none');
+		const range = b.cp_floor != null && b.cp_ceil != null
+			? `${formatNumber(b.cp_floor)}–${formatNumber(b.cp_ceil)}` : t('parses.class.allCp');
+		return t('parses.class.tip', {
+			pct: b.pct, cls: classInfo(cls)?.label ?? '', range, median: formatNumber(b.median),
+			top25: formatNumber(b.top25), top10: formatNumber(b.top10), n: formatNumber(b.samples)
+		});
+	});
 	const loading = $derived(!!parse && !!classInfo(cls) && parse.eu_at === null);
 </script>
 
@@ -43,6 +60,7 @@
 <span class="parses num">
 	{@render value(t('parses.eu'), parse?.eu, euTip, loading)}
 	{@render value(t('parses.guild'), parse?.guild, guildTip)}
+	{#if classStats}{@render value(t('parses.class'), parse?.bench?.pct, classTip)}{/if}
 </span>
 
 <style>

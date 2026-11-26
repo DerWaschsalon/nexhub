@@ -164,9 +164,23 @@ class RunDetail(RunOut):
     summary: dict
 
 
-def _out(run: Run, uploader: User) -> dict:
-    return dict(id=run.id, dungeon_id=run.dungeon_id, dungeon=dungeon_label(run.dungeon_id, run.dungeon),
-                difficulty=run.difficulty,
+def dungeon_info(request: Request) -> dict[int, tuple[str, str | None, str | None]]:
+    """Name, Schwierigkeit und Art je Dungeon-ID laut Abyss Logs (Modul parses, extras.py); leer ohne."""
+    return getattr(request.app.state, "dungeon_info", None) or {}
+
+
+def dungeon_names(dungeon_id: int, dungeon: str, difficulty: str | None,
+                  info: dict[int, tuple[str, str | None, str | None]]) -> tuple[str, str | None]:
+    """Anzeigename und Schwierigkeit: von Abyss Logs, wo die ID bekannt ist, sonst aus der Aufnahme."""
+    known = info.get(dungeon_id)
+    if known:
+        return known[0], known[1] or difficulty
+    return dungeon_label(dungeon_id, dungeon), difficulty
+
+
+def _out(run: Run, uploader: User, info: dict | None = None) -> dict:
+    name, difficulty = dungeon_names(run.dungeon_id, run.dungeon, run.difficulty, info or {})
+    return dict(id=run.id, dungeon_id=run.dungeon_id, dungeon=name, difficulty=difficulty,
                 start_ms=run.start_ms, end_ms=run.end_ms, complete=run.complete, bosses_total=run.bosses_total,
                 bosses_killed=run.bosses_killed, fights=run.fights, hits=run.hits, character=run.character,
                 uploader=uploader.name, created_at=run.created_at,
@@ -177,7 +191,7 @@ def _out(run: Run, uploader: User) -> dict:
 
 
 @router.get("")
-async def list_runs(user: CurrentUser, db: DB, limit: int = 100, dungeon_id: int | None = None,
+async def list_runs(request: Request, user: CurrentUser, db: DB, limit: int = 100, dungeon_id: int | None = None,
                     since_ms: int | None = None) -> list[RunOut]:
     query = select(Run, User).join(User, User.id == Run.user_id)
     if dungeon_id is not None:
@@ -185,7 +199,8 @@ async def list_runs(user: CurrentUser, db: DB, limit: int = 100, dungeon_id: int
     if since_ms is not None:
         query = query.where(Run.start_ms >= since_ms)
     rows = await db.execute(query.order_by(Run.start_ms.desc()).limit(min(max(limit, 1), 500)))
-    return [RunOut(**_out(run, uploader)) for run, uploader in rows.all()]
+    info = dungeon_info(request)
+    return [RunOut(**_out(run, uploader, info)) for run, uploader in rows.all()]
 
 
 class DungeonStat(BaseModel):
@@ -193,6 +208,7 @@ class DungeonStat(BaseModel):
     dungeon_id: int
     dungeon: str
     difficulty: str | None
+    category: str | None  # Dungeon, Raid, Transcendence, Ascension Trial … (Abyss Logs)
     runs: int
     complete: int
     fastest_ms: int | None  # schnellster vollständiger Run
@@ -206,28 +222,31 @@ class DungeonStat(BaseModel):
 async def list_dungeons(request: Request, user: CurrentUser, db: DB, since_ms: int | None = None) -> list[DungeonStat]:
     """Kennzahlen je Dungeon-ID für die Übersicht, neuester zuerst. Über alle Runs im Speicher gehalten, bis ein Run
     dazukommt oder gelöscht wird (Anzahl und höchste ID); ein Zeitraum liest nur seine Runs."""
+    info = dungeon_info(request)
     if since_ms is not None:
-        return await _dungeon_stats(db, since_ms)
-    key = tuple((await db.execute(select(func.count(), func.max(Run.id)).select_from(Run))).one())
+        return await _dungeon_stats(db, since_ms, info)
+    key = (tuple((await db.execute(select(func.count(), func.max(Run.id)).select_from(Run))).one()), id(info))
     cached = getattr(request.app.state, "runs_dungeons", None)
     if cached is None or cached[0] != key:
-        cached = (key, await _dungeon_stats(db, None))
+        cached = (key, await _dungeon_stats(db, None, info))
         request.app.state.runs_dungeons = cached
     return cached[1]
 
 
-async def _dungeon_stats(db: DB, since_ms: int | None) -> list[DungeonStat]:
+async def _dungeon_stats(db: DB, since_ms: int | None, info: dict) -> list[DungeonStat]:
     query = select(Run.dungeon_id, Run.dungeon, Run.difficulty, Run.start_ms, Run.end_ms, Run.complete, Run.summary)
     if since_ms is not None:
         query = query.where(Run.start_ms >= since_ms)
     stats: dict[int, dict] = {}
     names: dict[int, set[str]] = {}
     for dungeon_id, dungeon, difficulty, start, end, complete, summary in (await db.execute(query)).all():
-        s = stats.setdefault(dungeon_id, dict(dungeon_id=dungeon_id, dungeon=dungeon_label(dungeon_id, dungeon),
-                                              difficulty=difficulty, runs=0, complete=0, fastest_ms=None,
+        name, tier = dungeon_names(dungeon_id, dungeon, difficulty, info)
+        s = stats.setdefault(dungeon_id, dict(dungeon_id=dungeon_id, dungeon=name, difficulty=tier,
+                                              category=(info.get(dungeon_id) or (None, None, None))[2],
+                                              runs=0, complete=0, fastest_ms=None,
                                               kills=0, wipes=0, players=0, last_ms=start))
         s["runs"] += 1
-        s["difficulty"] = s["difficulty"] or difficulty
+        s["difficulty"] = s["difficulty"] or tier
         s["last_ms"] = max(s["last_ms"], start)
         if complete:
             s["complete"] += 1
@@ -256,9 +275,9 @@ def _may_manage(run: Run, user: User) -> bool:
 
 
 @router.get("/{run_id}")
-async def get_run(run_id: int, user: CurrentUser, db: DB, settings: SettingsDep) -> RunDetail:
+async def get_run(run_id: int, request: Request, user: CurrentUser, db: DB, settings: SettingsDep) -> RunDetail:
     run, uploader = await _get(db, run_id)
-    return RunDetail(**_out(run, uploader), size=run.size, summary=run.summary,
+    return RunDetail(**_out(run, uploader, dungeon_info(request)), size=run.size, summary=run.summary,
                      can_delete=_may_manage(run, user), share_url=share_url(settings, run))
 
 

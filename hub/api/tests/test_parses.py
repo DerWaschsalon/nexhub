@@ -433,3 +433,38 @@ def test_bestenliste_ab_lila(as_user, database_url):
     assert [(e["name"], e["eu"]) for e in body["entries"]] == [("C", 100), ("A", 90)] and body["computed_at"]
     top = member.get(f"/api/parses/top?since_ms={NOW_MS - DAY_MS}").json()
     assert [(t["name"], t["eu"]) for t in top] == [("C", 100), ("A", 90), ("B", 70)]
+
+
+def stat_cell(cls: str, floor: int, ceil: int, median: float, samples: int = 100) -> dict:
+    return {"classHint": cls, "bracketFloor": floor, "bracketCeil": ceil, "samples": samples,
+            "characters": samples // 2,
+            "lowest": median * 0.2, "top75": median * 0.8, "median": median, "top25": median * 1.2,
+            "top10": median * 1.4, "highest": median * 2, "weekBeforeMedian": median * 0.9}
+
+
+def test_klassenstatistik_im_parse(fake, as_user, database_url, client):
+    """Vergleich wie bei Abyss Logs: Verteilung von Klasse und Kampfkraft-Stufe, Platz geschätzt."""
+    from nexhub_api.modules.parses.extras import AbyssExtras
+    from nexhub_api.modules.parses.routes import bench_pct
+
+    fake.abyss.stats = {1: [stat_cell("Ranger", 0, 0, 100.0), stat_cell("Ranger", 225_000, 250_000, 200.0),
+                            stat_cell("Ranger", 250_000, 275_000, 300.0, samples=5)]}
+    member = as_user(MEMBER)
+    run_id = new_run(database_url, summary(boss(1, [("A", "ranger", 200), ("B", "ranger", 240), ("C", "ranger", 100)])),
+                     legion=None)
+    add_snapshot(database_url, run_id, "A", 230_000)
+    add_snapshot(database_url, run_id, "B", 260_000)  # Stufe mit zu wenig Kämpfen: über alle Kampfkraft
+
+    async def work(fetcher, sm):
+        extras = AbyssExtras(client.app.state, sm, fetcher.http, pause=0)
+        assert await extras.tick() == 1
+        assert await extras.tick() == 0  # frisch
+        assert extras.state.dungeon_info[600123] == ("Ferocious Horn Den", "Conquest [Hard]", "Dungeon")
+    fetch(database_url, fake, work)
+    p = member.get(f"/api/parses/runs/{run_id}").json()["fights"]["f1"]
+    a, b, c = p["A"]["bench"], p["B"]["bench"], p["C"]["bench"]
+    assert (a["median"], a["cp_floor"], a["cp_ceil"], a["pct"]) == (200.0, 225_000, 250_000, 50)
+    assert (b["median"], b["cp_floor"], b["pct"]) == (100.0, None, 100)
+    assert (c["median"], c["pct"]) == (100.0, 50)
+    cell = stat_cell("Ranger", 0, 0, 100.0)
+    assert [bench_pct(x, cell) for x in (10, 20, 90, 110, 130, 170, 250)] == [0, 0, 37, 62, 82, 95, 100]
