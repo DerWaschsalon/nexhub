@@ -36,7 +36,7 @@ from pydantic import Field, field_validator
 from . import __version__
 from .config import _Strict
 from .report import run_report
-from .run_image import run_image
+from .run_image import Parses, render_run, run_image
 from .run_model import Run, dungeon_parts_en
 
 log = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ CHECK_EVERY_S = 600  # Gerät noch gültig? So oft, solange das Modul an ist
 MIN_POLL_S = 1.0  # schneller fragt der Daemon nie nach, egal was der Hub sagt
 UPLOAD_TIMEOUT_S = 120
 OUTBOX_MAX_BYTES = 500 * 1024 * 1024  # darüber fliegen die ältesten Runs raus
+REPORT_RUNS_MAX = 5  # Runs im Speicher, deren Bild nach dem Upload mit Parses neu gemalt wird
 LOOT_GRACE_MS = 60_000  # die Beute des Endbosses steht erst nach seinem Tod zum Würfeln
 NEXLOG, REPORT = ".nexlog.gz", ".report.json"  # Dateien im Postausgang: <Start>-<Dungeon> + Endung
 RETRY_S = (60, 300, 900, 1800)  # Wartezeiten nach einem Fehlschlag, dann bleibt es bei der letzten
@@ -158,6 +159,7 @@ class Hub:
         self.last_upload: dict | None = None  # {ok, text, at, url}
         self._wake = asyncio.Event()
         self._failures = 0
+        self._report_runs: dict[str, Run] = {}  # Name im Postausgang -> Run, für das Bild mit Parses
         # setzt app.py: wo die Kampfdateien liegen, in welcher Sprache, welcher Mitschnitt
         self.history_dir: Callable[[], Path] = lambda: Path()
         self.language: Callable[[], str] = lambda: "en"
@@ -349,6 +351,9 @@ class Hub:
         if self.settings.discord:
             report = run_report(run, await run_image(run)).model_dump_json()
             await asyncio.to_thread(self._enqueue_report, name, report)
+            self._report_runs[name] = run  # nach dem Upload kommt das Bild mit Parses (send_report)
+            while len(self._report_runs) > REPORT_RUNS_MAX:
+                self._report_runs.pop(next(iter(self._report_runs)))
         await asyncio.to_thread(self._enqueue, f"{name}{NEXLOG}", data)
         log.info("NexHub: Run %s in den Postausgang (%d KB)", run.name, len(data) // 1024)
         self._failures = 0
@@ -383,10 +388,17 @@ class Hub:
 
     async def send_report(self, nexlog: Path, run_id: int) -> None:
         """Run-Bericht zum gerade hochgeladenen NexLog an den Hub (der leitet ihn an den Bot weiter)."""
-        path = nexlog.with_name(nexlog.name.removesuffix(NEXLOG) + REPORT)
+        name = nexlog.name.removesuffix(NEXLOG)
+        path = nexlog.with_name(name + REPORT)
+        run = self._report_runs.pop(name, None)
         if not path.exists():
             return
         body = await asyncio.to_thread(path.read_text)
+        if run is not None:  # nach einem Neustart fehlt der Run: dann das Bild ohne Parses
+            parses = await self.run_parses(run_id)
+            if parses:
+                image = await asyncio.to_thread(render_run, run, parses)
+                body = run_report(run, image).model_dump_json()
         headers = {"Authorization": f"Bearer {self.settings.token}", "Content-Type": "application/json",
                    REQUEST_ID_HEADER: request_id.get()}
         try:
@@ -397,6 +409,30 @@ class Hub:
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             log.warning("NexHub: Run-Bericht nicht angekommen, kein Discord-Post: %s", e)
         path.unlink(missing_ok=True)
+
+    async def run_parses(self, run_id: int) -> Parses:
+        """Parses des hochgeladenen Runs je Boss und Spieler (Hub: /api/parses/device/runs). Leer, wenn der Hub
+        sie nicht kennt (älterer Hub, Modul aus) oder keine Zahl dabei ist: dann bleibt das Bild ohne."""
+        try:
+            status, body = await self._call("GET", f"/api/parses/device/runs/{run_id}", auth=True)
+        except HubError as e:
+            log.info("NexHub: Parses nicht geholt: %s", e)
+            return {}
+        if status != 200 or not isinstance(body.get("bosses"), dict):
+            return {}
+        parses: Parses = {}
+        for mob, players in body["bosses"].items():
+            if not (str(mob).isdigit() and isinstance(players, dict)):
+                continue
+            for player, p in players.items():
+                if not isinstance(p, dict):
+                    continue
+                eu, guild = p.get("eu"), p.get("guild")
+                eu = eu if isinstance(eu, int) else None
+                guild = guild if isinstance(guild, int) else None
+                if eu is not None or guild is not None:
+                    parses.setdefault(int(mob), {})[str(player)] = (eu, guild)
+        return parses
 
     def _note(self, ok: bool, text: str, url: str | None = None) -> None:
         self.last_upload = {"ok": ok, "text": text, "at": int(time.time()), "url": url}

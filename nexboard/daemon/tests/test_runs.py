@@ -110,6 +110,31 @@ def test_render_webp():
     assert img[:4] == b"RIFF" and img[8:12] == b"WEBP" and len(img) > 5000
 
 
+def test_render_mit_parses():
+    """Parses stehen nur in den Zeilen getöteter Bosse, Farben wie im Hub."""
+    from deckbar_daemon.run_image import parse_color
+
+    tr = RunTracker(idle_ms=60_000)
+    for i in range(2):
+        tr.add(F(i + 1, i * 100))
+    [run] = tr.check_idle(T0 + 10**7)
+    names = [p.name for p in run.bosses()[0].players.values()]
+    img = render_run(run, {1: {names[0]: (99, 100), names[1]: (None, 12)}})
+    assert img[:4] == b"RIFF" and img != render_run(run)
+    assert parse_color(100) == (212, 180, 90) and parse_color(99) == (226, 104, 168)
+    assert parse_color(50) == (61, 134, 240) and parse_color(0) == (154, 160, 166)
+
+
+def test_parse_ohne_platz_nur_eu_oder_nichts():
+    from deckbar_daemon.run_image import _draw_parse, _Layers
+
+    L = _Layers((800, 60))
+    breit = 700 - _draw_parse(L, 700, 30, 0, (87, 60))
+    nur_eu = 700 - _draw_parse(L, 700, 30, 700 - breit + 1, (87, 60))
+    assert 0 < nur_eu < breit
+    assert _draw_parse(L, 700, 30, 699, (87, 60)) == 700
+
+
 def test_settings_validation():
     RunSettings(webhook="https://discord.com/api/webhooks/123/abc-DEF_9")
     with pytest.raises(ValidationError):

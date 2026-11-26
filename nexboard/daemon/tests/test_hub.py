@@ -1,5 +1,6 @@
 """NexHub-Anbindung gegen einen nachgebauten Hub (gleiche Endpunkte wie hub/api, routes/devices.py)."""
 import asyncio
+import base64
 
 import pytest
 from aiohttp import web
@@ -175,8 +176,9 @@ from deckbar_daemon.run_model import Run, parse_fight  # noqa: E402
 from test_runs import DUNGEON, fight  # noqa: E402
 
 
-async def fake_runs_hub(*statuses):
-    """Nimmt Runs an (POST /api/runs) und antwortet der Reihe nach mit `statuses` (danach 201)."""
+async def fake_runs_hub(*statuses, parses: dict | None = None):
+    """Nimmt Runs an (POST /api/runs) und antwortet der Reihe nach mit `statuses` (danach 201). Mit `parses`
+    kennt er auch GET /api/parses/device/runs/{id}, sonst 404 wie ein Hub ohne Parses."""
     got, answers = [], list(statuses)
 
     async def runs(request):
@@ -191,9 +193,15 @@ async def fake_runs_hub(*statuses):
         got.append(("report", int(request.match_info["run_id"]), await request.json()))
         return web.json_response({"forwarded": True}, status=202)
 
+    async def run_parses(request):
+        got.append(("parses", int(request.match_info["run_id"]), request.headers.get("Authorization")))
+        return web.json_response(parses)
+
     app = web.Application()
     app.router.add_post("/api/runs", runs)
     app.router.add_post("/api/runs/{run_id}/report", report)
+    if parses is not None:
+        app.router.add_get("/api/parses/device/runs/{run_id}", run_parses)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "127.0.0.1", 0)
@@ -354,6 +362,57 @@ async def test_run_bericht_geht_nach_dem_upload_an_den_hub(tmp_path, monkeypatch
         kind, run_id, report = got[1]
         assert (kind, run_id) == ("report", 1) and report["dungeon_id"] == DUNGEON and report["image_webp"]
         assert list((tmp_path / "outbox").iterdir()) == []  # beides weg
+    finally:
+        await runner.cleanup()
+        await hub.close()
+
+
+async def test_run_bild_bekommt_nach_dem_upload_die_parses(tmp_path, monkeypatch):
+    """Nach dem Upload holt das NexBoard die Parses des Runs und malt das Bild für Discord damit neu."""
+    from deckbar_daemon import hub as hub_mod
+    from deckbar_daemon import run_image as runs_mod
+
+    monkeypatch.setattr(runs_mod, "render_run", lambda r: b"RIFF\0\0\0\0WEBPohne")
+    rendered = []
+    monkeypatch.setattr(hub_mod, "render_run",
+                        lambda r, parses: rendered.append(parses) or b"RIFF\0\0\0\0WEBPmit")
+    answer = {"bosses": {"2400011": {"Morgan": {"eu": 87, "guild": None}, "Gamunex": {"eu": None, "guild": None}},
+                         "kaputt": {"X": {"eu": 1}}, "2400012": {"Gamunex": "falsch"}}}
+    runner, url, got = await fake_runs_hub(parses=answer)
+    hub = uploading_hub(tmp_path, url)
+    hub.save(hub.settings.model_copy(update={"discord": True}))
+    run, hist = history_run(tmp_path)
+    hub.history_dir = lambda: hist
+    try:
+        await hub.publish(run)
+        await hub.flush_outbox()
+        assert got[1][0] == "parses" and got[1][1] == 1 and got[1][2].startswith("Bearer ")
+        assert rendered == [{2400011: {"Morgan": (87, None)}}]  # nur Zahlen, Unsinn fliegt raus
+        kind, _, report = got[2]
+        assert kind == "report" and base64.b64decode(report["image_webp"]).endswith(b"WEBPmit")
+        assert hub._report_runs == {}
+    finally:
+        await runner.cleanup()
+        await hub.close()
+
+
+async def test_ohne_parses_bleibt_das_erste_bild(tmp_path, monkeypatch):
+    """Hub ohne Parses (404) oder nach einem Neustart (Run nicht mehr im Speicher): Bild wie vorher."""
+    from deckbar_daemon import hub as hub_mod
+    from deckbar_daemon import run_image as runs_mod
+
+    monkeypatch.setattr(runs_mod, "render_run", lambda r: b"RIFF\0\0\0\0WEBPohne")
+    monkeypatch.setattr(hub_mod, "render_run", lambda r, parses: pytest.fail("ohne Parses nicht neu malen"))
+    runner, url, got = await fake_runs_hub()
+    hub = uploading_hub(tmp_path, url)
+    hub.save(hub.settings.model_copy(update={"discord": True}))
+    run, hist = history_run(tmp_path)
+    hub.history_dir = lambda: hist
+    try:
+        await hub.publish(run)
+        await hub.flush_outbox()
+        kind, _, report = got[1]
+        assert kind == "report" and base64.b64decode(report["image_webp"]).endswith(b"WEBPohne")
     finally:
         await runner.cleanup()
         await hub.close()
