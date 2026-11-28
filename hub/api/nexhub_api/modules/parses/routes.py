@@ -3,6 +3,7 @@
     GET /api/parses/runs/{run_id}            mit Login
     GET /api/public/parses/shared/{token}    geteilter Run (/r/<token>), ohne Login
     GET /api/parses/device/runs/{run_id}     eigener Run des gekoppelten NexBoards, für das Run-Bild in Discord
+    POST /api/parses/device/fight            ein eben getöteter Boss (mob, Spieler), für die Plakette im DPS-Meter
     GET /api/parses/top?since_ms=            bester EU-Parse je Gildenmitglied seit since_ms (Startseite)
     GET /api/parses/hall                     Bestenliste ab Lila über alle Runs
 
@@ -173,8 +174,9 @@ async def _guild(request: Request, db: DB) -> Guild:
     return cached[1]
 
 
-async def _combat_power(db: DB, run: Run, names: set[str]) -> dict[str, int]:
-    """Kampfkraft je Spieler: aus der Momentaufnahme dieses Runs, sonst (noch nicht geladen) die jüngste bekannte."""
+async def _combat_power(db: DB, run: Run | None, names: set[str]) -> dict[str, int]:
+    """Kampfkraft je Spieler: aus der Momentaufnahme dieses Runs, sonst (noch nicht geladen, oder ohne Run direkt nach
+    dem Kill) die jüngste bekannte."""
     rows = await db.execute(select(RunCharacter.name, RunCharacter.combat_power, RunCharacter.run_id).where(
         RunCharacter.status == "ok", RunCharacter.combat_power.is_not(None), RunCharacter.name.in_(names))
         .order_by(RunCharacter.fetched_at))
@@ -182,7 +184,7 @@ async def _combat_power(db: DB, run: Run, names: set[str]) -> dict[str, int]:
     this_run: dict[str, int] = {}
     for name, cp, run_id in rows.all():
         latest[name] = cp
-        if run_id == run.id:
+        if run is not None and run_id == run.id:
             this_run[name] = cp
     return latest | this_run
 
@@ -199,10 +201,15 @@ def _eu(dps: float, cp: int | None, board: ParseBoard | None) -> dict:
     return {"eu": percentile(dps, board.dps), "eu_n": len(board.dps), "eu_at": at, "eu_cp": None, "eu_few": False}
 
 
-async def _parses(request: Request, db: DB, run: Run) -> RunParses:
-    killed = [b for b in run.summary.get("bosses", []) if b.get("killed")]
-    if not killed:
-        return RunParses(guild_min=GUILD_MIN, fights={})
+class _Inputs(NamedTuple):
+    """Was die Rechnung für eine Reihe getöteter Bosse aus der Datenbank braucht."""
+    boards: dict[tuple[int, str | None], ParseBoard]
+    guild: Guild
+    cps: dict[str, int]
+    benches: dict[int, list[dict]]
+
+
+async def _inputs(request: Request, db: DB, run: Run | None, killed: list[dict]) -> _Inputs:
     pairs = {(b["mob"], p.get("cls")) for b in killed for p in b.get("players", [])}
     boards = {(b.boss, b.cls): b for b in (await db.scalars(select(ParseBoard).where(
         ParseBoard.region == REGION, ParseBoard.boss.in_({m for m, _ in pairs}),
@@ -211,21 +218,35 @@ async def _parses(request: Request, db: DB, run: Run) -> RunParses:
     cps = await _combat_power(db, run, {p["name"] for b in killed for p in b.get("players", [])})
     benches = {b.boss: b.cells for b in (await db.scalars(select(ParseBenchmark).where(
         ParseBenchmark.boss.in_({b["mob"] for b in killed})))).all()}
+    return _Inputs(boards, guild, cps, benches)
+
+
+def _boss_parses(mob: int, players: list[dict], src: _Inputs) -> dict[str, Parse]:
+    """Parses je Name für einen getöteten Boss; derselbe Name doppelt (Relog): der stärkere Eintrag."""
+    best: dict[str, dict] = {}
+    for p in players:
+        if p["name"] not in best or p["dps"] > best[p["name"]]["dps"]:
+            best[p["name"]] = p
+    out: dict[str, Parse] = {}
+    for name, p in best.items():
+        board = src.boards.get((mob, p.get("cls")))
+        mates = src.guild.bests.get((mob, p.get("cls")), [])
+        member = name in src.guild.members
+        out[name] = Parse(**_eu(p["dps"], src.cps.get(name), board),
+                          guild=percentile(p["dps"], mates) if member and len(mates) >= GUILD_MIN else None,
+                          guild_n=len(mates), member=member,
+                          bench=_bench(src.benches.get(mob, []), p.get("cls"), src.cps.get(name), p["dps"]))
+    return out
+
+
+async def _parses(request: Request, db: DB, run: Run) -> RunParses:
+    killed = [b for b in run.summary.get("bosses", []) if b.get("killed")]
+    if not killed:
+        return RunParses(guild_min=GUILD_MIN, fights={})
+    src = await _inputs(request, db, run, killed)
     fights: dict[str, dict[str, Parse]] = {}
     for b in killed:
-        best: dict[str, dict] = {}  # derselbe Name doppelt (Relog): der stärkere Eintrag
-        for p in b.get("players", []):
-            if p["name"] not in best or p["dps"] > best[p["name"]]["dps"]:
-                best[p["name"]] = p
-        out = fights.setdefault(b["fight"], {})
-        for name, p in best.items():
-            board = boards.get((b["mob"], p.get("cls")))
-            mates = guild.bests.get((b["mob"], p.get("cls")), [])
-            member = name in guild.members
-            out[name] = Parse(**_eu(p["dps"], cps.get(name), board),
-                              guild=percentile(p["dps"], mates) if member and len(mates) >= GUILD_MIN else None,
-                              guild_n=len(mates), member=member,
-                              bench=_bench(benches.get(b["mob"], []), p.get("cls"), cps.get(name), p["dps"]))
+        fights.setdefault(b["fight"], {}).update(_boss_parses(b["mob"], b.get("players", []), src))
     return RunParses(guild_min=GUILD_MIN, fights=fights)
 
 
@@ -249,6 +270,34 @@ async def device_run_parses(run_id: int, request: Request, device: CurrentDevice
     if run is None or run.user_id != device.user_id:
         raise HTTPException(404, "Run nicht gefunden")
     return _by_boss(run, await _parses(request, db, run))
+
+
+class FightPlayer(BaseModel):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=64)]
+    cls: str | None = None
+    dps: float = Field(ge=0)
+
+
+class FightIn(BaseModel):
+    mob: int
+    players: list[FightPlayer] = Field(max_length=24)
+
+
+class FightParses(BaseModel):
+    players: dict[str, BossParse]
+
+
+@router.post("/device/fight")
+async def device_fight_parses(body: FightIn, request: Request, device: CurrentDevice, db: DB) -> FightParses:
+    """Parses eines eben getöteten Bosses für die Plakette im DPS-Meter des NexBoards, noch bevor der Run hochgeladen
+    ist. Nur lesend; Kampfkraft aus der jüngsten Momentaufnahme."""
+    del device  # nur zur Anmeldung
+    players = [p.model_dump() for p in body.players]
+    if not players:
+        return FightParses(players={})
+    src = await _inputs(request, db, None, [{"mob": body.mob, "players": players}])
+    return FightParses(players={n: BossParse(eu=p.eu, guild=p.guild)
+                                for n, p in _boss_parses(body.mob, players, src).items()})
 
 
 class TopParse(BaseModel):
