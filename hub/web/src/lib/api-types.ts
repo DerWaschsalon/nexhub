@@ -229,6 +229,21 @@ export type FeedbackEntry = {
 	author: string | null;
 };
 
+export type FightIn = {
+	mob: number;
+	players: FightPlayer[];
+};
+
+export type FightParses = {
+	players: Record<string, BossParse>;
+};
+
+export type FightPlayer = {
+	name: string;
+	cls: string | null;
+	dps: number;
+};
+
 export type Forwarded = {
 	forwarded: boolean;
 };
