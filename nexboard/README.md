@@ -262,6 +262,9 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   und Kartenlogik kommen aus dem installierten Plugin Pet Soul Tracker.
 - **Boss-Warnungen** (Modul „AION 2 · Boss-Warnungen“): nur während einer Warnung.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
+- **Parse-Plakette** hinter jedem Namen im Meter, ein bis zwei Sekunden nach einem Boss-Kill: EU-Parse und bei
+  Gildenmitgliedern der Gildenwert, in den Farbstufen des Hubs (gekoppeltes NexBoard nötig, `POST
+  /api/parses/device/fight`). Verschwindet beim nächsten Kampfbeginn.
 
 PvP (Kills, Tode, Assists, Abyss-Punkte), Vertraute und Würfel zeigt das Overlay nicht selbst: dafür gibt es die
 A2Tools-Plugins PvP Tracker, Pet Soul Tracker und Dice Rolls (Im Spiel → Plugins) mit eigenen Fenstern und Widgets.

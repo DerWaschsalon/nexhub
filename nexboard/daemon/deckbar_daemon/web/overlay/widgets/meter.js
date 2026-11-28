@@ -1,9 +1,11 @@
 /* DPS-Meter: die Oberfläche des A2Tools-Meters als iframe (gleicher Ursprung). Ihr Shim (web/a2shim.js)
  * schickt Fenster-Befehle an die Seite; was davon das Widget selbst betrifft, beantwortet es hier:
  * Größe, Ziehen an Kopf- oder Fußzeile, Sperren, Bildschirmfoto. Dazu der Namenseffekt auf der eigenen
- * Zeile (effects.css), der nur im Kampf animiert. */
+ * Zeile (effects.css), der nur im Kampf animiert, und nach einem Boss-Kill die Parse-Plakette am Namen
+ * (parse-badge.js, Ereignis dps-parses). */
 import * as host from "../host.js";
 import * as layout from "../layout.js";
+import { markParses } from "../parse-badge.js";
 import { rectOf } from "../util.js";
 
 const BLANK = "about:blank";
@@ -15,7 +17,7 @@ const NO_OPS = {
 };
 
 export default {
-  events: ["dps"],
+  events: ["dps", "dps-parses"],
   click: true,
   defaultPos: () => [48, Math.max(40, innerHeight - 380)],
 
@@ -29,6 +31,7 @@ export default {
     let cardOpen = false; // Karte (Popup) im Meter offen: dann nimmt auch gesperrt das ganze Meter Klicks an
     let lastDown = null; // letzter Mausdruck im Meter, in Seitenkoordinaten
     let effectsCss = null;
+    let parses = null; // Parses des letzten Kills je Name ({name: [eu, guild]}), bis zum nächsten Kampf
 
     const scale = () => ctx.cfg().scale || 1;
     /** Punkt im iframe → Punkt auf der Seite. */
@@ -58,18 +61,28 @@ export default {
       const doc = frame.contentDocument;
       if (!doc?.head || !layout.current()) return;
       if (!doc.getElementById("deckbar-fx")) {
-        effectsCss ??= await (await fetch("effects.css")).text();
+        effectsCss ??= (await Promise.all(["effects.css", "parses.css"].map(async (f) => (await fetch(f)).text())))
+          .join("\n");
         const style = doc.createElement("style");
         style.id = "deckbar-fx";
         style.textContent = effectsCss;
         doc.head.append(style);
-        // Nur die Zeilenliste: das Meter hängt Zeilen ein und schaltet isUser an ihnen um
+        // Nur die Zeilenliste: das Meter hängt Zeilen ein, schaltet isUser an ihnen um und tauscht Namen
         const rows = doc.querySelector(".list:not(.barPreviewList)") || doc.documentElement;
-        new MutationObserver(() => markOwnRow(doc)).observe(rows,
-          { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+        new MutationObserver(() => {
+          markOwnRow(doc);
+          markParses(doc, parses);
+        }).observe(rows, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
       }
       markOwnRow(doc);
+      markParses(doc, parses);
       fxIdle();
+    }
+
+    function showParses(players) {
+      parses = players || null;
+      const doc = frame.contentDocument;
+      if (doc?.body) markParses(doc, parses);
     }
 
     /** Effekt nur im Kampf animieren (außerhalb steht er still und kostet nichts). */
@@ -164,8 +177,14 @@ export default {
     });
 
     return {
-      onEvent(_, data) {
+      onEvent(name, data) {
+        if (name === "dps-parses") {
+          showParses(data?.players);
+          return;
+        }
+        const started = !fighting && !!data.dps_active;
         fighting = !!data.dps_active;
+        if (started) showParses(null); // neuer Kampf: die Plakette des letzten Kills gilt nicht mehr
         fxIdle();
       },
       onLayout() {
