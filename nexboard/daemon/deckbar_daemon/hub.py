@@ -37,7 +37,7 @@ from . import __version__
 from .config import _Strict
 from .report import run_report
 from .run_image import Parses, render_run, run_image
-from .run_model import Run, dungeon_parts_en
+from .run_model import Fight, Run, dungeon_parts_en
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +50,8 @@ MIN_POLL_S = 1.0  # schneller fragt der Daemon nie nach, egal was der Hub sagt
 UPLOAD_TIMEOUT_S = 120
 OUTBOX_MAX_BYTES = 500 * 1024 * 1024  # darüber fliegen die ältesten Runs raus
 REPORT_RUNS_MAX = 5  # Runs im Speicher, deren Bild nach dem Upload mit Parses neu gemalt wird
+KILL_PARSES_TIMEOUT_S = 3  # Parses direkt nach dem Kill: später passt die Plakette nicht mehr zum Meter
+KILL_PARSES_MAX = 24  # Spieler je Kill, so viele nimmt der Hub an
 LOOT_GRACE_MS = 60_000  # die Beute des Endbosses steht erst nach seinem Tod zum Würfeln
 NEXLOG, REPORT = ".nexlog.gz", ".report.json"  # Dateien im Postausgang: <Start>-<Dungeon> + Endung
 RETRY_S = (60, 300, 900, 1800)  # Wartezeiten nach einem Fehlschlag, dann bleibt es bei der letzten
@@ -433,6 +435,34 @@ class Hub:
                 if eu is not None or guild is not None:
                     parses.setdefault(int(mob), {})[str(player)] = (eu, guild)
         return parses
+
+    async def fight_parses(self, fight: Fight) -> dict[str, tuple[int | None, int | None]]:
+        """Parses eines eben getöteten Bosses je Name (Hub: POST /api/parses/device/fight), für die Plakette im
+        DPS-Meter. Leer, wenn nicht gekoppelt, der Hub die Route nicht kennt, zu lange braucht oder Unsinn schickt."""
+        if not (self.enabled and self.settings.token and fight.players):
+            return {}
+        seconds = max(fight.duration_ms, 1) / 1000
+        players = sorted(({"name": p.name, "cls": p.cls, "dps": p.dmg / seconds} for p in fight.players),
+                         key=lambda p: -p["dps"])[:KILL_PARSES_MAX]
+        try:
+            status, body = await asyncio.wait_for(
+                self._call("POST", "/api/parses/device/fight", auth=True, json={"mob": fight.mob, "players": players}),
+                KILL_PARSES_TIMEOUT_S)
+        except (HubError, TimeoutError) as e:
+            log.info("NexHub: Parses zum Kill nicht geholt: %s", e or "Zeitlimit")
+            return {}
+        if status != 200 or not isinstance(body.get("players"), dict):
+            return {}
+        out: dict[str, tuple[int | None, int | None]] = {}
+        for name, p in body["players"].items():
+            if not isinstance(p, dict):
+                continue
+            eu, guild = p.get("eu"), p.get("guild")
+            eu = eu if isinstance(eu, int) else None
+            guild = guild if isinstance(guild, int) else None
+            if eu is not None or guild is not None:
+                out[str(name)] = (eu, guild)
+        return out
 
     def _note(self, ok: bool, text: str, url: str | None = None) -> None:
         self.last_upload = {"ok": ok, "text": text, "at": int(time.time()), "url": url}

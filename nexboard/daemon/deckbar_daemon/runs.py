@@ -30,6 +30,7 @@ import logging
 import os
 import re
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Awaitable, Callable
 
@@ -127,6 +128,9 @@ class DungeonRuns:
         # Wohin ein beendeter Run mit besiegtem Boss geht (Discord-Webhook, NexHub), Namen schon aufgelöst.
         # Die Runs kennen ihre Wege nicht: app.py hängt sie ein.
         self.publishers: list[RunPublisher] = []
+        # Gleich nach jedem getöteten Boss, einmal je Kampf, Namen schon aufgelöst (Parse-Plakette im Meter, hub.py)
+        self.kill_listeners: list[Callable[[Fight], Awaitable[None]]] = []
+        self._kills_sent: set[str] = set()
         self._ready = False
         # Wo die History liegt, hängt an der DPS-Quelle (app.py setzt das)
         self.history_dir: Callable[[], Path] = lambda: a2tools_dir() / "history"
@@ -362,6 +366,9 @@ class DungeonRuns:
                      fmt_time(f.duration_ms), "besiegt" if f.killed else "läuft/nicht besiegt")
             if f.id in self.done or self._update_pending(f):
                 continue
+            if f.killed and f.id not in self._kills_sent:
+                self._kills_sent.add(f.id)
+                await self._notify_kill(f)
             closed += self.tracker.add(f)
         closed += self.tracker.check_idle(int(time.time() * 1000))
         now = time.monotonic()
@@ -408,6 +415,17 @@ class DungeonRuns:
         runs += tracker.check_idle(int(time.time() * 1000))  # der laufende Run zählt noch nicht
         runs = [r for r in runs if r.kills]
         return runs[-1] if runs else None
+
+    async def _notify_kill(self, f: Fight) -> None:
+        """Getöteter Boss an die kill_listeners, maskierte Namen durch bekannte volle ersetzt. Ein Fehler eines
+        Listeners hält das Einlesen nicht auf."""
+        names = self.names()
+        named = replace(f, players=[replace(p, name=names.get(p.key, p.name)) for p in f.players])
+        for fn in self.kill_listeners:
+            try:
+                await fn(named)
+            except Exception:  # ein Weg darf die Runs nicht anhalten
+                log.exception("Kill-Meldung an %s fehlgeschlagen", fn)
 
     async def _notify(self) -> None:
         for fn in self.listeners:
