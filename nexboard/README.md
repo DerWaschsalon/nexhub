@@ -262,7 +262,7 @@ den Spielmonitor, Ebene „overlay“, also über dem Vollbildspiel. Darin liege
   und Kartenlogik kommen aus dem installierten Plugin Pet Soul Tracker.
 - **Boss-Warnungen** (Modul „AION 2 · Boss-Warnungen“): nur während einer Warnung.
 - **Namenseffekt** auf dem eigenen Namen in der Meter-Zeile: Glanz, Brennen, Gold, Frost, Holo, Leere.
-- **Parse-Plakette** hinter jedem Namen im Meter, ein bis zwei Sekunden nach einem Boss-Kill: EU-Parse und bei
+- **Parse-Plakette** hinter jedem Namen im Meter, wenige Sekunden nach einem Boss-Kill (sobald die Kampfdatei ruht): EU-Parse und bei
   Gildenmitgliedern der Gildenwert, in den Farbstufen des Hubs (gekoppeltes NexBoard nötig, `POST
   /api/parses/device/fight`). Verschwindet beim nächsten Kampfbeginn.
 
