@@ -494,3 +494,63 @@ async def test_hub_meldet_veraltetes_nexboard(tmp_path):
     finally:
         await hub.close()
         await runner.cleanup()
+
+
+async def fake_fight_hub(answer=None, status: int = 200, delay: float = 0):
+    """Kennt POST /api/parses/device/fight; schreibt mit, was ankommt."""
+    got = []
+
+    async def fight_parses(request):
+        got.append((await request.json(), request.headers.get("Authorization")))
+        await asyncio.sleep(delay)
+        return web.json_response(answer or {}, status=status)
+
+    app = web.Application()
+    app.router.add_post("/api/parses/device/fight", fight_parses)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    return runner, f"http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}", got
+
+
+def killed_fight():
+    from deckbar_daemon.run_model import parse_fight
+    f = parse_fight(fight(2400011, 0, dur_s=60))
+    f.players[0].name = "Morgan"
+    return f
+
+
+async def test_parses_nach_einem_kill(tmp_path):
+    runner, url, got = await fake_fight_hub({"players": {"Morgan": {"eu": 87, "guild": 60}, "X": "kaputt",
+                                                         "Gamunex": {"eu": None, "guild": None}}})
+    hub = uploading_hub(tmp_path, url)
+    try:
+        assert await hub.fight_parses(killed_fight()) == {"Morgan": (87, 60)}
+        body, auth = got[0]
+        assert body["mob"] == 2400011 and auth == "Bearer geraete-token"
+        assert {p["name"] for p in body["players"]} == {"Morgan", "Gamunex"}
+        assert all(p["dps"] > 0 for p in body["players"])
+    finally:
+        await runner.cleanup()
+        await hub.close()
+
+
+async def test_kill_parses_ohne_hub_leer(tmp_path, monkeypatch):
+    runner, url, got = await fake_fight_hub(status=404)
+    hub = uploading_hub(tmp_path, url)
+    try:
+        assert await hub.fight_parses(killed_fight()) == {}           # älterer Hub ohne Route
+        hub.save(hub.settings.model_copy(update={"token": ""}))
+        assert await hub.fight_parses(killed_fight()) == {} and len(got) == 1  # nicht gekoppelt: kein Aufruf
+    finally:
+        await runner.cleanup()
+        await hub.close()
+    monkeypatch.setattr(hubmod, "KILL_PARSES_TIMEOUT_S", 0.2)
+    runner, url, got = await fake_fight_hub({"players": {}}, delay=1)
+    hub = uploading_hub(tmp_path, url)
+    try:
+        assert await hub.fight_parses(killed_fight()) == {}           # Hub hängt: nach dem Zeitlimit leer
+    finally:
+        await runner.cleanup()
+        await hub.close()

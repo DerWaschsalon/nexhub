@@ -420,3 +420,39 @@ async def test_webhook_weg_postet_nur_eingeschaltet(tmp_path, monkeypatch):
     settings = RunSettings(enabled=True, webhook="https://discord.com/api/webhooks/1/x")
     await publisher.publish(run)
     assert sent == [("https://discord.com/api/webhooks/1/x", b"bild")] and publisher.result.startswith("gepostet")
+
+
+async def test_kill_meldet_sich_einmal_mit_vollen_namen(tmp_path, monkeypatch):
+    """Getöteter Bosskampf → kill_listeners genau einmal, maskierte Namen schon aufgelöst; nicht getötet oder schon
+    erledigt → nichts."""
+    hist = tmp_path / "a2t" / "history"
+    hist.mkdir(parents=True)
+    monkeypatch.setattr(runs_mod, "a2tools_dir", lambda: tmp_path / "a2t")
+    monkeypatch.setattr(runs_mod, "SETTLE_S", 0)
+    runs = DungeonRuns(tmp_path / "cfg")
+    runs.save(RunSettings(enabled=True, webhook="https://discord.com/api/webhooks/1/x"))
+    kills = []
+
+    async def on_kill(f):
+        kills.append(f)
+
+    runs.kill_listeners.append(on_kill)
+    runs.last_ms = 0
+    await runs.start()
+    runs.learned = {char_key("Morgan", "ranger"): "Morgan"}
+    base = (int(time.time()) * 1000 - T0) // 1000 - 300
+
+    def write(f):
+        path = hist / f"{f['id']}.json"
+        path.write_text(json.dumps(f))
+        t = time.time() - 10
+        os.utime(path, (t, t))
+
+    write(fight(1, base))                          # getötet
+    write(fight(2, base + 100, dmg=(100, 100)))    # nicht getötet
+    await runs.poll()
+    write(fight(1, base))                          # dieselbe Datei noch einmal gelesen
+    runs._dirty = True
+    await runs.poll()
+    assert [f.mob for f in kills] == [1]
+    assert [p.name for p in kills[0].players] == ["Morgan", "Gamunex"]

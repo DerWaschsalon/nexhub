@@ -1,0 +1,31 @@
+/* Parse-Plakette hinter dem Namen im A2Tools-Meter (parse-badge.js). Kleine Kapsel mit 1-px-Rand in der Farbe der
+   Stufe, Zahl fett, Gildenwert klein dahinter. Farben wie run_image.PARSE_TIERS. */
+.dbx-parse {
+  --c: #9aa0a6;
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-left: 5px;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, var(--c) 70%, transparent);
+  border-radius: 6px;
+  background: rgba(8, 10, 16, .7);
+  color: var(--c);
+  font: 700 11px/1.45 Inter, "Noto Sans", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px #000;
+  white-space: nowrap;
+  animation: dbx-parse-in .35s ease-out;
+}
+.dbx-parse small { font-size: 9px; font-weight: 600; opacity: .8; }
+.dbx-tier-gold { --c: #d4b45a; }
+.dbx-tier-pink { --c: #e268a8; }
+.dbx-tier-orange { --c: #ff8000; }
+.dbx-tier-purple { --c: #a750ee; }
+.dbx-tier-blue { --c: #3d86f0; }
+.dbx-tier-green { --c: #2fbf3a; }
+.dbx-tier-gray { --c: #9aa0a6; }
+.dbx-tier-gold, .dbx-tier-pink, .dbx-tier-orange { box-shadow: 0 0 6px color-mix(in srgb, var(--c) 55%, transparent); }
+@keyframes dbx-parse-in { from { opacity: 0; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .dbx-parse { animation: none; } }

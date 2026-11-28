@@ -314,3 +314,15 @@ async def test_kurzbefehle_oeffnen_nur_mit_systemeinstellungen(tmp_path, monkeyp
     monkeypatch.setattr(module.shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError, match="kcmshell6"):
         await o.open_shortcuts()
+
+
+async def test_parses_zum_kill_bleiben_bis_zum_naechsten_kampf(tmp_path):
+    """Die Plakette steht auch auf einer später geöffneten Seite, aber nie über einem neuen Kampf."""
+    o = overlay(tmp_path)
+    parses = {"fight": "f1", "players": {"Morgan": [87, 60]}}
+    await o.publish("dps-parses", parses)
+    assert o.retained["dps-parses"] == parses
+    await o.on_state({"dps_active": False})
+    assert o.retained["dps-parses"] == parses
+    await o.on_state({"dps_active": True})
+    assert o.retained["dps-parses"] is None

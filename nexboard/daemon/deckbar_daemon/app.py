@@ -49,7 +49,7 @@ from .overlay import UNIT as OVERLAY_UNIT
 from .overlay import Overlay
 from .proc import have
 from .radar import Radar
-from .run_model import a2tools_dir
+from .run_model import Fight, a2tools_dir
 from .run_webhook import WebhookPublisher
 from .runs import SETTINGS_FILE as runs_settings_file
 from .runs import DungeonRuns
@@ -134,6 +134,7 @@ class NexBoard:
         self.dps.combat.fight_listeners.append(self.hub.on_fight)
         self.webhook = WebhookPublisher(lambda: self.runs.settings)
         self.runs.publishers += [self.webhook, self.hub]  # erst das Bild nach Discord, dann der NexHub
+        self.runs.kill_listeners.append(self._kill_parses)
         self.overlay = Overlay(c, manage_unit=self.real_config)
         self.overlay.game_check = self._game_running
         self.overlay.page_port = self.overlay_port
@@ -203,6 +204,13 @@ class NexBoard:
         if self.modules.on("aion2.dps") and self.dps.settings.source == "capture" and game is not None:
             return game
         return await asyncio.to_thread(aion2_running)
+
+    async def _kill_parses(self, fight: Fight) -> None:
+        """Getöteter Boss: Parses vom Hub holen und als Plakette ins DPS-Meter (Widget meter.js)."""
+        parses = await self.hub.fight_parses(fight)
+        if parses:
+            await self.overlay.publish("dps-parses", {"fight": fight.id,
+                                                      "players": {n: list(v) for n, v in parses.items()}})
 
     async def _publish_radar(self, stand: dict[str, Any]) -> None:
         """Stand des Radars an seine Widgets. Ist die Karte im Spiel offen, verschwindet das ganze Overlay."""

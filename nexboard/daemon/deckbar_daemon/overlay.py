@@ -42,7 +42,7 @@ UNIT_POLL_S = 30   # Dienststatus fürs Dashboard auffrischen (nur mit Spiel ode
 COMMANDS = ("toggle", "show", "hide", "edit", "lock", "click", "reload", "details", "history", "settings",
             "autohide-on", "autohide-off")
 # Ereignisse, deren letzter Stand eine neu verbundene Overlay-Seite sofort bekommt
-RETAINED = ("dps", "schedule", "veil", "plugin-widgets")
+RETAINED = ("dps", "dps-parses", "schedule", "veil", "plugin-widgets")
 
 
 def launcher_path() -> Path:
@@ -192,6 +192,8 @@ class Overlay:
         part = {k: diff[k] for k in ("dps", "dps_active") if k in diff}
         if part:  # immer der ganze Stand: ein später eingeblendetes Widget bekommt ihn so in einem Stück
             await self.publish("dps", {**self.retained["dps"], **part})
+        if diff.get("dps_active") and self.retained.get("dps-parses"):
+            await self.publish("dps-parses", None)  # neuer Kampf: die Parses des letzten Kills gelten nicht mehr
 
     async def on_schedule(self, entries: list[dict[str, Any]]) -> None:
         await self.publish("schedule", entries)

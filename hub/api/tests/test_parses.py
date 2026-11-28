@@ -468,3 +468,44 @@ def test_klassenstatistik_im_parse(fake, as_user, database_url, client):
     assert (c["median"], c["pct"]) == (100.0, 50)
     cell = stat_cell("Ranger", 0, 0, 100.0)
     assert [bench_pct(x, cell) for x in (10, 20, 90, 110, 130, 170, 250)] == [0, 0, 37, 62, 82, 95, 100]
+
+
+def test_parse_fuer_einen_kill_des_nexboards(client, as_user, database_url):
+    """Direkt nach dem Kill, noch ohne Run: Parses je Name, bei Relog der stärkere Eintrag."""
+    from .test_devices import bearer, pair
+
+    token = pair(client, as_user(MEMBER))
+    add_board(database_url, 1, "ranger", [100, 200, 300, 400])
+    body = {"mob": 1, "players": [{"name": "A", "cls": "ranger", "dps": 150},
+                                  {"name": "A", "cls": "ranger", "dps": 350},   # Relog: der stärkere zählt
+                                  {"name": "B", "cls": None, "dps": 500},       # ohne Klasse: keine Rangliste
+                                  {"name": "C", "cls": "ranger", "dps": 0}]}
+    r = client.post("/api/parses/device/fight", json=body, headers=bearer(token))
+    assert r.status_code == 200, r.text
+    assert r.json() == {"players": {"A": {"eu": 75, "guild": None}, "B": {"eu": None, "guild": None},
+                                    "C": {"eu": 0, "guild": None}}}
+
+
+def test_kill_parse_braucht_geraet_und_grenzen(client, as_user, database_url):
+    from .test_devices import bearer, pair
+
+    token = pair(client, as_user(MEMBER))
+    assert client.post("/api/parses/device/fight", json={"mob": 1, "players": []}).status_code == 401
+    many = [{"name": f"P{i}", "cls": "ranger", "dps": 1} for i in range(25)]
+    assert client.post("/api/parses/device/fight", json={"mob": 1, "players": many},
+                       headers=bearer(token)).status_code == 422
+
+
+def test_kill_parse_nimmt_juengste_kampfkraft(client, as_user, database_url):
+    """Noch kein Run: EU im CP-Bereich der zuletzt bekannten Momentaufnahme."""
+    from .test_devices import bearer, pair
+
+    token = pair(client, as_user(MEMBER))
+    dps = [float(10 * i) for i in range(1, 31)]
+    cp = [200_000] * 10 + [245_000, 255_000] + [250_000] * 18
+    add_board(database_url, 1, "ranger", dps, cp)
+    old = new_run(database_url, summary(boss(1, [("A", "ranger", 5)])), legion=None)
+    add_snapshot(database_url, old, "A", 250_000)
+    r = client.post("/api/parses/device/fight", headers=bearer(token),
+                    json={"mob": 1, "players": [{"name": "A", "cls": "ranger", "dps": 200}]})
+    assert r.json() == {"players": {"A": {"eu": 50, "guild": None}}}
